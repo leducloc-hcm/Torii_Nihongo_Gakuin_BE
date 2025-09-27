@@ -14,17 +14,17 @@ datasource db {
 }
 
 model User {
-  id             Int          @id @default(autoincrement())
-  email          String       @unique
-  password       String
-  displayName    String
-  role           Role         @default(CUSTOMER)
-  status         VerifyStatus @default(UNVERIFIED)
-  avatarUrl      String?
-  bio            String?
-  organizationId Int?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  id          Int          @id @default(autoincrement())
+  email       String       @unique
+  password    String
+  name String
+  role        Role         @default(CUSTOMER)
+  status      VerifyStatus @default(UNVERIFIED)
+  bio         String?
+  totpSecret  String?      @db.VarChar(1000)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  deletedAt   DateTime?
 
   lecturerProfile LecturerProfile?
   staffProfile    StaffProfile?
@@ -96,6 +96,19 @@ model RefreshToken {
 
   @@index([expiresAt])
 }
+model VerificationCode {
+  id    Int                  @id @default(autoincrement())
+  email String               @db.VarChar(500)
+  code  String               @db.VarChar(50)
+  type  VerificationCodeType
+
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@unique([email, type])
+  @@index([expiresAt])
+}
+
 
 model LecturerProfile {
   id          Int       @id @default(autoincrement())
@@ -117,12 +130,12 @@ model LecturerProfile {
 }
 
 model Specialty {
-  id          Int               @id @default(autoincrement())
-  name        String
-  url         String?           @unique
-  description String?
-  createdAt   DateTime          @default(now()) @map("created_at")
-  updatedAt   DateTime          @updatedAt @map("updated_at")
+  id                  Int                 @id @default(autoincrement())
+  name                String
+  url                 String?             @unique
+  description         String?
+  createdAt           DateTime            @default(now()) @map("created_at")
+  updatedAt           DateTime            @updatedAt @map("updated_at")
   lecturerSpecialties LecturerSpecialty[]
 }
 
@@ -130,8 +143,8 @@ model LecturerSpecialty {
   lecturerId  Int
   specialtyId Int
 
-  lecturer    LecturerProfile @relation(fields: [lecturerId], references: [id])
-  specialty   Specialty       @relation(fields: [specialtyId], references: [id])
+  lecturer  LecturerProfile @relation(fields: [lecturerId], references: [id])
+  specialty Specialty       @relation(fields: [specialtyId], references: [id])
 
   @@id([lecturerId, specialtyId])
 }
@@ -421,15 +434,17 @@ model LiveSession {
 
   mediaAssets LiveSessionMedia[]
 }
+
 model LiveSessionMedia {
   liveSessionId Int
   mediaAssetId  Int
 
-  liveSession LiveSession  @relation(fields: [liveSessionId], references: [id], onDelete: Cascade)
-  mediaAsset  MediaAsset   @relation(fields: [mediaAssetId], references: [id], onDelete: Cascade)
+  liveSession LiveSession @relation(fields: [liveSessionId], references: [id], onDelete: Cascade)
+  mediaAsset  MediaAsset  @relation(fields: [mediaAssetId], references: [id], onDelete: Cascade)
 
   @@id([liveSessionId, mediaAssetId])
 }
+
 model Attendance {
   id        Int              @id @default(autoincrement())
   sessionId Int
@@ -858,7 +873,6 @@ model Blog {
   authorId Int       @map("author_id")
   author   User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
   tags     BlogTag[]
-
 }
 
 model Tag {
@@ -867,7 +881,6 @@ model Tag {
   description String?
   slug        String    @unique
   blogs       BlogTag[]
-
 }
 
 model BlogTag {
@@ -1058,4 +1071,10 @@ enum LessonStatus {
   PRIVATE
   PUBLISHED
   GLOBAL_PUBLIC
+}
+enum VerificationCodeType {
+  REGISTER
+  FORGOT_PASSWORD
+  LOGIN
+  DISABLE_2FA
 }
