@@ -1,0 +1,1061 @@
+// JLPT Learning Platform — Prisma Schema
+// Stack: NestJS + Prisma + PostgreSQL
+// Generated: 2025-09-27
+
+// ===== Generator & Datasource =====
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-1.1.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             Int          @id @default(autoincrement())
+  email          String       @unique
+  password       String
+  displayName    String
+  role           Role         @default(CUSTOMER)
+  status         VerifyStatus @default(UNVERIFIED)
+  avatarUrl      String?
+  bio            String?
+  organizationId Int?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  lecturerProfile LecturerProfile?
+  staffProfile    StaffProfile?
+
+  enrollments    Enrollment[]
+  notes          LessonNote[]
+  devices        Device[]
+  refreshTokens  RefreshToken[]
+  quizAttempts   QuizAttempt[]
+  examAttempts   ExamAttempt[]
+  testAttempts   TestAttempt[]
+  cardProgress   CardProgress[]
+  flashcardDecks FlashcardDeck[]
+  wrongTerms     WrongTerm[]
+
+  classMembers ClassMember[]
+  liveChats    LiveChatMessage[]
+  liveHands    RaiseHand[]
+  liveNotes    LiveNote[]
+  attendances  Attendance[]
+  spinPicks    SpinWheelEvent[]  @relation("SpinPickUser")
+
+  folders   Folder[]
+  resources Resource[] @relation("ResourceAuthor")
+  reactions Reaction[]
+  comments  Comment[]
+
+  points      PointsLedger[]
+  streak      Streak?
+  redemptions RewardRedemption[]
+  orders      Order[]
+  reviews     Review[]
+
+  affiliateCodes AffiliateCode[]
+  referrals      AffiliateReferral[] @relation("ReferralReferrer")
+
+  blogs Blog[]
+
+  aiThreads  AIThread[]
+  aiMessages AIChatMessage[]
+
+  Class Class[]
+
+  Course Course[]
+
+  ExamPaper ExamPaper[]
+}
+
+model Device {
+  id            Int            @id @default(autoincrement())
+  userId        Int
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  userAgent     String
+  ip            String
+  lastActive    DateTime       @updatedAt
+  createdAt     DateTime       @default(now())
+  isActive      Boolean        @default(true)
+  refreshTokens RefreshToken[]
+}
+
+model RefreshToken {
+  token     String   @unique @db.VarChar(1000)
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  deviceId  Int
+  device    Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+}
+
+model LecturerProfile {
+  id          Int       @id @default(autoincrement())
+  userId      Int       @unique
+  name        String?
+  bio         String?
+  location    String?
+  username    String?   @unique
+  avatar      String?
+  coverPhoto  String?   @map("cover_photo")
+  description String?
+  phoneNumber String?   @map("phone_number")
+  dateOfBirth DateTime? @map("date_of_birth")
+  website     String?
+  socialLinks String[]  @map("social_links")
+  user        User      @relation(fields: [userId], references: [id])
+
+  lecturerSpecialties LecturerSpecialty[]
+}
+
+model Specialty {
+  id          Int               @id @default(autoincrement())
+  name        String
+  url         String?           @unique
+  description String?
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+  lecturerSpecialties LecturerSpecialty[]
+}
+
+model LecturerSpecialty {
+  lecturerId  Int
+  specialtyId Int
+
+  lecturer    LecturerProfile @relation(fields: [lecturerId], references: [id])
+  specialty   Specialty       @relation(fields: [specialtyId], references: [id])
+
+  @@id([lecturerId, specialtyId])
+}
+
+model StaffProfile {
+  id          Int       @id @default(autoincrement())
+  userId      Int       @unique
+  name        String?
+  bio         String?
+  location    String?
+  username    String?   @unique
+  avatar      String?
+  coverPhoto  String?   @map("cover_photo")
+  description String?
+  phoneNumber String?   @map("phone_number")
+  dateOfBirth DateTime? @map("date_of_birth")
+  website     String?
+  user        User      @relation(fields: [userId], references: [id])
+}
+
+// ===== Catalog: Course → Module → Lesson =====
+model Course {
+  id           Int          @id @default(autoincrement())
+  slug         String       @unique
+  title        String
+  subtitle     String?
+  description  String?
+  level        JLPTLevel
+  courseType   CourseType   @default(VIDEO_QUIZ)
+  thumbnailUrl String?
+  price        Int          @default(0)
+  status       CourseStatus @default(DRAFT)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  lecturerId   Int?
+
+  lecturer    User?        @relation(fields: [lecturerId], references: [id])
+  modules     Module[]
+  enrollments Enrollment[]
+  reviews     Review[]
+  orderItems  OrderItem[]
+
+  Class Class[]
+}
+
+model Module {
+  id       Int    @id @default(autoincrement())
+  courseId Int
+  title    String
+  order    Int    @default(0)
+
+  course  Course   @relation(fields: [courseId], references: [id])
+  lessons Lesson[]
+}
+
+model Lesson {
+  id          Int          @id @default(autoincrement())
+  moduleId    Int
+  title       String
+  kind        LessonKind   @default(VIDEO)
+  content     String?
+  videoUrl    String?
+  durationSec Int?
+  order       Int          @default(0)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  status      LessonStatus @default(PRIVATE)
+  module      Module       @relation(fields: [moduleId], references: [id])
+  resources   MediaAsset[]
+  liveSession LiveSession?
+  quiz        Quiz?
+  notes       LessonNote[]
+}
+
+model MediaAsset {
+  id        Int       @id @default(autoincrement())
+  lessonId  Int?
+  url       String
+  kind      MediaKind @default(OTHER)
+  mimeType  String?
+  sizeByte  Int?
+  caption   String?
+  meta      Json?
+  createdAt DateTime  @default(now())
+
+  lesson    Lesson?    @relation(fields: [lessonId], references: [id])
+  questions Question[]
+
+  liveSessions LiveSessionMedia[]
+}
+
+model Enrollment {
+  id         Int        @id @default(autoincrement())
+  userId     Int
+  courseId   Int
+  courseType CourseType
+  createdAt  DateTime   @default(now())
+  expiresAt  DateTime?
+
+  user   User   @relation(fields: [userId], references: [id])
+  course Course @relation(fields: [courseId], references: [id])
+
+  @@unique([userId, courseId])
+}
+
+model LessonNote {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  lessonId     Int
+  title        String?
+  body         String
+  timestampSec Int?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id])
+  lesson Lesson @relation(fields: [lessonId], references: [id])
+
+  @@index([lessonId, userId])
+}
+
+// ===== Placement Test & Question Bank =====
+model PlacementBlueprint {
+  id             Int       @id @default(autoincrement())
+  level          JLPTLevel
+  totalQuestions Int       @default(25)
+  vocabKanji     Int       @default(10)
+  grammar        Int       @default(5)
+  synonym        Int       @default(3)
+  orderSentence  Int       @default(2)
+  readingShort   Int       @default(2)
+  readingMedium  Int       @default(3)
+  active         Boolean   @default(true)
+}
+
+model Question {
+  id          Int          @id @default(autoincrement())
+  type        QuestionType
+  level       JLPTLevel
+  difficulty  Difficulty   @default(MEDIUM)
+  stem        String
+  passage     String?
+  mediaId     Int?
+  explanation String?
+  tags        String[]
+  metadata    Json?
+  createdAt   DateTime     @default(now())
+
+  media     MediaAsset? @relation(fields: [mediaId], references: [id])
+  options   Option[]
+  testItems TestItem[]
+  examItems ExamItem[]
+  quizItems QuizItem[]
+
+  QuizAnswer QuizAnswer[]
+
+  TestAnswer TestAnswer[]
+
+  ExamAnswer ExamAnswer[]
+}
+
+model Option {
+  id         Int     @id @default(autoincrement())
+  questionId Int
+  content    String
+  isCorrect  Boolean @default(false)
+  order      Int     @default(0)
+
+  question    Question     @relation(fields: [questionId], references: [id])
+  testAnswers TestAnswer[] @relation("TestAnswerOption")
+  quizAnswers QuizAnswer[] @relation("QuizAnswerOption")
+  examAnswers ExamAnswer[] @relation("ExamAnswerOption")
+}
+
+model TestPaper {
+  id          Int        @id @default(autoincrement())
+  title       String
+  level       JLPTLevel
+  isPlacement Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  visibility  Visibility @default(PRIVATE)
+
+  sections TestSection[]
+  attempts TestAttempt[]
+}
+
+model TestSection {
+  id     Int          @id @default(autoincrement())
+  testId Int
+  title  String
+  type   QuestionType
+  order  Int          @default(0)
+
+  test  TestPaper  @relation(fields: [testId], references: [id])
+  items TestItem[]
+}
+
+model TestItem {
+  id         Int @id @default(autoincrement())
+  sectionId  Int
+  questionId Int
+  order      Int @default(0)
+
+  section  TestSection @relation(fields: [sectionId], references: [id])
+  question Question    @relation(fields: [questionId], references: [id])
+}
+
+model TestAttempt {
+  id              Int        @id @default(autoincrement())
+  userId          Int
+  testId          Int
+  startedAt       DateTime   @default(now())
+  submittedAt     DateTime?
+  score           Float?
+  levelSuggestion JLPTLevel?
+
+  user    User         @relation(fields: [userId], references: [id])
+  test    TestPaper    @relation(fields: [testId], references: [id])
+  answers TestAnswer[]
+
+  @@unique([userId, testId])
+}
+
+model TestAnswer {
+  id               Int      @id @default(autoincrement())
+  attemptId        Int
+  questionId       Int
+  selectedOptionId Int?
+  isCorrect        Boolean?
+  timeSpentSec     Int?
+
+  attempt        TestAttempt @relation(fields: [attemptId], references: [id])
+  question       Question    @relation(fields: [questionId], references: [id])
+  selectedOption Option?     @relation("TestAnswerOption", fields: [selectedOptionId], references: [id])
+}
+
+// ===== Live Classes (WebRTC 2D/3D) =====
+model Class {
+  id          Int      @id @default(autoincrement())
+  courseId    Int?
+  title       String
+  description String?
+  lecturerId  Int
+  capacity    Int      @default(20)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  course     Course?       @relation(fields: [courseId], references: [id])
+  lecturer   User          @relation(fields: [lecturerId], references: [id])
+  sessions   LiveSession[]
+  members    ClassMember[]
+  orderItems OrderItem[]
+}
+
+model ClassMember {
+  id       Int      @id @default(autoincrement())
+  classId  Int
+  userId   Int
+  role     Role
+  joinedAt DateTime @default(now())
+
+  class Class @relation(fields: [classId], references: [id])
+  user  User  @relation(fields: [userId], references: [id])
+
+  @@unique([classId, userId])
+}
+
+model LiveSession {
+  id           Int       @id @default(autoincrement())
+  classId      Int
+  lessonId     Int?      @unique
+  title        String
+  scheduledAt  DateTime
+  endedAt      DateTime?
+  mode         LiveMode  @default(MODE2D)
+  roomKey      String    @unique
+  recordingUrl String?
+
+  class      Class             @relation(fields: [classId], references: [id])
+  lesson     Lesson?           @relation(fields: [lessonId], references: [id])
+  pings      ResourcePing[]
+  chats      LiveChatMessage[]
+  hands      RaiseHand[]
+  attendance Attendance[]
+  spins      SpinWheelEvent[]
+  notes      LiveNote[]
+
+  mediaAssets LiveSessionMedia[]
+}
+model LiveSessionMedia {
+  liveSessionId Int
+  mediaAssetId  Int
+
+  liveSession LiveSession  @relation(fields: [liveSessionId], references: [id], onDelete: Cascade)
+  mediaAsset  MediaAsset   @relation(fields: [mediaAssetId], references: [id], onDelete: Cascade)
+
+  @@id([liveSessionId, mediaAssetId])
+}
+model Attendance {
+  id        Int              @id @default(autoincrement())
+  sessionId Int
+  userId    Int
+  status    AttendanceStatus @default(PRESENT)
+  joinedAt  DateTime         @default(now())
+  leftAt    DateTime?
+
+  session LiveSession @relation(fields: [sessionId], references: [id])
+  user    User        @relation(fields: [userId], references: [id])
+
+  @@unique([sessionId, userId])
+}
+
+model LiveChatMessage {
+  id        Int      @id @default(autoincrement())
+  sessionId Int
+  userId    Int
+  content   String
+  createdAt DateTime @default(now())
+
+  session LiveSession @relation(fields: [sessionId], references: [id])
+  user    User        @relation(fields: [userId], references: [id])
+}
+
+model RaiseHand {
+  id        Int      @id @default(autoincrement())
+  sessionId Int
+  userId    Int
+  createdAt DateTime @default(now())
+  resolved  Boolean  @default(false)
+
+  session LiveSession @relation(fields: [sessionId], references: [id])
+  user    User        @relation(fields: [userId], references: [id])
+}
+
+model ResourcePing {
+  id        Int      @id @default(autoincrement())
+  sessionId Int
+  title     String
+  url       String
+  createdAt DateTime @default(now())
+
+  session LiveSession @relation(fields: [sessionId], references: [id])
+}
+
+model SpinWheelEvent {
+  id           Int      @id @default(autoincrement())
+  sessionId    Int
+  seed         String
+  pickedUserId Int?
+  createdAt    DateTime @default(now())
+
+  session    LiveSession @relation(fields: [sessionId], references: [id])
+  pickedUser User?       @relation("SpinPickUser", fields: [pickedUserId], references: [id])
+}
+
+model LiveNote {
+  id        Int      @id @default(autoincrement())
+  sessionId Int
+  userId    Int
+  title     String?
+  body      String
+  createdAt DateTime @default(now())
+
+  session LiveSession @relation(fields: [sessionId], references: [id])
+  user    User        @relation(fields: [userId], references: [id])
+}
+
+// ===== Flashcards & Spaced Repetition =====
+model FlashcardDeck {
+  id         Int        @id @default(autoincrement())
+  ownerId    Int
+  title      String
+  level      JLPTLevel?
+  visibility Visibility @default(PRIVATE)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  owner User        @relation(fields: [ownerId], references: [id])
+  cards Flashcard[]
+}
+
+model Flashcard {
+  id        Int      @id @default(autoincrement())
+  deckId    Int
+  front     String
+  back      String
+  examples  String?
+  hints     String?
+  tags      String[]
+  aiMeta    Json?
+  createdAt DateTime @default(now())
+
+  deck       FlashcardDeck  @relation(fields: [deckId], references: [id])
+  progresses CardProgress[]
+}
+
+model CardProgress {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  cardId      Int
+  ef          Float    @default(2.5)
+  interval    Int      @default(0)
+  repetitions Int      @default(0)
+  dueAt       DateTime @default(now())
+  lastGrade   Int?
+
+  user User      @relation(fields: [userId], references: [id])
+  card Flashcard @relation(fields: [cardId], references: [id])
+
+  @@unique([userId, cardId])
+}
+
+// ===== Quizzes (Lesson-level) & Quick Review =====
+model Quiz {
+  id        Int      @id @default(autoincrement())
+  lessonId  Int?     @unique
+  title     String
+  createdAt DateTime @default(now())
+
+  lesson   Lesson?       @relation(fields: [lessonId], references: [id])
+  items    QuizItem[]
+  attempts QuizAttempt[]
+}
+
+model QuizItem {
+  id         Int @id @default(autoincrement())
+  quizId     Int
+  questionId Int
+  order      Int @default(0)
+
+  quiz     Quiz     @relation(fields: [quizId], references: [id])
+  question Question @relation(fields: [questionId], references: [id])
+}
+
+model QuizAttempt {
+  id          Int       @id @default(autoincrement())
+  quizId      Int
+  userId      Int
+  startedAt   DateTime  @default(now())
+  submittedAt DateTime?
+  score       Float?
+
+  quiz    Quiz         @relation(fields: [quizId], references: [id])
+  user    User         @relation(fields: [userId], references: [id])
+  answers QuizAnswer[]
+}
+
+model QuizAnswer {
+  id               Int      @id @default(autoincrement())
+  attemptId        Int
+  questionId       Int
+  selectedOptionId Int?
+  isCorrect        Boolean?
+
+  attempt        QuizAttempt @relation(fields: [attemptId], references: [id])
+  question       Question    @relation(fields: [questionId], references: [id])
+  selectedOption Option?     @relation("QuizAnswerOption", fields: [selectedOptionId], references: [id])
+}
+
+model WrongTerm {
+  id       Int        @id @default(autoincrement())
+  userId   Int
+  term     String
+  level    JLPTLevel?
+  count    Int        @default(1)
+  lastSeen DateTime   @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, term])
+}
+
+// ===== Exam System (AI-assisted make & grade) =====
+model ExamPaper {
+  id         Int        @id @default(autoincrement())
+  title      String
+  level      JLPTLevel
+  createdBy  Int
+  createdAt  DateTime   @default(now())
+  visibility Visibility @default(PRIVATE)
+
+  author   User          @relation(fields: [createdBy], references: [id])
+  sections ExamSection[]
+  attempts ExamAttempt[]
+}
+
+model ExamSection {
+  id     Int          @id @default(autoincrement())
+  examId Int
+  title  String
+  type   QuestionType
+  order  Int          @default(0)
+
+  exam  ExamPaper  @relation(fields: [examId], references: [id])
+  items ExamItem[]
+}
+
+model ExamItem {
+  id         Int @id @default(autoincrement())
+  sectionId  Int
+  questionId Int
+  order      Int @default(0)
+
+  section  ExamSection @relation(fields: [sectionId], references: [id])
+  question Question    @relation(fields: [questionId], references: [id])
+}
+
+model ExamAttempt {
+  id          Int       @id @default(autoincrement())
+  examId      Int
+  userId      Int
+  startedAt   DateTime  @default(now())
+  submittedAt DateTime?
+  score       Float?
+  breakdown   Json?
+  feedback    String?
+
+  exam    ExamPaper    @relation(fields: [examId], references: [id])
+  user    User         @relation(fields: [userId], references: [id])
+  answers ExamAnswer[]
+}
+
+model ExamAnswer {
+  id               Int      @id @default(autoincrement())
+  attemptId        Int
+  questionId       Int
+  selectedOptionId Int?
+  isCorrect        Boolean?
+  timeSpentSec     Int?
+
+  attempt        ExamAttempt @relation(fields: [attemptId], references: [id])
+  question       Question    @relation(fields: [questionId], references: [id])
+  selectedOption Option?     @relation("ExamAnswerOption", fields: [selectedOptionId], references: [id])
+}
+
+// ===== Community Library & Folders =====
+model Folder {
+  id       Int    @id @default(autoincrement())
+  ownerId  Int
+  name     String
+  parentId Int?
+
+  owner     User       @relation(fields: [ownerId], references: [id])
+  parent    Folder?    @relation("FolderToFolder", fields: [parentId], references: [id])
+  children  Folder[]   @relation("FolderToFolder")
+  resources Resource[]
+}
+
+model Resource {
+  id         Int        @id @default(autoincrement())
+  ownerId    Int
+  folderId   Int?
+  title      String
+  body       String?
+  mediaUrl   String?
+  visibility Visibility @default(PRIVATE)
+  tags       String[]
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  owner     User       @relation("ResourceAuthor", fields: [ownerId], references: [id])
+  folder    Folder?    @relation(fields: [folderId], references: [id])
+  reactions Reaction[]
+  comments  Comment[]
+
+  AICitation AICitation[]
+}
+
+model Reaction {
+  id         Int          @id @default(autoincrement())
+  resourceId Int
+  userId     Int
+  kind       ReactionKind
+  createdAt  DateTime     @default(now())
+
+  resource Resource @relation(fields: [resourceId], references: [id])
+  user     User     @relation(fields: [userId], references: [id])
+
+  @@unique([resourceId, userId])
+}
+
+model Comment {
+  id         Int      @id @default(autoincrement())
+  resourceId Int
+  userId     Int
+  body       String
+  createdAt  DateTime @default(now())
+
+  resource Resource @relation(fields: [resourceId], references: [id])
+  user     User     @relation(fields: [userId], references: [id])
+}
+
+// ===== Gamification (Points, Streaks, Rewards) =====
+model PointsLedger {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  delta     Int
+  reason    String
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model Streak {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique
+  startDate DateTime
+  lastDate  DateTime
+  longest   Int      @default(0)
+  current   Int      @default(0)
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model Reward {
+  id     Int        @id @default(autoincrement())
+  type   RewardType
+  name   String
+  points Int        @default(0)
+  stock  Int?
+
+  redemptions RewardRedemption[]
+}
+
+model RewardRedemption {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  rewardId  Int
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id])
+  reward Reward @relation(fields: [rewardId], references: [id])
+}
+
+// ===== Commerce, Coupons, Affiliates =====
+model Order {
+  id            Int           @id @default(autoincrement())
+  userId        Int
+  totalAmount   Int
+  status        PaymentStatus @default(PENDING)
+  providerRef   String?
+  createdAt     DateTime      @default(now())
+  couponId      Int?
+  affiliateCode String?
+
+  user   User        @relation(fields: [userId], references: [id])
+  items  OrderItem[]
+  coupon Promotion?  @relation(fields: [couponId], references: [id])
+}
+
+model OrderItem {
+  id        Int           @id @default(autoincrement())
+  orderId   Int
+  type      OrderItemType
+  courseId  Int?
+  classId   Int?
+  unitPrice Int
+  quantity  Int           @default(1)
+
+  order  Order   @relation(fields: [orderId], references: [id])
+  course Course? @relation(fields: [courseId], references: [id])
+  class  Class?  @relation(fields: [classId], references: [id])
+}
+
+model Promotion {
+  id          Int       @id @default(autoincrement())
+  code        String    @unique
+  kind        PromoKind @default(COUPON)
+  title       String
+  description String?
+  discountPct Int?
+  discountAmt Int?
+  maxUsage    Int?
+  used        Int       @default(0)
+  active      Boolean   @default(true)
+  startsAt    DateTime?
+  endsAt      DateTime?
+
+  orders Order[]
+}
+
+model AffiliateCode {
+  id        Int      @id @default(autoincrement())
+  code      String   @unique
+  ownerId   Int
+  ratePct   Int      @default(10)
+  createdAt DateTime @default(now())
+
+  owner User @relation(fields: [ownerId], references: [id])
+}
+
+model AffiliateReferral {
+  id           Int      @id @default(autoincrement())
+  referrerId   Int
+  refereeEmail String
+  createdAt    DateTime @default(now())
+
+  referrer User @relation("ReferralReferrer", fields: [referrerId], references: [id])
+}
+
+// ===== Ratings & Reviews, Blog, Ads =====
+model Review {
+  id        Int      @id @default(autoincrement())
+  courseId  Int
+  userId    Int
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+
+  course Course @relation(fields: [courseId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([courseId, userId])
+}
+
+model Blog {
+  id       Int       @id @default(autoincrement())
+  title    String
+  content  String
+  image    String?
+  slug     String    @unique
+  date     DateTime  @default(now())
+  authorId Int       @map("author_id")
+  author   User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  tags     BlogTag[]
+
+}
+
+model Tag {
+  id          Int       @id @default(autoincrement())
+  name        String
+  description String?
+  slug        String    @unique
+  blogs       BlogTag[]
+
+}
+
+model BlogTag {
+  blog   Blog @relation(fields: [blogId], references: [id], onDelete: Cascade)
+  blogId Int
+  tag    Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  tagId  Int
+
+  @@id([blogId, tagId])
+}
+
+model AdSlot {
+  id     Int     @id @default(autoincrement())
+  key    String  @unique
+  active Boolean @default(true)
+
+  creatives AdCreative[]
+}
+
+model AdCreative {
+  id        Int       @id @default(autoincrement())
+  slotId    Int
+  title     String
+  imageUrl  String?
+  targetUrl String
+  startsAt  DateTime?
+  endsAt    DateTime?
+
+  slot AdSlot @relation(fields: [slotId], references: [id])
+}
+
+// ===== AI “Sensei” (Chat + Voice) =====
+model AIThread {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  title     String?
+  createdAt DateTime @default(now())
+
+  user     User            @relation(fields: [userId], references: [id])
+  messages AIChatMessage[]
+}
+
+model AIChatMessage {
+  id        Int      @id @default(autoincrement())
+  threadId  Int
+  userId    Int
+  role      ChatRole
+  content   String
+  audioUrl  String?
+  createdAt DateTime @default(now())
+
+  thread    AIThread     @relation(fields: [threadId], references: [id])
+  user      User         @relation(fields: [userId], references: [id])
+  citations AICitation[]
+}
+
+model AICitation {
+  id         Int     @id @default(autoincrement())
+  messageId  Int
+  sourceUrl  String?
+  resourceId Int?
+
+  message  AIChatMessage @relation(fields: [messageId], references: [id])
+  resource Resource?     @relation(fields: [resourceId], references: [id])
+}
+
+// ===== Enums =====
+enum Role {
+  CUSTOMER
+  STAFF
+  LECTURER
+  ADMIN
+}
+
+enum VerifyStatus {
+  UNVERIFIED
+  VERIFIED
+  BANNED
+}
+
+enum CourseStatus {
+  DRAFT
+  PENDING_REVIEW
+  PUBLISHED
+  ARCHIVED
+}
+
+enum JLPTLevel {
+  N5
+  N4
+  N3
+  N2
+  N1
+}
+
+enum QuestionType {
+  VOCAB
+  KANJI
+  GRAMMAR
+  SYNONYM
+  ORDER
+  READING
+  LISTENING
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum Visibility {
+  PRIVATE
+  UNLISTED
+  PUBLIC
+}
+
+enum CourseType {
+  VIDEO_QUIZ
+  VIDEO_QUIZ_LIVE
+  LIVE_ONLY
+}
+
+enum LessonKind {
+  VIDEO
+  ARTICLE
+  QUIZ
+  LIVE
+}
+
+enum LiveMode {
+  MODE2D
+  MODE3D
+}
+
+enum AttendanceStatus {
+  PRESENT
+  LATE
+  ABSENT
+  EXCUSED
+}
+
+enum MediaKind {
+  AUDIO
+  VIDEO
+  IMAGE
+  PDF
+  OTHER
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum OrderItemType {
+  COURSE
+  LIVE_SESSION
+  PACKAGE
+}
+
+enum PromoKind {
+  COUPON
+  VOUCHER
+}
+
+enum RewardType {
+  POINTS
+  ITEM
+  BADGE
+}
+
+enum ReactionKind {
+  LIKE
+  LOVE
+  HELPFUL
+}
+
+enum ChatRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum LessonStatus {
+  PRIVATE
+  PUBLISHED
+  GLOBAL_PUBLIC
+}
