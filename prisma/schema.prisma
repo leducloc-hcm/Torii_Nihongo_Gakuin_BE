@@ -14,31 +14,31 @@ datasource db {
 }
 
 model User {
-  id          Int          @id @default(autoincrement())
-  email       String       @unique
-  password    String
-  name String
-  role        Role         @default(CUSTOMER)
-  status      VerifyStatus @default(UNVERIFIED)
-  bio         String?
-  totpSecret  String?      @db.VarChar(1000)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  deletedAt   DateTime?
+  id         Int          @id @default(autoincrement())
+  email      String       @unique
+  password   String
+  name       String
+  role       Role         @default(CUSTOMER)
+  status     VerifyStatus @default(UNVERIFIED)
+  bio        String?
+  totpSecret String?      @db.VarChar(1000)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  deletedAt  DateTime?
 
   lecturerProfile LecturerProfile?
   staffProfile    StaffProfile?
-
-  enrollments    Enrollment[]
-  notes          LessonNote[]
-  devices        Device[]
-  refreshTokens  RefreshToken[]
-  quizAttempts   QuizAttempt[]
-  examAttempts   ExamAttempt[]
-  testAttempts   TestAttempt[]
-  cardProgress   CardProgress[]
-  flashcardDecks FlashcardDeck[]
-  wrongTerms     WrongTerm[]
+  customerProfile CustomerProfile?
+  enrollments     Enrollment[]
+  notes           LessonNote[]
+  devices         Device[]
+  refreshTokens   RefreshToken[]
+  quizAttempts    QuizAttempt[]
+  examAttempts    ExamAttempt[]
+  testAttempts    TestAttempt[]
+  cardProgress    CardProgress[]
+  flashcardDecks  FlashcardDeck[]
+  wrongTerms      WrongTerm[]
 
   classMembers ClassMember[]
   liveChats    LiveChatMessage[]
@@ -73,6 +73,22 @@ model User {
   ExamPaper ExamPaper[]
 }
 
+model CustomerProfile {
+  id          Int       @id @default(autoincrement())
+  name        String?
+  bio         String?
+  location    String?
+  username    String?   @unique
+  avatar      String?
+  coverPhoto  String?   @map("cover_photo")
+  description String?
+  phoneNumber String?   @map("phone_number")
+  dateOfBirth DateTime? @map("date_of_birth")
+  website     String?
+  userId      Int       @unique @map("user_id")
+  user        User      @relation(fields: [userId], references: [id])
+}
+
 model Device {
   id            Int            @id @default(autoincrement())
   userId        Int
@@ -96,6 +112,7 @@ model RefreshToken {
 
   @@index([expiresAt])
 }
+
 model VerificationCode {
   id    Int                  @id @default(autoincrement())
   email String               @db.VarChar(500)
@@ -108,7 +125,6 @@ model VerificationCode {
   @@unique([email, type])
   @@index([expiresAt])
 }
-
 
 model LecturerProfile {
   id          Int       @id @default(autoincrement())
@@ -1072,6 +1088,7 @@ enum LessonStatus {
   PUBLISHED
   GLOBAL_PUBLIC
 }
+
 enum VerificationCodeType {
   REGISTER
   FORGOT_PASSWORD

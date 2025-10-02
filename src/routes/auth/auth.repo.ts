@@ -12,7 +12,7 @@ export class AuthRepository {
   async createUser(
     user: Pick<UserType, 'email' | 'name' | 'password' | 'status'>,
   ): Promise<Omit<UserType, 'password' | 'totpSecret'>> {
-    return await this.prismaService.user.create({
+    return this.prismaService.user.create({
       data: user,
       omit: {
         password: true,
@@ -22,7 +22,7 @@ export class AuthRepository {
   }
 
   async createUserInclueRole(user: Pick<UserType, 'email' | 'name' | 'password' | 'status'>): Promise<UserType> {
-    return await this.prismaService.user.create({
+    return this.prismaService.user.create({
       data: user,
     })
   }
@@ -30,7 +30,7 @@ export class AuthRepository {
   async createVerificationCode(
     payload: Pick<VerificationCodeType, 'email' | 'type' | 'code' | 'expiresAt'>,
   ): Promise<VerificationCodeType> {
-    return await this.prismaService.verificationCode.upsert({
+    return this.prismaService.verificationCode.upsert({
       where: {
         email_type: {
           email: payload.email,
@@ -55,7 +55,7 @@ export class AuthRepository {
           }
         },
   ): Promise<VerificationCodeType | null> {
-    return await this.prismaService.verificationCode.findUnique({
+    return this.prismaService.verificationCode.findUnique({
       where: uniqueValue,
     })
   }
@@ -75,7 +75,7 @@ export class AuthRepository {
   }
 
   async findUniqueUserIncludeRole(where: WhereUniqueUserType): Promise<UserType | null> {
-    return await this.prismaService.user.findFirst({
+    return this.prismaService.user.findFirst({
       where: {
         ...where,
         deletedAt: null,
@@ -86,7 +86,7 @@ export class AuthRepository {
   async findUniqueRefreshTokenIncludeUserRole(where: {
     token: string
   }): Promise<(RefreshTokenType & { user: UserType }) | null> {
-    return await this.prismaService.refreshToken.findUnique({
+    return this.prismaService.refreshToken.findUnique({
       where,
       include: {
         user: true,
