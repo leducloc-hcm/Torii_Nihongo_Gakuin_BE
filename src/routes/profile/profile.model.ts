@@ -1,4 +1,3 @@
-import { ideahub } from 'googleapis/build/src/apis/ideahub'
 import { z } from 'zod'
 export const LectureProfileSchema = z.object({
   id: z.number(),
