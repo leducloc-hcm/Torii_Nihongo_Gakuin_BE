@@ -6,9 +6,11 @@ import { LoggerModule } from 'nestjs-pino'
 import pino from 'pino'
 import path from 'path'
 import { AuthModule } from './routes/auth/auth.module'
+import { TagModule } from './routes/tag/tag.module'
+import { BlogModule } from './routes/blog/blog.module'
 
 @Module({
-  imports: [AuthModule, SharedModule],
+  imports: [AuthModule, TagModule, BlogModule, SharedModule],
   controllers: [AppController],
   providers: [AppService],
 })
