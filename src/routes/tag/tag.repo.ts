@@ -15,7 +15,7 @@ export class TagRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(data: TagCreateInputType): Promise<TagResponseType> {
-    return this.prisma.tag.create({
+    return await this.prisma.tag.create({
       data,
       include: {
         _count: {
@@ -52,7 +52,7 @@ export class TagRepository {
   }
 
   async findOne(where: TagWhereUniqueInputType): Promise<TagResponseType | null> {
-    return this.prisma.tag.findUnique({
+    return await this.prisma.tag.findUnique({
       where: where as any,
       include: {
         _count: {
@@ -63,7 +63,7 @@ export class TagRepository {
   }
 
   async findBySlug(slug: string): Promise<TagResponseType | null> {
-    return this.prisma.tag.findUnique({
+    return await this.prisma.tag.findUnique({
       where: { slug },
       include: {
         _count: {
@@ -75,7 +75,7 @@ export class TagRepository {
 
   async update(params: { where: TagWhereUniqueInputType; data: TagUpdateInputType }): Promise<TagResponseType> {
     const { where, data } = params
-    return this.prisma.tag.update({
+    return await this.prisma.tag.update({
       where: where as any,
       data,
       include: {
@@ -87,7 +87,7 @@ export class TagRepository {
   }
 
   async delete(where: TagWhereUniqueInputType): Promise<TagResponseType> {
-    return this.prisma.tag.delete({
+    return await this.prisma.tag.delete({
       where: where as any,
     })
   }
