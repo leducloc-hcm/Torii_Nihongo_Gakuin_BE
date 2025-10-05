@@ -1,3 +1,4 @@
+import './shared/config'
 import { NestFactory } from '@nestjs/core'
 import { AppModule } from './app.module'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
@@ -9,9 +10,24 @@ import { NestExpressApplication } from '@nestjs/platform-express'
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true })
   // app.useLogger(app.get(Logger))
-  app.set('trust proxy', 'loopback') // Trust requests from the loopback address
+  app.set('trust proxy', true) // Trust proxy headers
   app.enableCors()
-  app.use(helmet())
+
+  // Configure Helmet with CSP settings that allow Swagger UI to work
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: [`'self'`],
+          styleSrc: [`'self'`, `'unsafe-inline'`],
+          scriptSrc: [`'self'`, `'unsafe-inline'`],
+          imgSrc: [`'self'`, 'data:', 'validator.swagger.io'],
+        },
+      },
+      crossOriginEmbedderPolicy: false,
+    }),
+  )
+
   patchNestJsSwagger()
   const config = new DocumentBuilder()
     .setTitle('Torii Nihongo Gakuin API')
@@ -34,4 +50,5 @@ async function bootstrap() {
   })
   await app.listen(process.env.PORT ?? 4000)
 }
-bootstrap()
+
+void bootstrap()

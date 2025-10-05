@@ -21,7 +21,7 @@ export class S3Service {
     const parallelUploads3 = new Upload({
       client: this.s3,
       params: {
-        Bucket: process.env.S3_BUCKET_NAME,
+        Bucket: process.env.S3_BUCKET_NAME!,
         Key: filename,
         Body: readFileSync(filepath),
         ContentType: contentType,
@@ -37,7 +37,7 @@ export class S3Service {
   createPresignedUrlWithClient(filename: string) {
     const contentType = mime.lookup(filename) || 'application/octet-stream'
     const command = new PutObjectCommand({
-      Bucket: process.env.S3_BUCKET_NAME,
+      Bucket: process.env.S3_BUCKET_NAME!,
       Key: filename,
       ContentType: contentType,
     })
