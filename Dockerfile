@@ -98,8 +98,8 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
 ENV NODE_ENV=production
 
 ENV DATABASE_URL="postgresql://postgres:nhatngutorii@torii-nihongo-db.ct64ww6csug1.ap-southeast-1.rds.amazonaws.com:5432/postgres?schema=public"
-ENV ACCESS_TOKEN_SECRET= 'nhatngutorii'
-ENV ACCESS_TOKEN_EXPIRES_IN= 1h
+ENV ACCESS_TOKEN_SECRET='nhatngutorii'
+ENV ACCESS_TOKEN_EXPIRES_IN=1h
 ENV REFRESH_TOKEN_SECRET='nhatngutorii'
 ENV REFRESH_TOKEN_EXPIRES_IN=1d
 ENV PORT=4000
