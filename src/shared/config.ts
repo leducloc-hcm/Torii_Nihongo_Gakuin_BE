@@ -3,13 +3,15 @@ import fs from 'fs'
 import path from 'path'
 import { config } from 'dotenv'
 
-config({
-  path: '.env',
-})
-// Kiểm tra coi thử có file .env hay chưa
-if (!fs.existsSync(path.resolve('.env'))) {
-  console.log('Không tìm thấy file .env')
-  process.exit(1)
+// Only try to load .env file if it exists (for local development)
+// In production/Docker, environment variables are already set
+if (fs.existsSync(path.resolve('.env'))) {
+  config({
+    path: '.env',
+  })
+  console.log('✅ Đã tải file .env')
+} else {
+  console.log('ℹ️  Không tìm thấy file .env - sử dụng biến môi trường từ hệ thống')
 }
 
 const configSchema = z.object({
