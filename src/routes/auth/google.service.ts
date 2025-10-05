@@ -5,7 +5,6 @@ import { GoogleAuthStateType } from 'src/routes/auth/auth.model'
 import { AuthRepository } from 'src/routes/auth/auth.repo'
 import { AuthService } from 'src/routes/auth/auth.service'
 import { GoogleUserInfoError } from 'src/routes/auth/auth.error'
-import envConfig from 'src/shared/config'
 import { HashingService } from 'src/shared/services/hashing.service'
 import { v4 as uuidv4 } from 'uuid'
 import { RoleName } from 'src/shared/constants/role.constant'
@@ -20,9 +19,9 @@ export class GoogleService {
     private readonly authService: AuthService,
   ) {
     this.oauth2Client = new google.auth.OAuth2(
-      envConfig.GOOGLE_CLIENT_ID,
-      envConfig.GOOGLE_CLIENT_SECRET,
-      envConfig.GOOGLE_REDIRECT_URI,
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      process.env.GOOGLE_REDIRECT_URI,
     )
   }
   getAuthorizationUrl({ userAgent, ip }: GoogleAuthStateType) {

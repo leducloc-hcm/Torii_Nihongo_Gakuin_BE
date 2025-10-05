@@ -92,10 +92,39 @@ EXPOSE 4000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-    CMD node -e "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})" || exit 1
+    CMD node -e "require('http').get('http://localhost:4000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})" || exit 1
 
 # Set environment to production
 ENV NODE_ENV=production
+
+ENV DATABASE_URL="postgresql://postgres:nhatngutorii@torii-nihongo-db.ct64ww6csug1.ap-southeast-1.rds.amazonaws.com:5432/postgres?schema=public"
+ENV ACCESS_TOKEN_SECRET= 'nhatngutorii'
+ENV ACCESS_TOKEN_EXPIRES_IN= 1h
+ENV REFRESH_TOKEN_SECRET='nhatngutorii'
+ENV REFRESH_TOKEN_EXPIRES_IN=1d
+ENV PORT=4000
+
+ENV SECRET_API_KEY=toriinihongogakuin
+ENV PAYMENT_API_KEY=
+
+ENV ADMIN_NAME=
+ENV ADMIN_PASSWORD=
+ENV ADMIN_EMAIL=
+ENV ADMIN_PHONE_NUMBER=
+ENV OTP_EXPIRES_IN=5m
+ENV RESEND_API_KEY='re_XDGkQ5ic_CziF5XzBiXYxAnnoPoJgFDpz'
+ENV GOOGLE_CLIENT_ID=
+ENV GOOGLE_CLIENT_SECRET=
+ENV GOOGLE_REDIRECT_URI=
+ENV GOOGLE_CLIENT_REDIRECT_URI=
+ENV APP_NAME=
+ENV PREFIX_STATIC_ENPOINT=
+
+ENV S3_REGION='ap-southeast-1'
+ENV S3_ACCESS_KEY='AKIAVVZPCSCKZAVMUOVN'
+ENV S3_SECRET_KEY='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'
+ENV S3_BUCKET_NAME='torii-nihongo-gakuin-s3'
+ENV REDIS_URL='redis://default:password@localhost:6379'
 
 # Start the application
 CMD ["node", "dist/src/main.js"]

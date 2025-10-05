@@ -18,7 +18,6 @@ import {
 
 import { AuthService } from 'src/routes/auth/auth.service'
 import { GoogleService } from 'src/routes/auth/google.service'
-import envConfig from 'src/shared/config'
 import { ActiveUser } from 'src/shared/decorators/active-user.decorator'
 import { IsPublic } from 'src/shared/decorators/auth.decorator'
 import { UserAgent } from 'src/shared/decorators/user-agent.decorator'
@@ -94,14 +93,14 @@ export class AuthController {
         state,
       })
       return res.redirect(
-        `${envConfig.GOOGLE_CLIENT_REDIRECT_URI}?accessToken=${data.accessToken}&refreshToken=${data.refreshToken}`,
+        `${process.env.GOOGLE_CLIENT_REDIRECT_URI}?accessToken=${data.accessToken}&refreshToken=${data.refreshToken}`,
       )
     } catch (error) {
       const message =
         error instanceof Error
           ? error.message
           : 'Đã xảy ra lỗi khi đăng nhập bằng Google, vui lòng thử lại bằng cách khác'
-      return res.redirect(`${envConfig.GOOGLE_CLIENT_REDIRECT_URI}?errorMessage=${message}`)
+      return res.redirect(`${process.env.GOOGLE_CLIENT_REDIRECT_URI}?errorMessage=${message}`)
     }
   }
 
