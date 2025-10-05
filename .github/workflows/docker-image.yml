@@ -26,3 +26,15 @@ jobs:
           context: .
           push: true
           tags: leducloc02122004/torii-nihongo-gakuin:latest
+  deploy:
+    needs: build
+    runs-on: self-hosted
+    steps:
+      - name: Pull image from Docker Hub
+        run: sudo docker pull leducloc02122004/torii-nihongo-gakuin:latest
+
+      - name: Delete old container if exists
+        run: sudo docker rm -f torii-nihongo-gakuin_container || true
+
+      - name: Run docker container
+        run: sudo docker container run -dp 4000:4000 --name torii-nihongo-gakuin_container leducloc02122004/torii-nihongo-gakuin
