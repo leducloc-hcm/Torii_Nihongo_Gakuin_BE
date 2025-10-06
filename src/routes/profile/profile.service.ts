@@ -11,6 +11,7 @@ import {
   CustomerProfileType,
 } from './profile.model'
 import { RoleName } from 'src/shared/constants/role.constant'
+import { S3Service } from 'src/shared/services/s3.service'
 
 @Injectable()
 export class ProfileService {
@@ -20,6 +21,7 @@ export class ProfileService {
     private readonly customerProfileRepo: CustomerProfileRepository,
     private readonly sharedUserRepo: SharedUserRepository,
     private readonly prismaService: PrismaService,
+    private readonly s3Service: S3Service,
   ) {}
 
   async getProfile(userId: number): Promise<GetLectureProfileType | GetStaffProfileType | CustomerProfileType> {
@@ -79,10 +81,28 @@ export class ProfileService {
   async updateProfile(
     userId: number,
     data: Partial<UpdateLectureProfileType | UpdateStaffProfileType | UpdateCustomerProfileType>,
+    files?: { avatar?: Express.Multer.File[]; coverPhoto?: Express.Multer.File[] },
   ): Promise<GetLectureProfileType | GetStaffProfileType | CustomerProfileType> {
     const user = await this.sharedUserRepo.findUnique({ id: userId })
     if (!user) {
       throw new NotFoundException('User not found')
+    }
+
+    let avatarUrl = (data as any).avatar
+    let coverPhotoUrl = (data as any).coverPhoto
+
+    if (files?.avatar?.[0]) {
+      avatarUrl = (await this.s3Service.uploadFileToS3(files.avatar[0])).url
+    }
+
+    if (files?.coverPhoto?.[0]) {
+      coverPhotoUrl = (await this.s3Service.uploadFileToS3(files.coverPhoto[0])).url
+    }
+
+    const updatedData = {
+      ...data,
+      ...(avatarUrl && { avatar: avatarUrl }),
+      ...(coverPhotoUrl && { coverPhoto: coverPhotoUrl }),
     }
 
     switch (user.role) {
@@ -95,7 +115,7 @@ export class ProfileService {
         }
         const updatedLecturerProfile = await this.lectureProfileRepo.updateLectureProfile(
           lecturerProfile.id,
-          data as Partial<UpdateLectureProfileType>,
+          updatedData as Partial<UpdateLectureProfileType>,
         )
         if (!updatedLecturerProfile) {
           throw new NotFoundException('Failed to update lecturer profile')
@@ -112,7 +132,7 @@ export class ProfileService {
         }
         const updatedStaffProfile = await this.staffProfileRepo.updateStaffProfile(
           staffProfile.id,
-          data as Partial<UpdateStaffProfileType>,
+          updatedData as Partial<UpdateStaffProfileType>,
         )
         if (!updatedStaffProfile) {
           throw new NotFoundException('Failed to update staff profile')
@@ -129,7 +149,7 @@ export class ProfileService {
         }
         const updatedCustomerProfile = await this.customerProfileRepo.updateCustomerProfile(
           customerProfile.id,
-          data as Partial<UpdateCustomerProfileType>,
+          updatedData as Partial<UpdateCustomerProfileType>,
         )
         if (!updatedCustomerProfile) {
           throw new NotFoundException('Failed to update customer profile')

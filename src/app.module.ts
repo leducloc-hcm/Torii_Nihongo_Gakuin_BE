@@ -6,9 +6,23 @@ import { AuthModule } from './routes/auth/auth.module'
 import { TagModule } from './routes/tag/tag.module'
 import { BlogModule } from './routes/blog/blog.module'
 import { ProfileModule } from './routes/profile/profile.module'
+import { CourseModule } from './routes/course/course.module'
+import { ModuleModule } from './routes/module/module.module'
+import { LessonModule } from './routes/lesson/lesson.module'
+import { EnrollmentModule } from './routes/enrollment/enrollment.module'
 
 @Module({
-  imports: [AuthModule, TagModule, BlogModule, SharedModule, ProfileModule],
+  imports: [
+    AuthModule,
+    TagModule,
+    BlogModule,
+    SharedModule,
+    ProfileModule,
+    CourseModule,
+    ModuleModule,
+    LessonModule,
+    EnrollmentModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })

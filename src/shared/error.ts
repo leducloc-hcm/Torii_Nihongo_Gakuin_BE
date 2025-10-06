@@ -1,4 +1,4 @@
-import { ConflictException, NotFoundException, UnprocessableEntityException } from '@nestjs/common'
+import { ConflictException, NotFoundException, UnprocessableEntityException, BadRequestException } from '@nestjs/common'
 
 export const NotFoundRecordException = new NotFoundException('Error.NotFound')
 
@@ -10,3 +10,9 @@ export const InvalidPasswordException = new UnprocessableEntityException([
 ])
 
 export const VersionConflictException = new ConflictException('Error.VersionConflict')
+
+export class InvalidFileExtensionError extends BadRequestException {
+  constructor(message: string) {
+    super(message)
+  }
+}

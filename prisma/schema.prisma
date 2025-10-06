@@ -68,8 +68,6 @@ model User {
 
   Class Class[]
 
-  Course Course[]
-
   ExamPaper ExamPaper[]
 }
 
@@ -181,7 +179,6 @@ model StaffProfile {
   user        User      @relation(fields: [userId], references: [id])
 }
 
-// ===== Catalog: Course → Module → Lesson =====
 model Course {
   id           Int          @id @default(autoincrement())
   slug         String       @unique
@@ -195,9 +192,8 @@ model Course {
   status       CourseStatus @default(DRAFT)
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
-  lecturerId   Int?
-
-  lecturer    User?        @relation(fields: [lecturerId], references: [id])
+  createdBy   Int
+  lecturerIds   Int[]
   modules     Module[]
   enrollments Enrollment[]
   reviews     Review[]
