@@ -103,6 +103,11 @@ export const RefreshTokenSchema = z.object({
   createdAt: z.date(),
 })
 
+export const CreateStaffAccountSchema = z.object({
+  email: z.string().email(),
+  role: z.enum(['STAFF', 'LECTURER']),
+  name: z.string().min(1).max(100),
+})
 export const RoleSchema = z.object({
   id: z.number(),
   name: z.string(),
@@ -186,3 +191,4 @@ export type GetAuthorizationUrlResType = z.infer<typeof GetAuthorizationUrlResSc
 export type ForgotPasswordBodyType = z.infer<typeof ForgotPasswordBodySchema>
 export type DisableTwoFactorBodyType = z.infer<typeof DisableTwoFactorBodySchema>
 export type TwoFactorSetupResType = z.infer<typeof TwoFactorSetupResSchema>
+export type CreateStaffAccountType = z.infer<typeof CreateStaffAccountSchema>

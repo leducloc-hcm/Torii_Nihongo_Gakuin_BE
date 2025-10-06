@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common'
 import { Resend } from 'resend'
 import * as React from 'react'
 import { OTPEmail } from 'emails/otp'
+import AccountCreatedEmail from 'emails/accountCreated'
 
 @Injectable()
 export class EmailService {
@@ -16,6 +17,15 @@ export class EmailService {
       to: [payload.email],
       subject,
       react: <OTPEmail otpCode={payload.code} title={subject} />,
+    })
+  }
+  async sendAccountCreated(payload: { email: string; password: string; role: 'Nhân viên' | 'Giảng viên' }) {
+    const subject = `Tài khoản ${payload.role} đã được tạo`
+    return await this.resend.emails.send({
+      from: process.env.RESEND_FROM_ADDRESS!,
+      to: [payload.email],
+      subject,
+      react: <AccountCreatedEmail passworDefault={payload.password} title={subject} role={payload.role} />,
     })
   }
 }

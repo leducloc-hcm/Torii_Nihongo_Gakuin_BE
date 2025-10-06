@@ -141,4 +141,45 @@ export class ProfileService {
         throw new BadRequestException('Invalid user role')
     }
   }
+  async createProfile(data: { email: string; name: string; role: string }) {
+    const user = await this.sharedUserRepo.findUnique({ email: data.email })
+    if (!user) {
+      throw new NotFoundException('User not found')
+    }
+
+    switch (data.role.toUpperCase()) {
+      case RoleName.Lecturer: {
+        const existingProfile = await this.prismaService.lecturerProfile.findUnique({
+          where: { userId: user.id },
+        })
+        if (existingProfile) {
+          throw new BadRequestException('Lecturer profile already exists')
+        }
+        return this.lectureProfileRepo.createLectureProfile(user.id, data.name)
+      }
+
+      case RoleName.Staff: {
+        const existingProfile = await this.prismaService.staffProfile.findUnique({
+          where: { userId: user.id },
+        })
+        if (existingProfile) {
+          throw new BadRequestException('Staff profile already exists')
+        }
+        return this.staffProfileRepo.createStaffProfile(user.id, data.name)
+      }
+
+      case RoleName.Customer: {
+        const existingProfile = await this.prismaService.customerProfile.findUnique({
+          where: { userId: user.id },
+        })
+        if (existingProfile) {
+          throw new BadRequestException('Customer profile already exists')
+        }
+        return this.customerProfileRepo.createCustomerProfile(user.id, data.name)
+      }
+
+      default:
+        throw new BadRequestException('Invalid user role')
+    }
+  }
 }

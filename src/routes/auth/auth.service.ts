@@ -33,6 +33,9 @@ import {
 import { TwoFactorService } from 'src/shared/services/2fa.service'
 import { InvalidPasswordException } from 'src/shared/error'
 import { EmailService } from 'src/shared/services/email.service'
+import { ProfileService } from '../profile/profile.service'
+import { RoleName } from 'src/shared/constants/role.constant'
+import { CreateStaffAccountBodyDTO } from './auth.dto'
 
 @Injectable()
 export class AuthService {
@@ -43,6 +46,7 @@ export class AuthService {
     private readonly emailService: EmailService,
     private readonly tokenService: TokenService,
     private readonly twoFactorService: TwoFactorService,
+    private readonly profileService: ProfileService,
   ) {}
 
   async validateVerificationCode({ email, type }: { email: string; type: TypeOfVerificationCodeType }) {
@@ -81,6 +85,11 @@ export class AuthService {
           },
         }),
       ])
+      await this.profileService.createProfile({
+        email: body.email,
+        name: body.name,
+        role: RoleName.Customer,
+      })
       return user
     } catch (error) {
       if (isUniqueConstraintPrismaError(error)) {
@@ -345,6 +354,39 @@ export class AuthService {
     // 5. Trả về thông báo
     return {
       message: 'Tắt 2FA thành công',
+    }
+  }
+
+  async createStaffAccount({ email, name, role }: CreateStaffAccountBodyDTO) {
+    try {
+      const tempPassword = 'defaultPassword123@@'
+      const hashedPassword = await this.hashingService.hash(tempPassword)
+      const user = await this.authRepository.createUser({
+        email,
+        name,
+        password: hashedPassword,
+        status: VerifyStatus.VERIFIED,
+      })
+      await this.profileService.createProfile({
+        email,
+        name,
+        role,
+      })
+      // Gửi email thông báo tạo tài khoản thành công
+      const { error } = await this.emailService.sendAccountCreated({
+        email,
+        password: tempPassword,
+        role: role.toUpperCase() === 'STAFF' ? 'Nhân viên' : 'Giảng viên',
+      })
+      if (error) {
+        throw FailedToSendOTPException
+      }
+      return { message: 'Tạo tài khoản thành công' }
+    } catch (error) {
+      if (isUniqueConstraintPrismaError(error)) {
+        throw EmailAlreadyExistsException
+      }
+      throw error
     }
   }
 }

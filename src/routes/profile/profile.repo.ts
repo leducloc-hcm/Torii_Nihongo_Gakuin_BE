@@ -78,6 +78,16 @@ export class LectureProfileRepository {
       coverPhoto: updatedProfile.coverPhoto,
     }
   }
+  async createLectureProfile(userId: number, name: string) {
+    const profile = await this.prismaService.lecturerProfile.create({
+      data: {
+        userId,
+        name,
+      },
+    })
+
+    return
+  }
 }
 
 @Injectable()
@@ -139,6 +149,16 @@ export class StaffProfileRepository {
       coverPhoto: updatedProfile.coverPhoto,
     }
   }
+  async createStaffProfile(userId: number, name: string) {
+    const profile = await this.prismaService.staffProfile.create({
+      data: {
+        userId,
+        name,
+      },
+    })
+
+    return
+  }
 }
 
 @Injectable()
@@ -199,5 +219,15 @@ export class CustomerProfileRepository {
       dateOfBirth: updatedProfile.dateOfBirth?.toISOString() || null,
       coverPhoto: updatedProfile.coverPhoto,
     }
+  }
+  async createCustomerProfile(userId: number, name: string) {
+    const profile = await this.prismaService.customerProfile.create({
+      data: {
+        userId,
+        name,
+      },
+    })
+
+    return
   }
 }

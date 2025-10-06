@@ -2,6 +2,7 @@ import { Body, Controller, Get, HttpCode, HttpStatus, Ip, Post, Query, Req, Res 
 import type { Response } from 'express'
 import { ZodSerializerDto } from 'nestjs-zod'
 import {
+  CreateStaffAccountBodyDTO,
   DisableTwoFactorBodyDTO,
   ForgotPasswordBodyDTO,
   GetAuthorizationUrlResDTO,
@@ -18,8 +19,11 @@ import {
 
 import { AuthService } from 'src/routes/auth/auth.service'
 import { GoogleService } from 'src/routes/auth/google.service'
+import { AuthType } from 'src/shared/constants/auth.constant'
+import { RoleName } from 'src/shared/constants/role.constant'
 import { ActiveUser } from 'src/shared/decorators/active-user.decorator'
-import { IsPublic } from 'src/shared/decorators/auth.decorator'
+import { Auth, IsPublic } from 'src/shared/decorators/auth.decorator'
+import { Roles } from 'src/shared/decorators/roles.decorator'
 import { UserAgent } from 'src/shared/decorators/user-agent.decorator'
 import { EmptyBodyDTO } from 'src/shared/dtos/request.dto'
 import { MessageResDTO } from 'src/shared/dtos/response.dto'
@@ -126,5 +130,13 @@ export class AuthController {
       ...body,
       userId,
     })
+  }
+
+  @Post('/admin/create-account')
+  @ZodSerializerDto(MessageResDTO)
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Admin)
+  createStaffAccount(@Body() body: CreateStaffAccountBodyDTO) {
+    return this.authService.createStaffAccount(body)
   }
 }
