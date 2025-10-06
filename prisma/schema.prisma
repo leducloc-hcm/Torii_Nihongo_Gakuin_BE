@@ -571,7 +571,6 @@ model CardProgress {
   @@unique([userId, cardId])
 }
 
-// ===== Quizzes (Lesson-level) & Quick Review =====
 model Quiz {
   id        Int      @id @default(autoincrement())
   lessonId  Int?     @unique
