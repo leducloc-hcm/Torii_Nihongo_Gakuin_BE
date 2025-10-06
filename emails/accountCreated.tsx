@@ -9,7 +9,6 @@ interface EmailProps {
 
 const logoUrl = 'https://mconnectv1.s3.ap-southeast-1.amazonaws.com/Torii_Nihongo_Gakuin_Logo.png'
 
-// Tuỳ chọn: chỉnh link đổi mật khẩu tại đây (nếu có)
 const resetPasswordUrl = 'https://app.toriinihongo.vn/account/change-password'
 
 export const AccountCreatedEmail = ({ passworDefault, title, role }: EmailProps) => (

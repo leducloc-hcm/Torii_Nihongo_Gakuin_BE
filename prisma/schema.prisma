@@ -69,6 +69,10 @@ model User {
   Class Class[]
 
   ExamPaper ExamPaper[]
+
+  Notification Notification[]
+
+  Websocket Websocket[]
 }
 
 model CustomerProfile {
@@ -151,6 +155,38 @@ model Specialty {
   createdAt           DateTime            @default(now()) @map("created_at")
   updatedAt           DateTime            @updatedAt @map("updated_at")
   lecturerSpecialties LecturerSpecialty[]
+}
+
+
+model Notification {
+  id            Int                  @id @default(autoincrement())
+  type          NotificationType
+  title         String
+  message       String
+  status        NotificationStatus   @default(UNREAD)
+  priority      NotificationPriority @default(NORMAL)
+  data          Json?
+  actionUrl     String?              @map("action_url")
+  userId        Int                  @map("user_id")
+  relatedUserId Int?                 @map("related_user_id")
+  entityId      Int?                 @map("entity_id")
+  entityType    String?              @map("entity_type")
+  createdAt     DateTime             @default(now()) @map("created_at")
+  readAt        DateTime?            @map("read_at")
+  expiresAt     DateTime?            @map("expires_at")
+  user          User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([userId, createdAt])
+  @@index([type])
+  @@map("notifications")
+}
+
+model Websocket {
+  id        String   @id
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  createdAt DateTime @default(now())
 }
 
 model LecturerSpecialty {
@@ -1089,4 +1125,32 @@ enum VerificationCodeType {
   FORGOT_PASSWORD
   LOGIN
   DISABLE_2FA
+}
+
+enum NotificationType {
+  FRIEND_REQUEST
+  FRIEND_REQUEST_ACCEPTED
+  COURSE_ENROLLMENT
+  COURSE_UPDATE
+  MESSAGE
+  MENTION
+  LIKE
+  COMMENT
+  RATING
+  SYSTEM
+  PROMOTION
+  REMINDER
+}
+
+enum NotificationStatus {
+  UNREAD
+  READ
+  ARCHIVED
+}
+
+enum NotificationPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
 }
