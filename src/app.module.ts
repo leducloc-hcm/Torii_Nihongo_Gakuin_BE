@@ -10,6 +10,7 @@ import { CourseModule } from './routes/course/course.module'
 import { ModuleModule } from './routes/module/module.module'
 import { LessonModule } from './routes/lesson/lesson.module'
 import { EnrollmentModule } from './routes/enrollment/enrollment.module'
+import { FlashcardModule } from './routes/flashcard/flashcard.module'
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { EnrollmentModule } from './routes/enrollment/enrollment.module'
     ModuleModule,
     LessonModule,
     EnrollmentModule,
+    FlashcardModule,
   ],
   controllers: [AppController],
   providers: [AppService],
