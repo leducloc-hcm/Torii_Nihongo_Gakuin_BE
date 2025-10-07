@@ -4,6 +4,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import { patchNestJsSwagger } from 'nestjs-zod'
 import helmet from 'helmet'
 import { NestExpressApplication } from '@nestjs/platform-express'
+import { WebsocketAdapter } from 'src/websockets/websockets.adapter'
 // import { Logger } from 'nestjs-pino/Logger'
 
 async function bootstrap() {
@@ -26,7 +27,7 @@ async function bootstrap() {
       crossOriginEmbedderPolicy: false,
     }),
   )
-
+  app.useWebSocketAdapter(new WebsocketAdapter(app))
   patchNestJsSwagger()
   const config = new DocumentBuilder()
     .setTitle('Torii Nihongo Gakuin API')
