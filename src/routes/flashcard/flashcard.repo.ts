@@ -164,7 +164,7 @@ export class FlashcardRepository {
   }
 
   async updateDeck(id: number, userId: number, data: UpdateFlashcardDeckInput) {
-    return this.prismaService.flashcardDeck.update({
+    return await this.prismaService.flashcardDeck.update({
       where: {
         id,
         ownerId: userId, // Ensure user owns the deck
@@ -187,7 +187,7 @@ export class FlashcardRepository {
   }
 
   async deleteDeck(id: number, userId: number) {
-    return this.prismaService.flashcardDeck.delete({
+    return await this.prismaService.flashcardDeck.delete({
       where: {
         id,
         ownerId: userId, // Ensure user owns the deck
@@ -198,13 +198,13 @@ export class FlashcardRepository {
   // Card operations
   async createCard(data: CreateFlashcardInput) {
     // Verify deck ownership is handled at service level
-    return this.prismaService.flashcard.create({
+    return await this.prismaService.flashcard.create({
       data,
     })
   }
 
   async findCardById(id: number) {
-    return this.prismaService.flashcard.findUnique({
+    return await this.prismaService.flashcard.findUnique({
       where: { id },
       include: {
         deck: {
@@ -235,7 +235,7 @@ export class FlashcardRepository {
 
   async updateCard(id: number, userId: number, data: UpdateFlashcardInput) {
     // Verify ownership through deck relationship
-    return this.prismaService.flashcard.update({
+    return await this.prismaService.flashcard.update({
       where: {
         id,
         deck: {
@@ -247,7 +247,7 @@ export class FlashcardRepository {
   }
 
   async deleteCard(id: number, userId: number) {
-    return this.prismaService.flashcard.delete({
+    return await this.prismaService.flashcard.delete({
       where: {
         id,
         deck: {
@@ -259,7 +259,7 @@ export class FlashcardRepository {
 
   // Progress operations
   async findOrCreateCardProgress(userId: number, cardId: number) {
-    return this.prismaService.cardProgress.upsert({
+    return await this.prismaService.cardProgress.upsert({
       where: {
         userId_cardId: {
           userId,
@@ -292,7 +292,7 @@ export class FlashcardRepository {
       lastGrade: number
     },
   ) {
-    return this.prismaService.cardProgress.update({
+    return await this.prismaService.cardProgress.update({
       where: {
         userId_cardId: {
           userId,
@@ -384,7 +384,7 @@ export class FlashcardRepository {
       }
     }
 
-    return this.prismaService.cardProgress.findMany({
+    return await this.prismaService.cardProgress.findMany({
       where,
       include: {
         card: {
