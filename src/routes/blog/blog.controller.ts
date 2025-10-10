@@ -14,7 +14,7 @@ import {
 } from '@nestjs/common'
 import { BlogService } from './blog.service'
 import { CreateBlogDTO, UpdateBlogDTO, QueryBlogDTO } from './blog.dto'
-import { Auth } from 'src/shared/decorators/auth.decorator'
+import { Auth, IsPublic } from 'src/shared/decorators/auth.decorator'
 import { AuthType } from 'src/shared/constants/auth.constant'
 import { Roles } from 'src/shared/decorators/roles.decorator'
 import { RolesGuard } from 'src/shared/guards/roles.guard'
@@ -42,7 +42,7 @@ export class BlogController {
   }
 
   @Get('author/:authorId')
-  @Auth([AuthType.Bearer])
+  @IsPublic()
   @HttpCode(HttpStatus.OK)
   async findByAuthor(@Param('authorId', ParseIntPipe) authorId: number, @Query() queryDto: QueryBlogDTO) {
     return this.blogService.findByAuthor(authorId, queryDto)
@@ -56,14 +56,14 @@ export class BlogController {
   }
 
   @Get('slug/:slug')
-  @Auth([AuthType.Bearer])
+  @IsPublic()
   @HttpCode(HttpStatus.OK)
   async findBySlug(@Param('slug') slug: string) {
     return this.blogService.findBySlug(slug)
   }
 
   @Get(':id')
-  @Auth([AuthType.Bearer])
+  @IsPublic()
   @HttpCode(HttpStatus.OK)
   async findOne(@Param('id', ParseIntPipe) id: number) {
     return this.blogService.findOne(id)

@@ -25,7 +25,6 @@ model User {
   createdAt  DateTime     @default(now())
   updatedAt  DateTime     @updatedAt
   deletedAt  DateTime?
-
   lecturerProfile LecturerProfile?
   staffProfile    StaffProfile?
   customerProfile CustomerProfile?
@@ -815,7 +814,6 @@ model Reward {
   name   String
   points Int        @default(0)
   stock  Int?
-
   redemptions RewardRedemption[]
 }
 
@@ -853,7 +851,6 @@ model OrderItem {
   classId   Int?
   unitPrice Int
   quantity  Int           @default(1)
-
   order  Order   @relation(fields: [orderId], references: [id])
   course Course? @relation(fields: [courseId], references: [id])
   class  Class?  @relation(fields: [classId], references: [id])
