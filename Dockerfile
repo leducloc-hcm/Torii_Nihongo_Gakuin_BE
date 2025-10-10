@@ -121,11 +121,11 @@ ENV GOOGLE_CLIENT_REDIRECT_URI=
 ENV APP_NAME=
 ENV PREFIX_STATIC_ENPOINT=
 
-ENV S3_ACCESS_KEY='AKIAVVZPCSCKZAVMUOVN'
-ENV S3_SECRET_KEY='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'
-ENV S3_BUCKET_NAME='torii-nihongo-gakuin-s3'
-ENV REDIS_URL='redis://default:password@localhost:6379'
-ENV AWS_REGION='ap-southeast-1'
 
+ENV AWS_ACCESS_KEY_ID='AKIAXJ6WQCKVC7LMUOD4'
+ENV AWS_SECRET_ACCESS_KEY='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'
+ENV AWS_REGION='ap-southeast-1'
+ENV AWS_S3_BUCKET_NAME='torii-nihongo-gakuin-s3'
+ENV REDIS_URL='redis://default:password@localhost:6379'
 # Start the application
 CMD ["node", "dist/src/main.js"]
