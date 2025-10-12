@@ -4,7 +4,7 @@ import { JanusService } from './janus/janus.service'
 export interface ClassSession {
   classId: string
   janusRoomId: number
-  teacherId?: string
+  lecturerId?: string
   participants: Map<string, ParticipantInfo>
   isRecording: boolean
   recordingId?: string
@@ -15,7 +15,7 @@ export interface ClassSession {
 export interface ParticipantInfo {
   userId: string
   displayName: string
-  role: 'teacher' | 'student'
+  role: 'lecturer' | 'customer'
   sessionId: number
   handleId: number
   isPublishing: boolean
@@ -30,7 +30,7 @@ export class WebRtcService {
 
   constructor(private readonly janusService: JanusService) {}
 
-  createClassSession(classId: string, teacherId: string): ClassSession {
+  createClassSession(classId: string, lecturerId: string): ClassSession {
     if (this.activeSessions.has(classId)) {
       throw new Error(`Class session ${classId} already exists`)
     }
@@ -39,14 +39,14 @@ export class WebRtcService {
     const session: ClassSession = {
       classId,
       janusRoomId,
-      teacherId,
+      lecturerId,
       participants: new Map(),
       isRecording: false,
       startTime: new Date(),
     }
 
     this.activeSessions.set(classId, session)
-    this.logger.log(`Created class session ${classId} with teacher ${teacherId}`)
+    this.logger.log(`Created class session ${classId} with lecturer ${lecturerId}`)
 
     return session
   }
@@ -55,14 +55,14 @@ export class WebRtcService {
     classId: string,
     userId: string,
     displayName: string,
-    role: 'teacher' | 'student',
+    role: 'lecturer' | 'customer',
     sessionId: number,
     handleId: number,
   ): Promise<boolean> {
     let session = this.activeSessions.get(classId)
 
-    if (!session && role === 'teacher') {
-      // Create new session if teacher is joining
+    if (!session && role === 'lecturer') {
+      // Create new session if lecturer is joining
       session = this.createClassSession(classId, userId)
     } else if (!session) {
       throw new Error(`Class session ${classId} does not exist`)
@@ -107,8 +107,8 @@ export class WebRtcService {
     session.participants.delete(userId)
     this.userSessions.delete(userId)
 
-    // If teacher left, end the session
-    if (participant.role === 'teacher') {
+    // If lecturer left, end the session
+    if (participant.role === 'lecturer') {
       await this.endClassSession(classId)
     } else if (session.participants.size === 0) {
       // No participants left, clean up session

@@ -30,7 +30,7 @@ interface ParticipantSession {
   handleId: number
   screenShareHandleId?: number
   roomId: number
-  role: 'teacher' | 'student'
+  role: 'lecturer' | 'customer'
   classId: string
   userId: string
   displayName: string
@@ -72,7 +72,7 @@ interface ClassRecording {
 @WebSocketGateway({
   cors: { origin: '*' },
   namespace: '/webrtc',
-  transports: ['websocket'],
+  transports: ['websocket', 'polling'],
 })
 export class WebRtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
@@ -81,6 +81,7 @@ export class WebRtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly logger = new Logger(WebRtcGateway.name)
   private readonly activeSessions = new Map<string, ParticipantSession>()
   private readonly classParticipants = new Map<string, Set<string>>() // classId -> Set<connectionId>
+  private readonly socketInstances = new Map<string, Socket>() // socketId -> Socket instance
   private readonly chatHistory = new Map<string, ChatMessage[]>() // classId -> messages
   private readonly raisedHands = new Map<string, Map<string, Date>>() // classId -> userId -> timestamp
   private readonly recordings = new Map<string, ClassRecording>() // classId -> recording info
@@ -97,6 +98,9 @@ export class WebRtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
   async handleConnection(client: Socket) {
     const { userId, classId, role, displayName, token, avatar } = client.handshake.query
 
+    // Store socket instance for easy access
+    this.socketInstances.set(client.id, client)
+
     // Validate connection parameters and ensure they are strings
     const userIdStr = Array.isArray(userId) ? userId[0] : userId
     const classIdStr = Array.isArray(classId) ? classId[0] : classId
@@ -106,6 +110,7 @@ export class WebRtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (!userIdStr || !classIdStr || !roleStr || !displayNameStr) {
       this.logger.warn(`Invalid connection parameters from ${client.id}`)
       client.emit('error', { message: 'Invalid connection parameters' })
+      this.socketInstances.delete(client.id)
       client.disconnect()
       return
     }
@@ -134,7 +139,7 @@ export class WebRtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.raisedHands.set(classIdStr, new Map())
     }
 
-    this.logger.log(`User ${userIdStr} connected to class ${classIdStr} as ${roleStr}`)
+    this.logger.log(`User ${userIdStr} connected to class ${classIdStr} as ${roleStr} (socket: ${client.id})`)
     await client.join(classIdStr)
 
     // Send current class state to new participant
@@ -142,14 +147,20 @@ export class WebRtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     // Emit participant count update
     this.updateParticipantCount(classIdStr)
+
+    // Debug: Log current socket instances
+    this.logger.debug(
+      `Total socket instances: ${this.socketInstances.size}, Class ${classIdStr} participants: ${this.classParticipants.get(classIdStr)?.size || 0}`,
+    )
   }
 
-  async handleDisconnect(client: Socket) {
+  handleDisconnect(client: Socket) {
     const session = this.activeSessions.get(client.id)
 
+    // Remove socket instance
+    this.socketInstances.delete(client.id)
+
     if (session) {
-      // Cleanup Janus resources
-      await this.cleanupJanusSession(session)
       this.activeSessions.delete(client.id)
 
       // Remove from class participants
@@ -173,7 +184,7 @@ export class WebRtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
 
       // Notify other participants about disconnection
-      client.to(session.classId).emit('participant-left', {
+      client.to(session.classId).emit('user-left', {
         userId: session.userId,
         displayName: session.displayName,
         role: session.role,
@@ -187,35 +198,20 @@ export class WebRtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('join-class')
-  async handleJoinClass(@ConnectedSocket() client: Socket, @MessageBody() data: JoinClassDto) {
+  handleJoinClass(@ConnectedSocket() client: Socket, @MessageBody() data: JoinClassDto) {
     try {
-      // Create Janus session
-      const sessionId = await this.janusService.createSession()
-      if (!sessionId) {
-        client.emit('error', { message: 'Failed to create media session' })
-        return
-      }
-
-      // Attach VideoRoom plugin
-      const handleId = await this.janusService.attachPlugin(sessionId, 'janus.plugin.videoroom')
-      if (!handleId) {
-        client.emit('error', { message: 'Failed to initialize media handler' })
-        return
-      }
-
       // Set default capabilities based on role
       const capabilities = this.getDefaultCapabilities(data.role)
       const mediaSettings: MediaSettingsDto = {
         audio: { enabled: true, muted: false, volume: 100 },
-        video: { enabled: data.role === 'teacher', quality: 'medium', facingMode: 'user' },
+        video: { enabled: data.role === 'lecturer', quality: 'medium', facingMode: 'user' },
         screenShare: { enabled: false, includeAudio: false },
       }
 
-      const roomId = parseInt(data.classId)
       const session: ParticipantSession = {
-        sessionId,
-        handleId,
-        roomId,
+        sessionId: Date.now(), // Simple session ID for peer-to-peer
+        handleId: Date.now() + Math.random(),
+        roomId: parseInt(data.classId),
         role: data.role,
         classId: data.classId,
         userId: data.userId,
@@ -229,29 +225,33 @@ export class WebRtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
         joinTime: new Date(),
       }
 
-      // Handle role-specific join logic
-      if (data.role === 'teacher') {
-        await this.handleTeacherJoin(session, client)
-      } else {
-        await this.handleStudentJoin(session, client)
-      }
-
       // Store session
       this.activeSessions.set(client.id, session)
 
-      // Notify successful join
+      // Get existing participants
+      const existingParticipants = Array.from(this.activeSessions.values())
+        .filter((s) => s.classId === data.classId && s.userId !== data.userId)
+        .map((s) => ({
+          userId: s.userId,
+          displayName: s.displayName,
+          role: s.role,
+          avatar: s.avatar,
+        }))
+
+      // Notify successful join with existing participants
       client.emit('joined-class', {
-        sessionId,
-        handleId,
-        roomId,
+        sessionId: session.sessionId,
+        handleId: session.handleId,
+        roomId: session.roomId,
         role: data.role,
         capabilities,
         mediaSettings,
         participantCount: this.classParticipants.get(data.classId)?.size || 0,
+        existingParticipants,
       })
 
-      // Notify other participants
-      client.to(data.classId).emit('participant-joined', {
+      // Notify other participants that someone joined
+      client.to(data.classId).emit('user-joined', {
         userId: data.userId,
         displayName: data.displayName,
         role: data.role,
@@ -265,6 +265,149 @@ export class WebRtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.logger.error('Error joining class:', error)
       client.emit('error', { message: 'Failed to join class' })
     }
+  }
+
+  @SubscribeMessage('get-participants')
+  handleGetParticipants(@ConnectedSocket() client: Socket, @MessageBody() data: { classId: string }) {
+    try {
+      const existingParticipants = Array.from(this.activeSessions.values())
+        .filter((s) => s.classId === data.classId)
+        .map((s) => ({
+          userId: s.userId,
+          displayName: s.displayName,
+          role: s.role,
+          avatar: s.avatar,
+        }))
+
+      client.emit('participants-list', {
+        participants: existingParticipants,
+      })
+    } catch (error) {
+      this.logger.error('Error getting participants:', error)
+      client.emit('error', { message: 'Failed to get participants' })
+    }
+  }
+
+  // New WebRTC peer-to-peer signaling events
+  @SubscribeMessage('webrtc-offer')
+  handleWebRTCOffer(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { classId: string; targetUserId: string; offer: RTCSessionDescription },
+  ) {
+    try {
+      const session = this.activeSessions.get(client.id)
+      if (!session) {
+        this.logger.warn(`WebRTC offer: Session not found for client ${client.id}`)
+        client.emit('error', { message: 'Session not found' })
+        return
+      }
+
+      this.logger.log(`WebRTC offer from ${session.userId} to ${data.targetUserId} in class ${data.classId}`)
+
+      // Forward offer to target user
+      const targetSocket = this.findSocketByUserId(data.targetUserId, data.classId)
+      if (targetSocket) {
+        targetSocket.emit('webrtc-offer', {
+          userId: session.userId,
+          offer: data.offer,
+        })
+        this.logger.log(`WebRTC offer forwarded successfully to ${data.targetUserId}`)
+      } else {
+        this.logger.warn(`Target socket not found for user ${data.targetUserId} in class ${data.classId}`)
+        client.emit('error', { message: 'Target user not found' })
+      }
+    } catch (error) {
+      this.logger.error('Error handling WebRTC offer:', error)
+      client.emit('error', { message: 'Failed to process WebRTC offer' })
+    }
+  }
+
+  @SubscribeMessage('webrtc-answer')
+  handleWebRTCAnswer(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { classId: string; targetUserId: string; answer: RTCSessionDescription },
+  ) {
+    try {
+      const session = this.activeSessions.get(client.id)
+      if (!session) {
+        this.logger.warn(`WebRTC answer: Session not found for client ${client.id}`)
+        client.emit('error', { message: 'Session not found' })
+        return
+      }
+
+      this.logger.log(`WebRTC answer from ${session.userId} to ${data.targetUserId} in class ${data.classId}`)
+
+      // Forward answer to target user
+      const targetSocket = this.findSocketByUserId(data.targetUserId, data.classId)
+      if (targetSocket) {
+        targetSocket.emit('webrtc-answer', {
+          userId: session.userId,
+          answer: data.answer,
+        })
+        this.logger.log(`WebRTC answer forwarded successfully to ${data.targetUserId}`)
+      } else {
+        this.logger.warn(`Target socket not found for user ${data.targetUserId} in class ${data.classId}`)
+        client.emit('error', { message: 'Target user not found' })
+      }
+    } catch (error) {
+      this.logger.error('Error handling WebRTC answer:', error)
+      client.emit('error', { message: 'Failed to process WebRTC answer' })
+    }
+  }
+
+  @SubscribeMessage('webrtc-ice-candidate')
+  handleWebRTCIceCandidate(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { classId: string; targetUserId: string; candidate: RTCIceCandidate },
+  ) {
+    try {
+      const session = this.activeSessions.get(client.id)
+      if (!session) {
+        this.logger.warn(`WebRTC ICE candidate: Session not found for client ${client.id}`)
+        client.emit('error', { message: 'Session not found' })
+        return
+      }
+
+      // Forward ICE candidate to target user
+      const targetSocket = this.findSocketByUserId(data.targetUserId, data.classId)
+      if (targetSocket) {
+        targetSocket.emit('webrtc-ice-candidate', {
+          userId: session.userId,
+          candidate: data.candidate,
+        })
+      } else {
+        this.logger.warn(
+          `Target socket not found for ICE candidate to user ${data.targetUserId} in class ${data.classId}`,
+        )
+      }
+    } catch (error) {
+      this.logger.error('Error handling WebRTC ICE candidate:', error)
+      client.emit('error', { message: 'Failed to process ICE candidate' })
+    }
+  }
+
+  @SubscribeMessage('media-state-change')
+  handleMediaStateChange(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    data: { classId: string; userId: string; mediaState: { audio: boolean; video: boolean; screenShare: boolean } },
+  ) {
+    const session = this.activeSessions.get(client.id)
+    if (!session) {
+      client.emit('error', { message: 'Session not found' })
+      return
+    }
+
+    // Update session media settings
+    session.mediaSettings.audio.enabled = data.mediaState.audio
+    session.mediaSettings.video.enabled = data.mediaState.video
+    session.isSharingScreen = data.mediaState.screenShare
+
+    // Broadcast media state change to other participants
+    client.to(data.classId).emit('participant-media-state-changed', {
+      userId: session.userId,
+      mediaState: data.mediaState,
+    })
   }
 
   @SubscribeMessage('publish-offer')
@@ -564,7 +707,7 @@ export class WebRtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
             )
 
             // Upload to S3 in background
-            void this.uploadRecordingToS3(recording)
+            // void this.uploadRecordingToS3(recording)
           }
           break
         }
@@ -709,7 +852,7 @@ export class WebRtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
           break
 
         case 'demote_presenter':
-          if (targetSession.role !== 'teacher') {
+          if (targetSession.role !== 'lecturer') {
             targetSession.capabilities.canPublishVideo = false
             targetSession.capabilities.canShareScreen = false
             targetSession.capabilities.canShareDocuments = false
@@ -841,18 +984,34 @@ export class WebRtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   private findSocketByUserId(userId: string, classId: string): Socket | null {
-    const participants = this.classParticipants.get(classId)
-    if (!participants) return null
-
-    for (const socketId of participants) {
-      const session = this.activeSessions.get(socketId)
-      if (session && session.userId === userId) {
-        return this.server.sockets.sockets.get(socketId) || null
+    try {
+      const participants = this.classParticipants.get(classId)
+      if (!participants) {
+        this.logger.warn(`No participants found for class ${classId}`)
+        return null
       }
-    }
-    return null
-  }
 
+      for (const socketId of participants) {
+        const session = this.activeSessions.get(socketId)
+        if (session && session.userId === userId) {
+          // Get socket from our stored instances
+          const socket = this.socketInstances.get(socketId)
+          if (socket) {
+            this.logger.debug(`Found socket for user ${userId}`)
+            return socket
+          } else {
+            this.logger.warn(`Socket instance not found for socketId ${socketId}, user ${userId}`)
+          }
+        }
+      }
+
+      this.logger.warn(`No socket found for user ${userId} in class ${classId}`)
+      return null
+    } catch (error) {
+      this.logger.error(`Error finding socket for user ${userId}:`, error)
+      return null
+    }
+  }
   private findSessionByUserId(userId: string, classId: string): ParticipantSession | null {
     const participants = this.classParticipants.get(classId)
     if (!participants) return null
@@ -900,8 +1059,8 @@ export class WebRtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
-  private getDefaultCapabilities(role: 'teacher' | 'student'): ClassCapabilityDto {
-    if (role === 'teacher') {
+  private getDefaultCapabilities(role: 'lecturer' | 'customer'): ClassCapabilityDto {
+    if (role === 'lecturer') {
       return {
         canPublishVideo: true,
         canPublishAudio: true,

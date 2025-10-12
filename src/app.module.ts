@@ -11,7 +11,9 @@ import { ModuleModule } from './routes/module/module.module'
 import { LessonModule } from './routes/lesson/lesson.module'
 import { EnrollmentModule } from './routes/enrollment/enrollment.module'
 import { FlashcardModule } from './routes/flashcard/flashcard.module'
+import { NotificationModule } from './routes/notification/notification.module'
 import { WebsocketsModule } from './websockets/websockets.module'
+import { OnlineClassModule } from './routes/online-class/online-class.module'
 
 @Module({
   imports: [
@@ -25,7 +27,9 @@ import { WebsocketsModule } from './websockets/websockets.module'
     LessonModule,
     EnrollmentModule,
     FlashcardModule,
+    NotificationModule,
     WebsocketsModule,
+    OnlineClassModule,
   ],
   controllers: [AppController],
   providers: [AppService],
