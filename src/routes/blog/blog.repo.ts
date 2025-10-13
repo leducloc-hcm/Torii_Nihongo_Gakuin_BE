@@ -63,8 +63,6 @@ export class BlogRepository {
 
     const [blogs, total] = await Promise.all([
       this.prisma.blog.findMany({
-        skip,
-        take,
         where: where as any,
         orderBy: orderBy as any,
         include: this.includeRelations,

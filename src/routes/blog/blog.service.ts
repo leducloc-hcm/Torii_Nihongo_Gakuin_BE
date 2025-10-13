@@ -74,7 +74,7 @@ export class BlogService {
 
     const { blogs, total } = await this.blogRepository.findAll({
       skip,
-      take: limit,
+      take: Number(limit),
       where,
       orderBy,
     })

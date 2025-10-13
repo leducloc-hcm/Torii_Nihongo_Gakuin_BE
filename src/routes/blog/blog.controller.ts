@@ -41,13 +41,6 @@ export class BlogController {
     return this.blogService.findAll(queryDto)
   }
 
-  @Get('author/:authorId')
-  @IsPublic()
-  @HttpCode(HttpStatus.OK)
-  async findByAuthor(@Param('authorId', ParseIntPipe) authorId: number, @Query() queryDto: QueryBlogDTO) {
-    return this.blogService.findByAuthor(authorId, queryDto)
-  }
-
   @Get('tag/:tagId')
   @IsPublic()
   @HttpCode(HttpStatus.OK)
@@ -55,14 +48,14 @@ export class BlogController {
     return this.blogService.findByTag(tagId, queryDto)
   }
 
-  @Get('slug/:slug')
+  @Get(':slug')
   @IsPublic()
   @HttpCode(HttpStatus.OK)
   async findBySlug(@Param('slug') slug: string) {
     return this.blogService.findBySlug(slug)
   }
 
-  @Get(':id')
+  @Get('id/:id')
   @IsPublic()
   @HttpCode(HttpStatus.OK)
   async findOne(@Param('id', ParseIntPipe) id: number) {
