@@ -72,6 +72,8 @@ model User {
   Notification Notification[]
 
   Websocket Websocket[]
+
+  AdminProfile AdminProfile[]
 }
 
 model CustomerProfile {
@@ -214,6 +216,21 @@ model StaffProfile {
   user        User      @relation(fields: [userId], references: [id])
 }
 
+model AdminProfile {
+  id          Int       @id @default(autoincrement())
+  userId      Int       @unique
+  name        String?
+  bio         String?
+  location    String?
+  username    String?   @unique
+  avatar      String?
+  coverPhoto  String?   @map("cover_photo")
+  description String?
+  phoneNumber String?   @map("phone_number")
+  dateOfBirth DateTime? @map("date_of_birth")
+  website     String?
+  user        User      @relation(fields: [userId], references: [id])
+}
 model Course {
   id           Int          @id @default(autoincrement())
   slug         String       @unique

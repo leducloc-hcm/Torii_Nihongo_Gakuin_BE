@@ -35,7 +35,7 @@ export class BlogController {
   }
 
   @Get()
-  @Auth([AuthType.Bearer])
+  @IsPublic()
   @HttpCode(HttpStatus.OK)
   async findAll(@Query() queryDto: QueryBlogDTO) {
     return this.blogService.findAll(queryDto)
@@ -49,7 +49,7 @@ export class BlogController {
   }
 
   @Get('tag/:tagId')
-  @Auth([AuthType.Bearer])
+  @IsPublic()
   @HttpCode(HttpStatus.OK)
   async findByTag(@Param('tagId', ParseIntPipe) tagId: number, @Query() queryDto: QueryBlogDTO) {
     return this.blogService.findByTag(tagId, queryDto)

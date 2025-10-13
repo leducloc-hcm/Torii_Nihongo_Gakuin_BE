@@ -361,17 +361,19 @@ export class AuthService {
     try {
       const tempPassword = 'defaultPassword123@@'
       const hashedPassword = await this.hashingService.hash(tempPassword)
-      const user = await this.authRepository.createUser({
-        email,
-        name,
-        password: hashedPassword,
-        status: VerifyStatus.VERIFIED,
-      })
-      await this.profileService.createProfile({
-        email,
-        name,
-        role,
-      })
+      await Promise.all([
+        this.authRepository.createUser({
+          email,
+          name,
+          password: hashedPassword,
+          status: VerifyStatus.VERIFIED,
+        }),
+        await this.profileService.createProfile({
+          email,
+          name,
+          role,
+        }),
+      ])
       // Gửi email thông báo tạo tài khoản thành công
       const { error } = await this.emailService.sendAccountCreated({
         email,

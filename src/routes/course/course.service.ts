@@ -227,14 +227,14 @@ export class CourseService {
 
     const { courses, total } = await this.courseRepository.getPublishedCourses({
       skip,
-      take: limit,
+      take: Number(limit),
       where,
       orderBy,
     })
 
     return {
       data: courses,
-      meta: {
+      pagination: {
         page,
         limit,
         total,
