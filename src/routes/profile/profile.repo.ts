@@ -2,8 +2,10 @@ import { Injectable } from '@nestjs/common'
 import { PrismaService } from 'src/shared/services/prisma.service'
 import {
   CustomerProfileType,
+  GetAdminProfileType,
   GetLectureProfileType,
   GetStaffProfileType,
+  UpdateAdminProfileType,
   UpdateCustomerProfileType,
   UpdateLectureProfileType,
   UpdateStaffProfileType,
@@ -156,8 +158,17 @@ export class StaffProfileRepository {
         name,
       },
     })
-
-    return
+    return {
+      id: profile.id,
+      name: profile.name,
+      bio: profile.bio,
+      avatar: profile.avatar,
+      location: profile.location,
+      website: profile.website,
+      phoneNumber: profile.phoneNumber,
+      dateOfBirth: profile.dateOfBirth?.toISOString() || null,
+      coverPhoto: profile.coverPhoto,
+    }
   }
 }
 
@@ -229,5 +240,86 @@ export class CustomerProfileRepository {
     })
 
     return
+  }
+}
+
+@Injectable()
+export class AdminProfileRepository {
+  constructor(private readonly prismaService: PrismaService) {}
+
+  async getAdminProfile(adminProfileId: number): Promise<GetAdminProfileType | null> {
+    const profile = await this.prismaService.adminProfile.findFirst({
+      where: {
+        id: adminProfileId,
+      },
+    })
+
+    if (!profile || !profile.name) {
+      return null
+    }
+
+    return {
+      id: profile.id,
+      name: profile.name,
+      bio: profile.bio,
+      avatar: profile.avatar,
+      location: profile.location,
+      website: profile.website,
+      phoneNumber: profile.phoneNumber,
+      dateOfBirth: profile.dateOfBirth?.toISOString() || null,
+      coverPhoto: profile.coverPhoto,
+    }
+  }
+
+  async updateAdminProfile(
+    adminProfileId: number,
+    data: Partial<Omit<UpdateAdminProfileType, 'id'>>,
+  ): Promise<GetAdminProfileType | null> {
+    const { dateOfBirth, ...restData } = data
+    const updateData = {
+      ...restData,
+      ...(dateOfBirth && { dateOfBirth: new Date(dateOfBirth) }),
+    }
+
+    const updatedProfile = await this.prismaService.adminProfile.update({
+      where: { id: adminProfileId },
+      data: updateData,
+    })
+
+    if (!updatedProfile || !updatedProfile.name) {
+      return null
+    }
+
+    return {
+      id: updatedProfile.id,
+      name: updatedProfile.name,
+      bio: updatedProfile.bio,
+      avatar: updatedProfile.avatar,
+      location: updatedProfile.location,
+      website: updatedProfile.website,
+      phoneNumber: updatedProfile.phoneNumber,
+      dateOfBirth: updatedProfile.dateOfBirth?.toISOString() || null,
+      coverPhoto: updatedProfile.coverPhoto,
+    }
+  }
+  async createAdminProfile(userId: number, name: string) {
+    const profile = await this.prismaService.adminProfile.create({
+      data: {
+        userId,
+        name,
+      },
+    })
+
+    return {
+      id: profile.id,
+      name: profile.name,
+      bio: profile.bio,
+      avatar: profile.avatar,
+      location: profile.location,
+      website: profile.website,
+      phoneNumber: profile.phoneNumber,
+      dateOfBirth: profile.dateOfBirth?.toISOString() || null,
+      coverPhoto: profile.coverPhoto,
+    }
   }
 }

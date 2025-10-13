@@ -55,7 +55,7 @@ export class LessonController {
     return this.lessonService.findOne(id)
   }
 
-  @Get(':lessonId/stream-url')
+  @Get(':lessonId/stream')
   @Auth([AuthType.Bearer])
   @HttpCode(HttpStatus.OK)
   async getStreamUrl(@ActiveUser('userId') userId: number, @Param('lessonId', ParseIntPipe) lessonId: number) {

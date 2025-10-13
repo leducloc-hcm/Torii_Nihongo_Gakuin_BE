@@ -1,5 +1,10 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common'
-import { LectureProfileRepository, StaffProfileRepository, CustomerProfileRepository } from './profile.repo'
+import {
+  LectureProfileRepository,
+  StaffProfileRepository,
+  CustomerProfileRepository,
+  AdminProfileRepository,
+} from './profile.repo'
 import { SharedUserRepository } from 'src/shared/repositories/shared-user.repo'
 import { PrismaService } from 'src/shared/services/prisma.service'
 import {
@@ -9,6 +14,8 @@ import {
   GetLectureProfileType,
   GetStaffProfileType,
   CustomerProfileType,
+  AdminProfileType,
+  UpdateAdminProfileType,
 } from './profile.model'
 import { RoleName } from 'src/shared/constants/role.constant'
 import { S3Service } from 'src/shared/services/s3.service'
@@ -19,12 +26,15 @@ export class ProfileService {
     private readonly lectureProfileRepo: LectureProfileRepository,
     private readonly staffProfileRepo: StaffProfileRepository,
     private readonly customerProfileRepo: CustomerProfileRepository,
+    private readonly adminProfileRepo: AdminProfileRepository,
     private readonly sharedUserRepo: SharedUserRepository,
     private readonly prismaService: PrismaService,
     private readonly s3Service: S3Service,
   ) {}
 
-  async getProfile(userId: number): Promise<GetLectureProfileType | GetStaffProfileType | CustomerProfileType> {
+  async getProfile(
+    userId: number,
+  ): Promise<GetLectureProfileType | GetStaffProfileType | CustomerProfileType | AdminProfileType> {
     const user = await this.sharedUserRepo.findUnique({ id: userId })
     if (!user) {
       throw new NotFoundException('User not found')
@@ -72,6 +82,19 @@ export class ProfileService {
         }
         return profile
       }
+      case RoleName.Admin: {
+        const adminProfile = await this.prismaService.adminProfile.findUnique({
+          where: { userId },
+        })
+        if (!adminProfile) {
+          throw new NotFoundException('Admin profile not found')
+        }
+        const profile = await this.adminProfileRepo.getAdminProfile(adminProfile.id)
+        if (!profile) {
+          throw new NotFoundException('Admin profile not found')
+        }
+        return profile
+      }
 
       default:
         throw new BadRequestException('Invalid user role')
@@ -80,9 +103,11 @@ export class ProfileService {
 
   async updateProfile(
     userId: number,
-    data: Partial<UpdateLectureProfileType | UpdateStaffProfileType | UpdateCustomerProfileType>,
+    data: Partial<
+      UpdateLectureProfileType | UpdateStaffProfileType | UpdateCustomerProfileType | UpdateAdminProfileType
+    >,
     files?: { avatar?: Express.Multer.File[]; coverPhoto?: Express.Multer.File[] },
-  ): Promise<GetLectureProfileType | GetStaffProfileType | CustomerProfileType> {
+  ): Promise<GetLectureProfileType | GetStaffProfileType | CustomerProfileType | AdminProfileType> {
     const user = await this.sharedUserRepo.findUnique({ id: userId })
     if (!user) {
       throw new NotFoundException('User not found')
@@ -155,6 +180,22 @@ export class ProfileService {
           throw new NotFoundException('Failed to update customer profile')
         }
         return updatedCustomerProfile
+      }
+      case RoleName.Admin: {
+        const adminProfile = await this.prismaService.adminProfile.findUnique({
+          where: { userId },
+        })
+        if (!adminProfile) {
+          throw new NotFoundException('Admin profile not found')
+        }
+        const updatedAdminProfile = await this.adminProfileRepo.updateAdminProfile(
+          adminProfile.id,
+          updatedData as Partial<UpdateAdminProfileType>,
+        )
+        if (!updatedAdminProfile) {
+          throw new NotFoundException('Failed to update admin profile')
+        }
+        return updatedAdminProfile
       }
 
       default:

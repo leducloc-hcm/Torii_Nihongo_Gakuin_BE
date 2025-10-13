@@ -16,7 +16,7 @@ import {
 } from '@nestjs/common'
 import { CourseService } from './course.service'
 import { CreateCourseDTO, UpdateCourseDTO, QueryCourseDTO } from './course.dto'
-import { Auth } from 'src/shared/decorators/auth.decorator'
+import { Auth, IsPublic } from 'src/shared/decorators/auth.decorator'
 import { AuthType } from 'src/shared/constants/auth.constant'
 import { Roles } from 'src/shared/decorators/roles.decorator'
 import { RolesGuard } from 'src/shared/guards/roles.guard'
@@ -51,7 +51,8 @@ export class CourseController {
     return this.courseService.findAll(queryDto)
   }
 
-  @Get('published')
+  @Get('public/all')
+  @IsPublic()
   @HttpCode(HttpStatus.OK)
   async findPublished(@Query() queryDto: Omit<QueryCourseDTO, 'status'>) {
     return this.courseService.getPublishedCourses(queryDto)
@@ -67,6 +68,8 @@ export class CourseController {
 
   @Get(':slug')
   @HttpCode(HttpStatus.OK)
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Admin, RoleName.Staff, RoleName.Lecturer)
   async findBySlug(@Param('slug') slug: string, @Query('includeReviews') includeReviews?: boolean) {
     return this.courseService.findBySlug(slug, includeReviews)
   }
