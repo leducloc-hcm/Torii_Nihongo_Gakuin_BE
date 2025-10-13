@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, ConflictException, BadRequestException }
 import { BlogRepository } from './blog.repo'
 import { CreateBlogDTO, UpdateBlogDTO, QueryBlogDTO } from './blog.dto'
 import { BlogWithRelations, BlogWhereInput, BlogOrderByInput } from './blog.model'
+import { TagRepository } from '../tag/tag.repo'
 
 @Injectable()
 export class BlogService {

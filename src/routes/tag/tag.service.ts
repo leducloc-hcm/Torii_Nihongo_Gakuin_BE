@@ -39,7 +39,7 @@ export class TagService {
 
     const { tags, total } = await this.tagRepository.findAll({
       skip,
-      take: limit,
+      take: Number(limit),
       where,
       orderBy: { name: 'asc' },
     })
