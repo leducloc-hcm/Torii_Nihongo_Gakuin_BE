@@ -26,9 +26,9 @@ RUN npm cache clean --force
 # ===================================
 # Stage 2: Builder
 # ===================================
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
 
-RUN apk add --no-cache openssl libc6-compat
+RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -48,11 +48,15 @@ COPY prisma ./prisma/
 RUN npx prisma generate
 
 # Build the application
-RUN node --max-old-space-size=2048 node_modules/.bin/nest build
+ENV NODE_OPTIONS="--max-old-space-size=4096"
+
+# Build the NestJS application
+RUN npm run build
 
 # Build email templates (if needed)
 RUN npm run email:build || true
 
+RUN npm cache clean --force && rm -rf /root/.npm /tmp/*
 # ===================================
 # Stage 3: Runner (Production)
 # ===================================
