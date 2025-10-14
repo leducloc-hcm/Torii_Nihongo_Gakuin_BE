@@ -11,6 +11,8 @@ import {
   HttpStatus,
   UseGuards,
   ParseIntPipe,
+  UseInterceptors,
+  UploadedFiles,
 } from '@nestjs/common'
 import { BlogService } from './blog.service'
 import { CreateBlogDTO, UpdateBlogDTO, QueryBlogDTO } from './blog.dto'
@@ -20,6 +22,8 @@ import { Roles } from 'src/shared/decorators/roles.decorator'
 import { RolesGuard } from 'src/shared/guards/roles.guard'
 import { RoleName } from 'src/shared/constants/role.constant'
 import { ActiveUser } from 'src/shared/decorators/active-user.decorator'
+import { imageUploadOptions } from 'src/shared/config/upload.config'
+import { FileFieldsInterceptor } from '@nestjs/platform-express'
 
 @Controller('blogs')
 @UseGuards(RolesGuard)
@@ -30,8 +34,13 @@ export class BlogController {
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Admin)
   @HttpCode(HttpStatus.CREATED)
-  async create(@Body() createBlogDto: CreateBlogDTO, @ActiveUser('userId') userId: number) {
-    return this.blogService.create(createBlogDto, userId)
+  @UseInterceptors(FileFieldsInterceptor([{ name: 'image', maxCount: 1 }], imageUploadOptions))
+  async create(
+    @Body() createBlogDto: CreateBlogDTO,
+    @ActiveUser('userId') userId: number,
+    @UploadedFiles() files?: { image?: Express.Multer.File[] },
+  ) {
+    return this.blogService.create(createBlogDto, userId, files)
   }
 
   @Get()
@@ -41,13 +50,6 @@ export class BlogController {
     return this.blogService.findAll(queryDto)
   }
 
-  @Get('author/:authorId')
-  @IsPublic()
-  @HttpCode(HttpStatus.OK)
-  async findByAuthor(@Param('authorId', ParseIntPipe) authorId: number, @Query() queryDto: QueryBlogDTO) {
-    return this.blogService.findByAuthor(authorId, queryDto)
-  }
-
   @Get('tag/:tagId')
   @IsPublic()
   @HttpCode(HttpStatus.OK)
@@ -55,14 +57,14 @@ export class BlogController {
     return this.blogService.findByTag(tagId, queryDto)
   }
 
-  @Get('slug/:slug')
+  @Get(':slug')
   @IsPublic()
   @HttpCode(HttpStatus.OK)
   async findBySlug(@Param('slug') slug: string) {
     return this.blogService.findBySlug(slug)
   }
 
-  @Get(':id')
+  @Get('id/:id')
   @IsPublic()
   @HttpCode(HttpStatus.OK)
   async findOne(@Param('id', ParseIntPipe) id: number) {
@@ -73,12 +75,14 @@ export class BlogController {
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Admin)
   @HttpCode(HttpStatus.OK)
+  @UseInterceptors(FileFieldsInterceptor([{ name: 'image', maxCount: 1 }], imageUploadOptions))
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateBlogDto: UpdateBlogDTO,
     @ActiveUser('userId') userId: number,
+    @UploadedFiles() files?: { image?: Express.Multer.File[] },
   ) {
-    return this.blogService.update(id, updateBlogDto, userId)
+    return this.blogService.update(id, updateBlogDto, userId, files)
   }
 
   @Delete(':id')

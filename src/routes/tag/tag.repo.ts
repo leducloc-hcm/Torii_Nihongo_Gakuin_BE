@@ -35,8 +35,6 @@ export class TagRepository {
 
     const [tags, total] = await Promise.all([
       this.prisma.tag.findMany({
-        skip,
-        take,
         where,
         orderBy: orderBy as any,
         include: {

@@ -49,14 +49,22 @@ export class AuthService {
     private readonly profileService: ProfileService,
   ) {}
 
-  async validateVerificationCode({ email, type }: { email: string; type: TypeOfVerificationCodeType }) {
+  async validateVerificationCode({
+    email,
+    type,
+    code,
+  }: {
+    email: string
+    type: TypeOfVerificationCodeType
+    code: string
+  }) {
     const vevificationCode = await this.authRepository.findUniqueVerificationCode({
       email_type: {
         email,
         type,
       },
     })
-    if (!vevificationCode) {
+    if (!vevificationCode || vevificationCode.code !== code) {
       throw InvalidOTPException
     }
     if (vevificationCode.expiresAt < new Date()) {
@@ -69,6 +77,7 @@ export class AuthService {
       await this.validateVerificationCode({
         email: body.email,
         type: TypeOfVerificationCode.REGISTER,
+        code: body.code,
       })
       const hashedPassword = await this.hashingService.hash(body.password)
       const [user] = await Promise.all([
@@ -163,6 +172,7 @@ export class AuthService {
         await this.validateVerificationCode({
           email: user.email,
           type: TypeOfVerificationCode.LOGIN,
+          code: body.code,
         })
       }
     }
@@ -281,6 +291,7 @@ export class AuthService {
     await this.validateVerificationCode({
       email,
       type: TypeOfVerificationCode.FORGOT_PASSWORD,
+      code,
     })
     //3. Cập nhật lại mật khẩu mới và xóa đi OTP
     const hashedPassword = await this.hashingService.hash(newPassword)
@@ -348,6 +359,7 @@ export class AuthService {
       await this.validateVerificationCode({
         email: user.email,
         type: TypeOfVerificationCode.DISABLE_2FA,
+        code,
       })
     }
 
