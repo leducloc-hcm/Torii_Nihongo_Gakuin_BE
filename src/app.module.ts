@@ -13,6 +13,7 @@ import { EnrollmentModule } from './routes/enrollment/enrollment.module'
 import { FlashcardModule } from './routes/flashcard/flashcard.module'
 import { PlacementBlueprintModule } from './routes/placement/placement-blueprint.module'
 import { QuestionModule } from './routes/question/question.module'
+import { OptionModule } from './routes/question-option/option.module'
 import { WebsocketsModule } from './websockets/websockets.module'
 
 @Module({
@@ -29,6 +30,7 @@ import { WebsocketsModule } from './websockets/websockets.module'
     FlashcardModule,
     PlacementBlueprintModule,
     QuestionModule,
+    OptionModule,
     WebsocketsModule,
   ],
   controllers: [AppController],
