@@ -91,7 +91,7 @@ export class FlashcardController {
   @HttpCode(HttpStatus.CREATED)
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Customer, RoleName.Lecturer)
-  async createCard(@Body() createCardDto: CreateFlashcardDto, @ActiveUser('userId') userId: number) {
+  async createCard(@Body() createCardDto: CreateFlashcardDto[], @ActiveUser('userId') userId: number) {
     return await this.flashcardService.createCard(createCardDto, userId)
   }
 
