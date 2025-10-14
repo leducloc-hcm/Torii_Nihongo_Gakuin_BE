@@ -10,6 +10,7 @@
     "email:build": "email build",
     "email:export": "email export",
     "build": "nest build",
+    "prepare": "husky",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
@@ -21,6 +22,12 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json"
+  },
+  "lint-staged": {
+    "*.{js,ts,tsx,jsx,json,css,md}": [
+      "prettier --write",
+      "eslint --fix"
+    ]
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.896.0",
@@ -57,6 +64,8 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@commitlint/cli": "^20.1.0",
+    "@commitlint/config-conventional": "^20.0.0",
     "@eslint/eslintrc": "^3.2.0",
     "@eslint/js": "^9.18.0",
     "@nestjs/cli": "^11.0.0",
@@ -68,12 +77,14 @@
     "@types/multer": "^2.0.0",
     "@types/node": "^22.10.7",
     "@types/supertest": "^6.0.2",
-    "eslint": "^9.18.0",
+    "eslint": "^9.37.0",
     "eslint-config-prettier": "^10.0.1",
     "eslint-plugin-prettier": "^5.2.2",
     "globals": "^16.0.0",
+    "husky": "^9.1.7",
     "jest": "^30.0.0",
-    "prettier": "^3.4.2",
+    "lint-staged": "^16.2.4",
+    "prettier": "^3.6.2",
     "prisma": "^6.16.3",
     "react-email": "4.2.12",
     "source-map-support": "^0.5.21",
