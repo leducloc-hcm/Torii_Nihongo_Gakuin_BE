@@ -150,12 +150,12 @@ export class BlogRepository {
 
   async checkTagsExist(tagIds: number[]): Promise<{ exists: boolean; missingIds: number[] }> {
     const tags = await this.prisma.tag.findMany({
-      where: { id: { in: tagIds.map(Number) } },
+      where: { id: { in: tagIds?.map(Number) } },
       select: { id: true },
     })
 
     const foundIds = tags.map((tag) => tag.id)
-    const missingIds = tagIds.map((id) => parseInt(id as any, 10)).filter((id) => !foundIds.includes(id))
+    const missingIds = tagIds?.map((id) => parseInt(id as any, 10)).filter((id) => !foundIds.includes(id))
 
     return {
       exists: missingIds.length === 0,

@@ -43,7 +43,7 @@ export class BlogService {
       {
         title,
         content,
-        image: image ?? null,
+        image: imageUrl,
         slug,
         author: {
           connect: { id: authorId },
