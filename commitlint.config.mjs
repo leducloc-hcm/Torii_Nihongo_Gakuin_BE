@@ -5,7 +5,7 @@ export default {
       2,
       'always',
       [
-        'feat', // thêm tính năng mới
+        'fea', // thêm tính năng mới
         'fix', // sửa lỗi
         'chore', // thay đổi nhỏ không ảnh hưởng logic
         'docs', // cập nhật tài liệu
