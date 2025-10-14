@@ -12,6 +12,7 @@ import { LessonModule } from './routes/lesson/lesson.module'
 import { EnrollmentModule } from './routes/enrollment/enrollment.module'
 import { FlashcardModule } from './routes/flashcard/flashcard.module'
 import { PlacementBlueprintModule } from './routes/placement/placement-blueprint.module'
+import { QuestionModule } from './routes/question/question.module'
 import { WebsocketsModule } from './websockets/websockets.module'
 
 @Module({
@@ -27,6 +28,7 @@ import { WebsocketsModule } from './websockets/websockets.module'
     EnrollmentModule,
     FlashcardModule,
     PlacementBlueprintModule,
+    QuestionModule,
     WebsocketsModule,
   ],
   controllers: [AppController],
