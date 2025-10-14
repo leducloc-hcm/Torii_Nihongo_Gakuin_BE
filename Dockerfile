@@ -10,7 +10,7 @@ WORKDIR /app
 
 # Copy package files
 COPY package.json package-lock.json* ./
-
+ENV HUSKY=0
 # Install production dependencies
 RUN npm pkg delete scripts.prepare && npm ci --only=production
 
@@ -48,7 +48,7 @@ COPY prisma ./prisma/
 RUN npx prisma generate
 
 # Build the application
-RUN npm run build
+RUN node --max-old-space-size=2048 node_modules/.bin/nest build
 
 # Build email templates (if needed)
 RUN npm run email:build || true
