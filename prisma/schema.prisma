@@ -357,7 +357,7 @@ model Question {
   tags        String[]
   metadata    Json?
   createdAt   DateTime     @default(now())
-readingLength ReadingLength?
+  readingLength ReadingLength?
   tokenCount    Int?
   media     MediaAsset? @relation(fields: [mediaId], references: [id])
   options   Option[]

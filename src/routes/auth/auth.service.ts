@@ -271,9 +271,12 @@ export class AuthService {
     const user = await this.sharedUserRepository.findUnique({
       email,
     })
+
+    // const code = await
     if (!user) {
       throw EmailNotFoundException
     }
+
     //2. Kiểm tra mã OTP có hợp lệ không
     await this.validateVerificationCode({
       email,
