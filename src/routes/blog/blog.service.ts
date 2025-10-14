@@ -3,12 +3,20 @@ import { BlogRepository } from './blog.repo'
 import { CreateBlogDTO, UpdateBlogDTO, QueryBlogDTO } from './blog.dto'
 import { BlogWithRelations, BlogWhereInput, BlogOrderByInput } from './blog.model'
 import { TagRepository } from '../tag/tag.repo'
+import { S3Service } from 'src/shared/services/s3.service'
 
 @Injectable()
 export class BlogService {
-  constructor(private readonly blogRepository: BlogRepository) {}
+  constructor(
+    private readonly blogRepository: BlogRepository,
+    private readonly s3Service: S3Service,
+  ) {}
 
-  async create(createBlogDto: CreateBlogDTO, authorId: number): Promise<BlogWithRelations> {
+  async create(
+    createBlogDto: CreateBlogDTO,
+    authorId: number,
+    files?: { image?: Express.Multer.File[] },
+  ): Promise<BlogWithRelations> {
     const { title, content, image, slug, tagIds } = createBlogDto
 
     // Check if slug already exists
@@ -16,7 +24,10 @@ export class BlogService {
     if (slugExists) {
       throw new ConflictException(`Blog with slug '${slug}' already exists`)
     }
-
+    let imageUrl = createBlogDto.image
+    if (files?.image?.[0]) {
+      imageUrl = (await this.s3Service.uploadFileToS3(files.image[0], 'blogs')).url
+    }
     // Validate that all tags exist
     if (tagIds && tagIds.length > 0) {
       const { exists, missingIds } = await this.blogRepository.checkTagsExist(tagIds)
@@ -24,6 +35,9 @@ export class BlogService {
         throw new BadRequestException(`Tags with IDs [${missingIds.join(', ')}] do not exist`)
       }
     }
+    const finalTagIds = tagIds?.map((id) => Number(id)) ?? []
+
+    // Create the blog
 
     return this.blogRepository.create(
       {
@@ -35,7 +49,7 @@ export class BlogService {
           connect: { id: authorId },
         },
       },
-      tagIds,
+      finalTagIds,
     )
   }
 
@@ -111,14 +125,15 @@ export class BlogService {
     return blog
   }
 
-  async update(id: number, updateBlogDto: UpdateBlogDTO, userId: number): Promise<BlogWithRelations> {
+  async update(
+    id: number,
+    updateBlogDto: UpdateBlogDTO,
+    userId: number,
+    files?: { image?: Express.Multer.File[] },
+  ): Promise<BlogWithRelations> {
     // Check if blog exists
     const existingBlog = await this.findOne(id)
 
-    // Check if user is the author (this can be enforced at controller level with guards)
-    // For now, we'll allow admins/staff to update any blog via role guards
-
-    // If slug is being updated, check if it's already taken
     if (updateBlogDto.slug && updateBlogDto.slug !== existingBlog.slug) {
       const slugExists = await this.blogRepository.checkSlugExists(updateBlogDto.slug, id)
       if (slugExists) {
