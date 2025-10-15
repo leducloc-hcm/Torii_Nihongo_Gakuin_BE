@@ -19,7 +19,9 @@ import { AuthType } from 'src/shared/constants/auth.constant'
 import { Roles } from 'src/shared/decorators/roles.decorator'
 import { RolesGuard } from 'src/shared/guards/roles.guard'
 import { RoleName } from 'src/shared/constants/role.constant'
+import { ApiTags } from '@nestjs/swagger'
 
+@ApiTags('Question Options')
 @Controller()
 @UseGuards(RolesGuard)
 export class OptionController {
