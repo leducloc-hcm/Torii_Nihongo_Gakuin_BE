@@ -9,10 +9,15 @@ import {
   LessonWhereInput,
   LessonOrderByInput,
 } from './lesson.model'
+import { S3Service } from 'src/shared/services/s3.service'
+import { MediaKind, MediaStatus } from 'src/shared/constants/media.constant'
 
 @Injectable()
 export class LessonRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly s3Service: S3Service,
+  ) {}
 
   private readonly includeRelations = {
     module: {
@@ -211,5 +216,49 @@ export class LessonRepository {
     }
 
     return this.findAll({ skip, take, where: whereWithModules as any, orderBy })
+  }
+
+  async generateUploadUrl(lessonId: number, filename: string, contentType: string) {
+    const lesson = await this.prisma.lesson.findFirst({
+      where: {
+        id: lessonId,
+      },
+      include: {
+        module: {
+          include: {
+            course: true,
+          },
+        },
+      },
+    })
+
+    if (!lesson) {
+      throw new Error('Lesson not found')
+    }
+
+    const uploadInfo = await this.s3Service.generatePresignedUploadUrl(
+      lesson.module.course.id,
+      lesson.module.id,
+      lessonId,
+      filename,
+      contentType,
+    )
+
+    // Create media asset record if it doesn't exist
+    if (!lesson.mediaId) {
+      const mediaAsset = await this.prisma.mediaAsset.create({
+        data: {
+          kind: MediaKind.VIDEO,
+          url: uploadInfo.key,
+        },
+      })
+
+      await this.prisma.lesson.update({
+        where: { id: lessonId },
+        data: { mediaId: mediaAsset.id, videoUrl: uploadInfo.uploadUrl },
+      })
+    }
+
+    return uploadInfo
   }
 }

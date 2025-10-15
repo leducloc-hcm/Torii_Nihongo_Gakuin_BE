@@ -7,6 +7,7 @@ export const LessonSchema = z.object({
   title: z.string().min(1, 'Title is required').max(255, 'Title must be less than 255 characters'),
   kind: z.enum(['VIDEO', 'ARTICLE', 'QUIZ', 'LIVE']).default('VIDEO'),
   content: z.string().nullable().optional(),
+  mediaId: z.number().int().positive().nullable().optional(),
   videoUrl: z.string().url('Invalid video URL').nullable().optional(),
   durationSec: z.number().int().min(0, 'Duration must be non-negative').nullable().optional(),
   order: z.number().int().min(0, 'Order must be non-negative').default(0),

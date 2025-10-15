@@ -89,4 +89,14 @@ export class LessonController {
     await this.lessonService.reorderLessons(moduleId, body.lessons)
     return { message: 'Lessons reordered successfully' }
   }
+  @Post('/upload/video')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Admin, RoleName.Staff, RoleName.Lecturer)
+  @HttpCode(HttpStatus.OK)
+  async generateUploadUrl(
+    @Body() body: { lessonId: number; filename: string; contentType: string },
+    @ActiveUser('userId') userId: number,
+  ) {
+    return this.lessonService.generateUploadUrl(body, userId)
+  }
 }

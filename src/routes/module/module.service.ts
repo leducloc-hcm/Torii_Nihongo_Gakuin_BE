@@ -32,7 +32,7 @@ export class ModuleService {
 
   async findAll(queryDto: QueryModuleDTO) {
     const { page, limit, search, courseId, sortBy, sortOrder } = queryDto
-    const skip = (page - 1) * limit
+    const skip = (page - 1) * Number(limit)
 
     // Build where clause
     const where: ModuleWhereInput = {}
@@ -55,7 +55,7 @@ export class ModuleService {
 
     const { modules, total } = await this.moduleRepository.findAll({
       skip,
-      take: limit,
+      take: Number(limit),
       where,
       orderBy,
     })
@@ -64,9 +64,9 @@ export class ModuleService {
       data: modules,
       meta: {
         page,
-        limit,
+        limit: Number(limit),
         total,
-        totalPages: Math.ceil(total / limit),
+        totalPages: Math.ceil(total / Number(limit)),
       },
     }
   }
@@ -103,7 +103,7 @@ export class ModuleService {
 
   async findByCourse(courseId: number, queryDto: Omit<QueryModuleDTO, 'courseId'>) {
     const { page, limit, search, sortBy, sortOrder } = queryDto
-    const skip = (page - 1) * limit
+    const skip = (page - 1) * Number(limit)
 
     // Build where clause (excluding courseId since it's passed separately)
     const where: Omit<ModuleWhereInput, 'courseId'> = {}
@@ -122,7 +122,7 @@ export class ModuleService {
 
     const { modules, total } = await this.moduleRepository.findByCourse(courseId, {
       skip,
-      take: limit,
+      take: Number(limit),
       where,
       orderBy,
     })
@@ -131,9 +131,9 @@ export class ModuleService {
       data: modules,
       meta: {
         page,
-        limit,
+        limit: Number(limit),
         total,
-        totalPages: Math.ceil(total / limit),
+        totalPages: Math.ceil(total / Number(limit)),
       },
     }
   }
