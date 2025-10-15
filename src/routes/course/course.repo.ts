@@ -78,8 +78,6 @@ export class CourseRepository {
 
     const [courses, total] = await Promise.all([
       this.prisma.course.findMany({
-        skip,
-        take,
         where: where as any,
         orderBy: orderBy as any,
         include: this.includeRelations,
@@ -115,7 +113,7 @@ export class CourseRepository {
   }
 
   async delete(where: CourseWhereUniqueInput): Promise<Course> {
-    return this.prisma.course.delete({
+    return await this.prisma.course.delete({
       where: where as any,
     })
   }

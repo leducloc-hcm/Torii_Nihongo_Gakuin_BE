@@ -90,7 +90,7 @@ export class ModuleRepository {
   }
 
   async delete(where: ModuleWhereUniqueInput): Promise<Module> {
-    return this.prisma.module.delete({
+    return await this.prisma.module.delete({
       where: where as any,
     })
   }

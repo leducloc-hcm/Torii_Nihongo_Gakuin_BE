@@ -118,7 +118,7 @@ export class LessonRepository {
   }
 
   async delete(where: LessonWhereUniqueInput): Promise<Lesson> {
-    return this.prisma.lesson.delete({
+    return await this.prisma.lesson.delete({
       where: where as any,
     })
   }

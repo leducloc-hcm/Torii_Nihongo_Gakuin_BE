@@ -50,7 +50,7 @@ export class CourseService {
 
   async findAll(queryDto: QueryCourseDTO) {
     const { page, limit, search, level, courseType, status, sortBy, sortOrder } = queryDto
-    const skip = (page - 1) * limit
+    const skip = (page - 1) * Number(limit)
 
     // Build where clause
     const where: CourseWhereInput = {}
@@ -88,7 +88,7 @@ export class CourseService {
 
     const { courses, total } = await this.courseRepository.findAll({
       skip,
-      take: limit,
+      take: Number(limit),
       where,
       orderBy,
     })
@@ -97,9 +97,9 @@ export class CourseService {
       data: courses,
       meta: {
         page,
-        limit,
+        limit: Number(limit),
         total,
-        totalPages: Math.ceil(total / limit),
+        totalPages: Math.ceil(total / Number(limit)),
       },
     }
   }
@@ -227,14 +227,14 @@ export class CourseService {
 
     const { courses, total } = await this.courseRepository.getPublishedCourses({
       skip,
-      take: limit,
+      take: Number(limit),
       where,
       orderBy,
     })
 
     return {
       data: courses,
-      meta: {
+      pagination: {
         page,
         limit,
         total,

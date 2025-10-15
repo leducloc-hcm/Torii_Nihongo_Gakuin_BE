@@ -82,14 +82,16 @@ export class FlashcardService {
   }
 
   // Card operations
-  async createCard(data: CreateFlashcardInput, userId: number) {
-    // Verify deck ownership
-    const deck = await this.flashcardRepository.findDeckById(data.deckId, userId)
-    if (!deck || deck.ownerId !== userId) {
-      throw new ForbiddenException('You can only add cards to your own decks')
+  async createCard(data: CreateFlashcardInput[], userId: number) {
+    for (const card of data) {
+      // Verify deck ownership
+      const deck = await this.flashcardRepository.findDeckById(card.deckId, userId)
+      if (!deck || deck.ownerId !== userId) {
+        throw new ForbiddenException('You can only add cards to your own decks')
+      }
     }
-
-    return await this.flashcardRepository.createCard(data)
+    await Promise.all(data?.map((card) => this.flashcardRepository.createCard(card)))
+    return 'Cards created successfully'
   }
 
   async getDeckCards(deckId: number, userId?: number) {
@@ -183,6 +185,7 @@ export class FlashcardService {
       results,
     }
   }
+  async updateCardProgress(userId: number, cardId: number) {}
 
   async getUserProgress(userId: number, deckId?: number) {
     return await this.flashcardRepository.findUserCardProgress(userId, deckId)

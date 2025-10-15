@@ -203,7 +203,7 @@ export class EnrollmentRepository {
   }
 
   async delete(where: EnrollmentWhereUniqueInput): Promise<Enrollment> {
-    return this.prisma.enrollment.delete({
+    return await this.prisma.enrollment.delete({
       where: where as any,
     })
   }
@@ -283,19 +283,19 @@ export class EnrollmentRepository {
   }
 
   async getUserEnrollmentCount(userId: number): Promise<number> {
-    return this.prisma.enrollment.count({
+    return await this.prisma.enrollment.count({
       where: { userId },
     })
   }
 
   async getCourseEnrollmentCount(courseId: number): Promise<number> {
-    return this.prisma.enrollment.count({
+    return await this.prisma.enrollment.count({
       where: { courseId },
     })
   }
 
   async bulkUpdateExpirations(enrollmentIds: number[], expiresAt: Date | null): Promise<{ count: number }> {
-    return this.prisma.enrollment.updateMany({
+    return await this.prisma.enrollment.updateMany({
       where: {
         id: {
           in: enrollmentIds,

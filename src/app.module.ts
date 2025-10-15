@@ -12,6 +12,9 @@ import { LessonModule } from './routes/lesson/lesson.module'
 import { EnrollmentModule } from './routes/enrollment/enrollment.module'
 import { FlashcardModule } from './routes/flashcard/flashcard.module'
 import { NotificationModule } from './routes/notification/notification.module'
+import { PlacementBlueprintModule } from './routes/placement/placement-blueprint.module'
+import { QuestionModule } from './routes/question/question.module'
+import { OptionModule } from './routes/question-option/option.module'
 import { WebsocketsModule } from './websockets/websockets.module'
 import { OnlineClassModule } from './routes/online-class/online-class.module'
 
@@ -28,6 +31,9 @@ import { OnlineClassModule } from './routes/online-class/online-class.module'
     EnrollmentModule,
     FlashcardModule,
     NotificationModule,
+    PlacementBlueprintModule,
+    QuestionModule,
+    OptionModule,
     WebsocketsModule,
     OnlineClassModule,
   ],

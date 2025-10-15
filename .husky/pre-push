@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "🚫 Checking commits before push..."
+npx commitlint --from=origin/main --to=HEAD

@@ -25,7 +25,6 @@ model User {
   createdAt  DateTime     @default(now())
   updatedAt  DateTime     @updatedAt
   deletedAt  DateTime?
-
   lecturerProfile LecturerProfile?
   staffProfile    StaffProfile?
   customerProfile CustomerProfile?
@@ -73,6 +72,8 @@ model User {
   Notification Notification[]
 
   Websocket Websocket[]
+
+  AdminProfile AdminProfile[]
 }
 
 model CustomerProfile {
@@ -215,6 +216,21 @@ model StaffProfile {
   user        User      @relation(fields: [userId], references: [id])
 }
 
+model AdminProfile {
+  id          Int       @id @default(autoincrement())
+  userId      Int       @unique
+  name        String?
+  bio         String?
+  location    String?
+  username    String?   @unique
+  avatar      String?
+  coverPhoto  String?   @map("cover_photo")
+  description String?
+  phoneNumber String?   @map("phone_number")
+  dateOfBirth DateTime? @map("date_of_birth")
+  website     String?
+  user        User      @relation(fields: [userId], references: [id])
+}
 model Course {
   id           Int          @id @default(autoincrement())
   slug         String       @unique
@@ -326,6 +342,7 @@ model PlacementBlueprint {
   readingShort   Int       @default(2)
   readingMedium  Int       @default(3)
   active         Boolean   @default(true)
+  papers TestPaper[]
 }
 
 model Question {
@@ -340,17 +357,15 @@ model Question {
   tags        String[]
   metadata    Json?
   createdAt   DateTime     @default(now())
-
+  readingLength ReadingLength?
+  tokenCount    Int?
   media     MediaAsset? @relation(fields: [mediaId], references: [id])
   options   Option[]
   testItems TestItem[]
   examItems ExamItem[]
   quizItems QuizItem[]
-
   QuizAnswer QuizAnswer[]
-
   TestAnswer TestAnswer[]
-
   ExamAnswer ExamAnswer[]
 }
 
@@ -374,7 +389,14 @@ model TestPaper {
   isPlacement Boolean    @default(false)
   createdAt   DateTime   @default(now())
   visibility  Visibility @default(PRIVATE)
-
+  blueprintId       Int?
+  blueprint         PlacementBlueprint? @relation(fields: [blueprintId], references: [id])
+  blueprintSnapshot Json?     // copy JSON blueprint tại thời điểm sinh đề
+  seed              BigInt?   // để chọn câu deterministic
+  version           Int       @default(1)   // phiên bản nội dung đề
+  generatorVersion  String?               // version engine MCP (vd "1.3.2")
+  generatorMeta     Json?                 // model/temp/code_sha/config_hash...
+  status            String    @default("published")
   sections TestSection[]
   attempts TestAttempt[]
 }
@@ -816,7 +838,6 @@ model Reward {
   name   String
   points Int        @default(0)
   stock  Int?
-
   redemptions RewardRedemption[]
 }
 
@@ -854,7 +875,6 @@ model OrderItem {
   classId   Int?
   unitPrice Int
   quantity  Int           @default(1)
-
   order  Order   @relation(fields: [orderId], references: [id])
   course Course? @relation(fields: [courseId], references: [id])
   class  Class?  @relation(fields: [classId], references: [id])
@@ -1126,6 +1146,12 @@ enum VerificationCodeType {
   FORGOT_PASSWORD
   LOGIN
   DISABLE_2FA
+}
+
+enum ReadingLength {
+  SHORT
+  MEDIUM
+  LONG
 }
 
 enum NotificationType {

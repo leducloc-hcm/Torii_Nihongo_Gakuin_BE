@@ -14,7 +14,7 @@ import {
 } from '@nestjs/common'
 import { TagService } from './tag.service'
 import { CreateTagDTO, UpdateTagDTO, QueryTagDTO } from './tag.dto'
-import { Auth } from 'src/shared/decorators/auth.decorator'
+import { Auth, IsPublic } from 'src/shared/decorators/auth.decorator'
 import { AuthType } from 'src/shared/constants/auth.constant'
 import { Roles } from 'src/shared/decorators/roles.decorator'
 import { RolesGuard } from 'src/shared/guards/roles.guard'
@@ -34,7 +34,7 @@ export class TagController {
   }
 
   @Get()
-  @Auth([AuthType.Bearer])
+  @IsPublic()
   @HttpCode(HttpStatus.OK)
   async findAll(@Query() queryDto: QueryTagDTO) {
     return this.tagService.findAll(queryDto)
@@ -48,7 +48,7 @@ export class TagController {
   }
 
   @Get('slug/:slug')
-  @Auth([AuthType.Bearer])
+  @IsPublic()
   @HttpCode(HttpStatus.OK)
   async findBySlug(@Param('slug') slug: string) {
     return this.tagService.findBySlug(slug)
