@@ -82,6 +82,8 @@ export const JoinClassTokenSchema = z.object({
     scheduledAt: z.coerce.date(),
     lecturerName: z.string(),
     capacity: z.number(),
+    janusRoomId: z.number().optional(),
+    janusServer: z.string().optional(),
     features: z.object({
       chatEnabled: z.boolean(),
       screenShareEnabled: z.boolean(),
@@ -144,6 +146,7 @@ export const OnlineClassResponseSchema = OnlineClassSchema.extend({
       startedAt: z.coerce.date(),
       participantCount: z.number(),
       isRecording: z.boolean(),
+      janusRoomId: z.number().optional(),
     })
     .optional(),
   lecturer: z

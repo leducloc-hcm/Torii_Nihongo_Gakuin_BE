@@ -124,6 +124,103 @@ export class JanusService implements OnModuleDestroy {
     return null
   }
 
+  async createRoom(options: {
+    description?: string
+    is_private?: boolean
+    publishers?: number
+    bitrate?: number
+    fir_freq?: number
+    videocodec?: string
+    audiocodec?: string
+    record?: boolean
+  }): Promise<{ room: number }> {
+    try {
+      // Create a temporary session and handle for room creation
+      const sessionId = await this.createSession()
+      if (!sessionId) {
+        throw new Error('Failed to create session for room creation')
+      }
+
+      const handleId = await this.attachPlugin(sessionId, 'janus.plugin.videoroom')
+      if (!handleId) {
+        throw new Error('Failed to attach plugin for room creation')
+      }
+
+      // Generate a random room ID
+      const roomId = Math.floor(Math.random() * 1000000) + 10000
+
+      const createResponse = await this.janusWsManager.sendAsync({
+        janus: 'message',
+        session_id: sessionId,
+        handle_id: handleId,
+        body: {
+          request: 'create',
+          room: roomId,
+          publishers: options.publishers || 10,
+          bitrate: options.bitrate || 256000,
+          bitrate_cap: true,
+          fir_freq: options.fir_freq || 10,
+          audiocodec: options.audiocodec || 'opus',
+          videocodec: options.videocodec || 'vp8',
+          description: options.description || `Room ${roomId}`,
+          is_private: options.is_private || false,
+          record: options.record || false,
+          rec_dir: '/opt/janus/share/janus/recordings',
+        },
+        transaction: this.generateTransaction(),
+      })
+
+      if (createResponse.janus === 'success' || createResponse.plugindata?.data?.videoroom === 'created') {
+        this.logger.log(`Created Janus room: ${roomId}`)
+        return { room: roomId }
+      }
+
+      throw new Error('Failed to create Janus room')
+    } catch (error) {
+      this.logger.error('Error creating room:', error)
+      throw error
+    }
+  }
+
+  async destroyRoom(roomId: number): Promise<boolean> {
+    try {
+      // Create a temporary session and handle for room destruction
+      const sessionId = await this.createSession()
+      if (!sessionId) {
+        throw new Error('Failed to create session for room destruction')
+      }
+
+      const handleId = await this.attachPlugin(sessionId, 'janus.plugin.videoroom')
+      if (!handleId) {
+        throw new Error('Failed to attach plugin for room destruction')
+      }
+
+      const destroyResponse = await this.janusWsManager.sendAsync({
+        janus: 'message',
+        session_id: sessionId,
+        handle_id: handleId,
+        body: {
+          request: 'destroy',
+          room: roomId,
+        },
+        transaction: this.generateTransaction(),
+      })
+
+      // Clean up the temporary session
+      await this.destroySession(sessionId)
+
+      if (destroyResponse.janus === 'success' || destroyResponse.plugindata?.data?.videoroom === 'destroyed') {
+        this.logger.log(`Destroyed Janus room: ${roomId}`)
+        return true
+      }
+
+      return false
+    } catch (error) {
+      this.logger.error(`Error destroying room ${roomId}:`, error)
+      return false
+    }
+  }
+
   async createOrJoinRoom(
     sessionId: number,
     handleId: number,

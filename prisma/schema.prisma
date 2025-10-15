@@ -469,6 +469,7 @@ model LiveSession {
   endedAt      DateTime?
   mode         LiveMode  @default(MODE2D)
   roomKey      String    @unique
+  janusRoomId  Int?     
   recordingUrl String?
 
   class      Class             @relation(fields: [classId], references: [id])

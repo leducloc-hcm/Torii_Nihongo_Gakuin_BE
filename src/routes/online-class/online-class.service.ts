@@ -404,7 +404,7 @@ export class OnlineClassService {
         throw new ForbiddenException('Access denied to this class')
       }
 
-      // Get class details
+      // Get class details with active session
       const onlineClass = await this.prisma.class.findUnique({
         where: { id: classIdInt },
         include: {
@@ -426,6 +426,11 @@ export class OnlineClassService {
         throw new NotFoundException('Online class not found')
       }
 
+      const activeSession = onlineClass.sessions[0]
+      if (!activeSession) {
+        throw new BadRequestException('No active session available for this class')
+      }
+
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
       })
@@ -437,19 +442,30 @@ export class OnlineClassService {
       // Determine user role in class
       const userRole = onlineClass.lecturerId === userId ? 'teacher' : 'student'
 
-      // Generate JWT token
+      // Generate JWT token with Janus room info
       const tokenPayload = {
         classId,
         userId: userId.toString(),
         role: userRole,
         displayName: user.name,
         avatar: userRole === 'teacher' ? onlineClass.lecturer.lecturerProfile?.avatar : undefined,
+        janusRoomId: activeSession.janusRoomId ?? undefined,
+        sessionId: activeSession.id.toString(),
       }
 
       const secret = process.env.JWT_SECRET || 'default-secret'
       const token = sign(tokenPayload, secret, { expiresIn: '4h' })
 
-      const expiresAt = new Date(Date.now() + 4 * 60 * 60 * 1000) // 4 hours from now
+      const expiresAt = new Date(Date.now() + 4 * 60 * 60 * 1000)
+
+      // Record attendance
+      await this.prisma.attendance.create({
+        data: {
+          sessionId: activeSession.id,
+          userId,
+          joinedAt: new Date(),
+        },
+      })
 
       return {
         token,
@@ -458,11 +474,13 @@ export class OnlineClassService {
           id: classId,
           title: onlineClass.title,
           description: onlineClass.description || '',
-          scheduledAt: onlineClass.sessions[0]?.scheduledAt || new Date(),
+          scheduledAt: activeSession.scheduledAt,
           lecturerName: onlineClass.lecturer.name,
           capacity: onlineClass.capacity,
+          janusRoomId: activeSession.janusRoomId ?? undefined,
+          janusServer: process.env.JANUS_SERVER_URL || 'ws://localhost:8188',
           features: {
-            chatEnabled: true, // Default enabled features
+            chatEnabled: true,
             screenShareEnabled: true,
             documentShareEnabled: true,
             raiseHandEnabled: true,
@@ -473,7 +491,10 @@ export class OnlineClassService {
       }
     } catch (error) {
       this.logger.error('Failed to generate join token:', error)
-      throw error instanceof Error && (error instanceof NotFoundException || error instanceof ForbiddenException)
+      throw error instanceof Error &&
+        (error instanceof NotFoundException ||
+          error instanceof ForbiddenException ||
+          error instanceof BadRequestException)
         ? error
         : new BadRequestException('Failed to generate join token')
     }
@@ -487,6 +508,7 @@ export class OnlineClassService {
     roomKey: string
     startedAt: Date
     janusRoomId: number
+    janusServer: string
   }> {
     try {
       const classIdInt = parseInt(classId)
@@ -512,10 +534,20 @@ export class OnlineClassService {
         throw new BadRequestException('Class session is already active')
       }
 
-      // Create new session
+      // Create Janus room via JanusService
       const roomKey = this.generateRoomKey()
-      const janusRoomId = parseInt(classId) + 1000 // Simple room ID generation
+      const janusRoom = await this.janusService.createRoom({
+        description: onlineClass.title,
+        is_private: false,
+        publishers: onlineClass.capacity,
+        bitrate: 128000,
+        fir_freq: 10,
+        videocodec: 'vp8',
+        audiocodec: 'opus',
+        record: true, // Enable recording if needed
+      })
 
+      // Create new session with Janus room ID
       const session = await this.prisma.liveSession.create({
         data: {
           classId: classIdInt,
@@ -523,16 +555,23 @@ export class OnlineClassService {
           scheduledAt: new Date(),
           mode: LiveMode.MODE2D,
           roomKey,
+          janusRoomId: janusRoom.room,
         },
       })
 
-      this.logger.log(`Started online class session ${session.id} for class ${classId}`)
+      // Notify enrolled students that class has started
+      await this.notifyStudentsClassStarted(classIdInt, onlineClass.title)
+
+      this.logger.log(
+        `Started online class session ${session.id} for class ${classId} with Janus room ${janusRoom.room}`,
+      )
 
       return {
         sessionId: session.id.toString(),
         roomKey,
         startedAt: session.scheduledAt,
-        janusRoomId,
+        janusRoomId: janusRoom.room,
+        janusServer: process.env.JANUS_SERVER_URL || 'ws://localhost:8188',
       }
     } catch (error) {
       this.logger.error('Failed to start online class session:', error)
@@ -578,10 +617,31 @@ export class OnlineClassService {
       const endedAt = new Date()
       const duration = endedAt.getTime() - activeSession.scheduledAt.getTime()
 
+      // Destroy Janus room if exists
+      if (activeSession.janusRoomId) {
+        try {
+          await this.janusService.destroyRoom(activeSession.janusRoomId)
+          this.logger.log(`Destroyed Janus room ${activeSession.janusRoomId}`)
+        } catch (error) {
+          this.logger.error(`Failed to destroy Janus room ${activeSession.janusRoomId}:`, error)
+        }
+      }
+
       // Update session
       const updatedSession = await this.prisma.liveSession.update({
         where: { id: activeSession.id },
         data: { endedAt },
+      })
+
+      // Mark all active attendees as left
+      await this.prisma.attendance.updateMany({
+        where: {
+          sessionId: activeSession.id,
+          leftAt: null,
+        },
+        data: {
+          leftAt: endedAt,
+        },
       })
 
       this.logger.log(`Ended online class session ${activeSession.id} for class ${classId}`)
@@ -700,6 +760,48 @@ export class OnlineClassService {
     return `room_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`
   }
 
+  private async notifyStudentsClassStarted(classId: number, classTitle: string): Promise<void> {
+    try {
+      // Get all enrolled students
+      const enrolledStudents = await this.prisma.enrollment.findMany({
+        where: {
+          course: {
+            Class: {
+              some: { id: classId },
+            },
+          },
+        },
+        select: {
+          userId: true,
+          user: {
+            select: {
+              name: true,
+              email: true,
+            },
+          },
+        },
+      })
+
+      // Send notifications to each student
+      for (const enrollment of enrolledStudents) {
+        await this.notificationService.create({
+          userId: enrollment.userId,
+          type: 'SYSTEM',
+          title: 'Class Started',
+          message: `${classTitle} has started. Join now!`,
+          priority: 'HIGH',
+          entityId: classId,
+          entityType: 'CLASS',
+        })
+      }
+
+      this.logger.log(`Notified ${enrolledStudents.length} students about class ${classId} starting`)
+    } catch (error) {
+      this.logger.error('Failed to notify students:', error)
+      // Don't throw error, just log it
+    }
+  }
+
   private mapToResponseDto(
     onlineClass: any,
     session?: any,
@@ -734,6 +836,7 @@ export class OnlineClassService {
               startedAt: session.scheduledAt,
               participantCount: participantCount || 0,
               isRecording: !!session.recordingUrl,
+              janusRoomId: session.janusRoomId,
             }
           : undefined,
       lecturer: lecturer
