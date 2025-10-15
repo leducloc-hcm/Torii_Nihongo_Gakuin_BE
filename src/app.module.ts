@@ -18,6 +18,7 @@ import { TestPaperModule } from './routes/test-paper/test-paper.module'
 import { TestSectionModule } from './routes/test-section/test-section.module'
 import { TestItemModule } from './routes/test-item/test-item.module'
 import { TestAttemptModule } from './routes/test-attempt/test-attempt.module'
+import { TestAnswerModule } from './routes/test-answer/test-answer.module'
 import { WebsocketsModule } from './websockets/websockets.module'
 
 @Module({
@@ -39,6 +40,7 @@ import { WebsocketsModule } from './websockets/websockets.module'
     TestSectionModule,
     TestItemModule,
     TestAttemptModule,
+    TestAnswerModule,
     WebsocketsModule,
   ],
   controllers: [AppController],

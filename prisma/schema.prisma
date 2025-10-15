@@ -445,6 +445,7 @@ model TestAnswer {
   selectedOptionId Int?
   isCorrect        Boolean?
   timeSpentSec     Int?
+  explanation      String?
 
   attempt        TestAttempt @relation(fields: [attemptId], references: [id])
   question       Question    @relation(fields: [questionId], references: [id])
@@ -669,6 +670,7 @@ model QuizAnswer {
   questionId       Int
   selectedOptionId Int?
   isCorrect        Boolean?
+  explanation      String?
 
   attempt        QuizAttempt @relation(fields: [attemptId], references: [id])
   question       Question    @relation(fields: [questionId], references: [id])
@@ -745,6 +747,7 @@ model ExamAnswer {
   selectedOptionId Int?
   isCorrect        Boolean?
   timeSpentSec     Int?
+  explanation      String?
 
   attempt        ExamAttempt @relation(fields: [attemptId], references: [id])
   question       Question    @relation(fields: [questionId], references: [id])
