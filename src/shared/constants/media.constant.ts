@@ -12,3 +12,9 @@ export const MediaKind = {
   PDF: 'PDF',
   OTHER: 'OTHER',
 } as const
+
+export const LessonStatus = {
+  PRIVATE: 'PRIVATE',
+  PUBLISHED: 'PUBLISHED',
+  GLOBAL_PUBLIC: 'GLOBAL_PUBLIC',
+} as const

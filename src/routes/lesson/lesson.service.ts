@@ -5,6 +5,7 @@ import { LessonWithRelations, LessonWhereInput, LessonOrderByInput } from './les
 import { S3Service } from 'src/shared/services/s3.service'
 import { SharedUserRepository } from 'src/shared/repositories/shared-user.repo'
 import { EnrollmentRepository } from '../enrollment/enrollment.repo'
+import { LessonStatus } from 'src/shared/constants/media.constant'
 
 @Injectable()
 export class LessonService {
@@ -16,7 +17,7 @@ export class LessonService {
   ) {}
 
   async create(createLessonDto: CreateLessonDTO): Promise<LessonWithRelations> {
-    const { moduleId, title, kind, content, videoUrl, durationSec, order, status } = createLessonDto
+    const { moduleId, title, kind, content, durationSec, order, status } = createLessonDto
 
     // Check if module exists
     const moduleExists = await this.lessonRepository.checkModuleExists(moduleId)
@@ -36,65 +37,10 @@ export class LessonService {
       title,
       kind,
       content,
-      videoUrl,
       durationSec,
       order: lessonOrder,
       status,
     })
-  }
-
-  async findAll(queryDto: QueryLessonDTO) {
-    const { page, limit, search, moduleId, kind, status, sortBy, sortOrder } = queryDto
-    const skip = (page - 1) * limit
-
-    // Build where clause
-    const where: LessonWhereInput = {}
-
-    if (search) {
-      where.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { content: { contains: search, mode: 'insensitive' } },
-      ]
-    }
-
-    if (moduleId) {
-      where.moduleId = moduleId
-    }
-
-    if (kind) {
-      where.kind = kind
-    }
-
-    if (status) {
-      where.status = status
-    }
-
-    // Build orderBy clause
-    const orderBy: LessonOrderByInput = {}
-    if (sortBy === 'order') {
-      orderBy.order = sortOrder
-    } else if (sortBy === 'title') {
-      orderBy.title = sortOrder
-    } else if (sortBy === 'createdAt') {
-      orderBy.createdAt = sortOrder
-    }
-
-    const { lessons, total } = await this.lessonRepository.findAll({
-      skip,
-      take: limit,
-      where,
-      orderBy,
-    })
-
-    return {
-      data: lessons,
-      meta: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
-    }
   }
 
   async findOne(id: number): Promise<LessonWithRelations> {
@@ -127,178 +73,6 @@ export class LessonService {
     return lesson
   }
 
-  async findByModule(moduleId: number, queryDto: Omit<QueryLessonDTO, 'moduleId'>) {
-    const { page, limit, search, kind, status, sortBy, sortOrder } = queryDto
-    const skip = (page - 1) * limit
-
-    // Build where clause (excluding moduleId since it's passed separately)
-    const where: Omit<LessonWhereInput, 'moduleId'> = {}
-
-    if (search) {
-      where.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { content: { contains: search, mode: 'insensitive' } },
-      ]
-    }
-
-    if (kind) {
-      where.kind = kind
-    }
-
-    if (status) {
-      where.status = status
-    }
-
-    // Build orderBy clause
-    const orderBy: LessonOrderByInput = {}
-    if (sortBy === 'order') {
-      orderBy.order = sortOrder
-    } else if (sortBy === 'title') {
-      orderBy.title = sortOrder
-    } else if (sortBy === 'createdAt') {
-      orderBy.createdAt = sortOrder
-    }
-
-    const { lessons, total } = await this.lessonRepository.findByModule(moduleId, {
-      skip,
-      take: limit,
-      where,
-      orderBy,
-    })
-
-    return {
-      data: lessons,
-      meta: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
-    }
-  }
-
-  async reorderLessons(moduleId: number, lessonOrders: { id: number; order: number }[]): Promise<void> {
-    // Check if module exists
-    const moduleExists = await this.lessonRepository.checkModuleExists(moduleId)
-    if (!moduleExists) {
-      throw new BadRequestException(`Module with ID ${moduleId} does not exist`)
-    }
-
-    // Validate that all lesson IDs exist and belong to the module
-    const lessonIds = lessonOrders.map((l) => l.id)
-    const { lessons } = await this.lessonRepository.findByModule(moduleId, {
-      take: 1000, // Large number to get all lessons
-    })
-
-    const existingLessonIds = lessons.map((l) => l.id)
-    const invalidIds = lessonIds.filter((id) => !existingLessonIds.includes(id))
-
-    if (invalidIds.length > 0) {
-      throw new BadRequestException(`Lesson IDs [${invalidIds.join(', ')}] do not exist in module ${moduleId}`)
-    }
-
-    await this.lessonRepository.reorderLessons(moduleId, lessonOrders)
-  }
-
-  async getPublishedLessons(queryDto: Omit<QueryLessonDTO, 'status'>) {
-    const { page, limit, search, moduleId, kind, sortBy, sortOrder } = queryDto
-    const skip = (page - 1) * limit
-
-    // Build where clause (excluding status since it's set to PUBLISHED)
-    const where: Omit<LessonWhereInput, 'status'> = {}
-
-    if (search) {
-      where.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { content: { contains: search, mode: 'insensitive' } },
-      ]
-    }
-
-    if (moduleId) {
-      where.moduleId = moduleId
-    }
-
-    if (kind) {
-      where.kind = kind
-    }
-
-    // Build orderBy clause
-    const orderBy: LessonOrderByInput = {}
-    if (sortBy === 'order') {
-      orderBy.order = sortOrder
-    } else if (sortBy === 'title') {
-      orderBy.title = sortOrder
-    } else if (sortBy === 'createdAt') {
-      orderBy.createdAt = sortOrder
-    }
-
-    const { lessons, total } = await this.lessonRepository.getPublishedLessons({
-      skip,
-      take: limit,
-      where,
-      orderBy,
-    })
-
-    return {
-      data: lessons,
-      meta: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
-    }
-  }
-
-  async findByCourse(courseId: number, queryDto: Omit<QueryLessonDTO, 'moduleId'>) {
-    const { page, limit, search, kind, status, sortBy, sortOrder } = queryDto
-    const skip = (page - 1) * limit
-
-    // Build where clause (excluding moduleId since it's determined by courseId)
-    const where: Omit<LessonWhereInput, 'moduleId'> = {}
-
-    if (search) {
-      where.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { content: { contains: search, mode: 'insensitive' } },
-      ]
-    }
-
-    if (kind) {
-      where.kind = kind
-    }
-
-    if (status) {
-      where.status = status
-    }
-
-    // Build orderBy clause
-    const orderBy: LessonOrderByInput = {}
-    if (sortBy === 'order') {
-      orderBy.order = sortOrder
-    } else if (sortBy === 'title') {
-      orderBy.title = sortOrder
-    } else if (sortBy === 'createdAt') {
-      orderBy.createdAt = sortOrder
-    }
-
-    const { lessons, total } = await this.lessonRepository.findByCourse(courseId, {
-      skip,
-      take: limit,
-      where,
-      orderBy,
-    })
-
-    return {
-      data: lessons,
-      meta: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
-    }
-  }
   async generateStreamUrl(lessonId: number, userId: number) {
     const user = await this.sharedUserRepo.findUnique({ id: userId })
     if (!user) {
@@ -312,14 +86,10 @@ export class LessonService {
     if (!enrollment) {
       throw new BadRequestException('User is not enrolled in the course for this lesson')
     }
-    if (lesson.status !== 'PUBLISHED') {
+    if (lesson.status !== LessonStatus.PUBLISHED && lesson.status !== LessonStatus.GLOBAL_PUBLIC) {
       throw new BadRequestException('Lesson is not published')
     }
-    const streamInfo = await this.s3Service.generatePresignedStreamUrl(
-      enrollment.course.id,
-      lesson.module.id,
-      lesson.id,
-    )
+    const streamInfo = await this.lessonRepository.generatePublicStreamUrl(lessonId)
     return streamInfo
   }
   async generateUploadUrl(body: { lessonId: number; filename: string; contentType: string }, userId: number) {
@@ -336,5 +106,16 @@ export class LessonService {
       message: 'Presigned upload URL generated successfully',
       data: result,
     }
+  }
+  async getPublicStreamUrl(lessonId: number) {
+    const lesson = await this.lessonRepository.findOne({ id: lessonId })
+    if (!lesson) {
+      throw new NotFoundException('Lesson not found')
+    }
+    if (lesson.status !== LessonStatus.GLOBAL_PUBLIC) {
+      throw new BadRequestException('Lesson is not public for global access')
+    }
+    const streamInfo = await this.lessonRepository.generatePublicStreamUrl(lessonId)
+    return streamInfo
   }
 }

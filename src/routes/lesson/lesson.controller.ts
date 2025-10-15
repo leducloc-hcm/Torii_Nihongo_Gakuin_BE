@@ -35,19 +35,6 @@ export class LessonController {
     return this.lessonService.create(createLessonDto)
   }
 
-  @Get()
-  @Auth([AuthType.Bearer])
-  @HttpCode(HttpStatus.OK)
-  async findAll(@Query() queryDto: QueryLessonDTO) {
-    return this.lessonService.findAll(queryDto)
-  }
-
-  @Get('published')
-  @HttpCode(HttpStatus.OK)
-  async findPublished(@Query() queryDto: Omit<QueryLessonDTO, 'status'>) {
-    return this.lessonService.getPublishedLessons(queryDto)
-  }
-
   @Get(':id')
   @Auth([AuthType.Bearer])
   @HttpCode(HttpStatus.OK)
@@ -78,17 +65,6 @@ export class LessonController {
     return this.lessonService.remove(id)
   }
 
-  @Patch('module/:moduleId/reorder')
-  @Auth([AuthType.Bearer])
-  @Roles(RoleName.Admin, RoleName.Staff, RoleName.Lecturer)
-  @HttpCode(HttpStatus.OK)
-  async reorderLessons(
-    @Param('moduleId', ParseIntPipe) moduleId: number,
-    @Body() body: { lessons: { id: number; order: number }[] },
-  ) {
-    await this.lessonService.reorderLessons(moduleId, body.lessons)
-    return { message: 'Lessons reordered successfully' }
-  }
   @Post('/upload/video')
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Admin, RoleName.Staff, RoleName.Lecturer)
@@ -98,5 +74,10 @@ export class LessonController {
     @ActiveUser('userId') userId: number,
   ) {
     return this.lessonService.generateUploadUrl(body, userId)
+  }
+  @Get('public/:lessonId/stream')
+  @HttpCode(HttpStatus.OK)
+  async getPublicStreamUrl(@Param('lessonId', ParseIntPipe) lessonId: number) {
+    return this.lessonService.getPublicStreamUrl(lessonId)
   }
 }

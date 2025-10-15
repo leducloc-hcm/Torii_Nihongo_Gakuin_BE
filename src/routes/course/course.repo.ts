@@ -20,9 +20,20 @@ export class CourseRepository {
         id: true,
         title: true,
         order: true,
-        _count: {
+        lessons: {
           select: {
-            lessons: true,
+            id: true,
+            title: true,
+            kind: true,
+            content: true,
+            order: true,
+            status: true,
+            durationSec: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+          orderBy: {
+            order: 'asc' as const,
           },
         },
       },

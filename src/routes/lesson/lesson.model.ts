@@ -8,7 +8,6 @@ export const LessonSchema = z.object({
   kind: z.enum(['VIDEO', 'ARTICLE', 'QUIZ', 'LIVE']).default('VIDEO'),
   content: z.string().nullable().optional(),
   mediaId: z.number().int().positive().nullable().optional(),
-  videoUrl: z.string().url('Invalid video URL').nullable().optional(),
   durationSec: z.number().int().min(0, 'Duration must be non-negative').nullable().optional(),
   order: z.number().int().min(0, 'Order must be non-negative').default(0),
   createdAt: z.coerce.date(),
@@ -19,6 +18,7 @@ export const LessonSchema = z.object({
 // Create Lesson Schema
 export const CreateLessonSchema = LessonSchema.omit({
   id: true,
+  mediaId: true,
   createdAt: true,
   updatedAt: true,
 })
@@ -27,6 +27,7 @@ export const CreateLessonSchema = LessonSchema.omit({
 export const UpdateLessonSchema = LessonSchema.omit({
   id: true,
   moduleId: true,
+  mediaId: true,
   createdAt: true,
   updatedAt: true,
 }).partial()
@@ -54,7 +55,7 @@ export const LessonResponseSchema = LessonSchema.extend({
       slug: z.string(),
     }),
   }),
-  resources: z.array(
+  media: z.array(
     z.object({
       id: z.number(),
       url: z.string(),
@@ -86,7 +87,7 @@ export const LessonResponseSchema = LessonSchema.extend({
     .nullable(),
   _count: z.object({
     notes: z.number(),
-    resources: z.number(),
+    media: z.number(),
   }),
 })
 
@@ -111,7 +112,7 @@ export const LessonListItemSchema = z.object({
   }),
   _count: z.object({
     notes: z.number(),
-    resources: z.number(),
+    media: z.number(),
   }),
 })
 
@@ -167,7 +168,6 @@ export type LessonWithRelations = {
   title: string
   kind: 'VIDEO' | 'ARTICLE' | 'QUIZ' | 'LIVE'
   content: string | null
-  videoUrl: string | null
   durationSec: number | null
   order: number
   createdAt: Date
@@ -182,7 +182,7 @@ export type LessonWithRelations = {
       slug: string
     }
   }
-  resources: Array<{
+  media: Array<{
     id: number
     url: string
     kind: 'AUDIO' | 'VIDEO' | 'IMAGE' | 'PDF' | 'OTHER'
@@ -208,7 +208,7 @@ export type LessonWithRelations = {
   } | null
   _count: {
     notes: number
-    resources: number
+    media: number
   }
 }
 

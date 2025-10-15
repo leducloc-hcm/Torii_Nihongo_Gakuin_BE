@@ -33,7 +33,7 @@ export class LessonRepository {
         },
       },
     },
-    resources: {
+    media: {
       select: {
         id: true,
         url: true,
@@ -71,7 +71,7 @@ export class LessonRepository {
     _count: {
       select: {
         notes: true,
-        resources: true,
+        media: true,
       },
     },
   }
@@ -81,28 +81,6 @@ export class LessonRepository {
       data,
       include: this.includeRelations,
     })) as any
-  }
-
-  async findAll(params: {
-    skip?: number
-    take?: number
-    where?: LessonWhereInput
-    orderBy?: LessonOrderByInput
-  }): Promise<{ lessons: LessonWithRelations[]; total: number }> {
-    const { skip, take, where, orderBy } = params
-
-    const [lessons, total] = await Promise.all([
-      this.prisma.lesson.findMany({
-        skip,
-        take,
-        where: where as any,
-        orderBy: orderBy as any,
-        include: this.includeRelations,
-      }) as Promise<LessonWithRelations[]>,
-      this.prisma.lesson.count({ where: where as any }),
-    ])
-
-    return { lessons, total }
   }
 
   async findOne(where: LessonWhereUniqueInput): Promise<LessonWithRelations | null> {
@@ -135,22 +113,6 @@ export class LessonRepository {
     return count > 0
   }
 
-  async findByModule(
-    moduleId: number,
-    params: {
-      skip?: number
-      take?: number
-      where?: Omit<LessonWhereInput, 'moduleId'>
-      orderBy?: LessonOrderByInput
-    },
-  ): Promise<{ lessons: LessonWithRelations[]; total: number }> {
-    const { skip, take, where = {}, orderBy } = params
-
-    const whereWithModule = { ...where, moduleId }
-
-    return this.findAll({ skip, take, where: whereWithModule, orderBy })
-  }
-
   async getMaxOrder(moduleId: number): Promise<number> {
     const result = await this.prisma.lesson.aggregate({
       where: { moduleId },
@@ -172,50 +134,6 @@ export class LessonRepository {
         }),
       ),
     )
-  }
-
-  async getPublishedLessons(params: {
-    skip?: number
-    take?: number
-    where?: Omit<LessonWhereInput, 'status'>
-    orderBy?: LessonOrderByInput
-  }): Promise<{ lessons: LessonWithRelations[]; total: number }> {
-    const { skip, take, where = {}, orderBy } = params
-
-    const whereWithStatus = { ...where, status: 'PUBLISHED' as const }
-
-    return this.findAll({ skip, take, where: whereWithStatus, orderBy })
-  }
-
-  async findByCourse(
-    courseId: number,
-    params: {
-      skip?: number
-      take?: number
-      where?: Omit<LessonWhereInput, 'moduleId'>
-      orderBy?: LessonOrderByInput
-    },
-  ): Promise<{ lessons: LessonWithRelations[]; total: number }> {
-    const { skip, take, where = {}, orderBy } = params
-
-    // Find all module IDs for the course first
-    const modules = await this.prisma.module.findMany({
-      where: { courseId },
-      select: { id: true },
-    })
-
-    const moduleIds = modules.map((m) => m.id)
-
-    if (moduleIds.length === 0) {
-      return { lessons: [], total: 0 }
-    }
-
-    const whereWithModules = {
-      ...where,
-      moduleId: { in: moduleIds },
-    }
-
-    return this.findAll({ skip, take, where: whereWithModules as any, orderBy })
   }
 
   async generateUploadUrl(lessonId: number, filename: string, contentType: string) {
@@ -255,10 +173,36 @@ export class LessonRepository {
 
       await this.prisma.lesson.update({
         where: { id: lessonId },
-        data: { mediaId: mediaAsset.id, videoUrl: uploadInfo.uploadUrl },
+        data: { mediaId: mediaAsset.id },
       })
     }
 
     return uploadInfo
+  }
+  async generatePublicStreamUrl(lessonId: number) {
+    const lesson = await this.prisma.lesson.findFirst({
+      where: {
+        id: lessonId,
+      },
+      include: {
+        module: {
+          include: {
+            course: true,
+          },
+        },
+      },
+    })
+    if (!lesson) {
+      throw new Error('Lesson not found')
+    }
+    if (!lesson.mediaId) {
+      throw new Error('Media not found for this lesson')
+    }
+    const streamInfo = await this.s3Service.generatePresignedStreamUrl(
+      lesson.module.course.id,
+      lesson.module.id,
+      lessonId,
+    )
+    return streamInfo
   }
 }
