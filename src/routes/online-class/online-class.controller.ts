@@ -319,6 +319,54 @@ export class OnlineClassController {
     }
   }
 
+  @Get(':id/janus-participants')
+  @IsPublic()
+  @ApiOperation({ summary: 'Get online class participants in Janus format' })
+  @ApiResponse({ status: 200, description: 'Janus participants retrieved successfully' })
+  async getJanusParticipants(@Param('id') classId: string) {
+    try {
+      const janusParticipants = await this.onlineClassService.getJanusParticipants(classId)
+
+      return {
+        success: true,
+        message: 'Janus participants retrieved successfully',
+        data: janusParticipants,
+      }
+    } catch (error) {
+      throw new HttpException(
+        {
+          success: false,
+          message: error instanceof Error ? error.message : 'Failed to retrieve Janus participants',
+        },
+        HttpStatus.BAD_REQUEST,
+      )
+    }
+  }
+
+  @Get(':id/janus-info')
+  @IsPublic()
+  @ApiOperation({ summary: 'Get Janus connection information for direct client connection' })
+  @ApiResponse({ status: 200, description: 'Janus connection info retrieved successfully' })
+  async getJanusConnectionInfo(@Param('id') classId: string) {
+    try {
+      const janusInfo = await this.onlineClassService.getJanusConnectionInfo(classId)
+
+      return {
+        success: true,
+        message: 'Janus connection info retrieved successfully',
+        data: janusInfo,
+      }
+    } catch (error) {
+      throw new HttpException(
+        {
+          success: false,
+          message: error instanceof Error ? error.message : 'Failed to retrieve Janus connection info',
+        },
+        HttpStatus.BAD_REQUEST,
+      )
+    }
+  }
+
   @Post(':id/recording/start')
   @UseGuards(RolesGuard)
   @Roles(Role.LECTURER, Role.STAFF)
@@ -526,6 +574,48 @@ export class OnlineClassController {
         {
           success: false,
           message: error instanceof Error ? error.message : 'Failed to retrieve analytics',
+        },
+        HttpStatus.BAD_REQUEST,
+      )
+    }
+  }
+
+  @Get(':id/debug-participants')
+  @IsPublic()
+  @ApiOperation({ summary: 'Debug endpoint to check participants with detailed logging' })
+  @ApiResponse({ status: 200, description: 'Debug participants info retrieved successfully' })
+  async debugParticipants(@Param('id') classId: string) {
+    try {
+      console.log(`🐛 DEBUG: Starting participants debug for class ${classId}`)
+
+      // Get Janus participants with detailed logging
+      const janusParticipants = await this.onlineClassService.getJanusParticipants(classId)
+
+      // Also get the class details
+      const classDetails = await this.onlineClassService.getOnlineClassDetails(classId, 1) // Use dummy user ID for debug
+
+      console.log(`🐛 DEBUG: Class details:`, JSON.stringify(classDetails, null, 2))
+      console.log(`🐛 DEBUG: Janus participants result:`, JSON.stringify(janusParticipants, null, 2))
+
+      return {
+        success: true,
+        message: 'Debug participants info retrieved successfully',
+        data: {
+          classId,
+          classDetails: {
+            currentSession: classDetails?.currentSession,
+            janusRoomId: classDetails?.currentSession?.janusRoomId,
+          },
+          janusParticipants,
+          timestamp: new Date().toISOString(),
+        },
+      }
+    } catch (error) {
+      console.error(`🐛 DEBUG ERROR:`, error)
+      throw new HttpException(
+        {
+          success: false,
+          message: error instanceof Error ? error.message : 'Failed to debug participants',
         },
         HttpStatus.BAD_REQUEST,
       )

@@ -76,6 +76,7 @@ export class OnlineClassService {
           scheduledAt: new Date(data.scheduledAt),
           mode: LiveMode.MODE2D, // Default to 2D mode
           roomKey: this.generateRoomKey(),
+          janusRoomId: null, // Will be set when class starts
         },
       })
 
@@ -218,7 +219,7 @@ export class OnlineClassService {
             sortBy === 'scheduledAt' ? { _count: sortOrder } : sortOrder,
         },
         skip,
-        take: limit,
+        take: Number(limit),
       })
 
       const responseDtos = classes.map((cls) =>
@@ -398,11 +399,11 @@ export class OnlineClassService {
     try {
       const classIdInt = parseInt(classId)
 
-      // Check access permissions
-      const hasAccess = await this.checkClassAccess(classIdInt, userId)
-      if (!hasAccess) {
-        throw new ForbiddenException('Access denied to this class')
-      }
+      // Check access permissions Tam thoi bo qua
+      // const hasAccess = await this.checkClassAccess(classIdInt, userId)
+      // if (!hasAccess) {
+      //   throw new ForbiddenException('Access denied to this class')
+      // }
 
       // Get class details with active session
       const onlineClass = await this.prisma.class.findUnique({
@@ -440,7 +441,44 @@ export class OnlineClassService {
       }
 
       // Determine user role in class
-      const userRole = onlineClass.lecturerId === userId ? 'teacher' : 'student'
+      const userRole: 'lecturer' | 'customer' = onlineClass.lecturerId === userId ? 'lecturer' : 'customer'
+
+      // Get participants in the active session through Janus
+      let participants: any[] = []
+      if (activeSession.janusRoomId) {
+        try {
+          this.logger.log(`🎯 GenerateJoinToken: Querying participants for room ${activeSession.janusRoomId}`)
+
+          // Create a temporary session to query participants
+          const tempSessionId = await this.janusService.createSession()
+          if (tempSessionId) {
+            const tempHandleId = await this.janusService.attachPlugin(tempSessionId, 'janus.plugin.videoroom')
+            if (tempHandleId) {
+              participants = await this.janusService.listParticipants(
+                tempSessionId,
+                tempHandleId,
+                activeSession.janusRoomId,
+              )
+              this.logger.log(
+                `👥 GenerateJoinToken: Found ${participants.length} participants:`,
+                JSON.stringify(participants, null, 2),
+              )
+
+              // Clean up temp session
+              await this.janusService.destroySession(tempSessionId)
+            } else {
+              this.logger.warn('⚠️ GenerateJoinToken: Failed to attach plugin for participants query')
+            }
+          } else {
+            this.logger.warn('⚠️ GenerateJoinToken: Failed to create temp session for participants query')
+          }
+        } catch (error) {
+          this.logger.error('❌ GenerateJoinToken: Failed to get participants from Janus:', error)
+          // Don't throw error, just log it and continue with empty participants
+        }
+      } else {
+        this.logger.log('ℹ️ GenerateJoinToken: No Janus room ID available, skipping participants query')
+      }
 
       // Generate JWT token with Janus room info
       const tokenPayload = {
@@ -448,7 +486,7 @@ export class OnlineClassService {
         userId: userId.toString(),
         role: userRole,
         displayName: user.name,
-        avatar: userRole === 'teacher' ? onlineClass.lecturer.lecturerProfile?.avatar : undefined,
+        avatar: userRole === 'lecturer' ? onlineClass.lecturer.lecturerProfile?.avatar : undefined,
         janusRoomId: activeSession.janusRoomId ?? undefined,
         sessionId: activeSession.id.toString(),
       }
@@ -459,15 +497,37 @@ export class OnlineClassService {
       const expiresAt = new Date(Date.now() + 4 * 60 * 60 * 1000)
 
       // Record attendance
-      await this.prisma.attendance.create({
-        data: {
+      await this.prisma.attendance.upsert({
+        where: {
+          sessionId_userId: {
+            sessionId: activeSession.id,
+            userId,
+          },
+        },
+        create: {
           sessionId: activeSession.id,
           userId,
           joinedAt: new Date(),
         },
+        update: { joinedAt: new Date(), leftAt: null },
       })
 
-      return {
+      // Prepare ICE servers
+      const iceServers = [
+        { urls: process.env.JANUS_STUN_URL || 'stun:janus.torii-nihongo-gakuin.io.vn:3478' },
+        // Add TURN servers from environment if configured
+        ...(process.env.JANUS_TURN_URL
+          ? [
+              {
+                urls: process.env.JANUS_TURN_URL || 'turn:janus.torii-nihongo-gakuin.io.vn:3478',
+                username: process.env.JANUS_TURN_USERNAME || 'turnuser',
+                credential: process.env.JANUS_TURN_PASSWORD || 'turnpassword',
+              },
+            ]
+          : []),
+      ]
+
+      const joinTokenResponse = {
         token,
         expiresAt,
         classInfo: {
@@ -479,16 +539,32 @@ export class OnlineClassService {
           capacity: onlineClass.capacity,
           janusRoomId: activeSession.janusRoomId ?? undefined,
           janusServer: process.env.JANUS_SERVER_URL || 'ws://localhost:8188',
+          iceServers,
           features: {
             chatEnabled: true,
             screenShareEnabled: true,
             documentShareEnabled: true,
             raiseHandEnabled: true,
           },
+          // Add participants information in the expected format
+          participants: {
+            videoroom: 'participants',
+            room: activeSession.janusRoomId ?? 0,
+            participants: participants || [],
+          },
         },
         userRole,
         permissions: this.getUserPermissions(userRole),
       }
+
+      this.logger.log('🚀 GenerateJoinToken: Returning response with participants:', {
+        classId,
+        janusRoomId: activeSession.janusRoomId,
+        participantCount: participants?.length || 0,
+        participants: joinTokenResponse.classInfo.participants,
+      })
+
+      return joinTokenResponse
     } catch (error) {
       this.logger.error('Failed to generate join token:', error)
       throw error instanceof Error &&
@@ -692,14 +768,152 @@ export class OnlineClassService {
       return participants.map((p) => ({
         userId: p.userId.toString(),
         displayName: p.user.name,
-        role: p.user.role === Role.LECTURER ? 'teacher' : 'student',
+        role: p.user.role === Role.LECTURER ? 'lecturer' : 'customer',
         joinedAt: p.joinedAt,
         isActive: !p.leftAt,
-        capabilities: this.getUserPermissions(p.user.role === Role.LECTURER ? 'teacher' : 'student'),
+        capabilities: this.getUserPermissions(p.user.role === Role.LECTURER ? 'lecturer' : 'customer'),
       }))
     } catch (error) {
       this.logger.error('Failed to get participants:', error)
       throw new BadRequestException('Failed to retrieve participants')
+    }
+  }
+
+  async getJanusParticipants(classId: string): Promise<{
+    videoroom: string
+    room: number
+    participants: any[]
+  }> {
+    try {
+      const classIdInt = parseInt(classId)
+
+      // Get the active session with Janus room ID
+      const activeSession = await this.prisma.liveSession.findFirst({
+        where: {
+          classId: classIdInt,
+          endedAt: null,
+        },
+      })
+
+      if (!activeSession || !activeSession.janusRoomId) {
+        return {
+          videoroom: 'participants',
+          room: 0,
+          participants: [],
+        }
+      }
+
+      // Get participants from Janus
+      let janusParticipants: any[] = []
+      try {
+        this.logger.log(`🔍 Querying participants for Janus room: ${activeSession.janusRoomId}`)
+
+        // Create a temporary session to query participants
+        const tempSessionId = await this.janusService.createSession()
+        this.logger.log(`📱 Created temp session: ${tempSessionId}`)
+
+        if (tempSessionId) {
+          const tempHandleId = await this.janusService.attachPlugin(tempSessionId, 'janus.plugin.videoroom')
+          this.logger.log(`🔗 Attached plugin with handle: ${tempHandleId}`)
+
+          if (tempHandleId) {
+            janusParticipants = await this.janusService.listParticipants(
+              tempSessionId,
+              tempHandleId,
+              activeSession.janusRoomId,
+            )
+            this.logger.log(`👥 Raw Janus participants response:`, JSON.stringify(janusParticipants, null, 2))
+
+            // Clean up temp session
+            await this.janusService.destroySession(tempSessionId)
+            this.logger.log(`🧹 Cleaned up temp session: ${tempSessionId}`)
+          } else {
+            this.logger.warn('⚠️ Failed to attach plugin - no handle ID received')
+          }
+        } else {
+          this.logger.warn('⚠️ Failed to create temp session for participants query')
+        }
+      } catch (error) {
+        this.logger.error('❌ Failed to get participants from Janus:', error)
+        // Return empty participants if Janus query fails
+      }
+
+      return {
+        videoroom: 'participants',
+        room: activeSession.janusRoomId,
+        participants: janusParticipants,
+      }
+    } catch (error) {
+      this.logger.error('Failed to get Janus participants:', error)
+      throw new BadRequestException('Failed to retrieve Janus participants')
+    }
+  }
+
+  async getJanusConnectionInfo(classId: string): Promise<{
+    janusServer: string
+    janusRoomId: number | null
+    iceServers: Array<{
+      urls: string
+      username?: string
+      credential?: string
+    }>
+    participants: {
+      videoroom: string
+      room: number
+      participants: any[]
+    }
+  }> {
+    try {
+      const classIdInt = parseInt(classId)
+
+      // Get the active session
+      const activeSession = await this.prisma.liveSession.findFirst({
+        where: {
+          classId: classIdInt,
+          endedAt: null,
+        },
+        include: {
+          class: {
+            include: {
+              lecturer: true,
+            },
+          },
+        },
+      })
+
+      if (!activeSession) {
+        throw new NotFoundException('No active session found for this class')
+      }
+
+      // Get participants information
+      const participantsInfo = await this.getJanusParticipants(classId)
+
+      // Prepare ICE servers
+      const iceServers = [
+        { urls: process.env.JANUS_STUN_URL || 'stun:janus.torii-nihongo-gakuin.io.vn:3478' },
+        // Add TURN servers from environment if configured
+        ...(process.env.JANUS_TURN_URL
+          ? [
+              {
+                urls: process.env.JANUS_TURN_URL || 'turn:janus.torii-nihongo-gakuin.io.vn:3478',
+                username: process.env.JANUS_TURN_USERNAME || 'turnuser',
+                credential: process.env.JANUS_TURN_PASSWORD || 'turnpassword',
+              },
+            ]
+          : []),
+      ]
+
+      return {
+        janusServer: process.env.JANUS_SERVER_URL || 'wss://janus.torii-nihongo-gakuin.io.vn/ws',
+        janusRoomId: activeSession.janusRoomId,
+        iceServers,
+        participants: participantsInfo,
+      }
+    } catch (error) {
+      this.logger.error('Failed to get Janus connection info:', error)
+      throw error instanceof NotFoundException
+        ? error
+        : new BadRequestException('Failed to retrieve Janus connection info')
     }
   }
 
@@ -732,8 +946,8 @@ export class OnlineClassService {
     return !!isEnrolled
   }
 
-  private getUserPermissions(role: 'teacher' | 'student') {
-    if (role === 'teacher') {
+  private getUserPermissions(role: 'lecturer' | 'customer') {
+    if (role === 'lecturer') {
       return {
         canPublishVideo: true,
         canPublishAudio: true,

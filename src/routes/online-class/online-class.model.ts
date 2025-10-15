@@ -84,14 +84,28 @@ export const JoinClassTokenSchema = z.object({
     capacity: z.number(),
     janusRoomId: z.number().optional(),
     janusServer: z.string().optional(),
+    iceServers: z.array(
+      z.object({
+        urls: z.string(),
+        username: z.string().optional(),
+        credential: z.string().optional(),
+      }),
+    ),
     features: z.object({
       chatEnabled: z.boolean(),
       screenShareEnabled: z.boolean(),
       documentShareEnabled: z.boolean(),
       raiseHandEnabled: z.boolean(),
     }),
+    participants: z
+      .object({
+        videoroom: z.string(),
+        room: z.number(),
+        participants: z.array(z.any()),
+      })
+      .optional(),
   }),
-  userRole: z.enum(['teacher', 'student']),
+  userRole: z.enum(['lecturer', 'customer']),
   permissions: z.object({
     canPublishVideo: z.boolean(),
     canPublishAudio: z.boolean(),

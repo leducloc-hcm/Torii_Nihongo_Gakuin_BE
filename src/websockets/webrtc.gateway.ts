@@ -198,7 +198,7 @@ export class WebRtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('join-class')
-  handleJoinClass(@ConnectedSocket() client: Socket, @MessageBody() data: JoinClassDto) {
+  async handleJoinClass(@ConnectedSocket() client: Socket, @MessageBody() data: JoinClassDto) {
     try {
       // Set default capabilities based on role
       const capabilities = this.getDefaultCapabilities(data.role)
@@ -228,6 +228,29 @@ export class WebRtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // Store session
       this.activeSessions.set(client.id, session)
 
+      // Actually join the Janus room
+      const isPublisher = data.role === 'lecturer'
+      this.logger.log(
+        `Joining Janus room ${session.roomId} as ${isPublisher ? 'publisher' : 'subscriber'} for user ${data.userId}`,
+      )
+
+      const janusJoinResult = await this.janusService.createOrJoinRoom(
+        session.sessionId,
+        session.handleId,
+        session.roomId,
+        data.displayName,
+        isPublisher,
+      )
+
+      if (!janusJoinResult.success) {
+        this.logger.error(`Failed to join Janus room for user ${data.userId}`)
+        client.emit('error', { message: 'Failed to join Janus room' })
+        this.activeSessions.delete(client.id)
+        return
+      }
+
+      this.logger.log(`Successfully joined Janus room ${session.roomId} for user ${data.userId}`)
+
       // Get existing participants
       const existingParticipants = Array.from(this.activeSessions.values())
         .filter((s) => s.classId === data.classId && s.userId !== data.userId)
@@ -238,7 +261,23 @@ export class WebRtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
           avatar: s.avatar,
         }))
 
-      // Notify successful join with existing participants
+      // Prepare Janus connection details
+      const janusUrl = process.env.JANUS_SERVER_URL || 'wss://janus.torii-nihongo-gakuin.io.vn/ws'
+      const iceServers = [
+        { urls: process.env.JANUS_STUN_URL || 'stun:janus.torii-nihongo-gakuin.io.vn:3478' },
+        // Add TURN servers from environment if configured
+        ...(process.env.JANUS_TURN_URL
+          ? [
+              {
+                urls: process.env.JANUS_TURN_URL || 'turn:janus.torii-nihongo-gakuin.io.vn:3478',
+                username: process.env.JANUS_TURN_USERNAME || 'turnuser',
+                credential: process.env.JANUS_TURN_PASSWORD || 'turnpassword',
+              },
+            ]
+          : []),
+      ]
+
+      // Notify successful join with existing participants and Janus config
       client.emit('joined-class', {
         sessionId: session.sessionId,
         handleId: session.handleId,
@@ -248,6 +287,11 @@ export class WebRtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
         mediaSettings,
         participantCount: this.classParticipants.get(data.classId)?.size || 0,
         existingParticipants,
+        janusJsep: janusJoinResult.jsep, // Include Janus JSEP if available
+        // Add Janus connection details for frontend
+        janusUrl,
+        iceServers,
+        userId: data.userId,
       })
 
       // Notify other participants that someone joined
@@ -895,64 +939,6 @@ export class WebRtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
     } catch (error) {
       this.logger.error('Error getting chat history:', error)
       client.emit('error', { message: 'Failed to get chat history' })
-    }
-  }
-
-  private async handleTeacherJoin(session: ParticipantSession, client: Socket) {
-    // Create room if it doesn't exist, or join as publisher
-    const result = await this.janusService.createOrJoinRoom(
-      session.sessionId,
-      session.handleId,
-      session.roomId,
-      session.displayName,
-      true, // isPublisher
-    )
-
-    if (!result.success) {
-      throw new Error('Failed to setup teacher session')
-    }
-  }
-
-  private async handleStudentJoin(session: ParticipantSession, client: Socket) {
-    // List existing participants to find teacher
-    const participants = await this.janusService.listParticipants(session.sessionId, session.handleId, session.roomId)
-
-    const teacher = participants.find((p: any) => p.publisher === true)
-
-    if (teacher) {
-      // Join as subscriber
-      const result = await this.janusService.joinAsSubscriber(
-        session.sessionId,
-        session.handleId,
-        session.roomId,
-        session.displayName,
-        teacher.id,
-      )
-
-      if (result.success && result.jsep) {
-        client.emit('teacher-offer', {
-          type: 'offer',
-          sdp: result.jsep.sdp,
-        })
-      }
-    } else {
-      // No teacher yet, join as listener
-      await this.janusService.joinAsListener(session.sessionId, session.handleId, session.roomId, session.displayName)
-    }
-  }
-
-  private async cleanupJanusSession(session: ParticipantSession) {
-    try {
-      // Clean up screen share handle if exists
-      if (session.screenShareHandleId) {
-        await this.janusService.stopScreenShare(session.sessionId, session.screenShareHandleId)
-      }
-
-      await this.janusService.leaveRoom(session.sessionId, session.handleId, session.roomId)
-
-      await this.janusService.destroySession(session.sessionId)
-    } catch (error) {
-      this.logger.error('Error cleaning up Janus session:', error)
     }
   }
 
