@@ -26,7 +26,9 @@ export class CourseService {
 
     // Validate lecturer exists if provided
     if (lecturerIds) {
-      const lecturerExists = await Promise.all(lecturerIds.map((id) => this.courseRepository.checkLecturerExists(id)))
+      const lecturerExists = await Promise.all(
+        lecturerIds.map((id) => this.courseRepository.checkLecturerExists(Number(id))),
+      )
       if (lecturerExists.some((exists) => !exists)) {
         throw new BadRequestException(`Lecturers with IDs ${lecturerIds.join(', ')} do not exist or are not authorized`)
       }
@@ -43,7 +45,7 @@ export class CourseService {
       slug,
       ...courseData,
       thumbnailUrl,
-      lecturerIds,
+      lecturerIds: lecturerIds.map((id) => Number(id)),
       createdBy: userId,
     })
   }
@@ -143,7 +145,7 @@ export class CourseService {
     // Validate lecturers exist if provided
     if (updateCourseDto.lecturerIds) {
       const lecturerExists = await Promise.all(
-        updateCourseDto.lecturerIds.map((id) => this.courseRepository.checkLecturerExists(id)),
+        updateCourseDto.lecturerIds.map((id) => this.courseRepository.checkLecturerExists(Number(id))),
       )
       if (lecturerExists.some((exists) => !exists)) {
         throw new BadRequestException(
@@ -193,7 +195,7 @@ export class CourseService {
 
   async getPublishedCourses(queryDto: Omit<QueryCourseDTO, 'status'>) {
     const { page, limit, search, level, courseType, sortBy, sortOrder } = queryDto
-    const skip = (page - 1) * limit
+    const skip = (page - 1) * Number(limit)
 
     // Build where clause (excluding status since it's set to PUBLISHED)
     const where: Omit<CourseWhereInput, 'status'> = {}
@@ -236,9 +238,9 @@ export class CourseService {
       data: courses,
       pagination: {
         page,
-        limit,
+        limit: Number(limit),
         total,
-        totalPages: Math.ceil(total / limit),
+        totalPages: Math.ceil(total / Number(limit)),
       },
     }
   }

@@ -63,7 +63,10 @@ export class CourseRepository {
 
   async create(data: CourseCreateInput): Promise<CourseWithRelations> {
     return (await this.prisma.course.create({
-      data: data as any,
+      data: {
+        ...data,
+        price: Number(data.price ?? 0),
+      },
       include: this.includeRelations,
     })) as any
   }
@@ -107,7 +110,10 @@ export class CourseRepository {
 
     return (await this.prisma.course.update({
       where: where as any,
-      data: data as any,
+      data: {
+        ...data,
+        price: data.price !== undefined ? Number(data.price) : undefined,
+      },
       include: this.includeRelations,
     })) as any
   }
