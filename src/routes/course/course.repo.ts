@@ -78,8 +78,6 @@ export class CourseRepository {
 
     const [courses, total] = await Promise.all([
       this.prisma.course.findMany({
-        skip,
-        take,
         where: where as any,
         orderBy: orderBy as any,
         include: this.includeRelations,
