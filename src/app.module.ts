@@ -17,6 +17,7 @@ import { OptionModule } from './routes/question-option/option.module'
 import { TestPaperModule } from './routes/test-paper/test-paper.module'
 import { TestSectionModule } from './routes/test-section/test-section.module'
 import { TestItemModule } from './routes/test-item/test-item.module'
+import { TestAttemptModule } from './routes/test-attempt/test-attempt.module'
 import { WebsocketsModule } from './websockets/websockets.module'
 
 @Module({
@@ -37,6 +38,7 @@ import { WebsocketsModule } from './websockets/websockets.module'
     TestPaperModule,
     TestSectionModule,
     TestItemModule,
+    TestAttemptModule,
     WebsocketsModule,
   ],
   controllers: [AppController],
