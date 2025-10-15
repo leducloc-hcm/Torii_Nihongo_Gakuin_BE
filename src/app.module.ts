@@ -14,6 +14,8 @@ import { FlashcardModule } from './routes/flashcard/flashcard.module'
 import { PlacementBlueprintModule } from './routes/placement/placement-blueprint.module'
 import { QuestionModule } from './routes/question/question.module'
 import { OptionModule } from './routes/question-option/option.module'
+import { TestPaperModule } from './routes/test-paper/test-paper.module'
+import { TestSectionModule } from './routes/test-section/test-section.module'
 import { WebsocketsModule } from './websockets/websockets.module'
 
 @Module({
@@ -31,6 +33,8 @@ import { WebsocketsModule } from './websockets/websockets.module'
     PlacementBlueprintModule,
     QuestionModule,
     OptionModule,
+    TestPaperModule,
+    TestSectionModule,
     WebsocketsModule,
   ],
   controllers: [AppController],
