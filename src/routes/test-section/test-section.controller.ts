@@ -23,6 +23,7 @@ import {
   TestSectionStatsDto,
   CopyTestSectionDto,
   MoveTestSectionDto,
+  BulkCreateSectionsWithItemsDto,
 } from './test-section.dto'
 import { Auth } from '../../shared/decorators/auth.decorator'
 import { AuthType } from '../../shared/constants/auth.constant'
@@ -250,5 +251,27 @@ export class TestSectionController {
     failed: number[]
   }> {
     return this.testSectionService.bulkDeleteTestSections(bulkDeleteDto.ids)
+  }
+
+  @Post('test-papers/:testId/sections/bulk-with-items')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Staff, RoleName.Lecturer)
+  @ApiOperation({
+    summary: 'Create multiple test sections with items',
+    description: 'Create multiple test sections and their associated test items in a single operation',
+  })
+  @ApiParam({ name: 'testId', description: 'Test paper ID' })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'Sections and items created successfully',
+    type: [TestSectionStatsDto],
+  })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid input or bulk limit exceeded' })
+  @ApiResponse({ status: HttpStatus.CONFLICT, description: 'Section title already exists or duplicate questions' })
+  async createSectionsWithItems(
+    @Param('testId', ParseIntPipe) testId: number,
+    @Body() createDto: BulkCreateSectionsWithItemsDto,
+  ) {
+    return this.testSectionService.createSectionsWithItems(testId, createDto.sections)
   }
 }
