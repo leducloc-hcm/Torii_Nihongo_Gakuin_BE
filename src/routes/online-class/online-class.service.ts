@@ -616,7 +616,7 @@ export class OnlineClassService {
         description: onlineClass.title,
         is_private: false,
         publishers: onlineClass.capacity,
-        bitrate: 128000,
+        bitrate: 8000000,
         fir_freq: 10,
         videocodec: 'vp8',
         audiocodec: 'opus',
