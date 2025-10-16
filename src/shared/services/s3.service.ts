@@ -266,4 +266,132 @@ export class S3Service {
       originalName: file.originalname,
     }
   }
+
+  // Recording-specific methods for WebRTC classes
+  uploadRecording = async (
+    recordingBuffer: Buffer,
+    classId: string,
+    recordingId: string,
+    filename: string,
+    contentType: string = 'video/webm',
+  ) => {
+    try {
+      const key = `recordings/${classId}/${recordingId}/${filename}`
+
+      const command = new PutObjectCommand({
+        Bucket: this.BUCKET_NAME,
+        Key: key,
+        Body: recordingBuffer,
+        ContentType: contentType,
+        Metadata: {
+          classId,
+          recordingId,
+          originalFilename: filename,
+          uploadedAt: new Date().toISOString(),
+          type: 'class-recording',
+        },
+      })
+
+      await this.s3.send(command)
+
+      const url = `https://${this.BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`
+
+      this.logger.log(`Recording uploaded to S3: ${key}`)
+
+      return {
+        key,
+        url,
+        recordingId,
+        classId,
+      }
+    } catch (error) {
+      this.logger.error(`Failed to upload recording to S3:`, error)
+      throw error
+    }
+  }
+
+  generateRecordingStreamUrl = async (
+    classId: string,
+    recordingId: string,
+    filename: string,
+    expiresIn: number = 3600, // 1 hour
+  ) => {
+    try {
+      const key = `recordings/${classId}/${recordingId}/${filename}`
+
+      const command = new GetObjectCommand({
+        Bucket: this.BUCKET_NAME,
+        Key: key,
+      })
+
+      const streamUrl = await getSignedUrl(this.s3, command, { expiresIn })
+
+      return {
+        streamUrl,
+        expiresIn,
+        key,
+      }
+    } catch (error) {
+      this.logger.error(`Failed to generate recording stream URL:`, error)
+      throw error
+    }
+  }
+
+  uploadClassDocument = async (file: Express.Multer.File, classId: string, uploadedBy: string) => {
+    try {
+      const fileExt = file.originalname.split('.').pop()
+      const key = `documents/${classId}/${Date.now()}-${uuidv4()}.${fileExt}`
+
+      const command = new PutObjectCommand({
+        Bucket: this.BUCKET_NAME,
+        Key: key,
+        Body: file.buffer,
+        ContentType: file.mimetype,
+        Metadata: {
+          classId,
+          uploadedBy,
+          originalFilename: file.originalname,
+          uploadedAt: new Date().toISOString(),
+          type: 'class-document',
+        },
+      })
+
+      await this.s3.send(command)
+
+      const url = `https://${this.BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`
+
+      this.logger.log(`Class document uploaded to S3: ${key}`)
+
+      return {
+        key,
+        url,
+        originalName: file.originalname,
+        size: file.size,
+        mimeType: file.mimetype,
+        classId,
+      }
+    } catch (error) {
+      this.logger.error(`Failed to upload class document to S3:`, error)
+      throw error
+    }
+  }
+
+  generateDocumentPresignedUrl = async (classId: string, documentKey: string, expiresIn: number = 3600) => {
+    try {
+      const command = new GetObjectCommand({
+        Bucket: this.BUCKET_NAME,
+        Key: documentKey,
+      })
+
+      const presignedUrl = await getSignedUrl(this.s3, command, { expiresIn })
+
+      return {
+        presignedUrl,
+        expiresIn,
+      }
+    } catch (error) {
+      this.logger.error(`Failed to generate document presigned URL:`, error)
+      throw error
+    }
+  }
 }

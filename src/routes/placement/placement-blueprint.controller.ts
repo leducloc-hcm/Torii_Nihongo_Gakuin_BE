@@ -11,6 +11,7 @@ import {
   HttpStatus,
   UseGuards,
   ParseIntPipe,
+  Put,
 } from '@nestjs/common'
 import { PlacementBlueprintService } from './placement-blueprint.service'
 import {
@@ -63,7 +64,7 @@ export class PlacementBlueprintController {
     return this.placementBlueprintService.findActiveByLevel(level)
   }
 
-  @Get(':id')
+  @Get('id/:id')
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Admin, RoleName.Lecturer)
   @HttpCode(HttpStatus.OK)
@@ -71,7 +72,7 @@ export class PlacementBlueprintController {
     return this.placementBlueprintService.findOne(id)
   }
 
-  @Patch(':id')
+  @Put(':id')
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Admin)
   @HttpCode(HttpStatus.OK)
@@ -83,8 +84,8 @@ export class PlacementBlueprintController {
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Admin)
   @HttpCode(HttpStatus.OK)
-  async activate(@Param('id', ParseIntPipe) id: number) {
-    return this.placementBlueprintService.activate(id)
+  async activate(@Param('id', ParseIntPipe) id: number, @Body() body: ActivateBlueprintDTO) {
+    return this.placementBlueprintService.activate(id, body)
   }
 
   @Delete(':id')

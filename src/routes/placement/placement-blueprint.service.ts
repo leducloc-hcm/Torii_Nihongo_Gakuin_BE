@@ -4,6 +4,7 @@ import {
   CreatePlacementBlueprintDTO,
   UpdatePlacementBlueprintDTO,
   QueryPlacementBlueprintDTO,
+  ActivateBlueprintDTO,
 } from './placement-blueprint.dto'
 import { PlacementBlueprintWhereInput, PlacementBlueprintOrderByInput } from './placement-blueprint.model'
 import { JLPTLevel, PlacementBlueprint } from '@prisma/client'
@@ -39,7 +40,6 @@ export class PlacementBlueprintService {
     const { page, limit, level, active, sortBy, sortOrder } = queryDto
     const skip = (page - 1) * limit
 
-    // Build where clause
     const where: PlacementBlueprintWhereInput = {}
 
     if (level !== undefined) {
@@ -50,7 +50,6 @@ export class PlacementBlueprintService {
       where.active = active
     }
 
-    // Build order by clause
     const orderBy: PlacementBlueprintOrderByInput = {}
     if (sortBy && sortOrder) {
       orderBy[sortBy] = sortOrder
@@ -59,7 +58,7 @@ export class PlacementBlueprintService {
     const [blueprints, total] = await Promise.all([
       this.placementBlueprintRepository.findMany({
         skip,
-        take: limit,
+        take: Number(limit),
         where,
         orderBy,
       }),
@@ -93,54 +92,50 @@ export class PlacementBlueprintService {
   }
 
   async update(id: number, updateDto: UpdatePlacementBlueprintDTO): Promise<PlacementBlueprint> {
-    // Check if blueprint exists
     const exists = await this.placementBlueprintRepository.checkExists(id)
     if (!exists) {
       throw new NotFoundException(`PlacementBlueprint with ID ${id} not found`)
     }
 
-    // If updating question counts, validate the sum
+    const current = await this.placementBlueprintRepository.findUnique({ id })
+    if (!current) {
+      throw new NotFoundException(`PlacementBlueprint with ID ${id} not found`)
+    }
+
+    const vocabKanji = updateDto.vocabKanji ?? current.vocabKanji
+    const grammar = updateDto.grammar ?? current.grammar
+    const synonym = updateDto.synonym ?? current.synonym
+    const orderSentence = updateDto.orderSentence ?? current.orderSentence
+    const readingShort = updateDto.readingShort ?? current.readingShort
+    const readingMedium = updateDto.readingMedium ?? current.readingMedium
+
+    const sum = vocabKanji + grammar + synonym + orderSentence + readingShort + readingMedium
+
     if (updateDto.totalQuestions !== undefined) {
-      const current = await this.placementBlueprintRepository.findUnique({ id })
-      if (!current) {
-        throw new NotFoundException(`PlacementBlueprint with ID ${id} not found`)
-      }
-
-      const vocabKanji = updateDto.vocabKanji ?? current.vocabKanji
-      const grammar = updateDto.grammar ?? current.grammar
-      const synonym = updateDto.synonym ?? current.synonym
-      const orderSentence = updateDto.orderSentence ?? current.orderSentence
-      const readingShort = updateDto.readingShort ?? current.readingShort
-      const readingMedium = updateDto.readingMedium ?? current.readingMedium
-
-      const sum = vocabKanji + grammar + synonym + orderSentence + readingShort + readingMedium
-
       if (sum !== updateDto.totalQuestions) {
         throw new BadRequestException('Sum of question types must equal totalQuestions')
       }
+    } else {
+      updateDto.totalQuestions = sum
     }
-
     return this.placementBlueprintRepository.update({ id }, updateDto)
   }
 
-  async activate(id: number): Promise<PlacementBlueprint> {
-    // Check if blueprint exists
+  async activate(id: number, activateDto: ActivateBlueprintDTO): Promise<PlacementBlueprint> {
     const exists = await this.placementBlueprintRepository.checkExists(id)
     if (!exists) {
       throw new NotFoundException(`PlacementBlueprint with ID ${id} not found`)
     }
 
-    return this.placementBlueprintRepository.activate(id)
+    return this.placementBlueprintRepository.activate(id, activateDto.activate)
   }
 
   async remove(id: number): Promise<PlacementBlueprint> {
-    // Check if blueprint exists
     const exists = await this.placementBlueprintRepository.checkExists(id)
     if (!exists) {
       throw new NotFoundException(`PlacementBlueprint with ID ${id} not found`)
     }
 
-    // Check if blueprint is currently active
     const blueprint = await this.placementBlueprintRepository.findUnique({ id })
     if (blueprint && blueprint.active) {
       throw new ConflictException('Cannot delete an active blueprint')

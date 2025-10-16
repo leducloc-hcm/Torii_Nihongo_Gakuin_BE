@@ -26,12 +26,26 @@ export class PlacementBlueprintRepository {
     orderBy?: PlacementBlueprintOrderByInput
   }): Promise<PlacementBlueprint[]> {
     const { skip, take, where, orderBy } = params
-    return this.prisma.placementBlueprint.findMany({
-      skip,
-      take,
-      where,
-      orderBy,
-    })
+
+    const findManyOptions: any = {}
+
+    if (skip !== undefined && !isNaN(skip) && skip >= 0) {
+      findManyOptions.skip = skip
+    }
+
+    if (take !== undefined && !isNaN(take) && take > 0) {
+      findManyOptions.take = take
+    }
+
+    if (where !== undefined) {
+      findManyOptions.where = where
+    }
+
+    if (orderBy !== undefined) {
+      findManyOptions.orderBy = orderBy
+    }
+
+    return this.prisma.placementBlueprint.findMany(findManyOptions)
   }
 
   async findUnique(where: PlacementBlueprintWhereUniqueInput): Promise<PlacementBlueprint | null> {
@@ -81,8 +95,7 @@ export class PlacementBlueprintRepository {
     })
   }
 
-  async activate(id: number): Promise<PlacementBlueprint> {
-    // First get the blueprint to know its level
+  async activate(id: number, activate: boolean = true): Promise<PlacementBlueprint> {
     const blueprint = await this.prisma.placementBlueprint.findUnique({
       where: { id },
       select: { level: true },
@@ -92,23 +105,22 @@ export class PlacementBlueprintRepository {
       throw new Error('Blueprint not found')
     }
 
-    // Use transaction to ensure atomicity
     return this.prisma.$transaction(async (tx) => {
-      // Deactivate all blueprints of the same level
-      await tx.placementBlueprint.updateMany({
-        where: {
-          level: blueprint.level,
-          active: true,
-        },
-        data: {
-          active: false,
-        },
-      })
+      if (activate) {
+        await tx.placementBlueprint.updateMany({
+          where: {
+            level: blueprint.level,
+            active: true,
+          },
+          data: {
+            active: false,
+          },
+        })
+      }
 
-      // Activate the target blueprint
       return tx.placementBlueprint.update({
         where: { id },
-        data: { active: true },
+        data: { active: activate },
       })
     })
   }

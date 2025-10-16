@@ -162,7 +162,6 @@ export class LessonRepository {
       contentType,
     )
 
-    // Create media asset record if it doesn't exist
     if (!lesson.mediaId) {
       const mediaAsset = await this.prisma.mediaAsset.create({
         data: {
