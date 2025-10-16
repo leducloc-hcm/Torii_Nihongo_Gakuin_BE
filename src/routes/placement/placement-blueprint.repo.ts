@@ -96,7 +96,6 @@ export class PlacementBlueprintRepository {
   }
 
   async activate(id: number, activate: boolean = true): Promise<PlacementBlueprint> {
-    // First get the blueprint to know its level
     const blueprint = await this.prisma.placementBlueprint.findUnique({
       where: { id },
       select: { level: true },
@@ -106,10 +105,8 @@ export class PlacementBlueprintRepository {
       throw new Error('Blueprint not found')
     }
 
-    // Use transaction to ensure atomicity
     return this.prisma.$transaction(async (tx) => {
       if (activate) {
-        // Deactivate all blueprints of the same level when activating
         await tx.placementBlueprint.updateMany({
           where: {
             level: blueprint.level,
@@ -121,7 +118,6 @@ export class PlacementBlueprintRepository {
         })
       }
 
-      // Update the target blueprint with the specified activate status
       return tx.placementBlueprint.update({
         where: { id },
         data: { active: activate },

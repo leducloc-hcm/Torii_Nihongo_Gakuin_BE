@@ -1,10 +1,7 @@
 import { z } from 'zod'
 import { Prisma, JLPTLevel } from '@prisma/client'
 
-// Enums
 export const JLPTLevelEnum = z.enum(['N5', 'N4', 'N3', 'N2', 'N1'])
-
-// PlacementBlueprint Schema
 export const PlacementBlueprintSchema = z.object({
   id: z.number().int().positive(),
   level: JLPTLevelEnum,
@@ -18,7 +15,6 @@ export const PlacementBlueprintSchema = z.object({
   active: z.boolean(),
 })
 
-// Create PlacementBlueprint Schema
 export const CreatePlacementBlueprintSchema = PlacementBlueprintSchema.omit({ id: true, active: true }).refine(
   (data) => {
     const sum =
@@ -31,7 +27,6 @@ export const CreatePlacementBlueprintSchema = PlacementBlueprintSchema.omit({ id
   },
 )
 
-// Update PlacementBlueprint Schema
 export const UpdatePlacementBlueprintSchema = PlacementBlueprintSchema.omit({ id: true, active: true })
   .partial()
   .refine(
@@ -54,7 +49,6 @@ export const UpdatePlacementBlueprintSchema = PlacementBlueprintSchema.omit({ id
     },
   )
 
-// Query PlacementBlueprint Schema
 export const QueryPlacementBlueprintSchema = z.object({
   page: z.coerce.number().int().positive().optional().default(1),
   limit: z.coerce.number().int().positive().max(100).optional().default(10),
@@ -64,18 +58,14 @@ export const QueryPlacementBlueprintSchema = z.object({
   sortOrder: z.enum(['asc', 'desc']).optional().default('asc'),
 })
 
-// PlacementBlueprint Response Schema
 export const PlacementBlueprintResponseSchema = PlacementBlueprintSchema
 
-// PlacementBlueprint List Item Schema
 export const PlacementBlueprintListItemSchema = PlacementBlueprintSchema
 
-// Activate Blueprint Schema
 export const ActivateBlueprintSchema = z.object({
   activate: z.boolean().default(true),
 })
 
-// Type definitions for Prisma
 export type PlacementBlueprint = z.infer<typeof PlacementBlueprintSchema>
 
 export type PlacementBlueprintCreateInput = Prisma.PlacementBlueprintCreateInput
