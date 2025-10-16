@@ -2,48 +2,44 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { createZodDto } from 'nestjs-zod'
 import { z } from 'zod'
 import {
-  CreateTestPaperSchema,
+  CreateTestPaperFlexibleSchema,
   UpdateTestPaperSchema,
   TestPaperQuerySchema,
   JLPTLevelSchema,
   VisibilitySchema,
   GeneratorMetaSchema,
 } from './test-paper.model'
-
-// ===== Create TestPaper DTO =====
-export class CreateTestPaperDto extends createZodDto(CreateTestPaperSchema) {
+export class CreateTestPaperDto extends createZodDto(CreateTestPaperFlexibleSchema) {
   @ApiProperty({ example: 'JLPT N3 Practice Test', description: 'Test paper title' })
   title!: string
 
   @ApiProperty({ enum: ['N5', 'N4', 'N3', 'N2', 'N1'], example: 'N3' })
   level!: z.infer<typeof JLPTLevelSchema>
 
-  @ApiPropertyOptional({ default: false, description: 'Whether this is a placement test' })
-  isPlacement!: boolean
-
   @ApiPropertyOptional({ enum: ['PRIVATE', 'UNLISTED', 'PUBLIC'], default: 'PRIVATE' })
   visibility!: z.infer<typeof VisibilitySchema>
 
-  @ApiPropertyOptional({ description: 'Blueprint ID if generated from blueprint' })
-  blueprintId?: number | null
+  @ApiPropertyOptional({ description: 'Blueprint ID if generated from blueprint (MCP mode)' })
+  blueprintId?: number
 
-  @ApiPropertyOptional({ description: 'Random seed for deterministic generation' })
-  seed?: bigint | null
+  @ApiPropertyOptional({ description: 'Blueprint snapshot at generation time (MCP mode)' })
+  blueprintSnapshot?: any
 
-  @ApiPropertyOptional({ default: 1, description: 'Content version' })
+  @ApiPropertyOptional({ description: 'Random seed for deterministic generation (MCP mode)' })
+  seed?: bigint
+
+  @ApiPropertyOptional({ default: 1, description: 'Content version (MCP mode)' })
   version!: number
 
-  @ApiPropertyOptional({ example: '1.3.2', description: 'Generator engine version' })
-  generatorVersion?: string | null
+  @ApiPropertyOptional({ example: '1.3.2', description: 'Generator engine version (MCP mode)' })
+  generatorVersion?: string
 
-  @ApiPropertyOptional({ description: 'Generator metadata (model, config, etc.)' })
+  @ApiPropertyOptional({ description: 'Generator metadata (model, config, etc.) (MCP mode)' })
   generatorMeta?: z.infer<typeof GeneratorMetaSchema>
 
   @ApiPropertyOptional({ default: 'published', description: 'Publication status' })
   status!: string
 }
-
-// ===== Update TestPaper DTO =====
 export class UpdateTestPaperDto extends createZodDto(UpdateTestPaperSchema) {
   @ApiPropertyOptional({ example: 'Updated JLPT N3 Practice Test' })
   title?: string
@@ -51,32 +47,30 @@ export class UpdateTestPaperDto extends createZodDto(UpdateTestPaperSchema) {
   @ApiPropertyOptional({ enum: ['N5', 'N4', 'N3', 'N2', 'N1'] })
   level?: z.infer<typeof JLPTLevelSchema>
 
-  @ApiPropertyOptional({ description: 'Whether this is a placement test' })
-  isPlacement?: boolean
-
   @ApiPropertyOptional({ enum: ['PRIVATE', 'UNLISTED', 'PUBLIC'] })
   visibility?: z.infer<typeof VisibilitySchema>
 
-  @ApiPropertyOptional({ description: 'Blueprint ID if generated from blueprint' })
-  blueprintId?: number | null
+  @ApiPropertyOptional({ description: 'Blueprint ID if generated from blueprint (MCP mode)' })
+  blueprintId?: number
 
-  @ApiPropertyOptional({ description: 'Random seed for deterministic generation' })
-  seed?: bigint | null
+  @ApiPropertyOptional({ description: 'Blueprint snapshot at generation time (MCP mode)' })
+  blueprintSnapshot?: any
 
-  @ApiPropertyOptional({ description: 'Content version' })
+  @ApiPropertyOptional({ description: 'Random seed for deterministic generation (MCP mode)' })
+  seed?: bigint
+
+  @ApiPropertyOptional({ description: 'Content version (MCP mode)' })
   version?: number
 
-  @ApiPropertyOptional({ description: 'Generator engine version' })
-  generatorVersion?: string | null
+  @ApiPropertyOptional({ description: 'Generator engine version (MCP mode)' })
+  generatorVersion?: string
 
-  @ApiPropertyOptional({ description: 'Generator metadata' })
+  @ApiPropertyOptional({ description: 'Generator metadata (MCP mode)' })
   generatorMeta?: z.infer<typeof GeneratorMetaSchema>
 
   @ApiPropertyOptional({ description: 'Publication status' })
   status?: string
 }
-
-// ===== Query TestPaper DTO =====
 export class TestPaperQueryDto extends createZodDto(TestPaperQuerySchema) {
   @ApiPropertyOptional({ default: 1, minimum: 1 })
   page!: number
@@ -89,9 +83,6 @@ export class TestPaperQueryDto extends createZodDto(TestPaperQuerySchema) {
 
   @ApiPropertyOptional({ enum: ['N5', 'N4', 'N3', 'N2', 'N1'] })
   level?: z.infer<typeof JLPTLevelSchema>
-
-  @ApiPropertyOptional({ description: 'Filter placement tests' })
-  isPlacement?: boolean
 
   @ApiPropertyOptional({ enum: ['PRIVATE', 'UNLISTED', 'PUBLIC'] })
   visibility?: z.infer<typeof VisibilitySchema>
@@ -109,7 +100,6 @@ export class TestPaperQueryDto extends createZodDto(TestPaperQuerySchema) {
   sortOrder!: 'asc' | 'desc'
 }
 
-// ===== Bulk Operations DTOs =====
 export const BulkDeleteTestPaperSchema = z.object({
   ids: z.array(z.number().int().positive()).min(1).max(100),
 })
@@ -140,7 +130,6 @@ export class BulkUpdateStatusDto extends createZodDto(BulkUpdateStatusSchema) {
   status!: string
 }
 
-// ===== Clone TestPaper DTO =====
 export const CloneTestPaperSchema = z.object({
   title: z.string().min(1).max(255).optional(),
   level: JLPTLevelSchema.optional(),
@@ -162,7 +151,6 @@ export class CloneTestPaperDto extends createZodDto(CloneTestPaperSchema) {
   includeAttempts!: boolean
 }
 
-// ===== Stats Response DTOs =====
 export class TestPaperStatsDto {
   @ApiProperty({ example: 45, description: 'Total number of attempts' })
   totalAttempts!: number
@@ -183,7 +171,6 @@ export class TestPaperStatsDto {
   averageCompletionTime!: number
 }
 
-// ===== Generator Metadata DTO =====
 export class GeneratorMetaDto {
   @ApiPropertyOptional({ example: 'gpt-4', description: 'AI model used' })
   model?: string

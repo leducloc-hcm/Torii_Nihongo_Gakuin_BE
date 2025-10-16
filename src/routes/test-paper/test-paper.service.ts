@@ -1,3 +1,21 @@
+/**
+ * ===== TestPaper Service =====
+ * Handles both MANUAL and MCP (Model Context Protocol) server generation modes:
+ *
+ * MANUAL MODE:
+ * - Create test papers manually by providing basic information
+ * - Only requires: title, level, visibility, status
+ * - Does not use blueprint or generator fields
+ *
+ * MCP MODE:
+ * - Create test papers via MCP server generation
+ * - Requires blueprintId for generation
+ * - Uses generator metadata: version, generatorVersion, generatorMeta
+ * - Supports deterministic generation via seed
+ * - Tracks blueprint snapshots for reproducibility
+ *
+ * Both modes share the same API endpoint but handle different field sets intelligently.
+ */
 import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common'
 import { TestPaperRepository } from './test-paper.repo'
 import {
@@ -16,26 +34,62 @@ import {
 export class TestPaperService {
   constructor(private readonly testPaperRepo: TestPaperRepository) {}
 
+  /**
+   * Create test paper supporting both MANUAL and MCP modes
+   *
+   * MANUAL MODE - provide only:
+   * { title, level, visibility?, status? }
+   *
+   * MCP MODE - provide:
+   * { title, level, blueprintId, visibility?, status?, seed?, generatorVersion?, generatorMeta?, blueprintSnapshot? }
+   */
   async createTestPaper(data: CreateTestPaperInput): Promise<TestPaper> {
-    // Validate title uniqueness
+    // Check if title already exists
     const titleExists = await this.testPaperRepo.getTitleExists(data.title)
     if (titleExists) {
       throw new ConflictException(`Test paper with title "${data.title}" already exists`)
     }
 
-    if (data.blueprintId) {
-      const nextVersion = await this.testPaperRepo.getNextVersion(data.blueprintId)
-      data.version = nextVersion
+    // Auto-detect creation mode based on presence of MCP fields
+    const isMCPMode = Boolean(data.blueprintId || data.seed || data.generatorVersion)
+
+    // Prepare creation data
+    const createData: any = {
+      title: data.title,
+      level: data.level,
+      visibility: data.visibility || 'PRIVATE',
+      status: data.status || 'published',
     }
 
-    if (data.seed !== undefined && data.seed !== null) {
-      const maxSeed = BigInt('9223372036854775807') // Max BigInt for PostgreSQL
-      if (data.seed < 0 || data.seed > maxSeed) {
-        throw new BadRequestException('Seed must be between 0 and 9223372036854775807')
+    // Handle MCP mode specific logic
+    if (isMCPMode) {
+      if (!data.blueprintId) {
+        throw new BadRequestException('Blueprint ID is required for MCP mode')
       }
+
+      // Get next version for this blueprint
+      const nextVersion = await this.testPaperRepo.getNextVersion(data.blueprintId)
+
+      createData.blueprintId = data.blueprintId
+      createData.version = data.version || nextVersion
+      createData.blueprintSnapshot = data.blueprintSnapshot
+      createData.seed = data.seed
+      createData.generatorVersion = data.generatorVersion
+      createData.generatorMeta = data.generatorMeta
+
+      // Validate seed if provided
+      if (data.seed !== undefined) {
+        const maxSeed = BigInt('9223372036854775807')
+        if (data.seed < 0 || data.seed > maxSeed) {
+          throw new BadRequestException('Seed must be between 0 and 9223372036854775807')
+        }
+      }
+    } else {
+      // Manual mode - set default version
+      createData.version = 1
     }
 
-    return this.testPaperRepo.create(data)
+    return this.testPaperRepo.create(createData)
   }
 
   async getTestPaper(id: number): Promise<TestPaper> {
@@ -63,26 +117,46 @@ export class TestPaperService {
   }
 
   async updateTestPaper(id: number, data: UpdateTestPaperInput): Promise<TestPaper> {
-    const exists = await this.testPaperRepo.exists(id)
-    if (!exists) {
+    // Check if test paper exists
+    const existingTestPaper = await this.testPaperRepo.findById(id)
+    if (!existingTestPaper) {
       throw new NotFoundException(`Test paper with ID ${id} not found`)
     }
 
-    if (data.title) {
+    // Check if new title conflicts
+    if (data.title && data.title !== existingTestPaper.title) {
       const titleExists = await this.testPaperRepo.getTitleExists(data.title, id)
       if (titleExists) {
         throw new ConflictException(`Test paper with title "${data.title}" already exists`)
       }
     }
 
-    if (data.seed !== undefined && data.seed !== null) {
+    // Validate seed if provided
+    if (data.seed !== undefined) {
       const maxSeed = BigInt('9223372036854775807')
       if (data.seed < 0 || data.seed > maxSeed) {
         throw new BadRequestException('Seed must be between 0 and 9223372036854775807')
       }
     }
 
-    return this.testPaperRepo.update(id, data)
+    // Prepare update data - only include provided fields
+    const updateData: any = {}
+
+    // Basic fields (available in both manual and MCP modes)
+    if (data.title !== undefined) updateData.title = data.title
+    if (data.level !== undefined) updateData.level = data.level
+    if (data.visibility !== undefined) updateData.visibility = data.visibility
+    if (data.status !== undefined) updateData.status = data.status
+
+    // MCP-specific fields (only update if provided)
+    if (data.blueprintId !== undefined) updateData.blueprintId = data.blueprintId
+    if (data.blueprintSnapshot !== undefined) updateData.blueprintSnapshot = data.blueprintSnapshot
+    if (data.seed !== undefined) updateData.seed = data.seed
+    if (data.version !== undefined) updateData.version = data.version
+    if (data.generatorVersion !== undefined) updateData.generatorVersion = data.generatorVersion
+    if (data.generatorMeta !== undefined) updateData.generatorMeta = data.generatorMeta
+
+    return this.testPaperRepo.update(id, updateData)
   }
 
   async deleteTestPaper(id: number): Promise<void> {
@@ -118,10 +192,6 @@ export class TestPaperService {
 
   async getTestPapersByLevel(level: JLPTLevel): Promise<TestPaper[]> {
     return this.testPaperRepo.findByLevel(level)
-  }
-
-  async getPlacementTests(): Promise<TestPaper[]> {
-    return this.testPaperRepo.findPlacementTests()
   }
 
   async getPublicTests(level?: JLPTLevel): Promise<TestPaper[]> {
@@ -271,7 +341,6 @@ export class TestPaperService {
     const testPaperData: CreateTestPaperInput = {
       title: baseTitle,
       level: 'N3', // Default, should come from blueprint
-      isPlacement: false,
       visibility: 'PRIVATE',
       blueprintId,
       seed: options.seed || BigInt(Math.floor(Math.random() * 1000000)),
@@ -307,8 +376,8 @@ export class TestPaperService {
 
     return this.testPaperRepo.update(cloned.id, {
       version: nextVersion,
-      generatorVersion: changes.generatorVersion || original.generatorVersion,
-      generatorMeta: changes.generatorMeta || original.generatorMeta,
+      generatorVersion: changes.generatorVersion || original.generatorVersion || undefined,
+      generatorMeta: changes.generatorMeta || original.generatorMeta || undefined,
       status: changes.status || 'draft',
     })
   }

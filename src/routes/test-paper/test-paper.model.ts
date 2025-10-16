@@ -73,7 +73,6 @@ export const TestPaperBaseSchema = z.object({
   id: z.number().int().positive(),
   title: z.string().min(1).max(255),
   level: JLPTLevelSchema,
-  isPlacement: z.boolean(),
   createdAt: z.date(),
   visibility: VisibilitySchema,
   blueprintId: z.number().int().positive().nullable(),
@@ -85,12 +84,22 @@ export const TestPaperBaseSchema = z.object({
   status: z.string(),
 })
 
-export const CreateTestPaperSchema = z.object({
+// Manual creation schema - for creating test papers by hand
+export const CreateTestPaperManualSchema = z.object({
   title: z.string().min(1).max(255),
   level: JLPTLevelSchema,
-  isPlacement: z.boolean().default(false),
   visibility: VisibilitySchema.default('PRIVATE'),
-  blueprintId: z.number().int().positive().nullable().optional(),
+  status: z.string().default('published'),
+  // Manual creation doesn't need these MCP fields
+})
+
+// MCP server generation schema - for creating test papers via MCP
+export const CreateTestPaperMCPSchema = z.object({
+  title: z.string().min(1).max(255),
+  level: JLPTLevelSchema,
+  visibility: VisibilitySchema.default('PRIVATE'),
+  blueprintId: z.number().int().positive(),
+  blueprintSnapshot: z.any().nullable().optional(), // JSON snapshot of blueprint
   seed: z.bigint().nullable().optional(),
   version: z.number().int().positive().default(1),
   generatorVersion: z.string().nullable().optional(),
@@ -98,14 +107,42 @@ export const CreateTestPaperSchema = z.object({
   status: z.string().default('published'),
 })
 
-export const UpdateTestPaperSchema = CreateTestPaperSchema.partial()
+// Union schema that accepts both modes
+export const CreateTestPaperSchema = z.discriminatedUnion('mode', [
+  z
+    .object({
+      mode: z.literal('manual'),
+    })
+    .merge(CreateTestPaperManualSchema),
+  z
+    .object({
+      mode: z.literal('mcp'),
+    })
+    .merge(CreateTestPaperMCPSchema),
+])
+
+// Alternative: Single schema that handles both (more flexible)
+export const CreateTestPaperFlexibleSchema = z.object({
+  title: z.string().min(1).max(255),
+  level: JLPTLevelSchema,
+  visibility: VisibilitySchema.default('PRIVATE'),
+  status: z.string().default('published'),
+  // Optional MCP fields - only used when creating via MCP server
+  blueprintId: z.number().int().positive().optional(),
+  blueprintSnapshot: z.any().optional(), // JSON
+  seed: z.bigint().optional(),
+  version: z.number().int().positive().default(1),
+  generatorVersion: z.string().optional(),
+  generatorMeta: z.any().optional(),
+})
+
+export const UpdateTestPaperSchema = CreateTestPaperFlexibleSchema.partial()
 
 export const TestPaperQuerySchema = z.object({
   page: z.number().int().positive().default(1),
   limit: z.number().int().positive().max(100).default(20),
   search: z.string().optional(),
   level: JLPTLevelSchema.optional(),
-  isPlacement: z.boolean().optional(),
   visibility: VisibilitySchema.optional(),
   status: z.string().optional(),
   blueprintId: z.number().int().positive().optional(),
@@ -114,7 +151,9 @@ export const TestPaperQuerySchema = z.object({
 })
 
 // ===== Type Exports =====
-export type CreateTestPaperInput = z.infer<typeof CreateTestPaperSchema>
+export type CreateTestPaperInput = z.infer<typeof CreateTestPaperFlexibleSchema>
+export type CreateTestPaperManualInput = z.infer<typeof CreateTestPaperManualSchema>
+export type CreateTestPaperMCPInput = z.infer<typeof CreateTestPaperMCPSchema>
 export type UpdateTestPaperInput = z.infer<typeof UpdateTestPaperSchema>
 export type TestPaperQuery = z.infer<typeof TestPaperQuerySchema>
 export type JLPTLevel = z.infer<typeof JLPTLevelSchema>

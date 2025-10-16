@@ -387,7 +387,6 @@ model TestPaper {
   id          Int        @id @default(autoincrement())
   title       String
   level       JLPTLevel
-  isPlacement Boolean    @default(false)
   createdAt   DateTime   @default(now())
   visibility  Visibility @default(PRIVATE)
   blueprintId       Int?

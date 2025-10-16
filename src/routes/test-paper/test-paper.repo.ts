@@ -111,7 +111,6 @@ export class TestPaperRepository {
       limit = 20,
       search,
       level,
-      isPlacement,
       visibility,
       status,
       blueprintId,
@@ -129,7 +128,6 @@ export class TestPaperRepository {
         },
       }),
       ...(level && { level }),
-      ...(typeof isPlacement === 'boolean' && { isPlacement }),
       ...(visibility && { visibility }),
       ...(status && { status }),
       ...(blueprintId && { blueprintId }),
@@ -187,13 +185,6 @@ export class TestPaperRepository {
     })
   }
 
-  async findPlacementTests(): Promise<TestPaper[]> {
-    return this.prisma.testPaper.findMany({
-      where: { isPlacement: true },
-      orderBy: { level: 'asc' },
-    })
-  }
-
   async findPublicTests(level?: JLPTLevel): Promise<TestPaper[]> {
     return this.prisma.testPaper.findMany({
       where: {
@@ -237,7 +228,6 @@ export class TestPaperRepository {
     })
   }
 
-  // ===== Clone Operations =====
   async clone(
     id: number,
     data: {
@@ -256,7 +246,6 @@ export class TestPaperRepository {
       data: {
         title: data.title || `${original.title} (Copy)`,
         level: data.level || original.level,
-        isPlacement: original.isPlacement,
         visibility: data.visibility || 'PRIVATE',
         blueprintId: original.blueprintId,
         blueprintSnapshot: original.blueprintSnapshot as any,
