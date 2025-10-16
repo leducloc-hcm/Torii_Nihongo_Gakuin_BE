@@ -25,7 +25,6 @@ model User {
   createdAt  DateTime     @default(now())
   updatedAt  DateTime     @updatedAt
   deletedAt  DateTime?
-
   lecturerProfile LecturerProfile?
   staffProfile    StaffProfile?
   customerProfile CustomerProfile?
@@ -73,6 +72,8 @@ model User {
   Notification Notification[]
 
   Websocket Websocket[]
+
+  AdminProfile AdminProfile[]
 }
 
 model CustomerProfile {
@@ -215,6 +216,21 @@ model StaffProfile {
   user        User      @relation(fields: [userId], references: [id])
 }
 
+model AdminProfile {
+  id          Int       @id @default(autoincrement())
+  userId      Int       @unique
+  name        String?
+  bio         String?
+  location    String?
+  username    String?   @unique
+  avatar      String?
+  coverPhoto  String?   @map("cover_photo")
+  description String?
+  phoneNumber String?   @map("phone_number")
+  dateOfBirth DateTime? @map("date_of_birth")
+  website     String?
+  user        User      @relation(fields: [userId], references: [id])
+}
 model Course {
   id           Int          @id @default(autoincrement())
   slug         String       @unique
@@ -254,14 +270,14 @@ model Lesson {
   title       String
   kind        LessonKind   @default(VIDEO)
   content     String?
-  videoUrl    String?
   durationSec Int?
+  mediaId     Int?
   order       Int          @default(0)
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   status      LessonStatus @default(PRIVATE)
   module      Module       @relation(fields: [moduleId], references: [id])
-  resources   MediaAsset[]
+  media   MediaAsset[]
   liveSession LiveSession?
   quiz        Quiz?
   notes       LessonNote[]
@@ -272,6 +288,7 @@ model MediaAsset {
   lessonId  Int?
   url       String
   kind      MediaKind @default(OTHER)
+  status    MediaStatus @default(UPLOADING)
   mimeType  String?
   sizeByte  Int?
   caption   String?
@@ -326,6 +343,7 @@ model PlacementBlueprint {
   readingShort   Int       @default(2)
   readingMedium  Int       @default(3)
   active         Boolean   @default(true)
+  papers TestPaper[]
 }
 
 model Question {
@@ -340,17 +358,15 @@ model Question {
   tags        String[]
   metadata    Json?
   createdAt   DateTime     @default(now())
-
+  readingLength ReadingLength?
+  tokenCount    Int?
   media     MediaAsset? @relation(fields: [mediaId], references: [id])
   options   Option[]
   testItems TestItem[]
   examItems ExamItem[]
   quizItems QuizItem[]
-
   QuizAnswer QuizAnswer[]
-
   TestAnswer TestAnswer[]
-
   ExamAnswer ExamAnswer[]
 }
 
@@ -371,10 +387,16 @@ model TestPaper {
   id          Int        @id @default(autoincrement())
   title       String
   level       JLPTLevel
-  isPlacement Boolean    @default(false)
   createdAt   DateTime   @default(now())
   visibility  Visibility @default(PRIVATE)
-
+  blueprintId       Int?
+  blueprint         PlacementBlueprint? @relation(fields: [blueprintId], references: [id])
+  blueprintSnapshot Json?     // copy JSON blueprint tại thời điểm sinh đề
+  seed              BigInt?   // để chọn câu deterministic
+  version           Int       @default(1)   // phiên bản nội dung đề
+  generatorVersion  String?               // version engine MCP (vd "1.3.2")
+  generatorMeta     Json?                 // model/temp/code_sha/config_hash...
+  status            String    @default("published")
   sections TestSection[]
   attempts TestAttempt[]
 }
@@ -423,6 +445,7 @@ model TestAnswer {
   selectedOptionId Int?
   isCorrect        Boolean?
   timeSpentSec     Int?
+  explanation      String?
 
   attempt        TestAttempt @relation(fields: [attemptId], references: [id])
   question       Question    @relation(fields: [questionId], references: [id])
@@ -469,6 +492,7 @@ model LiveSession {
   endedAt      DateTime?
   mode         LiveMode  @default(MODE2D)
   roomKey      String    @unique
+  janusRoomId  Int?
   recordingUrl String?
 
   class      Class             @relation(fields: [classId], references: [id])
@@ -647,6 +671,7 @@ model QuizAnswer {
   questionId       Int
   selectedOptionId Int?
   isCorrect        Boolean?
+  explanation      String?
 
   attempt        QuizAttempt @relation(fields: [attemptId], references: [id])
   question       Question    @relation(fields: [questionId], references: [id])
@@ -723,6 +748,7 @@ model ExamAnswer {
   selectedOptionId Int?
   isCorrect        Boolean?
   timeSpentSec     Int?
+  explanation      String?
 
   attempt        ExamAttempt @relation(fields: [attemptId], references: [id])
   question       Question    @relation(fields: [questionId], references: [id])
@@ -815,7 +841,6 @@ model Reward {
   name   String
   points Int        @default(0)
   stock  Int?
-
   redemptions RewardRedemption[]
 }
 
@@ -853,7 +878,6 @@ model OrderItem {
   classId   Int?
   unitPrice Int
   quantity  Int           @default(1)
-
   order  Order   @relation(fields: [orderId], references: [id])
   course Course? @relation(fields: [courseId], references: [id])
   class  Class?  @relation(fields: [classId], references: [id])
@@ -1127,6 +1151,12 @@ enum VerificationCodeType {
   DISABLE_2FA
 }
 
+enum ReadingLength {
+  SHORT
+  MEDIUM
+  LONG
+}
+
 enum NotificationType {
   FRIEND_REQUEST
   FRIEND_REQUEST_ACCEPTED
@@ -1153,4 +1183,11 @@ enum NotificationPriority {
   NORMAL
   HIGH
   URGENT
+}
+
+enum MediaStatus {
+  UPLOADING
+  TRANSCODING
+  READY
+  FAILED
 }

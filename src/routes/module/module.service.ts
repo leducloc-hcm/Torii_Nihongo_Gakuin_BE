@@ -30,44 +30,13 @@ export class ModuleService {
     })
   }
 
-  async findAll(queryDto: QueryModuleDTO) {
-    const { page, limit, search, courseId, sortBy, sortOrder } = queryDto
-    const skip = (page - 1) * limit
-
+  async findAll() {
     // Build where clause
-    const where: ModuleWhereInput = {}
 
-    if (search) {
-      where.OR = [{ title: { contains: search, mode: 'insensitive' } }]
-    }
-
-    if (courseId) {
-      where.courseId = courseId
-    }
-
-    // Build orderBy clause
-    const orderBy: ModuleOrderByInput = {}
-    if (sortBy === 'order') {
-      orderBy.order = sortOrder
-    } else if (sortBy === 'title') {
-      orderBy.title = sortOrder
-    }
-
-    const { modules, total } = await this.moduleRepository.findAll({
-      skip,
-      take: limit,
-      where,
-      orderBy,
-    })
+    const { modules, total } = await this.moduleRepository.findAll()
 
     return {
       data: modules,
-      meta: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
     }
   }
 
@@ -99,65 +68,5 @@ export class ModuleService {
     await this.moduleRepository.delete({ id })
 
     return module
-  }
-
-  async findByCourse(courseId: number, queryDto: Omit<QueryModuleDTO, 'courseId'>) {
-    const { page, limit, search, sortBy, sortOrder } = queryDto
-    const skip = (page - 1) * limit
-
-    // Build where clause (excluding courseId since it's passed separately)
-    const where: Omit<ModuleWhereInput, 'courseId'> = {}
-
-    if (search) {
-      where.OR = [{ title: { contains: search, mode: 'insensitive' } }]
-    }
-
-    // Build orderBy clause
-    const orderBy: ModuleOrderByInput = {}
-    if (sortBy === 'order') {
-      orderBy.order = sortOrder
-    } else if (sortBy === 'title') {
-      orderBy.title = sortOrder
-    }
-
-    const { modules, total } = await this.moduleRepository.findByCourse(courseId, {
-      skip,
-      take: limit,
-      where,
-      orderBy,
-    })
-
-    return {
-      data: modules,
-      meta: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
-    }
-  }
-
-  async reorderModules(courseId: number, moduleOrders: { id: number; order: number }[]): Promise<void> {
-    // Check if course exists
-    const courseExists = await this.moduleRepository.checkCourseExists(courseId)
-    if (!courseExists) {
-      throw new BadRequestException(`Course with ID ${courseId} does not exist`)
-    }
-
-    // Validate that all module IDs exist and belong to the course
-    const moduleIds = moduleOrders.map((m) => m.id)
-    const { modules } = await this.moduleRepository.findByCourse(courseId, {
-      take: 1000, // Large number to get all modules
-    })
-
-    const existingModuleIds = modules.map((m) => m.id)
-    const invalidIds = moduleIds.filter((id) => !existingModuleIds.includes(id))
-
-    if (invalidIds.length > 0) {
-      throw new BadRequestException(`Module IDs [${invalidIds.join(', ')}] do not exist in course ${courseId}`)
-    }
-
-    await this.moduleRepository.reorderModules(courseId, moduleOrders)
   }
 }

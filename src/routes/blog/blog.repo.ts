@@ -9,10 +9,14 @@ import {
   BlogWhereInput,
   BlogOrderByInput,
 } from './blog.model'
+import { TagRepository } from 'src/routes/tag/tag.repo'
 
 @Injectable()
 export class BlogRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly tagRepository: TagRepository,
+  ) {}
 
   private readonly includeRelations = {
     author: {
@@ -63,8 +67,6 @@ export class BlogRepository {
 
     const [blogs, total] = await Promise.all([
       this.prisma.blog.findMany({
-        skip,
-        take,
         where: where as any,
         orderBy: orderBy as any,
         include: this.includeRelations,
@@ -110,7 +112,7 @@ export class BlogRepository {
           ...data,
           tags: {
             create: tagIds.map((tagId) => ({
-              tag: { connect: { id: tagId } },
+              tag: { connect: { id: Number(tagId) } },
             })),
           },
         },
@@ -148,12 +150,12 @@ export class BlogRepository {
 
   async checkTagsExist(tagIds: number[]): Promise<{ exists: boolean; missingIds: number[] }> {
     const tags = await this.prisma.tag.findMany({
-      where: { id: { in: tagIds } },
+      where: { id: { in: tagIds?.map(Number) } },
       select: { id: true },
     })
 
     const foundIds = tags.map((tag) => tag.id)
-    const missingIds = tagIds.filter((id) => !foundIds.includes(id))
+    const missingIds = tagIds?.map((id) => parseInt(id as any, 10)).filter((id) => !foundIds.includes(id))
 
     return {
       exists: missingIds.length === 0,

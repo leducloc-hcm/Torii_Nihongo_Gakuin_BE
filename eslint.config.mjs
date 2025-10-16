@@ -6,11 +6,24 @@ import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
   {
-    ignores: ['eslint.config.mjs'],
+    ignores: [
+      // ✅ bỏ qua các file không cần lint
+      'eslint.config.mjs',
+      'commitlint.config.*',
+      '.husky/**',
+      'dist/**',
+      'node_modules/**',
+      '*.config.mjs',
+      '*.config.js',
+      '*.d.ts',
+    ],
   },
+
+  // Base ESLint + TypeScript + Prettier config
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
   eslintPluginPrettierRecommended,
+
   {
     languageOptions: {
       globals: {
@@ -24,8 +37,10 @@ export default tseslint.config(
       },
     },
   },
+
   {
     rules: {
+      // ===== TypeScript rules =====
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-floating-promises': 'warn',
       '@typescript-eslint/no-unsafe-assignment': 'off',
@@ -35,8 +50,10 @@ export default tseslint.config(
       '@typescript-eslint/no-unsafe-call': 'off',
       '@typescript-eslint/no-unused-vars': 'off',
       '@typescript-eslint/no-unsafe-return': 'off',
-      'prettier/prettier': 'off',
       '@typescript-eslint/no-redundant-type-constituents': 'off',
+
+      // ===== Prettier =====
+      'prettier/prettier': 'off',
     },
   },
 )

@@ -30,6 +30,17 @@ export const StaffProfileSchema = z.object({
   phoneNumber: z.string().nullable(),
   dateOfBirth: z.string().nullable(),
 })
+export const AdminProfileSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  bio: z.string().nullable(),
+  avatar: z.string().nullable(),
+  location: z.string().nullable(),
+  website: z.string().nullable(),
+  coverPhoto: z.string().nullable(),
+  phoneNumber: z.string().nullable(),
+  dateOfBirth: z.string().nullable(),
+})
 
 export const UpdateLectureProfileSchema = LectureProfileSchema.pick({
   name: true,
@@ -44,6 +55,16 @@ export const UpdateLectureProfileSchema = LectureProfileSchema.pick({
 })
 
 export const UpdateStaffProfileSchema = StaffProfileSchema.pick({
+  name: true,
+  bio: true,
+  avatar: true,
+  location: true,
+  website: true,
+  phoneNumber: true,
+  dateOfBirth: true,
+  coverPhoto: true,
+})
+export const UpdateAdminProfileSchema = AdminProfileSchema.pick({
   name: true,
   bio: true,
   avatar: true,
@@ -85,3 +106,6 @@ export type UpdateCustomerProfileType = z.infer<typeof UpdateCustomerProfileSche
 export type GetLectureProfileType = z.infer<typeof LectureProfileSchema>
 export type GetStaffProfileType = z.infer<typeof StaffProfileSchema>
 export type CustomerProfileType = z.infer<typeof CustomerProfileSchema>
+export type GetAdminProfileType = z.infer<typeof AdminProfileSchema>
+export type AdminProfileType = z.infer<typeof AdminProfileSchema>
+export type UpdateAdminProfileType = z.infer<typeof UpdateAdminProfileSchema>

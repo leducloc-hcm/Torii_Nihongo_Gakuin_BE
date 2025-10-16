@@ -20,9 +20,20 @@ export class CourseRepository {
         id: true,
         title: true,
         order: true,
-        _count: {
+        lessons: {
           select: {
-            lessons: true,
+            id: true,
+            title: true,
+            kind: true,
+            content: true,
+            order: true,
+            status: true,
+            durationSec: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+          orderBy: {
+            order: 'asc' as const,
           },
         },
       },
@@ -63,7 +74,10 @@ export class CourseRepository {
 
   async create(data: CourseCreateInput): Promise<CourseWithRelations> {
     return (await this.prisma.course.create({
-      data: data as any,
+      data: {
+        ...data,
+        price: Number(data.price ?? 0),
+      },
       include: this.includeRelations,
     })) as any
   }
@@ -78,8 +92,6 @@ export class CourseRepository {
 
     const [courses, total] = await Promise.all([
       this.prisma.course.findMany({
-        skip,
-        take,
         where: where as any,
         orderBy: orderBy as any,
         include: this.includeRelations,
@@ -109,7 +121,10 @@ export class CourseRepository {
 
     return (await this.prisma.course.update({
       where: where as any,
-      data: data as any,
+      data: {
+        ...data,
+        price: data.price !== undefined ? Number(data.price) : undefined,
+      },
       include: this.includeRelations,
     })) as any
   }

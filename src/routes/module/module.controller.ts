@@ -37,17 +37,8 @@ export class ModuleController {
   @Get()
   @Auth([AuthType.Bearer])
   @HttpCode(HttpStatus.OK)
-  async findAll(@Query() queryDto: QueryModuleDTO) {
-    return this.moduleService.findAll(queryDto)
-  }
-
-  @Get('course/:courseId')
-  @HttpCode(HttpStatus.OK)
-  async findByCourse(
-    @Param('courseId', ParseIntPipe) courseId: number,
-    @Query() queryDto: Omit<QueryModuleDTO, 'courseId'>,
-  ) {
-    return this.moduleService.findByCourse(courseId, queryDto)
+  async findAll() {
+    return this.moduleService.findAll()
   }
 
   @Get(':id')
@@ -71,17 +62,5 @@ export class ModuleController {
   @HttpCode(HttpStatus.OK)
   async remove(@Param('id', ParseIntPipe) id: number) {
     return this.moduleService.remove(id)
-  }
-
-  @Patch('course/:courseId/reorder')
-  @Auth([AuthType.Bearer])
-  @Roles(RoleName.Admin, RoleName.Staff, RoleName.Lecturer)
-  @HttpCode(HttpStatus.OK)
-  async reorderModules(
-    @Param('courseId', ParseIntPipe) courseId: number,
-    @Body() body: { modules: { id: number; order: number }[] },
-  ) {
-    await this.moduleService.reorderModules(courseId, body.modules)
-    return { message: 'Modules reordered successfully' }
   }
 }

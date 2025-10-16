@@ -11,6 +11,14 @@ import { ModuleModule } from './routes/module/module.module'
 import { LessonModule } from './routes/lesson/lesson.module'
 import { EnrollmentModule } from './routes/enrollment/enrollment.module'
 import { FlashcardModule } from './routes/flashcard/flashcard.module'
+import { PlacementBlueprintModule } from './routes/placement/placement-blueprint.module'
+import { QuestionModule } from './routes/question/question.module'
+import { OptionModule } from './routes/question-option/option.module'
+import { TestPaperModule } from './routes/test-paper/test-paper.module'
+import { TestSectionModule } from './routes/test-section/test-section.module'
+import { TestItemModule } from './routes/test-item/test-item.module'
+import { TestAttemptModule } from './routes/test-attempt/test-attempt.module'
+import { TestAnswerModule } from './routes/test-answer/test-answer.module'
 import { WebsocketsModule } from './websockets/websockets.module'
 
 @Module({
@@ -25,6 +33,14 @@ import { WebsocketsModule } from './websockets/websockets.module'
     LessonModule,
     EnrollmentModule,
     FlashcardModule,
+    PlacementBlueprintModule,
+    QuestionModule,
+    OptionModule,
+    TestPaperModule,
+    TestSectionModule,
+    TestItemModule,
+    TestAttemptModule,
+    TestAnswerModule,
     WebsocketsModule,
   ],
   controllers: [AppController],

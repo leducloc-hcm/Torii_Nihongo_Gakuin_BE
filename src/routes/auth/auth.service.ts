@@ -49,14 +49,22 @@ export class AuthService {
     private readonly profileService: ProfileService,
   ) {}
 
-  async validateVerificationCode({ email, type }: { email: string; type: TypeOfVerificationCodeType }) {
+  async validateVerificationCode({
+    email,
+    type,
+    code,
+  }: {
+    email: string
+    type: TypeOfVerificationCodeType
+    code: string
+  }) {
     const vevificationCode = await this.authRepository.findUniqueVerificationCode({
       email_type: {
         email,
         type,
       },
     })
-    if (!vevificationCode) {
+    if (!vevificationCode || vevificationCode.code !== code) {
       throw InvalidOTPException
     }
     if (vevificationCode.expiresAt < new Date()) {
@@ -69,6 +77,7 @@ export class AuthService {
       await this.validateVerificationCode({
         email: body.email,
         type: TypeOfVerificationCode.REGISTER,
+        code: body.code,
       })
       const hashedPassword = await this.hashingService.hash(body.password)
       const [user] = await Promise.all([
@@ -163,6 +172,7 @@ export class AuthService {
         await this.validateVerificationCode({
           email: user.email,
           type: TypeOfVerificationCode.LOGIN,
+          code: body.code,
         })
       }
     }
@@ -271,13 +281,17 @@ export class AuthService {
     const user = await this.sharedUserRepository.findUnique({
       email,
     })
+
+    // const code = await
     if (!user) {
       throw EmailNotFoundException
     }
+
     //2. Kiểm tra mã OTP có hợp lệ không
     await this.validateVerificationCode({
       email,
       type: TypeOfVerificationCode.FORGOT_PASSWORD,
+      code,
     })
     //3. Cập nhật lại mật khẩu mới và xóa đi OTP
     const hashedPassword = await this.hashingService.hash(newPassword)
@@ -345,6 +359,7 @@ export class AuthService {
       await this.validateVerificationCode({
         email: user.email,
         type: TypeOfVerificationCode.DISABLE_2FA,
+        code,
       })
     }
 
@@ -361,17 +376,19 @@ export class AuthService {
     try {
       const tempPassword = 'defaultPassword123@@'
       const hashedPassword = await this.hashingService.hash(tempPassword)
-      const user = await this.authRepository.createUser({
-        email,
-        name,
-        password: hashedPassword,
-        status: VerifyStatus.VERIFIED,
-      })
-      await this.profileService.createProfile({
-        email,
-        name,
-        role,
-      })
+      await Promise.all([
+        this.authRepository.createUser({
+          email,
+          name,
+          password: hashedPassword,
+          status: VerifyStatus.VERIFIED,
+        }),
+        await this.profileService.createProfile({
+          email,
+          name,
+          role,
+        }),
+      ])
       // Gửi email thông báo tạo tài khoản thành công
       const { error } = await this.emailService.sendAccountCreated({
         email,

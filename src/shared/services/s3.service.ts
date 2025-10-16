@@ -67,7 +67,7 @@ export class S3Service {
   ) => {
     try {
       const fileExt = filename.split('.').pop()
-      const key = `videos/courses/${courseId}/modules/${moduleId}/lessons/${lessonId}/source.${fileExt}`
+      const key = `videos/courses/${courseId}/modules/${moduleId}/lessons/${lessonId}/source.mp4`
 
       const command = new PutObjectCommand({
         Bucket: this.BUCKET_NAME,
@@ -102,7 +102,7 @@ export class S3Service {
     expiresIn: number = 7200, // 2 hours
   ) => {
     try {
-      const key = `videos/courses/${courseId}/modules/${moduleId}/lessons/${lessonId}/${filename}`
+      const key = `videos/courses/${courseId}/modules/${moduleId}/lessons/${lessonId}/source.mp4`
 
       const command = new GetObjectCommand({
         Bucket: this.BUCKET_NAME,

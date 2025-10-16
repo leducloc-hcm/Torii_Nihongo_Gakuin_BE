@@ -9,10 +9,15 @@ import {
   LessonWhereInput,
   LessonOrderByInput,
 } from './lesson.model'
+import { S3Service } from 'src/shared/services/s3.service'
+import { MediaKind, MediaStatus } from 'src/shared/constants/media.constant'
 
 @Injectable()
 export class LessonRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly s3Service: S3Service,
+  ) {}
 
   private readonly includeRelations = {
     module: {
@@ -28,7 +33,7 @@ export class LessonRepository {
         },
       },
     },
-    resources: {
+    media: {
       select: {
         id: true,
         url: true,
@@ -66,7 +71,7 @@ export class LessonRepository {
     _count: {
       select: {
         notes: true,
-        resources: true,
+        media: true,
       },
     },
   }
@@ -76,28 +81,6 @@ export class LessonRepository {
       data,
       include: this.includeRelations,
     })) as any
-  }
-
-  async findAll(params: {
-    skip?: number
-    take?: number
-    where?: LessonWhereInput
-    orderBy?: LessonOrderByInput
-  }): Promise<{ lessons: LessonWithRelations[]; total: number }> {
-    const { skip, take, where, orderBy } = params
-
-    const [lessons, total] = await Promise.all([
-      this.prisma.lesson.findMany({
-        skip,
-        take,
-        where: where as any,
-        orderBy: orderBy as any,
-        include: this.includeRelations,
-      }) as Promise<LessonWithRelations[]>,
-      this.prisma.lesson.count({ where: where as any }),
-    ])
-
-    return { lessons, total }
   }
 
   async findOne(where: LessonWhereUniqueInput): Promise<LessonWithRelations | null> {
@@ -130,22 +113,6 @@ export class LessonRepository {
     return count > 0
   }
 
-  async findByModule(
-    moduleId: number,
-    params: {
-      skip?: number
-      take?: number
-      where?: Omit<LessonWhereInput, 'moduleId'>
-      orderBy?: LessonOrderByInput
-    },
-  ): Promise<{ lessons: LessonWithRelations[]; total: number }> {
-    const { skip, take, where = {}, orderBy } = params
-
-    const whereWithModule = { ...where, moduleId }
-
-    return this.findAll({ skip, take, where: whereWithModule, orderBy })
-  }
-
   async getMaxOrder(moduleId: number): Promise<number> {
     const result = await this.prisma.lesson.aggregate({
       where: { moduleId },
@@ -169,47 +136,72 @@ export class LessonRepository {
     )
   }
 
-  async getPublishedLessons(params: {
-    skip?: number
-    take?: number
-    where?: Omit<LessonWhereInput, 'status'>
-    orderBy?: LessonOrderByInput
-  }): Promise<{ lessons: LessonWithRelations[]; total: number }> {
-    const { skip, take, where = {}, orderBy } = params
-
-    const whereWithStatus = { ...where, status: 'PUBLISHED' as const }
-
-    return this.findAll({ skip, take, where: whereWithStatus, orderBy })
-  }
-
-  async findByCourse(
-    courseId: number,
-    params: {
-      skip?: number
-      take?: number
-      where?: Omit<LessonWhereInput, 'moduleId'>
-      orderBy?: LessonOrderByInput
-    },
-  ): Promise<{ lessons: LessonWithRelations[]; total: number }> {
-    const { skip, take, where = {}, orderBy } = params
-
-    // Find all module IDs for the course first
-    const modules = await this.prisma.module.findMany({
-      where: { courseId },
-      select: { id: true },
+  async generateUploadUrl(lessonId: number, filename: string, contentType: string) {
+    const lesson = await this.prisma.lesson.findFirst({
+      where: {
+        id: lessonId,
+      },
+      include: {
+        module: {
+          include: {
+            course: true,
+          },
+        },
+      },
     })
 
-    const moduleIds = modules.map((m) => m.id)
-
-    if (moduleIds.length === 0) {
-      return { lessons: [], total: 0 }
+    if (!lesson) {
+      throw new Error('Lesson not found')
     }
 
-    const whereWithModules = {
-      ...where,
-      moduleId: { in: moduleIds },
+    const uploadInfo = await this.s3Service.generatePresignedUploadUrl(
+      lesson.module.course.id,
+      lesson.module.id,
+      lessonId,
+      filename,
+      contentType,
+    )
+
+    if (!lesson.mediaId) {
+      const mediaAsset = await this.prisma.mediaAsset.create({
+        data: {
+          kind: MediaKind.VIDEO,
+          url: uploadInfo.key,
+        },
+      })
+
+      await this.prisma.lesson.update({
+        where: { id: lessonId },
+        data: { mediaId: mediaAsset.id },
+      })
     }
 
-    return this.findAll({ skip, take, where: whereWithModules as any, orderBy })
+    return uploadInfo
+  }
+  async generatePublicStreamUrl(lessonId: number) {
+    const lesson = await this.prisma.lesson.findFirst({
+      where: {
+        id: lessonId,
+      },
+      include: {
+        module: {
+          include: {
+            course: true,
+          },
+        },
+      },
+    })
+    if (!lesson) {
+      throw new Error('Lesson not found')
+    }
+    if (!lesson.mediaId) {
+      throw new Error('Media not found for this lesson')
+    }
+    const streamInfo = await this.s3Service.generatePresignedStreamUrl(
+      lesson.module.course.id,
+      lesson.module.id,
+      lessonId,
+    )
+    return streamInfo
   }
 }
