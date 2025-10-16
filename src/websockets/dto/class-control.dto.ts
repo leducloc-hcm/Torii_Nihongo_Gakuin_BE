@@ -3,7 +3,7 @@ import { z } from 'zod'
 
 const JoinClassSchema = z.object({
   classId: z.string().min(1, 'Class ID cannot be empty'),
-  role: z.enum(['teacher', 'student']),
+  role: z.enum(['lecturer', 'customer']),
   userId: z.string().min(1, 'User ID cannot be empty'),
   displayName: z.string().min(1, 'Display name cannot be empty'),
   avatar: z.string().url().optional(),

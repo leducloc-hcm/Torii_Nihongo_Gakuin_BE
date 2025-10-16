@@ -20,6 +20,18 @@ export class JanusWebSocketManager implements OnModuleDestroy {
   private readonly reconnectDelay = 2000 // 2 seconds
   private reconnectTimeout: NodeJS.Timeout | null = null
 
+  // Add ICE server configuration
+  private readonly iceServers = [
+    {
+      urls: process.env.JANUS_STUN_URL || 'stun:janus.torii-nihongo-gakuin.io.vn:3478',
+    },
+    {
+      urls: process.env.JANUS_TURN_URL || 'turn:janus.torii-nihongo-gakuin.io.vn:3478',
+      username: process.env.JANUS_TURN_USERNAME || 'turnuser',
+      credential: process.env.JANUS_TURN_PASSWORD || 'turnpassword',
+    },
+  ]
+
   constructor() {
     this.connect()
   }
@@ -235,5 +247,10 @@ export class JanusWebSocketManager implements OnModuleDestroy {
       }
       checkConnection()
     })
+  }
+
+  // Add method to get ICE servers
+  public getIceServers() {
+    return this.iceServers
   }
 }

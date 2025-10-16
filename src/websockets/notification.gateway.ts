@@ -65,24 +65,6 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
     }
   }
 
-  @SubscribeMessage('join-class-notifications')
-  handleJoinClassNotifications(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() data: { classId: string; userId: string },
-  ) {
-    void client.join(`class_${data.classId}`)
-    this.logger.log(`User ${data.userId} joined notifications for class ${data.classId}`)
-  }
-
-  @SubscribeMessage('leave-class-notifications')
-  handleLeaveClassNotifications(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() data: { classId: string; userId: string },
-  ) {
-    void client.leave(`class_${data.classId}`)
-    this.logger.log(`User ${data.userId} left notifications for class ${data.classId}`)
-  }
-
   @SubscribeMessage('message')
   handleMessage(@MessageBody() message: string): string {
     return message
@@ -189,33 +171,6 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
       userId,
       displayName,
       data: { reason },
-    })
-  }
-
-  notifyDocumentShared(classId: string, sharedBy: string, documentName: string, documentUrl: string) {
-    this.sendClassNotification(classId, {
-      type: 'document-shared',
-      message: `${sharedBy} shared a document: ${documentName}`,
-      displayName: sharedBy,
-      data: { documentName, documentUrl, sharedBy },
-    })
-  }
-
-  notifyScreenShareStarted(classId: string, userId: string, displayName: string) {
-    this.sendClassNotification(classId, {
-      type: 'screen-share-started',
-      message: `${displayName} started screen sharing`,
-      userId,
-      displayName,
-    })
-  }
-
-  notifyScreenShareEnded(classId: string, userId: string, displayName: string) {
-    this.sendClassNotification(classId, {
-      type: 'screen-share-ended',
-      message: `${displayName} stopped screen sharing`,
-      userId,
-      displayName,
     })
   }
 
