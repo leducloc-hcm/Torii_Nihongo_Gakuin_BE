@@ -406,4 +406,7 @@ export class AuthService {
       throw error
     }
   }
+  async getAllLecturers() {
+    return this.authRepository.findAllLecturers()
+  }
 }
