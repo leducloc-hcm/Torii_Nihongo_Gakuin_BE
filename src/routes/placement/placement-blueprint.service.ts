@@ -4,6 +4,7 @@ import {
   CreatePlacementBlueprintDTO,
   UpdatePlacementBlueprintDTO,
   QueryPlacementBlueprintDTO,
+  ActivateBlueprintDTO,
 } from './placement-blueprint.dto'
 import { PlacementBlueprintWhereInput, PlacementBlueprintOrderByInput } from './placement-blueprint.model'
 import { JLPTLevel, PlacementBlueprint } from '@prisma/client'
@@ -39,7 +40,6 @@ export class PlacementBlueprintService {
     const { page, limit, level, active, sortBy, sortOrder } = queryDto
     const skip = (page - 1) * limit
 
-    // Build where clause
     const where: PlacementBlueprintWhereInput = {}
 
     if (level !== undefined) {
@@ -59,7 +59,7 @@ export class PlacementBlueprintService {
     const [blueprints, total] = await Promise.all([
       this.placementBlueprintRepository.findMany({
         skip,
-        take: limit,
+        take: Number(limit),
         where,
         orderBy,
       }),
@@ -123,14 +123,14 @@ export class PlacementBlueprintService {
     return this.placementBlueprintRepository.update({ id }, updateDto)
   }
 
-  async activate(id: number): Promise<PlacementBlueprint> {
+  async activate(id: number, activateDto: ActivateBlueprintDTO): Promise<PlacementBlueprint> {
     // Check if blueprint exists
     const exists = await this.placementBlueprintRepository.checkExists(id)
     if (!exists) {
       throw new NotFoundException(`PlacementBlueprint with ID ${id} not found`)
     }
 
-    return this.placementBlueprintRepository.activate(id)
+    return this.placementBlueprintRepository.activate(id, activateDto.activate)
   }
 
   async remove(id: number): Promise<PlacementBlueprint> {
