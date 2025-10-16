@@ -599,16 +599,16 @@ export class OnlineClassService {
       }
 
       // Check if there's already an active session
-      const activeSession = await this.prisma.liveSession.findFirst({
-        where: {
-          classId: classIdInt,
-          endedAt: null,
-        },
-      })
+      // const activeSession = await this.prisma.liveSession.findFirst({
+      //   where: {
+      //     classId: classIdInt,
+      //     endedAt: null,
+      //   },
+      // })
 
-      if (activeSession) {
-        throw new BadRequestException('Class session is already active')
-      }
+      // if (activeSession) {
+      //   throw new BadRequestException('Class session is already active')
+      // }
 
       // Create Janus room via JanusService
       const roomKey = this.generateRoomKey()
@@ -616,7 +616,7 @@ export class OnlineClassService {
         description: onlineClass.title,
         is_private: false,
         publishers: onlineClass.capacity,
-        bitrate: 8000000,
+        bitrate: 24000000,
         fir_freq: 10,
         videocodec: 'vp8',
         audiocodec: 'opus',
