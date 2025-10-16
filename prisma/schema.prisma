@@ -270,14 +270,14 @@ model Lesson {
   title       String
   kind        LessonKind   @default(VIDEO)
   content     String?
-  videoUrl    String?
   durationSec Int?
+  mediaId     Int?
   order       Int          @default(0)
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   status      LessonStatus @default(PRIVATE)
   module      Module       @relation(fields: [moduleId], references: [id])
-  resources   MediaAsset[]
+  media   MediaAsset[]
   liveSession LiveSession?
   quiz        Quiz?
   notes       LessonNote[]
@@ -288,6 +288,7 @@ model MediaAsset {
   lessonId  Int?
   url       String
   kind      MediaKind @default(OTHER)
+  status    MediaStatus @default(UPLOADING)
   mimeType  String?
   sizeByte  Int?
   caption   String?
@@ -492,6 +493,7 @@ model LiveSession {
   endedAt      DateTime?
   mode         LiveMode  @default(MODE2D)
   roomKey      String    @unique
+  janusRoomId  Int?
   recordingUrl String?
 
   class      Class             @relation(fields: [classId], references: [id])
@@ -1182,4 +1184,11 @@ enum NotificationPriority {
   NORMAL
   HIGH
   URGENT
+}
+
+enum MediaStatus {
+  UPLOADING
+  TRANSCODING
+  READY
+  FAILED
 }

@@ -27,7 +27,6 @@ import { ApiTags } from '@nestjs/swagger'
 export class OptionController {
   constructor(private readonly optionService: OptionService) {}
 
-  // Add option to a question
   @Post('questions/:questionId/options')
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Admin, RoleName.Lecturer)
@@ -36,7 +35,6 @@ export class OptionController {
     return this.optionService.create(questionId, createDto)
   }
 
-  // Bulk create options for a question
   @Post('questions/:questionId/options/bulk')
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Admin, RoleName.Lecturer)
@@ -45,7 +43,6 @@ export class OptionController {
     return this.optionService.bulkCreate(questionId, bulkCreateDto)
   }
 
-  // Get all options for a question
   @Get('questions/:questionId/options')
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Admin, RoleName.Lecturer)
@@ -54,7 +51,6 @@ export class OptionController {
     return this.optionService.findByQuestion(questionId, queryDto)
   }
 
-  // Get question options summary
   @Get('questions/:questionId/options/summary')
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Admin, RoleName.Lecturer)
@@ -63,7 +59,6 @@ export class OptionController {
     return this.optionService.getQuestionOptions(questionId)
   }
 
-  // Reorder options for a question
   @Put('questions/:questionId/options/reorder')
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Admin, RoleName.Lecturer)
@@ -72,7 +67,6 @@ export class OptionController {
     return this.optionService.reorderOptions(questionId, reorderDto)
   }
 
-  // Delete all options for a question (dangerous operation)
   @Delete('questions/:questionId/options')
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Admin)
@@ -82,7 +76,6 @@ export class OptionController {
     return { message: 'All options deleted successfully' }
   }
 
-  // Get specific option
   @Get('options/:id')
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Admin, RoleName.Lecturer)
@@ -91,7 +84,6 @@ export class OptionController {
     return this.optionService.findOne(id)
   }
 
-  // Update specific option
   @Put('options/:id')
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Admin, RoleName.Lecturer)
@@ -100,7 +92,6 @@ export class OptionController {
     return this.optionService.update(id, updateDto)
   }
 
-  // Delete specific option
   @Delete('options/:id')
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Admin)

@@ -50,23 +50,12 @@ export class ModuleRepository {
     })) as any
   }
 
-  async findAll(params: {
-    skip?: number
-    take?: number
-    where?: ModuleWhereInput
-    orderBy?: ModuleOrderByInput
-  }): Promise<{ modules: ModuleWithRelations[]; total: number }> {
-    const { skip, take, where, orderBy } = params
-
+  async findAll(): Promise<{ modules: ModuleWithRelations[]; total: number }> {
     const [modules, total] = await Promise.all([
       this.prisma.module.findMany({
-        skip,
-        take,
-        where: where as any,
-        orderBy: orderBy as any,
         include: this.includeRelations,
       }) as Promise<ModuleWithRelations[]>,
-      this.prisma.module.count({ where: where as any }),
+      this.prisma.module.count(),
     ])
 
     return { modules, total }
@@ -101,23 +90,6 @@ export class ModuleRepository {
     })
     return count > 0
   }
-
-  async findByCourse(
-    courseId: number,
-    params: {
-      skip?: number
-      take?: number
-      where?: Omit<ModuleWhereInput, 'courseId'>
-      orderBy?: ModuleOrderByInput
-    },
-  ): Promise<{ modules: ModuleWithRelations[]; total: number }> {
-    const { skip, take, where = {}, orderBy } = params
-
-    const whereWithCourse = { ...where, courseId }
-
-    return this.findAll({ skip, take, where: whereWithCourse, orderBy })
-  }
-
   async getMaxOrder(courseId: number): Promise<number> {
     const result = await this.prisma.module.aggregate({
       where: { courseId },
