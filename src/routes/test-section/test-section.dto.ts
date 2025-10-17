@@ -38,7 +38,6 @@ export class UpdateTestSectionDto extends createZodDto(UpdateTestSectionSchema) 
   order?: number
 }
 
-// ===== Query TestSection DTO =====
 export class TestSectionQueryDto {
   @ApiPropertyOptional({ default: 1, minimum: 1 })
   page?: number = 1
@@ -61,8 +60,6 @@ export class TestSectionQueryDto {
   @ApiPropertyOptional({ enum: ['asc', 'desc'], default: 'asc' })
   sortOrder?: string = 'asc'
 }
-
-// ===== Bulk Operations DTOs =====
 export class BulkCreateTestSectionsDto {
   @ApiProperty({
     type: [CreateTestSectionDto],

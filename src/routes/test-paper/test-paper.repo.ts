@@ -17,7 +17,6 @@ import {
 export class TestPaperRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  // ===== Basic CRUD Operations =====
   async create(data: CreateTestPaperInput): Promise<TestPaper> {
     return this.prisma.testPaper.create({
       data,
@@ -56,7 +55,7 @@ export class TestPaperRepository {
             },
           },
           orderBy: { startedAt: 'desc' },
-          take: 10, // Latest 10 attempts
+          take: 10,
         },
       },
     })
@@ -115,7 +114,6 @@ export class TestPaperRepository {
       search,
       level,
       visibility,
-      status,
       blueprintId,
       sortBy = 'createdAt',
       sortOrder = 'desc',
@@ -250,7 +248,6 @@ export class TestPaperRepository {
       },
     })
 
-    // Clone sections and items
     for (const section of original.sections) {
       const clonedSection = await this.prisma.testSection.create({
         data: {
@@ -261,7 +258,6 @@ export class TestPaperRepository {
         },
       })
 
-      // Clone items
       for (const item of section.items) {
         await this.prisma.testItem.create({
           data: {
@@ -276,7 +272,6 @@ export class TestPaperRepository {
     return clonedPaper
   }
 
-  // ===== Statistics =====
   async getStatistics(id: number): Promise<any> {
     const stats = await this.prisma.testAttempt.aggregate({
       where: {
@@ -309,7 +304,6 @@ export class TestPaperRepository {
     }
   }
 
-  // ===== Search Operations =====
   async searchByContent(searchTerm: string, limit: number = 20): Promise<TestPaper[]> {
     return this.prisma.testPaper.findMany({
       where: {
@@ -337,7 +331,6 @@ export class TestPaperRepository {
     })
   }
 
-  // ===== Validation Helpers =====
   async exists(id: number): Promise<boolean> {
     const count = await this.prisma.testPaper.count({
       where: { id },
@@ -367,7 +360,6 @@ export class TestPaperRepository {
     return count > 0
   }
 
-  // ===== Latest Version Operations =====
   async getLatestVersion(blueprintId: number): Promise<TestPaper | null> {
     return this.prisma.testPaper.findFirst({
       where: { blueprintId },

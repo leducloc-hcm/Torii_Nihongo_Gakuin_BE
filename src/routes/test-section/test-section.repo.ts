@@ -79,38 +79,43 @@ export class TestSectionRepository {
     })
   }
 
-  // ===== Query Operations =====
   async findMany(query: TestSectionQuery): Promise<{
     data: TestSectionBasic[]
-    total: number
-    page: number
-    limit: number
-    totalPages: number
+    pagination: {
+      page: number
+      limit: number
+      total: number
+      totalPages: number
+      hasNext: boolean
+      hasPrev: boolean
+    }
   }> {
     const { page = 1, limit = 20, search, type, testId, sortBy = 'order', sortOrder = 'asc' } = query
 
     const skip = (page - 1) * limit
 
-    const where: Prisma.TestSectionWhereInput = {
-      ...(search && {
-        title: {
-          contains: search,
-          mode: 'insensitive',
-        },
-      }),
-      ...(type && { type }),
-      ...(testId && { testId }),
+    const where: Prisma.TestSectionWhereInput = {}
+
+    if (search) {
+      where.title = {
+        contains: search,
+        mode: 'insensitive',
+      }
     }
 
-    const orderBy: Prisma.TestSectionOrderByWithRelationInput = {
-      [sortBy]: sortOrder,
+    if (type) where.type = type
+    if (testId) where.testId = testId
+
+    const orderBy: Prisma.TestSectionOrderByWithRelationInput = {}
+    if (sortBy && sortOrder) {
+      orderBy[sortBy] = sortOrder
     }
 
     const [data, total] = await Promise.all([
       this.prisma.testSection.findMany({
         where,
-        skip,
-        take: limit,
+        skip: Number(skip),
+        take: Number(limit),
         orderBy,
         include: {
           _count: {
@@ -125,10 +130,14 @@ export class TestSectionRepository {
 
     return {
       data: data as TestSectionBasic[],
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasNext: page * limit < total,
+        hasPrev: page > 1,
+      },
     }
   }
 
