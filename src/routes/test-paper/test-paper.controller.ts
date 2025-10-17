@@ -17,7 +17,7 @@ export class TestPaperController {
 
   @Post()
   @Auth([AuthType.Bearer])
-  @Roles(RoleName.Staff, RoleName.Lecturer)
+  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
   @ApiOperation({ summary: 'Create new test paper' })
   async createTestPaper(@Body() createDto: CreateTestPaperDto): Promise<TestPaper> {
     return this.testPaperService.createTestPaper(createDto)
@@ -25,7 +25,7 @@ export class TestPaperController {
 
   @Get()
   @Auth([AuthType.Bearer])
-  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Customer)
+  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Customer, RoleName.Admin)
   @ApiOperation({ summary: 'Get all test papers' })
   async getTestPapers(@Query() queryDto: TestPaperQueryDto): Promise<{
     data: TestPaperBasic[]
@@ -39,7 +39,7 @@ export class TestPaperController {
 
   @Get(':id')
   @Auth([AuthType.Bearer])
-  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Customer)
+  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Customer, RoleName.Admin)
   @ApiOperation({ summary: 'Get test paper by ID' })
   async getTestPaper(@Param('id', ParseIntPipe) id: number): Promise<TestPaper> {
     return this.testPaperService.getTestPaper(id)
@@ -47,7 +47,7 @@ export class TestPaperController {
 
   @Put(':id')
   @Auth([AuthType.Bearer])
-  @Roles(RoleName.Staff, RoleName.Lecturer)
+  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
   @ApiOperation({ summary: 'Update test paper' })
   async updateTestPaper(
     @Param('id', ParseIntPipe) id: number,
@@ -58,7 +58,7 @@ export class TestPaperController {
 
   @Delete(':id')
   @Auth([AuthType.Bearer])
-  @Roles(RoleName.Staff)
+  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
   @ApiOperation({ summary: 'Delete test paper' })
   async deleteTestPaper(@Param('id', ParseIntPipe) id: number): Promise<void> {
     return this.testPaperService.deleteTestPaper(id)

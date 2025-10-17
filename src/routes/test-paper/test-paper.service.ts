@@ -1,21 +1,3 @@
-/**
- * ===== TestPaper Service =====
- * Handles both MANUAL and MCP (Model Context Protocol) server generation modes:
- *
- * MANUAL MODE:
- * - Create test papers manually by providing basic information
- * - Only requires: title, level, visibility, status
- * - Does not use blueprint or generator fields
- *
- * MCP MODE:
- * - Create test papers via MCP server generation
- * - Requires blueprintId for generation
- * - Uses generator metadata: version, generatorVersion, generatorMeta
- * - Supports deterministic generation via seed
- * - Tracks blueprint snapshots for reproducibility
- *
- * Both modes share the same API endpoint but handle different field sets intelligently.
- */
 import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common'
 import { TestPaperRepository } from './test-paper.repo'
 import {
@@ -34,23 +16,12 @@ import {
 export class TestPaperService {
   constructor(private readonly testPaperRepo: TestPaperRepository) {}
 
-  /**
-   * Create test paper supporting both MANUAL and MCP modes
-   *
-   * MANUAL MODE - provide only:
-   * { title, level, visibility?, status? }
-   *
-   * MCP MODE - provide:
-   * { title, level, blueprintId, visibility?, status?, seed?, generatorVersion?, generatorMeta?, blueprintSnapshot? }
-   */
   async createTestPaper(data: CreateTestPaperInput): Promise<TestPaper> {
-    // Check if title already exists
     const titleExists = await this.testPaperRepo.getTitleExists(data.title)
     if (titleExists) {
       throw new ConflictException(`Test paper with title "${data.title}" already exists`)
     }
 
-    // Auto-detect creation mode based on presence of MCP fields
     const isMCPMode = Boolean(data.blueprintId || data.seed || data.generatorVersion)
 
     // Prepare creation data
@@ -58,7 +29,6 @@ export class TestPaperService {
       title: data.title,
       level: data.level,
       visibility: data.visibility || 'PRIVATE',
-      status: data.status || 'published',
     }
 
     // Handle MCP mode specific logic
@@ -146,7 +116,6 @@ export class TestPaperService {
     if (data.title !== undefined) updateData.title = data.title
     if (data.level !== undefined) updateData.level = data.level
     if (data.visibility !== undefined) updateData.visibility = data.visibility
-    if (data.status !== undefined) updateData.status = data.status
 
     // MCP-specific fields (only update if provided)
     if (data.blueprintId !== undefined) updateData.blueprintId = data.blueprintId
@@ -217,26 +186,6 @@ export class TestPaperService {
         throw new BadRequestException('Cannot delete some test papers because they have associated test attempts')
       }
       throw error
-    }
-  }
-
-  async bulkUpdateStatus(ids: number[], status: string): Promise<{ updated: number; failed: number[] }> {
-    const validStatuses = ['draft', 'published', 'archived']
-    if (!validStatuses.includes(status)) {
-      throw new BadRequestException(`Status must be one of: ${validStatuses.join(', ')}`)
-    }
-
-    const existingIds = await this.testPaperRepo.existsByIds(ids)
-    const failedIds = ids.filter((id) => !existingIds.includes(id))
-
-    if (existingIds.length === 0) {
-      throw new NotFoundException('None of the specified test papers were found')
-    }
-
-    const result = await this.testPaperRepo.bulkUpdateStatus(existingIds, status)
-    return {
-      updated: result.count,
-      failed: failedIds,
     }
   }
 
@@ -350,7 +299,6 @@ export class TestPaperService {
         model: 'placeholder',
         timestamp: new Date(),
       },
-      status: 'draft',
     }
 
     return this.createTestPaper(testPaperData)
@@ -378,7 +326,6 @@ export class TestPaperService {
       version: nextVersion,
       generatorVersion: changes.generatorVersion || original.generatorVersion || undefined,
       generatorMeta: changes.generatorMeta || original.generatorMeta || undefined,
-      status: changes.status || 'draft',
     })
   }
 

@@ -112,7 +112,6 @@ export class TestPaperRepository {
       search,
       level,
       visibility,
-      status,
       blueprintId,
       sortBy = 'createdAt',
       sortOrder = 'desc',
@@ -129,7 +128,6 @@ export class TestPaperRepository {
       }),
       ...(level && { level }),
       ...(visibility && { visibility }),
-      ...(status && { status }),
       ...(blueprintId && { blueprintId }),
     }
 
@@ -206,17 +204,6 @@ export class TestPaperRepository {
     })
   }
 
-  async bulkUpdateStatus(ids: number[], status: string): Promise<{ count: number }> {
-    return this.prisma.testPaper.updateMany({
-      where: {
-        id: {
-          in: ids,
-        },
-      },
-      data: { status },
-    })
-  }
-
   async bulkUpdateVisibility(ids: number[], visibility: Visibility): Promise<{ count: number }> {
     return this.prisma.testPaper.updateMany({
       where: {
@@ -253,7 +240,6 @@ export class TestPaperRepository {
         version: 1,
         generatorVersion: original.generatorVersion,
         generatorMeta: original.generatorMeta as any,
-        status: 'draft',
       },
     })
 

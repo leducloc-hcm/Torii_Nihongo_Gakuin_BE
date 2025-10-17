@@ -396,7 +396,6 @@ model TestPaper {
   version           Int       @default(1)   // phiên bản nội dung đề
   generatorVersion  String?               // version engine MCP (vd "1.3.2")
   generatorMeta     Json?                 // model/temp/code_sha/config_hash...
-  status            String    @default("published")
   sections TestSection[]
   attempts TestAttempt[]
 }
