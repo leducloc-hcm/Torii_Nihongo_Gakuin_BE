@@ -98,13 +98,16 @@ export class TestPaperRepository {
     })
   }
 
-  // ===== Query Operations =====
   async findMany(query: TestPaperQuery): Promise<{
     data: TestPaperBasic[]
-    total: number
-    page: number
-    limit: number
-    totalPages: number
+    pagination: {
+      page: number
+      limit: number
+      total: number
+      totalPages: number
+      hasNext: boolean
+      hasPrev: boolean
+    }
   }> {
     const {
       page = 1,
@@ -112,6 +115,7 @@ export class TestPaperRepository {
       search,
       level,
       visibility,
+      status,
       blueprintId,
       sortBy = 'createdAt',
       sortOrder = 'desc',
@@ -119,27 +123,27 @@ export class TestPaperRepository {
 
     const skip = (page - 1) * limit
 
-    const where: Prisma.TestPaperWhereInput = {
-      ...(search && {
-        title: {
-          contains: search,
-          mode: 'insensitive',
-        },
-      }),
-      ...(level && { level }),
-      ...(visibility && { visibility }),
-      ...(blueprintId && { blueprintId }),
+    const where: Prisma.TestPaperWhereInput = {}
+    if (search) {
+      where.title = {
+        contains: search,
+        mode: 'insensitive',
+      }
     }
+    if (level) where.level = level
+    if (visibility) where.visibility = visibility
+    if (blueprintId) where.blueprintId = blueprintId
 
-    const orderBy: Prisma.TestPaperOrderByWithRelationInput = {
-      [sortBy]: sortOrder,
+    const orderBy: Prisma.TestPaperOrderByWithRelationInput = {}
+    if (sortBy && sortOrder) {
+      orderBy[sortBy] = sortOrder
     }
 
     const [data, total] = await Promise.all([
       this.prisma.testPaper.findMany({
-        where,
         skip,
-        take: limit,
+        take: Number(limit),
+        where,
         orderBy,
         include: {
           blueprint: {
@@ -161,14 +165,17 @@ export class TestPaperRepository {
 
     return {
       data: data as TestPaperBasic[],
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasNext: page * limit < total,
+        hasPrev: page > 1,
+      },
     }
   }
 
-  // ===== Advanced Queries =====
   async findByBlueprint(blueprintId: number): Promise<TestPaper[]> {
     return this.prisma.testPaper.findMany({
       where: { blueprintId },

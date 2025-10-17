@@ -29,10 +29,14 @@ export class TestPaperController {
   @ApiOperation({ summary: 'Get all test papers' })
   async getTestPapers(@Query() queryDto: TestPaperQueryDto): Promise<{
     data: TestPaperBasic[]
-    total: number
-    page: number
-    limit: number
-    totalPages: number
+    pagination: {
+      total: number
+      page: number
+      limit: number
+      totalPages: number
+      hasNext: boolean
+      hasPrev: boolean
+    }
   }> {
     return this.testPaperService.getTestPapers(queryDto)
   }
