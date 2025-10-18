@@ -90,6 +90,20 @@ export class LectureProfileRepository {
 
     return
   }
+
+  async findLectureProfileByUserIds(userId: number[]) {
+    return this.prismaService.lecturerProfile.findMany({
+      where: {
+        userId: { in: userId },
+      },
+      select: {
+        userId: true,
+        username: true,
+        name: true,
+        avatar: true,
+      },
+    })
+  }
 }
 
 @Injectable()
