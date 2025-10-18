@@ -19,6 +19,6 @@ import { SharedModule } from 'src/shared/shared.module'
     CustomerProfileRepository,
     AdminProfileRepository,
   ],
-  exports: [ProfileService],
+  exports: [ProfileService, LectureProfileRepository],
 })
 export class ProfileModule {}

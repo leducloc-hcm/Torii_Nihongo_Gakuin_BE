@@ -12,7 +12,7 @@ import {
   LeaderboardEntryDto,
   TestStatisticsDto,
 } from './test-attempt.dto'
-import { JLPTLevel } from '@prisma/client'
+import type { JLPTLevelType } from 'src/shared/constants/enum.constant'
 
 @ApiTags('Test Attempts')
 @Controller('test-attempts')
@@ -299,7 +299,7 @@ export class TestAttemptController {
       },
     },
   })
-  async analyzeLevelReadiness(@Param('userId', ParseIntPipe) userId: number, @Param('level') level: JLPTLevel) {
+  async analyzeLevelReadiness(@Param('userId', ParseIntPipe) userId: number, @Param('level') level: JLPTLevelType) {
     return this.testAttemptService.analyzeLevelReadiness(userId, level)
   }
 }

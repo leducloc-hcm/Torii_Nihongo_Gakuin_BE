@@ -1,68 +1,12 @@
-import { Prisma } from '@prisma/client'
 import { z } from 'zod'
+import { TestPaperType } from 'src/shared/types/question.types'
 
-// ===== Prisma Types =====
-export type TestPaper = Prisma.TestPaperGetPayload<Record<string, never>>
-export type TestPaperWithRelations = Prisma.TestPaperGetPayload<{
-  include: {
-    blueprint: true
-    sections: {
-      include: {
-        items: {
-          include: {
-            question: true
-          }
-        }
-      }
-    }
-    attempts: {
-      include: {
-        user: {
-          select: {
-            id: true
-            name: true
-            email: true
-          }
-        }
-      }
-    }
-  }
-}>
-
-export type TestPaperBasic = Prisma.TestPaperGetPayload<{
-  include: {
-    blueprint: {
-      select: {
-        id: true
-        title: true
-      }
-    }
-    _count: {
-      select: {
-        sections: true
-        attempts: true
-      }
-    }
-  }
-}>
-
-export type TestPaperWithSections = Prisma.TestPaperGetPayload<{
-  include: {
-    sections: {
-      include: {
-        items: {
-          include: {
-            question: {
-              include: {
-                option: true
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-}>
+// ===== Base Types =====
+export type TestPaper = TestPaperType
+// Complex relation types - using any for simplicity
+export type TestPaperWithRelations = any
+export type TestPaperBasic = any
+export type TestPaperWithSections = any
 
 // ===== Zod Schemas =====
 export const JLPTLevelSchema = z.enum(['N5', 'N4', 'N3', 'N2', 'N1'])

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../../shared/services/prisma.service'
-import { JLPTLevel } from '@prisma/client'
+import { JLPTLevelType } from 'src/shared/constants/enum.constant'
 import {
   TestAttempt,
   TestAttemptWithDetails,
@@ -206,7 +206,7 @@ export class TestAttemptRepository {
     })
   }
 
-  async gradeAttempt(attemptId: number, score: number, levelSuggestion: JLPTLevel | null): Promise<TestAttempt> {
+  async gradeAttempt(attemptId: number, score: number, levelSuggestion: JLPTLevelType | null): Promise<TestAttempt> {
     return await this.prisma.testAttempt.update({
       where: { id: attemptId },
       data: {

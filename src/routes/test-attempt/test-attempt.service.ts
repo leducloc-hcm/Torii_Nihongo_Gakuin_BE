@@ -16,7 +16,8 @@ import {
   calculateScaledScore,
   TEST_ATTEMPT_ERRORS,
 } from './test-attempt.model'
-import { JLPTLevel } from '@prisma/client'
+import { JLPTLevelType } from 'src/shared/constants/enum.constant'
+import { JLPTLevel } from 'src/routes/test-paper/test-paper.model'
 
 export interface PaginatedTestAttempts {
   attempts: TestAttemptWithDetails[]

@@ -1,7 +1,7 @@
-import { TestItem as PrismaTestItem } from '@prisma/client'
 import { z } from 'zod'
+import { TestItemType } from 'src/shared/types/question.types'
 
-export type TestItem = PrismaTestItem
+export type TestItem = TestItemType
 export interface TestItemWithDetails extends TestItem {
   section?: {
     id: number

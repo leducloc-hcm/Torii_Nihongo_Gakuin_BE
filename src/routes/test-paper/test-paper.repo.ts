@@ -1,29 +1,27 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../../shared/services/prisma.service'
-import { Prisma } from '@prisma/client'
+import { JLPTLevelType, VisibilityType } from '../../shared/constants/enum.constant'
+import { TestPaperType } from '../../shared/types/question.types'
 import {
-  TestPaper,
   TestPaperWithRelations,
   TestPaperBasic,
   TestPaperWithSections,
   CreateTestPaperInput,
   UpdateTestPaperInput,
   TestPaperQuery,
-  JLPTLevel,
-  Visibility,
 } from './test-paper.model'
 
 @Injectable()
 export class TestPaperRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(data: CreateTestPaperInput): Promise<TestPaper> {
+  async create(data: CreateTestPaperInput): Promise<TestPaperType> {
     return await this.prisma.testPaper.create({
       data,
     })
   }
 
-  async findById(id: number): Promise<TestPaper | null> {
+  async findById(id: number): Promise<TestPaperType | null> {
     return await this.prisma.testPaper.findUnique({
       where: { id },
     })
@@ -84,14 +82,14 @@ export class TestPaperRepository {
     })
   }
 
-  async update(id: number, data: UpdateTestPaperInput): Promise<TestPaper> {
+  async update(id: number, data: UpdateTestPaperInput): Promise<TestPaperType> {
     return await this.prisma.testPaper.update({
       where: { id },
       data,
     })
   }
 
-  async delete(id: number): Promise<TestPaper> {
+  async delete(id: number): Promise<TestPaperType> {
     return await this.prisma.testPaper.delete({
       where: { id },
     })
@@ -121,7 +119,7 @@ export class TestPaperRepository {
 
     const skip = (page - 1) * limit
 
-    const where: Prisma.TestPaperWhereInput = {}
+    const where: any = {}
     if (search) {
       where.title = {
         contains: search,
@@ -132,7 +130,7 @@ export class TestPaperRepository {
     if (visibility) where.visibility = visibility
     if (blueprintId) where.blueprintId = blueprintId
 
-    const orderBy: Prisma.TestPaperOrderByWithRelationInput = {}
+    const orderBy: any = {}
     if (sortBy && sortOrder) {
       orderBy[sortBy] = sortOrder
     }
@@ -174,21 +172,21 @@ export class TestPaperRepository {
     }
   }
 
-  async findByBlueprint(blueprintId: number): Promise<TestPaper[]> {
+  async findByBlueprint(blueprintId: number): Promise<TestPaperType[]> {
     return await this.prisma.testPaper.findMany({
       where: { blueprintId },
       orderBy: { version: 'desc' },
     })
   }
 
-  async findByLevel(level: JLPTLevel): Promise<TestPaper[]> {
+  async findByLevel(level: JLPTLevelType): Promise<TestPaperType[]> {
     return await this.prisma.testPaper.findMany({
       where: { level },
       orderBy: { createdAt: 'desc' },
     })
   }
 
-  async findPublicTests(level?: JLPTLevel): Promise<TestPaper[]> {
+  async findPublicTests(level?: JLPTLevelType): Promise<TestPaperType[]> {
     return await this.prisma.testPaper.findMany({
       where: {
         visibility: 'PUBLIC',
@@ -209,7 +207,7 @@ export class TestPaperRepository {
     })
   }
 
-  async bulkUpdateVisibility(ids: number[], visibility: Visibility): Promise<{ count: number }> {
+  async bulkUpdateVisibility(ids: number[], visibility: VisibilityType): Promise<{ count: number }> {
     return await this.prisma.testPaper.updateMany({
       where: {
         id: {
@@ -224,11 +222,11 @@ export class TestPaperRepository {
     id: number,
     data: {
       title?: string
-      level?: JLPTLevel
-      visibility?: Visibility
+      level?: JLPTLevelType
+      visibility?: VisibilityType
       includeAttempts?: boolean
     },
-  ): Promise<TestPaper> {
+  ): Promise<TestPaperType> {
     const original = await this.findByIdWithSections(id)
     if (!original) {
       throw new Error('Test paper not found')
@@ -240,11 +238,11 @@ export class TestPaperRepository {
         level: data.level || original.level,
         visibility: data.visibility || 'PRIVATE',
         blueprintId: original.blueprintId,
-        blueprintSnapshot: original.blueprintSnapshot as any,
+        blueprintSnapshot: original.blueprintSnapshot,
         seed: original.seed,
         version: 1,
         generatorVersion: original.generatorVersion,
-        generatorMeta: original.generatorMeta as any,
+        generatorMeta: original.generatorMeta,
       },
     })
 
@@ -269,7 +267,7 @@ export class TestPaperRepository {
       }
     }
 
-    return await clonedPaper
+    return clonedPaper
   }
 
   async getStatistics(id: number): Promise<any> {
@@ -304,7 +302,7 @@ export class TestPaperRepository {
     }
   }
 
-  async searchByContent(searchTerm: string, limit: number = 20): Promise<TestPaper[]> {
+  async searchByContent(searchTerm: string, limit: number = 20): Promise<TestPaperType[]> {
     return await this.prisma.testPaper.findMany({
       where: {
         OR: [
@@ -360,7 +358,7 @@ export class TestPaperRepository {
     return (await count) > 0
   }
 
-  async getLatestVersion(blueprintId: number): Promise<TestPaper | null> {
+  async getLatestVersion(blueprintId: number): Promise<TestPaperType | null> {
     return await this.prisma.testPaper.findFirst({
       where: { blueprintId },
       orderBy: { version: 'desc' },

@@ -2,11 +2,12 @@
 // Represents student test submissions with grading and JLPT level suggestions
 // Handles scoring logic based on JLPT official scoring criteria
 
-import { TestAttempt as PrismaTestAttempt, JLPTLevel } from '@prisma/client'
 import { z } from 'zod'
+import { TestAttemptType } from 'src/shared/types/question.types'
+import { JLPTLevelType, JLPTLevel } from 'src/shared/constants/enum.constant'
 
-// ===== Prisma Types =====
-export type TestAttempt = PrismaTestAttempt
+// ===== Base Types =====
+export type TestAttempt = TestAttemptType
 
 // ===== Extended Types with Relations =====
 export interface TestAttemptWithDetails extends TestAttempt {
@@ -18,7 +19,7 @@ export interface TestAttemptWithDetails extends TestAttempt {
   test: {
     id: number
     title: string
-    level: JLPTLevel
+    level: JLPTLevelType
     totalQuestions: number
   }
   answers: Array<{
@@ -54,11 +55,11 @@ export interface SectionScore {
 }
 
 export interface LevelEvaluation {
-  currentLevel: JLPTLevel
+  currentLevel: JLPTLevelType
   totalScore: number // Out of 180
   totalPassed: boolean
   sectionsPassed: boolean
-  suggestedLevel: JLPTLevel | null
+  suggestedLevel: JLPTLevelType | null
   recommendation: string
 }
 
@@ -170,11 +171,11 @@ export function calculateScaledScore(correctAnswers: number, totalQuestions: num
   return Math.round(rawPercentage * maxScore)
 }
 
-export function determineSectionGrouping(level: JLPTLevel): keyof typeof SECTION_GROUPINGS {
+export function determineSectionGrouping(level: JLPTLevelType): keyof typeof SECTION_GROUPINGS {
   return level === 'N5' || level === 'N4' ? 'N5_N4' : 'N3_N2_N1'
 }
 
-export function evaluateJLPTLevel(sectionScores: SectionScore[], currentLevel: JLPTLevel): LevelEvaluation {
+export function evaluateJLPTLevel(sectionScores: SectionScore[], currentLevel: JLPTLevelType): LevelEvaluation {
   const criteria = JLPT_SCORING_CRITERIA[currentLevel]
   const totalScore = sectionScores.reduce((sum, section) => sum + section.scaledScore, 0)
 
@@ -195,12 +196,12 @@ export function evaluateJLPTLevel(sectionScores: SectionScore[], currentLevel: J
   const passed = totalPassed && sectionsPassed
 
   // Suggest appropriate level
-  let suggestedLevel: JLPTLevel | null = null
+  let suggestedLevel: JLPTLevelType | null = null
   let recommendation = ''
 
   if (passed) {
     // If passed current level, suggest next level up (if available)
-    const levels: JLPTLevel[] = ['N5', 'N4', 'N3', 'N2', 'N1']
+    const levels: JLPTLevelType[] = ['N5', 'N4', 'N3', 'N2', 'N1']
     const currentIndex = levels.indexOf(currentLevel)
 
     if (currentIndex > 0) {
@@ -222,7 +223,7 @@ export function evaluateJLPTLevel(sectionScores: SectionScore[], currentLevel: J
     // Suggest staying at current level or going down if score is very low
     const scorePercentage = totalScore / criteria.totalMaxScore
     if (scorePercentage < 0.3 && currentLevel !== 'N5') {
-      const levels: JLPTLevel[] = ['N5', 'N4', 'N3', 'N2', 'N1']
+      const levels: JLPTLevelType[] = ['N5', 'N4', 'N3', 'N2', 'N1']
       const currentIndex = levels.indexOf(currentLevel)
       suggestedLevel = levels[currentIndex + 1]
       recommendation += ` Consider starting with ${suggestedLevel} to build a stronger foundation.`

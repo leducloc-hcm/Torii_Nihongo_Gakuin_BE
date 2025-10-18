@@ -1,48 +1,12 @@
-import { Prisma } from '@prisma/client'
 import { z } from 'zod'
+import { TestSectionType } from '../../shared/types/question.types'
 
-// ===== Prisma Types =====
-export type TestSection = Prisma.TestSectionGetPayload<Record<string, never>>
-export type TestSectionWithItems = Prisma.TestSectionGetPayload<{
-  include: {
-    items: {
-      include: {
-        question: {
-          include: {
-            option: true
-          }
-        }
-      }
-    }
-  }
-}>
-
-export type TestSectionWithTest = Prisma.TestSectionGetPayload<{
-  include: {
-    test: {
-      select: {
-        id: true
-        title: true
-        level: true
-      }
-    }
-    _count: {
-      select: {
-        items: true
-      }
-    }
-  }
-}>
-
-export type TestSectionBasic = Prisma.TestSectionGetPayload<{
-  include: {
-    _count: {
-      select: {
-        items: true
-      }
-    }
-  }
-}>
+// ===== Base Types =====
+export type TestSection = TestSectionType
+// Complex relation types - using any for simplicity
+export type TestSectionWithItems = any
+export type TestSectionWithTest = any
+export type TestSectionBasic = any
 
 // ===== Zod Schemas =====
 export const QuestionTypeSchema = z.enum(['VOCAB', 'KANJI', 'GRAMMAR', 'SYNONYM', 'ORDER', 'READING', 'LISTENING'])

@@ -5,6 +5,7 @@ import {
   DifficultyType,
   ReadingLengthType,
   QuestionGroupTypeType,
+  VisibilityType,
 } from 'src/shared/constants/enum.constant'
 
 // Question Type Definition
@@ -201,4 +202,159 @@ export interface TestAnswerWhereInput {
   attemptId?: number
   questionId?: number
   isCorrect?: boolean | null
+}
+
+// TestAttempt Type Definition
+export interface TestAttemptType {
+  id: number
+  userId: number
+  testId: number
+  startedAt: Date
+  submittedAt: Date | null
+  score: number | null
+  levelSuggestion: JLPTLevelType | null
+}
+
+export interface TestAttemptCreateData {
+  userId: number
+  testId: number
+  startedAt?: Date
+  submittedAt?: Date | null
+  score?: number | null
+  levelSuggestion?: JLPTLevelType | null
+}
+
+export interface TestAttemptUpdateData {
+  userId?: number
+  testId?: number
+  startedAt?: Date
+  submittedAt?: Date | null
+  score?: number | null
+  levelSuggestion?: JLPTLevelType | null
+}
+
+export interface TestAttemptWhereUniqueInput {
+  id?: number
+  userId_testId?: { userId: number; testId: number }
+}
+
+export interface TestAttemptWhereInput {
+  id?: number
+  userId?: number
+  testId?: number
+  submittedAt?: Date | null
+  score?: number | { gte?: number; lte?: number }
+}
+
+// TestItem Type Definition
+export interface TestItemType {
+  id: number
+  sectionId: number
+  questionId: number
+  order: number
+}
+
+export interface TestItemCreateData {
+  sectionId: number
+  questionId: number
+  order?: number
+}
+
+export interface TestItemUpdateData {
+  sectionId?: number
+  questionId?: number
+  order?: number
+}
+
+export interface TestItemWhereUniqueInput {
+  id?: number
+}
+
+export interface TestItemWhereInput {
+  id?: number
+  sectionId?: number
+  questionId?: number
+}
+
+// TestPaper Type Definition
+export interface TestPaperType {
+  id: number
+  title: string
+  level: JLPTLevelType
+  createdAt: Date
+  visibility: VisibilityType
+  blueprintId: number | null
+  blueprintSnapshot: any
+  seed: bigint | null
+  version: number
+  generatorVersion: string | null
+  generatorMeta: any
+}
+
+export interface TestPaperCreateData {
+  title: string
+  level: JLPTLevelType
+  visibility?: VisibilityType
+  blueprintId?: number | null
+  blueprintSnapshot?: any
+  seed?: bigint | null
+  version?: number
+  generatorVersion?: string | null
+  generatorMeta?: any
+}
+
+export interface TestPaperUpdateData {
+  title?: string
+  level?: JLPTLevelType
+  visibility?: VisibilityType
+  blueprintId?: number | null
+  blueprintSnapshot?: any
+  seed?: bigint | null
+  version?: number
+  generatorVersion?: string | null
+  generatorMeta?: any
+}
+
+export interface TestPaperWhereUniqueInput {
+  id?: number
+}
+
+export interface TestPaperWhereInput {
+  id?: number
+  level?: JLPTLevelType
+  visibility?: VisibilityType
+  blueprintId?: number | null
+}
+
+// TestSection Type Definition
+export interface TestSectionType {
+  id: number
+  testId: number
+  title: string
+  type: QuestionTypeType
+  order: number
+}
+
+export interface TestSectionCreateData {
+  testId: number
+  title: string
+  type: QuestionTypeType
+  order?: number
+}
+
+export interface TestSectionUpdateData {
+  testId?: number
+  title?: string
+  type?: QuestionTypeType
+  order?: number
+}
+
+export interface TestSectionWhereUniqueInput {
+  id?: number
+}
+
+export interface TestSectionWhereInput {
+  id?: number
+  testId?: number
+  type?: QuestionTypeType
 }

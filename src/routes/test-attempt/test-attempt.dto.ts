@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
-import { JLPTLevel } from '@prisma/client'
+import type { JLPTLevelType } from 'src/shared/constants/enum.constant'
 
 // ===== Start Test Attempt DTO =====
 export class StartTestAttemptDto {
@@ -57,7 +57,7 @@ export class TestAttemptQueryDto {
     example: 'N3',
     description: 'Filter by JLPT level',
   })
-  level?: JLPTLevel
+  level?: JLPTLevelType
 
   @ApiPropertyOptional({
     example: '2025-01-01T00:00:00.000Z',
@@ -162,7 +162,7 @@ export class SectionScoreDto {
 // ===== Level Evaluation Response DTO =====
 export class LevelEvaluationDto {
   @ApiProperty({ enum: ['N5', 'N4', 'N3', 'N2', 'N1'], example: 'N3' })
-  currentLevel!: JLPTLevel
+  currentLevel!: JLPTLevelType
 
   @ApiProperty({ example: 142, description: 'Total score out of 180' })
   totalScore!: number
@@ -178,7 +178,7 @@ export class LevelEvaluationDto {
     example: 'N2',
     description: 'Suggested next level to attempt',
   })
-  suggestedLevel?: JLPTLevel
+  suggestedLevel?: JLPTLevelType
 
   @ApiProperty({
     example: "Congratulations! You passed N3. You're ready to attempt N2.",
@@ -218,7 +218,7 @@ export class TestAttemptResponseDto {
     example: 'N2',
     description: 'Suggested JLPT level (null if not graded)',
   })
-  levelSuggestion?: JLPTLevel
+  levelSuggestion?: JLPTLevelType
 
   @ApiPropertyOptional({
     description: 'User details (when includeUser=true)',
@@ -246,7 +246,7 @@ export class TestAttemptResponseDto {
   test?: {
     id: number
     title: string
-    level: JLPTLevel
+    level: JLPTLevelType
     totalQuestions: number
   }
 

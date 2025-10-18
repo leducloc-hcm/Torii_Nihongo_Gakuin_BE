@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../../shared/services/prisma.service'
-import { Prisma } from '@prisma/client'
+import { TestSectionType } from '../../shared/types/question.types'
 import {
   TestSection,
   TestSectionWithItems,
@@ -15,13 +15,13 @@ import {
 export class TestSectionRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(data: CreateTestSectionInput): Promise<TestSection> {
+  async create(data: CreateTestSectionInput): Promise<TestSectionType> {
     return await this.prisma.testSection.create({
       data,
     })
   }
 
-  async findById(id: number): Promise<TestSection | null> {
+  async findById(id: number): Promise<TestSectionType | null> {
     return await this.prisma.testSection.findUnique({
       where: { id },
     })
@@ -65,14 +65,14 @@ export class TestSectionRepository {
     })
   }
 
-  async update(id: number, data: UpdateTestSectionInput): Promise<TestSection> {
+  async update(id: number, data: UpdateTestSectionInput): Promise<TestSectionType> {
     return await this.prisma.testSection.update({
       where: { id },
       data,
     })
   }
 
-  async delete(id: number): Promise<TestSection> {
+  async delete(id: number): Promise<TestSectionType> {
     return await this.prisma.testSection.delete({
       where: { id },
     })
@@ -93,7 +93,7 @@ export class TestSectionRepository {
 
     const skip = (page - 1) * limit
 
-    const where: Prisma.TestSectionWhereInput = {}
+    const where: any = {}
 
     if (search) {
       where.title = {
@@ -105,7 +105,7 @@ export class TestSectionRepository {
     if (type) where.type = type
     if (testId) where.testId = testId
 
-    const orderBy: Prisma.TestSectionOrderByWithRelationInput = {}
+    const orderBy: any = {}
     if (sortBy && sortOrder) {
       orderBy[sortBy] = sortOrder
     }
@@ -176,7 +176,7 @@ export class TestSectionRepository {
   }
 
   // ===== Bulk Operations =====
-  async bulkCreate(testId: number, sections: Omit<CreateTestSectionInput, 'testId'>[]): Promise<TestSection[]> {
+  async bulkCreate(testId: number, sections: Omit<CreateTestSectionInput, 'testId'>[]): Promise<TestSectionType[]> {
     const sectionsWithTestId = sections.map((section) => ({
       ...section,
       testId,
@@ -259,7 +259,7 @@ export class TestSectionRepository {
   }
 
   // ===== Copy Operations =====
-  async copySection(id: number, targetTestId: number, newTitle?: string): Promise<TestSection> {
+  async copySection(id: number, targetTestId: number, newTitle?: string): Promise<TestSectionType> {
     const originalSection = await this.findByIdWithItems(id)
     if (!originalSection) {
       throw new Error('Section not found')
@@ -298,7 +298,7 @@ export class TestSectionRepository {
   }
 
   // ===== Move Operations =====
-  async moveSection(id: number, targetTestId: number): Promise<TestSection> {
+  async moveSection(id: number, targetTestId: number): Promise<TestSectionType> {
     // Get the next order for the target test
     const lastSection = await this.prisma.testSection.findFirst({
       where: { testId: targetTestId },

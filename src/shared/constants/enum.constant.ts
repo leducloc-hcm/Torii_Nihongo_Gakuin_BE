@@ -64,6 +64,7 @@ export const Difficulty = {
 
 export const Visibility = {
   PRIVATE: 'PRIVATE',
+  UNLISTED: 'UNLISTED',
   PUBLIC: 'PUBLIC',
 } as const
 
