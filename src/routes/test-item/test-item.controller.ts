@@ -1,7 +1,3 @@
-// ===== TestItem Controller =====
-// REST API endpoints for TestItem management
-// Handles CRUD operations, bulk operations, and statistics
-
 import {
   Controller,
   Get,

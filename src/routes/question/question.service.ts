@@ -109,8 +109,8 @@ export class QuestionService {
     // Transform questions to include stats
     const transformedQuestions = questions.map((question) => ({
       ...question,
-      optionsCount: question._count?.options || 0,
-      correctOptionsCount: question.options?.filter((opt) => opt.isCorrect).length || 0,
+      optionsCount: question._count?.option || 0,
+      correctOptionsCount: question.option?.filter((opt) => opt.isCorrect).length || 0,
       hasMedia: !!question.mediaId,
     }))
 

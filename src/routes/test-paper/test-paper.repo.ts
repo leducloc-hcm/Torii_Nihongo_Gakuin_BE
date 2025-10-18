@@ -18,19 +18,19 @@ export class TestPaperRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(data: CreateTestPaperInput): Promise<TestPaper> {
-    return this.prisma.testPaper.create({
+    return await this.prisma.testPaper.create({
       data,
     })
   }
 
   async findById(id: number): Promise<TestPaper | null> {
-    return this.prisma.testPaper.findUnique({
+    return await this.prisma.testPaper.findUnique({
       where: { id },
     })
   }
 
   async findByIdWithRelations(id: number): Promise<TestPaperWithRelations | null> {
-    return this.prisma.testPaper.findUnique({
+    return await this.prisma.testPaper.findUnique({
       where: { id },
       include: {
         blueprint: true,
@@ -62,7 +62,7 @@ export class TestPaperRepository {
   }
 
   async findByIdWithSections(id: number): Promise<TestPaperWithSections | null> {
-    return this.prisma.testPaper.findUnique({
+    return await this.prisma.testPaper.findUnique({
       where: { id },
       include: {
         sections: {
@@ -71,7 +71,7 @@ export class TestPaperRepository {
               include: {
                 question: {
                   include: {
-                    options: true,
+                    option: true,
                   },
                 },
               },
@@ -85,14 +85,14 @@ export class TestPaperRepository {
   }
 
   async update(id: number, data: UpdateTestPaperInput): Promise<TestPaper> {
-    return this.prisma.testPaper.update({
+    return await this.prisma.testPaper.update({
       where: { id },
       data,
     })
   }
 
   async delete(id: number): Promise<TestPaper> {
-    return this.prisma.testPaper.delete({
+    return await this.prisma.testPaper.delete({
       where: { id },
     })
   }
@@ -175,21 +175,21 @@ export class TestPaperRepository {
   }
 
   async findByBlueprint(blueprintId: number): Promise<TestPaper[]> {
-    return this.prisma.testPaper.findMany({
+    return await this.prisma.testPaper.findMany({
       where: { blueprintId },
       orderBy: { version: 'desc' },
     })
   }
 
   async findByLevel(level: JLPTLevel): Promise<TestPaper[]> {
-    return this.prisma.testPaper.findMany({
+    return await this.prisma.testPaper.findMany({
       where: { level },
       orderBy: { createdAt: 'desc' },
     })
   }
 
   async findPublicTests(level?: JLPTLevel): Promise<TestPaper[]> {
-    return this.prisma.testPaper.findMany({
+    return await this.prisma.testPaper.findMany({
       where: {
         visibility: 'PUBLIC',
         ...(level && { level }),
@@ -200,7 +200,7 @@ export class TestPaperRepository {
 
   // ===== Bulk Operations =====
   async bulkDelete(ids: number[]): Promise<{ count: number }> {
-    return this.prisma.testPaper.deleteMany({
+    return await this.prisma.testPaper.deleteMany({
       where: {
         id: {
           in: ids,
@@ -210,7 +210,7 @@ export class TestPaperRepository {
   }
 
   async bulkUpdateVisibility(ids: number[], visibility: Visibility): Promise<{ count: number }> {
-    return this.prisma.testPaper.updateMany({
+    return await this.prisma.testPaper.updateMany({
       where: {
         id: {
           in: ids,
@@ -269,7 +269,7 @@ export class TestPaperRepository {
       }
     }
 
-    return clonedPaper
+    return await clonedPaper
   }
 
   async getStatistics(id: number): Promise<any> {
@@ -305,7 +305,7 @@ export class TestPaperRepository {
   }
 
   async searchByContent(searchTerm: string, limit: number = 20): Promise<TestPaper[]> {
-    return this.prisma.testPaper.findMany({
+    return await this.prisma.testPaper.findMany({
       where: {
         OR: [
           {
@@ -335,7 +335,7 @@ export class TestPaperRepository {
     const count = await this.prisma.testPaper.count({
       where: { id },
     })
-    return count > 0
+    return (await count) > 0
   }
 
   async existsByIds(ids: number[]): Promise<number[]> {
@@ -347,7 +347,7 @@ export class TestPaperRepository {
       },
       select: { id: true },
     })
-    return papers.map((p) => p.id)
+    return await papers.map((p) => p.id)
   }
 
   async getTitleExists(title: string, excludeId?: number): Promise<boolean> {
@@ -357,11 +357,11 @@ export class TestPaperRepository {
         ...(excludeId && { id: { not: excludeId } }),
       },
     })
-    return count > 0
+    return (await count) > 0
   }
 
   async getLatestVersion(blueprintId: number): Promise<TestPaper | null> {
-    return this.prisma.testPaper.findFirst({
+    return await this.prisma.testPaper.findFirst({
       where: { blueprintId },
       orderBy: { version: 'desc' },
     })

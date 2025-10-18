@@ -1,7 +1,3 @@
-// ===== TestAnswer Service =====
-// Business logic for TestAnswer management
-// Handles answer operations, grading, analytics, and insights
-
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common'
 import { TestAnswerRepository } from './test-answer.repo'
 import {
@@ -25,8 +21,6 @@ import {
 @Injectable()
 export class TestAnswerService {
   constructor(private readonly testAnswerRepo: TestAnswerRepository) {}
-
-  // ===== Basic CRUD Operations =====
 
   async createAnswer(data: CreateTestAnswerInput): Promise<TestAnswer> {
     // Validate that the attempt and question exist (would need additional checks)

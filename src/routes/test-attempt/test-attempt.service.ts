@@ -1,7 +1,3 @@
-// ===== TestAttempt Service =====
-// Business logic for test submission and grading
-// Handles JLPT scoring algorithms and level recommendations
-
 import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common'
 import { TestAttemptRepository } from './test-attempt.repo'
 import {

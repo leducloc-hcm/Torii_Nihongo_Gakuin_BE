@@ -132,14 +132,14 @@ export class TestItemRepository {
   }
 
   async update(id: number, data: UpdateTestItemInput): Promise<TestItem> {
-    return this.prisma.testItem.update({
+    return await this.prisma.testItem.update({
       where: { id },
       data,
     })
   }
 
   async delete(id: number): Promise<TestItem> {
-    return this.prisma.testItem.delete({
+    return await this.prisma.testItem.delete({
       where: { id },
     })
   }
@@ -189,7 +189,7 @@ export class TestItemRepository {
   async reorder(data: ReorderTestItemsInput): Promise<TestItem[]> {
     const { updates } = data
 
-    return this.prisma.$transaction(
+    return await this.prisma.$transaction(
       updates.map((update) =>
         this.prisma.testItem.update({
           where: { id: update.id },
@@ -359,14 +359,14 @@ export class TestItemRepository {
   }
 
   async getBySectionId(sectionId: number): Promise<TestItem[]> {
-    return this.prisma.testItem.findMany({
+    return await this.prisma.testItem.findMany({
       where: { sectionId },
       orderBy: { order: 'asc' },
     })
   }
 
   async countBySectionId(sectionId: number): Promise<number> {
-    return this.prisma.testItem.count({
+    return await this.prisma.testItem.count({
       where: { sectionId },
     })
   }

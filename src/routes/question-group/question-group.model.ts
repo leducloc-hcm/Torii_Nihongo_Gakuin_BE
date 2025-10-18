@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import { Prisma, QuestionGroupType } from '@prisma/client'
 
 export const QuestionGroupTypeEnum = z.enum([
   'VOCAB',

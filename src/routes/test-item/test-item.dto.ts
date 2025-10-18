@@ -1,113 +1,109 @@
-// ===== TestItem DTOs =====
-// Data Transfer Objects for TestItem CRUD operations
-// Uses Zod for validation and Swagger for API documentation
-
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 
 // ===== Create TestItem DTO =====
 export class CreateTestItemDto {
-  @ApiProperty({ 
-    example: 123, 
-    description: 'ID of the test section this item belongs to' 
+  @ApiProperty({
+    example: 123,
+    description: 'ID of the test section this item belongs to',
   })
   sectionId!: number
 
-  @ApiProperty({ 
-    example: 456, 
-    description: 'ID of the question for this test item' 
+  @ApiProperty({
+    example: 456,
+    description: 'ID of the question for this test item',
   })
   questionId!: number
 
-  @ApiPropertyOptional({ 
-    example: 1, 
+  @ApiPropertyOptional({
+    example: 1,
     default: 0,
-    description: 'Order of the item within the section (auto-assigned if not provided)' 
+    description: 'Order of the item within the section (auto-assigned if not provided)',
   })
   order?: number
 }
 
 // ===== Update TestItem DTO =====
 export class UpdateTestItemDto {
-  @ApiPropertyOptional({ 
-    example: 789, 
-    description: 'New question ID for this test item' 
+  @ApiPropertyOptional({
+    example: 789,
+    description: 'New question ID for this test item',
   })
   questionId?: number
 
-  @ApiPropertyOptional({ 
-    example: 2, 
-    description: 'New order of the item within the section' 
+  @ApiPropertyOptional({
+    example: 2,
+    description: 'New order of the item within the section',
   })
   order?: number
 }
 
 // ===== Query TestItems DTO =====
 export class TestItemQueryDto {
-  @ApiPropertyOptional({ 
-    example: 123, 
-    description: 'Filter by section ID' 
+  @ApiPropertyOptional({
+    example: 123,
+    description: 'Filter by section ID',
   })
   sectionId?: number
 
-  @ApiPropertyOptional({ 
-    example: 456, 
-    description: 'Filter by question ID' 
+  @ApiPropertyOptional({
+    example: 456,
+    description: 'Filter by question ID',
   })
   questionId?: number
 
-  @ApiPropertyOptional({ 
-    example: 0, 
-    description: 'Filter by minimum order' 
+  @ApiPropertyOptional({
+    example: 0,
+    description: 'Filter by minimum order',
   })
   minOrder?: number
 
-  @ApiPropertyOptional({ 
-    example: 10, 
-    description: 'Filter by maximum order' 
+  @ApiPropertyOptional({
+    example: 10,
+    description: 'Filter by maximum order',
   })
   maxOrder?: number
 
-  @ApiPropertyOptional({ 
-    example: true, 
+  @ApiPropertyOptional({
+    example: true,
     default: false,
-    description: 'Include question details in response' 
+    description: 'Include question details in response',
   })
   includeQuestion?: boolean
 
-  @ApiPropertyOptional({ 
-    example: true, 
+  @ApiPropertyOptional({
+    example: true,
     default: false,
-    description: 'Include section details in response' 
+    description: 'Include section details in response',
   })
   includeSection?: boolean
 
-  @ApiPropertyOptional({ 
-    example: 1, 
-    default: 1, 
-    description: 'Page number for pagination' 
+  @ApiPropertyOptional({
+    example: 1,
+    default: 1,
+    description: 'Page number for pagination',
   })
   page?: number
 
-  @ApiPropertyOptional({ 
-    example: 20, 
-    default: 20, 
-    description: 'Number of items per page' 
+  @ApiPropertyOptional({
+    example: 20,
+    default: 20,
+    description: 'Number of items per page',
   })
   limit?: number
 
-  @ApiPropertyOptional({ 
-    example: 'order', 
+  @ApiPropertyOptional({
+    example: 'order',
     enum: ['id', 'order', 'questionId'],
     default: 'order',
-    description: 'Sort by field' 
+    description: 'Sort by field',
   })
   sortBy?: 'id' | 'order' | 'questionId'
 
-  @ApiPropertyOptional({ 
-    example: 'asc', 
+  @ApiPropertyOptional({
+    example: 'asc',
     enum: ['asc', 'desc'],
     default: 'asc',
-    description: 'Sort order' 
+    description: 'Sort order',
   })
   sortOrder?: 'asc' | 'desc'
 }
@@ -118,7 +114,7 @@ export class ReorderTestItemsDto {
     type: [Object],
     example: [
       { id: 1, newOrder: 0 },
-      { id: 2, newOrder: 1 }
+      { id: 2, newOrder: 1 },
     ],
     description: 'Array of item ID and new order pairs (max 100)',
   })
@@ -134,7 +130,7 @@ export class BulkCreateTestItemsDto {
     type: [CreateTestItemDto],
     example: [
       { sectionId: 123, questionId: 456, order: 0 },
-      { sectionId: 123, questionId: 789, order: 1 }
+      { sectionId: 123, questionId: 789, order: 1 },
     ],
     description: 'Array of test items to create (max 100)',
   })
@@ -153,31 +149,31 @@ export class BulkDeleteTestItemsDto {
 
 // ===== Copy TestItems DTO =====
 export class CopyTestItemsDto {
-  @ApiProperty({ 
-    example: 789, 
-    description: 'Target section ID to copy items to' 
+  @ApiProperty({
+    example: 789,
+    description: 'Target section ID to copy items to',
   })
   targetSectionId!: number
 
-  @ApiPropertyOptional({ 
-    example: true, 
+  @ApiPropertyOptional({
+    example: true,
     default: true,
-    description: 'Whether to maintain original order in target section' 
+    description: 'Whether to maintain original order in target section',
   })
   maintainOrder?: boolean
 }
 
 // ===== Move TestItems DTO =====
 export class MoveTestItemsDto {
-  @ApiProperty({ 
-    example: 789, 
-    description: 'Target section ID to move items to' 
+  @ApiProperty({
+    example: 789,
+    description: 'Target section ID to move items to',
   })
   targetSectionId!: number
 
-  @ApiPropertyOptional({ 
-    example: 0, 
-    description: 'New order for moved items in target section' 
+  @ApiPropertyOptional({
+    example: 0,
+    description: 'New order for moved items in target section',
   })
   newOrder?: number
 }
@@ -219,8 +215,8 @@ export class TestItemResponseDto {
     example: {
       id: 456,
       content: 'What is the meaning of "こんにちは"?',
-      type: 'VOCAB'
-    }
+      type: 'VOCAB',
+    },
   })
   question?: {
     id: number
@@ -234,8 +230,8 @@ export class TestItemResponseDto {
     example: {
       id: 123,
       title: 'Vocabulary Section',
-      testId: 789
-    }
+      testId: 789,
+    },
   })
   section?: {
     id: number
@@ -253,9 +249,9 @@ export class TestItemListResponseDto {
       total: 100,
       page: 1,
       limit: 20,
-      totalPages: 5
+      totalPages: 5,
     },
-    description: 'Pagination information'
+    description: 'Pagination information',
   })
   pagination!: {
     total: number
@@ -277,7 +273,7 @@ export class CreateItemsForSectionDto {
   @ApiPropertyOptional({
     example: true,
     default: true,
-    description: 'Whether to maintain question order as provided'
+    description: 'Whether to maintain question order as provided',
   })
   maintainOrder?: boolean
 }

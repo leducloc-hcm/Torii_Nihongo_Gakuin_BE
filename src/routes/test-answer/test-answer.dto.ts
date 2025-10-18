@@ -1,11 +1,5 @@
-// ===== TestAnswer DTOs =====
-// Data Transfer Objects for TestAnswer API endpoints
-// Handles documentation for TestAnswer operations
-
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { JLPTLevel, QuestionType, Difficulty } from '@prisma/client'
-
-// ===== Request DTOs =====
 
 export class CreateTestAnswerDto {
   @ApiProperty({
@@ -174,8 +168,6 @@ export class TestAnswerQueryDto {
   })
   sortOrder?: 'asc' | 'desc'
 }
-
-// ===== Response DTOs =====
 
 export class TestAnswerResponseDto {
   @ApiProperty({ example: 1, description: 'Answer ID' })

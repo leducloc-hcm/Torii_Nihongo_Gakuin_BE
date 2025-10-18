@@ -31,7 +31,7 @@ export class QuestionRepository {
   } as const
 
   async create(data: QuestionCreateInput): Promise<any> {
-    return this.prisma.question.create({
+    return await this.prisma.question.create({
       data,
       include: this.includeOptions,
     })
@@ -45,7 +45,7 @@ export class QuestionRepository {
       order: number
     }>,
   ): Promise<any> {
-    return this.prisma.question.create({
+    return await this.prisma.question.create({
       data: {
         ...questionData,
         options: {
@@ -66,7 +66,7 @@ export class QuestionRepository {
     const { skip, take, where, orderBy, includeOptions = false } = params
 
     if (includeOptions) {
-      return this.prisma.question.findMany({
+      return await this.prisma.question.findMany({
         skip,
         take,
         where,
@@ -75,7 +75,7 @@ export class QuestionRepository {
       })
     }
 
-    return this.prisma.question.findMany({
+    return await this.prisma.question.findMany({
       skip,
       take,
       where,
@@ -91,7 +91,7 @@ export class QuestionRepository {
   }) {
     const { skip, take, where, orderBy } = params
 
-    return this.prisma.question.findMany({
+    return await this.prisma.question.findMany({
       skip,
       take,
       where,
@@ -99,10 +99,10 @@ export class QuestionRepository {
       include: {
         _count: {
           select: {
-            options: true,
+            option: true,
           },
         },
-        options: {
+        option: {
           select: {
             isCorrect: true,
           },
@@ -121,19 +121,19 @@ export class QuestionRepository {
 
   async findUnique(where: QuestionWhereUniqueInput, includeOptions = true): Promise<any | null> {
     if (includeOptions) {
-      return this.prisma.question.findUnique({
+      return await this.prisma.question.findUnique({
         where,
         include: this.includeOptions,
       })
     }
 
-    return this.prisma.question.findUnique({
+    return await this.prisma.question.findUnique({
       where,
     })
   }
 
   async update(where: QuestionWhereUniqueInput, data: any): Promise<any> {
-    return this.prisma.question.update({
+    return await this.prisma.question.update({
       where,
       data,
       include: this.includeOptions,
@@ -150,7 +150,7 @@ export class QuestionRepository {
       order: number
     }>,
   ): Promise<any> {
-    return this.prisma.$transaction(async (tx) => {
+    return await this.prisma.$transaction(async (tx) => {
       // Update question data
       if (Object.keys(questionData).length > 0) {
         await tx.question.update({
@@ -177,8 +177,8 @@ export class QuestionRepository {
         })
       }
 
-      // Return updated question with options
-      return tx.question.findUnique({
+      // Return await updated question with options
+      return await tx.question.findUnique({
         where: { id: questionId },
         include: this.includeOptions,
       })
@@ -187,13 +187,13 @@ export class QuestionRepository {
 
   async delete(where: QuestionWhereUniqueInput): Promise<Question> {
     // Options will be deleted automatically due to cascade
-    return this.prisma.question.delete({
+    return await this.prisma.question.delete({
       where,
     })
   }
 
   async count(where?: QuestionWhereInput): Promise<number> {
-    return this.prisma.question.count({ where })
+    return await this.prisma.question.count({ where })
   }
 
   async getStatistics(): Promise<{
@@ -257,7 +257,7 @@ export class QuestionRepository {
       }>
     }>,
   ): Promise<any[]> {
-    return this.prisma.$transaction(async (tx) => {
+    return await this.prisma.$transaction(async (tx) => {
       const createdQuestions: any[] = []
 
       for (const { questionData, options } of questions) {
@@ -282,13 +282,13 @@ export class QuestionRepository {
     const count = await this.prisma.question.count({
       where: { id },
     })
-    return count > 0
+    return (await count) > 0
   }
 
   async checkMediaExists(mediaId: number): Promise<boolean> {
     const count = await this.prisma.mediaAsset.count({
       where: { id: mediaId },
     })
-    return count > 0
+    return (await count) > 0
   }
 }

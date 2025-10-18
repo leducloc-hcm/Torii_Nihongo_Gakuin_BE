@@ -337,7 +337,7 @@ export class TestPaperService {
       }
 
       for (const item of section.items) {
-        if (!item.question.options || item.question.options.length === 0) {
+        if (!item.question.option || item.question.option.length === 0) {
           warnings.push(`Question "${item.question.stem}" has no options`)
         }
       }

@@ -1,7 +1,3 @@
-// ===== TestAttempt DTOs =====
-// Data Transfer Objects for test submission and grading operations
-// Includes JLPT scoring and level evaluation DTOs
-
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { JLPTLevel } from '@prisma/client'
 
