@@ -1,7 +1,3 @@
-// ===== TestAttempt Repository =====
-// Database operations for TestAttempt entity
-// Handles CRUD operations, grading queries, and statistics
-
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../../shared/services/prisma.service'
 import { JLPTLevel } from '@prisma/client'
@@ -21,7 +17,7 @@ export class TestAttemptRepository {
   // ===== Basic CRUD Operations =====
 
   async startAttempt(userId: number, data: StartTestAttemptInput): Promise<TestAttempt> {
-    return this.prisma.testAttempt.create({
+    return await this.prisma.testAttempt.create({
       data: {
         userId,
         testId: data.testId,
@@ -190,7 +186,7 @@ export class TestAttemptRepository {
 
   async submitAttempt(attemptId: number, data: SubmitTestAttemptInput): Promise<TestAttempt> {
     // Use transaction to create all answers and update attempt
-    return this.prisma.$transaction(async (tx) => {
+    return await this.prisma.$transaction(async (tx) => {
       // Create all answers
       await tx.testAnswer.createMany({
         data: data.answers.map((answer) => ({
@@ -201,7 +197,7 @@ export class TestAttemptRepository {
       })
 
       // Update attempt with submission time
-      return tx.testAttempt.update({
+      return await tx.testAttempt.update({
         where: { id: attemptId },
         data: {
           submittedAt: new Date(),
@@ -211,7 +207,7 @@ export class TestAttemptRepository {
   }
 
   async gradeAttempt(attemptId: number, score: number, levelSuggestion: JLPTLevel | null): Promise<TestAttempt> {
-    return this.prisma.testAttempt.update({
+    return await this.prisma.testAttempt.update({
       where: { id: attemptId },
       data: {
         score,
@@ -226,28 +222,28 @@ export class TestAttemptRepository {
     const count = await this.prisma.testAttempt.count({
       where: { id },
     })
-    return count > 0
+    return (await count) > 0
   }
 
   async userHasStartedTest(userId: number, testId: number): Promise<boolean> {
     const count = await this.prisma.testAttempt.count({
       where: { userId, testId },
     })
-    return count > 0
+    return (await count) > 0
   }
 
   async testExists(testId: number): Promise<boolean> {
     const count = await this.prisma.testPaper.count({
       where: { id: testId },
     })
-    return count > 0
+    return (await count) > 0
   }
 
   async userExists(userId: number): Promise<boolean> {
     const count = await this.prisma.user.count({
       where: { id: userId },
     })
-    return count > 0
+    return (await count) > 0
   }
 
   async isSubmitted(attemptId: number): Promise<boolean> {
@@ -255,7 +251,7 @@ export class TestAttemptRepository {
       where: { id: attemptId },
       select: { submittedAt: true },
     })
-    return attempt?.submittedAt !== null
+    return (await attempt?.submittedAt) !== null
   }
 
   // ===== Answer and Grading Methods =====
@@ -304,7 +300,7 @@ export class TestAttemptRepository {
       },
     })
 
-    return answers.map((answer) => ({
+    return await answers.map((answer) => ({
       id: answer.id,
       questionId: answer.questionId,
       selectedOptionId: answer.selectedOptionId,
@@ -467,7 +463,7 @@ export class TestAttemptRepository {
       LIMIT ${limit}
     `
 
-    return topScores.map((entry, index) => ({
+    return await topScores.map((entry, index) => ({
       rank: index + 1,
       user: {
         id: entry.userId,
@@ -480,7 +476,7 @@ export class TestAttemptRepository {
   }
 
   async getUserBestAttempt(userId: number, testId: number): Promise<TestAttempt | null> {
-    return this.prisma.testAttempt.findFirst({
+    return await this.prisma.testAttempt.findFirst({
       where: {
         userId,
         testId,
@@ -491,7 +487,7 @@ export class TestAttemptRepository {
   }
 
   async getUserAttemptCount(userId: number, testId: number): Promise<number> {
-    return this.prisma.testAttempt.count({
+    return await this.prisma.testAttempt.count({
       where: { userId, testId },
     })
   }

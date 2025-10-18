@@ -1,7 +1,3 @@
-// ===== TestAnswer Controller =====
-// REST API endpoints for TestAnswer operations
-// Handles CRUD, bulk operations, grading, analytics, and insights
-
 import {
   Controller,
   Get,

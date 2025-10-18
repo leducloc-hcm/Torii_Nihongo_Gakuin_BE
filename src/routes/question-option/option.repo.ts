@@ -26,7 +26,7 @@ export class OptionRepository {
   } as const
 
   async create(data: OptionCreateInput): Promise<any> {
-    return this.prisma.option.create({
+    return await this.prisma.option.create({
       data,
       include: this.includeQuestion,
     })
@@ -41,7 +41,7 @@ export class OptionRepository {
   }): Promise<any[]> {
     const { skip, take, where, orderBy, includeQuestion = false } = params
 
-    return this.prisma.option.findMany({
+    return await this.prisma.option.findMany({
       skip,
       take,
       where,
@@ -51,14 +51,14 @@ export class OptionRepository {
   }
 
   async findUnique(where: OptionWhereUniqueInput, includeQuestion = true): Promise<any | null> {
-    return this.prisma.option.findUnique({
+    return await this.prisma.option.findUnique({
       where,
       include: includeQuestion ? this.includeQuestion : undefined,
     })
   }
 
   async update(where: OptionWhereUniqueInput, data: any): Promise<any> {
-    return this.prisma.option.update({
+    return await this.prisma.option.update({
       where,
       data,
       include: this.includeQuestion,
@@ -66,17 +66,17 @@ export class OptionRepository {
   }
 
   async delete(where: OptionWhereUniqueInput): Promise<Option> {
-    return this.prisma.option.delete({
+    return await this.prisma.option.delete({
       where,
     })
   }
 
   async count(where?: OptionWhereInput): Promise<number> {
-    return this.prisma.option.count({ where })
+    return await this.prisma.option.count({ where })
   }
 
   async findByQuestionId(questionId: number): Promise<Option[]> {
-    return this.prisma.option.findMany({
+    return await this.prisma.option.findMany({
       where: { questionId },
       orderBy: { order: 'asc' },
     })
@@ -90,7 +90,7 @@ export class OptionRepository {
       order: number
     }>,
   ): Promise<any[]> {
-    return this.prisma.$transaction(async (tx) => {
+    return await this.prisma.$transaction(async (tx) => {
       const createdOptions: any[] = []
 
       for (const option of options) {
@@ -136,14 +136,14 @@ export class OptionRepository {
     const count = await this.prisma.option.count({
       where: { id },
     })
-    return count > 0
+    return (await count) > 0
   }
 
   async checkQuestionExists(questionId: number): Promise<boolean> {
     const count = await this.prisma.question.count({
       where: { id: questionId },
     })
-    return count > 0
+    return (await count) > 0
   }
 
   async getNextOrder(questionId: number): Promise<number> {
@@ -152,7 +152,7 @@ export class OptionRepository {
       orderBy: { order: 'desc' },
       select: { order: true },
     })
-    return (lastOption?.order ?? -1) + 1
+    return (await (lastOption?.order ?? -1)) + 1
   }
 
   async validateCorrectOptions(

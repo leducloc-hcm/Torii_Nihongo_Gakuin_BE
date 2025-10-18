@@ -1,7 +1,3 @@
-// ===== TestAttempt Controller =====
-// REST API endpoints for test submission and grading
-// Handles student test attempts and JLPT level evaluation
-
 import { Controller, Get, Post, Body, Param, Query, ParseIntPipe, HttpStatus, HttpCode, Request } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger'
 import { TestAttemptService } from './test-attempt.service'

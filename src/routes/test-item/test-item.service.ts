@@ -1,7 +1,3 @@
-// ===== TestItem Service =====
-// Business logic for TestItem operations
-// Handles validation, authorization, and complex operations
-
 import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common'
 import { TestItemRepository } from './test-item.repo'
 import {

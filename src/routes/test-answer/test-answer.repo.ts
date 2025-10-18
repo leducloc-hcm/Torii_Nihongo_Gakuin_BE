@@ -1,7 +1,3 @@
-// ===== TestAnswer Repository =====
-// Database operations for TestAnswer entity
-// Handles CRUD operations, analytics queries, and answer statistics
-
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../../shared/services/prisma.service'
 import { JLPTLevel, QuestionType, Difficulty } from '@prisma/client'
@@ -23,10 +19,8 @@ import {
 export class TestAnswerRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  // ===== Basic CRUD Operations =====
-
   async create(data: CreateTestAnswerInput): Promise<TestAnswer> {
-    return this.prisma.testAnswer.create({
+    return await this.prisma.testAnswer.create({
       data: {
         attemptId: data.attemptId,
         questionId: data.questionId,
@@ -38,7 +32,7 @@ export class TestAnswerRepository {
   }
 
   async findById(id: number): Promise<TestAnswer | null> {
-    return this.prisma.testAnswer.findUnique({
+    return await this.prisma.testAnswer.findUnique({
       where: { id },
     })
   }
@@ -78,19 +72,17 @@ export class TestAnswerRepository {
   }
 
   async update(id: number, data: UpdateTestAnswerInput): Promise<TestAnswer> {
-    return this.prisma.testAnswer.update({
+    return await this.prisma.testAnswer.update({
       where: { id },
       data,
     })
   }
 
   async delete(id: number): Promise<TestAnswer> {
-    return this.prisma.testAnswer.delete({
+    return await this.prisma.testAnswer.delete({
       where: { id },
     })
   }
-
-  // ===== Bulk Operations =====
 
   async bulkCreate(data: BulkCreateTestAnswersInput): Promise<{ count: number; answers: TestAnswer[] }> {
     const answers = data.answers.map((answer) => ({
@@ -101,7 +93,6 @@ export class TestAnswerRepository {
       explanation: answer.explanation,
     }))
 
-    // Create all answers in a transaction
     const result = await this.prisma.$transaction(async (tx) => {
       const created: TestAnswer[] = []
       for (const answerData of answers) {
@@ -148,8 +139,6 @@ export class TestAnswerRepository {
 
     return { count: result.count }
   }
-
-  // ===== Query Operations =====
 
   async findMany(query: QueryTestAnswersInput): Promise<{
     answers: TestAnswerWithDetails[]
@@ -280,7 +269,7 @@ export class TestAnswerRepository {
             explanation: true,
             level: true,
             difficulty: true,
-            options: {
+            option: {
               select: {
                 id: true,
                 content: true,
@@ -394,7 +383,7 @@ export class TestAnswerRepository {
           if (option) {
             commonWrongAnswers.push({
               optionId: option.id,
-              content: option.content,
+              content: option.content as string,
               count: wa._count.id,
               percentage: Math.round((wa._count.id / totalAttempts) * 100 * 100) / 100,
             })

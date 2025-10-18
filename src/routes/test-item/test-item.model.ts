@@ -1,14 +1,7 @@
-// ===== TestItem Model =====
-// Represents items within test sections
-// Related to TestSection (parent) and Question (content)
-
 import { TestItem as PrismaTestItem } from '@prisma/client'
 import { z } from 'zod'
 
-// ===== Prisma Types =====
 export type TestItem = PrismaTestItem
-
-// ===== Extended Types with Relations =====
 export interface TestItemWithDetails extends TestItem {
   section?: {
     id: number

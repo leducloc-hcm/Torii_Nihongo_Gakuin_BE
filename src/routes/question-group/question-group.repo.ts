@@ -1,7 +1,5 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from 'src/shared/services/prisma.service'
-// Note: QuestionGroup and QuestionGroupType will be available after database migration
-// import { QuestionGroup, QuestionGroupType } from '@prisma/client'
 import { QuestionGroupType } from '@prisma/client'
 import {
   QuestionGroupCreateInput,

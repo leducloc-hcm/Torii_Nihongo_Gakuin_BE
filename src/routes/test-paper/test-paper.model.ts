@@ -54,7 +54,7 @@ export type TestPaperWithSections = Prisma.TestPaperGetPayload<{
           include: {
             question: {
               include: {
-                options: true
+                option: true
               }
             }
           }

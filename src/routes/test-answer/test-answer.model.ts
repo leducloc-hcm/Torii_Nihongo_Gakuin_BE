@@ -1,7 +1,3 @@
-// ===== TestAnswer Model =====
-// Types and validation schemas for TestAnswer entity
-// Handles individual student answers within test attempts
-
 import { z } from 'zod'
 import { TestAnswer } from '@prisma/client'
 
