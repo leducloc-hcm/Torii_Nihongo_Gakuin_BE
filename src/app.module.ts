@@ -22,6 +22,7 @@ import { TestAttemptModule } from './routes/test-attempt/test-attempt.module'
 import { TestAnswerModule } from './routes/test-answer/test-answer.module'
 import { WebsocketsModule } from './websockets/websockets.module'
 import { OnlineClassModule } from './routes/online-class/online-class.module'
+import { QuestionGroupModule } from 'src/routes/question-group/question-group.module'
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { OnlineClassModule } from './routes/online-class/online-class.module'
     EnrollmentModule,
     FlashcardModule,
     NotificationModule,
+    QuestionGroupModule,
     PlacementBlueprintModule,
     QuestionModule,
     OptionModule,

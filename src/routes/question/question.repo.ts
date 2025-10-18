@@ -282,13 +282,13 @@ export class QuestionRepository {
     const count = await this.prisma.question.count({
       where: { id },
     })
-    return (await count) > 0
+    return count > 0
   }
 
   async checkMediaExists(mediaId: number): Promise<boolean> {
     const count = await this.prisma.mediaAsset.count({
       where: { id: mediaId },
     })
-    return (await count) > 0
+    return count > 0
   }
 }
