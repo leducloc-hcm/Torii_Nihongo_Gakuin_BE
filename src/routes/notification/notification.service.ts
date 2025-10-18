@@ -12,7 +12,11 @@ export class NotificationService {
 
   async create(data: CreateNotificationDto) {
     const notification = await this.notificationRepository.create(data)
-    this.notificationGateway.sendNotification(notification.userId, notification)
+    this.notificationGateway.sendNotification(notification.userId.toString(), {
+      ...notification,
+      userId: notification.userId.toString(),
+      type: 'general' as const,
+    })
     return notification
   }
 

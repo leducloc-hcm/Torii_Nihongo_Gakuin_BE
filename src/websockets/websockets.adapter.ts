@@ -12,19 +12,19 @@ export class WebsocketAdapter extends IoAdapter {
     this.sharedWebsocketRepository = app.get(SharedWebsocketRepository)
   }
   createIOServer(port: number, options?: ServerOptions) {
-    const server: Server = super.createIOServer(3003, {
+    const server: Server = super.createIOServer(port, {
       ...options,
       cors: {
         origin: '*',
-        credentials: true,
+        // credentials: true,
       },
     })
-    server.use((socket, next) => {
-      this.authMiddleware(socket, next)
-        .then(() => {})
-        .catch(() => {})
-      return ''
-    })
+    // server.use((socket, next) => {
+    //   this.authMiddleware(socket, next)
+    //     .then(() => {})
+    //     .catch(() => {})
+    //   return ''
+    // })
     return server
   }
   async authMiddleware(socket: Socket, next: (err?: any) => void) {
