@@ -164,21 +164,14 @@ export class CourseService {
 
     const { lecturerIds, ...courseData } = updateCourseDto
 
-    let lecturerUpdate = {}
-    if (lecturerIds !== undefined) {
-      if (lecturerIds === null) {
-        lecturerUpdate = { lecturer: { disconnect: true } }
-      } else {
-        lecturerUpdate = { lecturer: { connect: { id: lecturerIds } } }
-      }
-    }
-
     return this.courseRepository.update({
       where: { id },
       data: {
         ...courseData,
         thumbnailUrl,
-        ...lecturerUpdate,
+        ...(lecturerIds !== undefined && {
+          lecturerIds: lecturerIds === null ? [] : lecturerIds.map((id) => Number(id)),
+        }),
       },
     })
   }

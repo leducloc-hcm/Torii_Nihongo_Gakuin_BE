@@ -69,14 +69,14 @@ export class CourseController {
   @Get(':slug')
   @HttpCode(HttpStatus.OK)
   @Auth([AuthType.Bearer])
-  @Roles(RoleName.Admin, RoleName.Staff, RoleName.Lecturer)
+  @Roles(RoleName.Admin, RoleName.Staff, RoleName.Lecturer, RoleName.Customer)
   async findBySlug(@Param('slug') slug: string, @Query('includeReviews') includeReviews?: boolean) {
     return this.courseService.findBySlug(slug, includeReviews)
   }
 
   @Put(':id')
   @Auth([AuthType.Bearer])
-  @Roles(RoleName.Admin, RoleName.Staff, RoleName.Lecturer)
+  @Roles(RoleName.Admin, RoleName.Staff)
   @HttpCode(HttpStatus.OK)
   @UseInterceptors(FileInterceptor('thumbnail', imageUploadOptions))
   async update(

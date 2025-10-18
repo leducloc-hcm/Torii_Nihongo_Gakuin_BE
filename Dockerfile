@@ -131,5 +131,18 @@ ENV AWS_SECRET_ACCESS_KEY='gvjEBxdj6KTGTMwDHv6op8ZBGhHI66bsm37sNppm'
 ENV AWS_REGION='ap-southeast-1'
 ENV AWS_S3_BUCKET_NAME='torii-nihongo-gakuin-s3'
 ENV REDIS_URL='redis://default:password@localhost:6379'
+
+ENV JANUS_HTTP_URL='https://janus.torii-nihongo-gakuin.io.vn/janus'
+ENV JANUS_SERVER_URL='wss://janus.torii-nihongo-gakuin.io.vn/ws'
+ENV JANUS_WS_URL='wss://janus.torii-nihongo-gakuin.io.vn/ws'
+
+ENV JANUS_ADMIN_SECRET='janusoverlord'
+ENV JANUS_API_SECRET='secret123'
+
+# ICE Servers
+ENV JANUS_STUN_URL='stun:janus.torii-nihongo-gakuin.io.vn:3478'
+ENV JANUS_TURN_URL='turn:janus.torii-nihongo-gakuin.io.vn:3478'
+ENV JANUS_TURN_USERNAME='turnuser'
+ENV JANUS_TURN_PASSWORD='turnpassword'
 # Start the application
 CMD ["node", "dist/src/main.js"]

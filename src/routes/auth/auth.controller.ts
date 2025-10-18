@@ -1,4 +1,5 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Ip, Post, Query, Req, Res } from '@nestjs/common'
+import { Role } from '@prisma/client'
 import type { Response } from 'express'
 import { ZodSerializerDto } from 'nestjs-zod'
 import {
@@ -138,5 +139,12 @@ export class AuthController {
   @Roles(RoleName.Admin)
   createStaffAccount(@Body() body: CreateStaffAccountBodyDTO) {
     return this.authService.createStaffAccount(body)
+  }
+  @Get('/lecturers/all')
+  @ZodSerializerDto(MessageResDTO)
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Admin, RoleName.Staff)
+  getAllLecturers() {
+    return this.authService.getAllLecturers()
   }
 }
