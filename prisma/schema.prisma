@@ -297,7 +297,8 @@ model MediaAsset {
 
   lesson    Lesson?    @relation(fields: [lessonId], references: [id])
   questions Question[]
-
+  questionGroups QuestionGroup[]
+  options   Option[]
   liveSessions LiveSessionMedia[]
 }
 
@@ -347,40 +348,58 @@ model PlacementBlueprint {
 }
 
 model Question {
-  id          Int          @id @default(autoincrement())
-  type        QuestionType
-  level       JLPTLevel
-  difficulty  Difficulty   @default(MEDIUM)
-  stem        String
+  id               Int              @id @default(autoincrement())
+  type             QuestionType
+  subType          QuestionSubtype? 
+  level            JLPTLevel
+  difficulty       Difficulty        @default(MEDIUM)
+  stem             String
+  passage          String?
+  mediaId          Int?
+  explanation      String?
+  tags             String[]
+  metadata         Json?
+  createdAt        DateTime          @default(now())
+  readingLength    ReadingLength?
+  tokenCount       Int?
+  questionGroupId  Int?
+  media            MediaAsset?       @relation(fields: [mediaId], references: [id])
+  questionGroup    QuestionGroup?    @relation(fields: [questionGroupId], references: [id])
+  option            Option[]        
+  testAnswers      TestAnswer[]
+  quizAnswers      QuizAnswer[]
+  examAnswers      ExamAnswer[]
+  testItems        TestItem[]
+  examItems       ExamItem[]
+  quizItems       QuizItem[]
+}
+
+model QuestionGroup {
+  id          Int       @id @default(autoincrement())
+  type        QuestionGroupType
+  title       String?
   passage     String?
   mediaId     Int?
-  explanation String?
-  tags        String[]
+  order       Int?
   metadata    Json?
-  createdAt   DateTime     @default(now())
-  readingLength ReadingLength?
-  tokenCount    Int?
-  media     MediaAsset? @relation(fields: [mediaId], references: [id])
-  options   Option[]
-  testItems TestItem[]
-  examItems ExamItem[]
-  quizItems QuizItem[]
-  QuizAnswer QuizAnswer[]
-  TestAnswer TestAnswer[]
-  ExamAnswer ExamAnswer[]
+  createdAt   DateTime  @default(now())
+
+  media       MediaAsset? @relation(fields: [mediaId], references: [id])
+  questions   Question[]
 }
 
 model Option {
   id         Int     @id @default(autoincrement())
   questionId Int
-  content    String
+  content    String?
+  imageId    Int?
   isCorrect  Boolean @default(false)
   order      Int     @default(0)
-
-  question    Question     @relation(fields: [questionId], references: [id])
-  testAnswers TestAnswer[] @relation("TestAnswerOption")
-  quizAnswers QuizAnswer[] @relation("QuizAnswerOption")
-  examAnswers ExamAnswer[] @relation("ExamAnswerOption")
+  testAnswers TestAnswer[] 
+  quizAnswers QuizAnswer[]
+  examAnswers ExamAnswer[]
+  image     MediaAsset? @relation(fields: [imageId], references: [id])
+  question  Question     @relation(fields: [questionId], references: [id])
 }
 
 model TestPaper {
@@ -396,7 +415,6 @@ model TestPaper {
   version           Int       @default(1)   // phiên bản nội dung đề
   generatorVersion  String?               // version engine MCP (vd "1.3.2")
   generatorMeta     Json?                 // model/temp/code_sha/config_hash...
-  status            String    @default("published")
   sections TestSection[]
   attempts TestAttempt[]
 }
@@ -449,7 +467,7 @@ model TestAnswer {
 
   attempt        TestAttempt @relation(fields: [attemptId], references: [id])
   question       Question    @relation(fields: [questionId], references: [id])
-  selectedOption Option?     @relation("TestAnswerOption", fields: [selectedOptionId], references: [id])
+  selectedOption Option?     @relation(fields: [selectedOptionId], references: [id])
 }
 
 // ===== Live Classes (WebRTC 2D/3D) =====
@@ -675,7 +693,7 @@ model QuizAnswer {
 
   attempt        QuizAttempt @relation(fields: [attemptId], references: [id])
   question       Question    @relation(fields: [questionId], references: [id])
-  selectedOption Option?     @relation("QuizAnswerOption", fields: [selectedOptionId], references: [id])
+  selectedOption Option?     @relation(fields: [selectedOptionId], references: [id])
 }
 
 model WrongTerm {
@@ -752,7 +770,7 @@ model ExamAnswer {
 
   attempt        ExamAttempt @relation(fields: [attemptId], references: [id])
   question       Question    @relation(fields: [questionId], references: [id])
-  selectedOption Option?     @relation("ExamAnswerOption", fields: [selectedOptionId], references: [id])
+  selectedOption Option?     @relation(fields: [selectedOptionId], references: [id])
 }
 
 // ===== Community Library & Folders =====
@@ -1055,6 +1073,28 @@ enum QuestionType {
   ORDER
   READING
   LISTENING
+}
+
+enum QuestionGroupType {
+  VOCAB           
+  KANJI
+  GRAMMAR
+  CLOZE
+  READING_SHORT
+  READING_MEDIUM
+  READING_LONG
+  LISTENING
+}
+
+enum QuestionSubtype {
+  SINGLE_CHOICE     // Một đáp án đúng (multiple choice cơ bản)
+  MULTI_CHOICE      // Nhiều đáp án đúng (checkbox style)
+  TRUE_FALSE        // Đúng / Sai
+  CLOZE             // Điền chỗ trống (fill-in-the-blank)
+  IMAGE_CHOICE      // Đáp án là hình ảnh
+  AUDIO_CHOICE      // Đáp án là file âm thanh
+  MATCHING          // Nối cặp (ví dụ ghép từ và nghĩa)
+  ORDERING          // Sắp xếp câu / từ đúng thứ tự
 }
 
 enum Difficulty {

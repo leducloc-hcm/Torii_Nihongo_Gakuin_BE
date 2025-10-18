@@ -1,36 +1,42 @@
 import {
+  Body,
   Controller,
+  Delete,
   Get,
+  HttpStatus,
+  Param,
+  ParseIntPipe,
   Post,
   Put,
-  Delete,
-  Body,
-  Param,
   Query,
-  ParseIntPipe,
   UseGuards,
-  HttpStatus,
 } from '@nestjs/common'
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger'
-import { TestSectionService } from './test-section.service'
-import {
-  CreateTestSectionDto,
-  UpdateTestSectionDto,
-  TestSectionQueryDto,
-  BulkCreateTestSectionsDto,
-  ReorderTestSectionsDto,
-  BulkDeleteTestSectionsDto,
-  TestSectionStatsDto,
-  CopyTestSectionDto,
-  MoveTestSectionDto,
-  BulkCreateSectionsWithItemsDto,
-} from './test-section.dto'
-import { Auth } from '../../shared/decorators/auth.decorator'
+import { ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { AuthType } from '../../shared/constants/auth.constant'
+import { RoleName } from '../../shared/constants/role.constant'
+import { Auth } from '../../shared/decorators/auth.decorator'
 import { Roles } from '../../shared/decorators/roles.decorator'
 import { RolesGuard } from '../../shared/guards/roles.guard'
-import { RoleName } from '../../shared/constants/role.constant'
-import type { TestSection, TestSectionWithItems, TestSectionWithTest, TestSectionBasic } from './test-section.model'
+import {
+  BulkCreateSectionsWithItemsDto,
+  BulkCreateTestSectionsDto,
+  BulkDeleteTestSectionsDto,
+  CopyTestSectionDto,
+  CreateTestSectionDto,
+  MoveTestSectionDto,
+  ReorderTestSectionsDto,
+  TestSectionQueryDto,
+  TestSectionStatsDto,
+  UpdateTestSectionDto,
+} from './test-section.dto'
+import type {
+  TestSection,
+  TestSectionBasic,
+  TestSectionQuery,
+  TestSectionWithItems,
+  TestSectionWithTest,
+} from './test-section.model'
+import { TestSectionService } from './test-section.service'
 
 @ApiTags('Test Sections')
 @Controller()
@@ -40,7 +46,7 @@ export class TestSectionController {
 
   @Post('test-papers/:testId/sections')
   @Auth([AuthType.Bearer])
-  @Roles(RoleName.Staff, RoleName.Lecturer)
+  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
   @ApiOperation({ summary: 'Create new test section' })
   @ApiResponse({ status: HttpStatus.CREATED, description: 'Test section created successfully' })
   @ApiResponse({ status: HttpStatus.CONFLICT, description: 'Section title already exists in test' })
@@ -59,28 +65,26 @@ export class TestSectionController {
 
   @Get('test-sections')
   @Auth([AuthType.Bearer])
-  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Customer)
+  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Customer, RoleName.Admin)
   @ApiOperation({ summary: 'Get all test sections with pagination and filtering' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Test sections retrieved successfully' })
   async getTestSections(@Query() queryDto: TestSectionQueryDto): Promise<{
     data: TestSectionBasic[]
-    total: number
-    page: number
-    limit: number
-    totalPages: number
+    pagination: {
+      total: number
+      page: number
+      limit: number
+      totalPages: number
+      hasNext: boolean
+      hasPrev: boolean
+    }
   }> {
-    return this.testSectionService.getTestSections({
-      ...queryDto,
-      page: queryDto.page ?? 1,
-      limit: queryDto.limit ?? 20,
-      sortBy: (queryDto.sortBy as any) ?? 'order',
-      sortOrder: (queryDto.sortOrder as any) ?? 'asc',
-    })
+    return this.testSectionService.getTestSections(queryDto as TestSectionQuery)
   }
 
   @Get('test-papers/:testId/sections')
   @Auth([AuthType.Bearer])
-  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Customer)
+  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Customer, RoleName.Admin)
   @ApiOperation({ summary: 'Get all sections for a test paper' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Test sections retrieved successfully' })
   @ApiParam({ name: 'testId', description: 'Test paper ID' })
@@ -97,7 +101,7 @@ export class TestSectionController {
 
   @Get('test-sections/:id')
   @Auth([AuthType.Bearer])
-  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Customer)
+  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Customer, RoleName.Admin)
   @ApiOperation({ summary: 'Get test section by ID' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Test section retrieved successfully' })
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Test section not found' })
@@ -108,7 +112,7 @@ export class TestSectionController {
 
   @Get('test-sections/:id/items')
   @Auth([AuthType.Bearer])
-  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Customer)
+  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Customer, RoleName.Admin)
   @ApiOperation({ summary: 'Get test section with all items and questions' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Test section with items retrieved successfully' })
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Test section not found' })
@@ -119,7 +123,7 @@ export class TestSectionController {
 
   @Get('test-sections/:id/details')
   @Auth([AuthType.Bearer])
-  @Roles(RoleName.Staff, RoleName.Lecturer)
+  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Customer, RoleName.Admin)
   @ApiOperation({ summary: 'Get test section with test information' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Test section with test info retrieved successfully' })
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Test section not found' })
@@ -130,7 +134,7 @@ export class TestSectionController {
 
   @Get('test-sections/:id/stats')
   @Auth([AuthType.Bearer])
-  @Roles(RoleName.Staff, RoleName.Lecturer)
+  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Customer, RoleName.Admin)
   @ApiOperation({ summary: 'Get test section statistics' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Statistics retrieved successfully', type: TestSectionStatsDto })
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Test section not found' })
@@ -141,7 +145,7 @@ export class TestSectionController {
 
   @Put('test-sections/:id')
   @Auth([AuthType.Bearer])
-  @Roles(RoleName.Staff, RoleName.Lecturer)
+  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
   @ApiOperation({ summary: 'Update test section' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Test section updated successfully' })
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Test section not found' })
@@ -156,7 +160,7 @@ export class TestSectionController {
 
   @Post('test-sections/:id/copy')
   @Auth([AuthType.Bearer])
-  @Roles(RoleName.Staff, RoleName.Lecturer)
+  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
   @ApiOperation({ summary: 'Copy test section to another test' })
   @ApiResponse({ status: HttpStatus.CREATED, description: 'Test section copied successfully' })
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Test section not found' })
@@ -171,7 +175,7 @@ export class TestSectionController {
 
   @Post('test-sections/:id/duplicate')
   @Auth([AuthType.Bearer])
-  @Roles(RoleName.Staff, RoleName.Lecturer)
+  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
   @ApiOperation({ summary: 'Duplicate test section within the same test' })
   @ApiResponse({ status: HttpStatus.CREATED, description: 'Test section duplicated successfully' })
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Test section not found' })
@@ -186,7 +190,7 @@ export class TestSectionController {
 
   @Put('test-sections/:id/move')
   @Auth([AuthType.Bearer])
-  @Roles(RoleName.Staff, RoleName.Lecturer)
+  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
   @ApiOperation({ summary: 'Move test section to another test' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Test section moved successfully' })
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Test section not found' })
@@ -201,7 +205,7 @@ export class TestSectionController {
 
   @Delete('test-sections/:id')
   @Auth([AuthType.Bearer])
-  @Roles(RoleName.Staff)
+  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
   @ApiOperation({ summary: 'Delete test section' })
   @ApiResponse({ status: HttpStatus.NO_CONTENT, description: 'Test section deleted successfully' })
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Test section not found' })
@@ -213,7 +217,7 @@ export class TestSectionController {
 
   @Post('test-papers/:testId/sections/bulk')
   @Auth([AuthType.Bearer])
-  @Roles(RoleName.Staff, RoleName.Lecturer)
+  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
   @ApiOperation({ summary: 'Bulk create test sections' })
   @ApiResponse({ status: HttpStatus.CREATED, description: 'Bulk creation completed' })
   @ApiParam({ name: 'testId', description: 'Test paper ID' })
@@ -231,7 +235,7 @@ export class TestSectionController {
 
   @Put('test-sections/reorder')
   @Auth([AuthType.Bearer])
-  @Roles(RoleName.Staff, RoleName.Lecturer)
+  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
   @ApiOperation({ summary: 'Reorder test sections' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Sections reordered successfully' })
   async reorderTestSections(@Body() reorderDto: ReorderTestSectionsDto): Promise<{
@@ -243,7 +247,7 @@ export class TestSectionController {
 
   @Delete('test-sections/bulk')
   @Auth([AuthType.Bearer])
-  @Roles(RoleName.Staff)
+  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
   @ApiOperation({ summary: 'Bulk delete test sections' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Bulk delete completed' })
   async bulkDeleteTestSections(@Body() bulkDeleteDto: BulkDeleteTestSectionsDto): Promise<{
@@ -255,7 +259,7 @@ export class TestSectionController {
 
   @Post('test-papers/:testId/sections/bulk-with-items')
   @Auth([AuthType.Bearer])
-  @Roles(RoleName.Staff, RoleName.Lecturer)
+  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
   @ApiOperation({
     summary: 'Create multiple test sections with items',
     description: 'Create multiple test sections and their associated test items in a single operation',

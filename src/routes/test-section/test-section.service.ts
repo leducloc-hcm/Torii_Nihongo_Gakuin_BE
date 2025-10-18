@@ -92,7 +92,6 @@ export class TestSectionService {
 
     try {
       await this.testSectionRepo.delete(id)
-      // Reorder remaining sections
       await this.testSectionRepo.updateOrdersAfterDelete(section.testId, section.order)
     } catch (error: any) {
       if (error.code === 'P2003') {
@@ -102,18 +101,20 @@ export class TestSectionService {
     }
   }
 
-  // ===== Query Operations =====
   async getTestSections(query: TestSectionQuery): Promise<{
     data: TestSectionBasic[]
-    total: number
-    page: number
-    limit: number
-    totalPages: number
+    pagination: {
+      total: number
+      page: number
+      limit: number
+      totalPages: number
+      hasNext: boolean
+      hasPrev: boolean
+    }
   }> {
     return this.testSectionRepo.findMany(query)
   }
 
-  // ===== Test-specific Operations =====
   async getTestSectionsByTestId(testId: number): Promise<TestSectionBasic[]> {
     return this.testSectionRepo.findByTestId(testId)
   }
@@ -122,7 +123,6 @@ export class TestSectionService {
     return this.testSectionRepo.findByTestIdWithItems(testId)
   }
 
-  // ===== Bulk Operations =====
   async bulkCreateTestSections(
     testId: number,
     sections: Omit<CreateTestSectionInput, 'testId'>[],
@@ -130,10 +130,8 @@ export class TestSectionService {
     const created: TestSection[] = []
     const failed: Array<{ section: any; error: string }> = []
 
-    // Validate all sections first
     for (const section of sections) {
       try {
-        // Check title uniqueness
         const titleExists = await this.testSectionRepo.getTitleExistsInTest(testId, section.title)
         if (titleExists) {
           failed.push({
@@ -143,7 +141,6 @@ export class TestSectionService {
           continue
         }
 
-        // Set order if not provided
         if (section.order === undefined) {
           section.order = await this.testSectionRepo.getNextOrderForTest(testId)
         }
@@ -155,7 +152,6 @@ export class TestSectionService {
       }
     }
 
-    // Create valid sections
     const validSections = sections.filter((section) => !failed.some((f) => f.section === section))
 
     if (validSections.length > 0) {
@@ -163,7 +159,6 @@ export class TestSectionService {
         const createdSections = await this.testSectionRepo.bulkCreate(testId, validSections)
         created.push(...createdSections)
       } catch (error: any) {
-        // If bulk creation fails, try individual creation
         for (const section of validSections) {
           try {
             const createdSection = await this.testSectionRepo.create({
@@ -185,7 +180,6 @@ export class TestSectionService {
   }
 
   async bulkDeleteTestSections(ids: number[]): Promise<{ deleted: number; failed: number[] }> {
-    // Check which IDs exist
     const existingIds = await this.testSectionRepo.existsByIds(ids)
     const failedIds = ids.filter((id) => !existingIds.includes(id))
 
@@ -213,7 +207,6 @@ export class TestSectionService {
     const failed: Array<{ id: number; error: string }> = []
     let updated = 0
 
-    // Validate all sections exist
     for (const update of updates) {
       const exists = await this.testSectionRepo.exists(update.id)
       if (!exists) {
@@ -224,7 +217,6 @@ export class TestSectionService {
       }
     }
 
-    // Filter valid updates
     const validUpdates = updates.filter((update) => !failed.some((f) => f.id === update.id))
 
     if (validUpdates.length > 0) {
@@ -232,7 +224,6 @@ export class TestSectionService {
         await this.testSectionRepo.reorderSections(validUpdates)
         updated = validUpdates.length
       } catch (error: any) {
-        // If bulk update fails, try individual updates
         for (const update of validUpdates) {
           try {
             await this.testSectionRepo.update(update.id, { order: update.order })
@@ -250,14 +241,12 @@ export class TestSectionService {
     return { updated, failed }
   }
 
-  // ===== Copy Operations =====
   async copyTestSection(id: number, targetTestId: number, newTitle?: string): Promise<TestSection> {
     const exists = await this.testSectionRepo.exists(id)
     if (!exists) {
       throw new NotFoundException(`Test section with ID ${id} not found`)
     }
 
-    // Validate title uniqueness if provided
     if (newTitle) {
       const titleExists = await this.testSectionRepo.getTitleExistsInTest(targetTestId, newTitle)
       if (titleExists) {
@@ -275,26 +264,22 @@ export class TestSectionService {
     }
   }
 
-  // ===== Move Operations =====
   async moveTestSection(id: number, targetTestId: number): Promise<TestSection> {
     const section = await this.testSectionRepo.findById(id)
     if (!section) {
       throw new NotFoundException(`Test section with ID ${id} not found`)
     }
 
-    // Check if title already exists in target test
     const titleExists = await this.testSectionRepo.getTitleExistsInTest(targetTestId, section.title)
     if (titleExists) {
       throw new ConflictException(`Section with title "${section.title}" already exists in target test`)
     }
 
-    // Remove from original position
     await this.testSectionRepo.updateOrdersAfterDelete(section.testId, section.order)
 
     return this.testSectionRepo.moveSection(id, targetTestId)
   }
 
-  // ===== Statistics =====
   async getTestSectionStatistics(id: number): Promise<{
     totalItems: number
     itemsByType: Record<string, number>
@@ -308,7 +293,6 @@ export class TestSectionService {
     return this.testSectionRepo.getStatistics(id)
   }
 
-  // ===== Validation Methods =====
   async validateSectionOrder(testId: number, order: number, excludeId?: number): Promise<boolean> {
     const sections = await this.testSectionRepo.findByTestId(testId)
     const existingSection = sections.find((s) => s.order === order && (!excludeId || s.id !== excludeId))
@@ -316,12 +300,10 @@ export class TestSectionService {
   }
 
   async validateSectionAccess(id: number, userId: number): Promise<TestSection> {
-    // This method can be extended with proper access control logic
     const section = await this.getTestSection(id)
     return section
   }
 
-  // ===== Helper Methods =====
   async getMaxOrderForTest(testId: number): Promise<number> {
     const sections = await this.testSectionRepo.findByTestId(testId)
     return sections.length > 0 ? Math.max(...sections.map((s) => s.order)) : -1
@@ -348,7 +330,6 @@ export class TestSectionService {
 
     const title = newTitle || `${section.title} (Copy)`
 
-    // Check title uniqueness
     const titleExists = await this.testSectionRepo.getTitleExistsInTest(section.testId, title)
     if (titleExists) {
       throw new ConflictException(`Section with title "${title}" already exists in this test`)
@@ -357,7 +338,6 @@ export class TestSectionService {
     return this.copyTestSection(id, section.testId, title)
   }
 
-  // ===== Bulk Operations with Items =====
   async createSectionsWithItems(
     testId: number,
     sectionsData: Array<{
@@ -374,15 +354,8 @@ export class TestSectionService {
     if (sectionsData.length > 10) {
       throw new BadRequestException('Maximum 10 sections can be created at once')
     }
-
-    // Validate test exists
-    // (Assuming we have access to test repo or can add validation)
-
-    // Validate all question IDs exist
     const allQuestionIds = [...new Set(sectionsData.flatMap((s) => s.questionIds))]
-    // TODO: Add validation for question existence
 
-    // Check for title uniqueness
     for (const sectionData of sectionsData) {
       const titleExists = await this.testSectionRepo.getTitleExistsInTest(testId, sectionData.title)
       if (titleExists) {
@@ -390,11 +363,9 @@ export class TestSectionService {
       }
     }
 
-    // Create sections and items in transaction
     const createdSections: TestSection[] = []
 
     for (const sectionData of sectionsData) {
-      // Create section
       const sectionInput: CreateTestSectionInput = {
         testId,
         title: sectionData.title,
@@ -405,7 +376,6 @@ export class TestSectionService {
       const section = await this.createTestSection(sectionInput)
       createdSections.push(section)
 
-      // Create items for this section
       if (sectionData.questionIds.length > 0) {
         // This would need the TestItemService to be injected
         // For now, we'll just store the section and let the caller handle items

@@ -36,9 +36,6 @@ export class CreateTestPaperDto extends createZodDto(CreateTestPaperFlexibleSche
 
   @ApiPropertyOptional({ description: 'Generator metadata (model, config, etc.) (MCP mode)' })
   generatorMeta?: z.infer<typeof GeneratorMetaSchema>
-
-  @ApiPropertyOptional({ default: 'published', description: 'Publication status' })
-  status!: string
 }
 export class UpdateTestPaperDto extends createZodDto(UpdateTestPaperSchema) {
   @ApiPropertyOptional({ example: 'Updated JLPT N3 Practice Test' })
@@ -67,9 +64,6 @@ export class UpdateTestPaperDto extends createZodDto(UpdateTestPaperSchema) {
 
   @ApiPropertyOptional({ description: 'Generator metadata (MCP mode)' })
   generatorMeta?: z.infer<typeof GeneratorMetaSchema>
-
-  @ApiPropertyOptional({ description: 'Publication status' })
-  status?: string
 }
 export class TestPaperQueryDto extends createZodDto(TestPaperQuerySchema) {
   @ApiPropertyOptional({ default: 1, minimum: 1 })
@@ -86,9 +80,6 @@ export class TestPaperQueryDto extends createZodDto(TestPaperQuerySchema) {
 
   @ApiPropertyOptional({ enum: ['PRIVATE', 'UNLISTED', 'PUBLIC'] })
   visibility?: z.infer<typeof VisibilitySchema>
-
-  @ApiPropertyOptional({ description: 'Filter by status' })
-  status?: string
 
   @ApiPropertyOptional({ description: 'Filter by blueprint ID' })
   blueprintId?: number
@@ -111,23 +102,6 @@ export class BulkDeleteTestPaperDto extends createZodDto(BulkDeleteTestPaperSche
     description: 'Array of test paper IDs to delete (max 100)',
   })
   ids!: number[]
-}
-
-export const BulkUpdateStatusSchema = z.object({
-  ids: z.array(z.number().int().positive()).min(1).max(100),
-  status: z.string().min(1),
-})
-
-export class BulkUpdateStatusDto extends createZodDto(BulkUpdateStatusSchema) {
-  @ApiProperty({
-    type: [Number],
-    example: [1, 2, 3],
-    description: 'Array of test paper IDs to update (max 100)',
-  })
-  ids!: number[]
-
-  @ApiProperty({ example: 'published', description: 'New status for all papers' })
-  status!: string
 }
 
 export const CloneTestPaperSchema = z.object({

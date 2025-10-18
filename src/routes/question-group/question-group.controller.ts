@@ -1,0 +1,127 @@
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  HttpCode,
+  HttpStatus,
+  UseGuards,
+  ParseIntPipe,
+} from '@nestjs/common'
+import { QuestionGroupService } from './question-group.service'
+import {
+  CreateQuestionGroupDTO,
+  UpdateQuestionGroupDTO,
+  QueryQuestionGroupDTO,
+  BulkCreateQuestionGroupsDTO,
+  AddQuestionsToGroupDTO,
+  RemoveQuestionsFromGroupDTO,
+} from './question-group.dto'
+import { Auth } from 'src/shared/decorators/auth.decorator'
+import { AuthType } from 'src/shared/constants/auth.constant'
+import { Roles } from 'src/shared/decorators/roles.decorator'
+import { RolesGuard } from 'src/shared/guards/roles.guard'
+import { RoleName } from 'src/shared/constants/role.constant'
+import { ApiTags } from '@nestjs/swagger'
+
+@ApiTags('Question Groups')
+@Controller('question-groups')
+@UseGuards(RolesGuard)
+export class QuestionGroupController {
+  constructor(private readonly questionGroupService: QuestionGroupService) {}
+
+  @Post()
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Staff, RoleName.Admin, RoleName.Lecturer)
+  @HttpCode(HttpStatus.CREATED)
+  async create(@Body() createDto: CreateQuestionGroupDTO) {
+    return this.questionGroupService.create(createDto)
+  }
+
+  @Post('bulk')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Staff, RoleName.Admin)
+  @HttpCode(HttpStatus.CREATED)
+  async bulkCreate(@Body() bulkCreateDto: BulkCreateQuestionGroupsDTO) {
+    return this.questionGroupService.bulkCreate(bulkCreateDto)
+  }
+
+  @Get()
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Staff, RoleName.Admin, RoleName.Lecturer)
+  @HttpCode(HttpStatus.OK)
+  async findAll(@Query() queryDto: QueryQuestionGroupDTO) {
+    return this.questionGroupService.findAll(queryDto)
+  }
+
+  @Get('statistics')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Staff, RoleName.Admin, RoleName.Lecturer)
+  @HttpCode(HttpStatus.OK)
+  async getStatistics() {
+    return this.questionGroupService.getStatistics()
+  }
+
+  @Get('type/:type')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Staff, RoleName.Admin, RoleName.Lecturer)
+  @HttpCode(HttpStatus.OK)
+  async findByType(@Param('type') type: string, @Query() queryDto: Omit<QueryQuestionGroupDTO, 'type'>) {
+    return this.questionGroupService.findByType(type, queryDto)
+  }
+
+  @Get(':id')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Staff, RoleName.Admin, RoleName.Lecturer)
+  @HttpCode(HttpStatus.OK)
+  async findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.questionGroupService.findOne(id)
+  }
+
+  @Get(':id/questions')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Staff, RoleName.Admin, RoleName.Lecturer)
+  @HttpCode(HttpStatus.OK)
+  async getGroupQuestions(@Param('id', ParseIntPipe) id: number) {
+    return this.questionGroupService.getGroupQuestions(id)
+  }
+
+  @Put(':id')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Staff, RoleName.Admin, RoleName.Lecturer)
+  @HttpCode(HttpStatus.OK)
+  async update(@Param('id', ParseIntPipe) id: number, @Body() updateDto: UpdateQuestionGroupDTO) {
+    return this.questionGroupService.update(id, updateDto)
+  }
+
+  @Post(':id/questions')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Staff, RoleName.Admin, RoleName.Lecturer)
+  @HttpCode(HttpStatus.OK)
+  async addQuestionsToGroup(@Param('id', ParseIntPipe) id: number, @Body() addDto: AddQuestionsToGroupDTO) {
+    return this.questionGroupService.addQuestionsToGroup(id, addDto)
+  }
+
+  @Delete(':id/questions')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Staff, RoleName.Admin, RoleName.Lecturer)
+  @HttpCode(HttpStatus.OK)
+  async removeQuestionsFromGroup(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() removeDto: RemoveQuestionsFromGroupDTO,
+  ) {
+    return this.questionGroupService.removeQuestionsFromGroup(id, removeDto)
+  }
+
+  @Delete(':id')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Staff, RoleName.Admin)
+  @HttpCode(HttpStatus.OK)
+  async remove(@Param('id', ParseIntPipe) id: number) {
+    return this.questionGroupService.remove(id)
+  }
+}

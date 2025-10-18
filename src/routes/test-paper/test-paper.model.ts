@@ -67,7 +67,6 @@ export type TestPaperWithSections = Prisma.TestPaperGetPayload<{
 // ===== Zod Schemas =====
 export const JLPTLevelSchema = z.enum(['N5', 'N4', 'N3', 'N2', 'N1'])
 export const VisibilitySchema = z.enum(['PRIVATE', 'UNLISTED', 'PUBLIC'])
-export const TestPaperStatusSchema = z.enum(['draft', 'published', 'archived'])
 
 export const TestPaperBaseSchema = z.object({
   id: z.number().int().positive(),
@@ -81,7 +80,6 @@ export const TestPaperBaseSchema = z.object({
   version: z.number().int().positive(),
   generatorVersion: z.string().nullable(),
   generatorMeta: z.any().nullable(), // JSON
-  status: z.string(),
 })
 
 // Manual creation schema - for creating test papers by hand
@@ -89,8 +87,6 @@ export const CreateTestPaperManualSchema = z.object({
   title: z.string().min(1).max(255),
   level: JLPTLevelSchema,
   visibility: VisibilitySchema.default('PRIVATE'),
-  status: z.string().default('published'),
-  // Manual creation doesn't need these MCP fields
 })
 
 // MCP server generation schema - for creating test papers via MCP
@@ -104,7 +100,6 @@ export const CreateTestPaperMCPSchema = z.object({
   version: z.number().int().positive().default(1),
   generatorVersion: z.string().nullable().optional(),
   generatorMeta: z.any().nullable().optional(),
-  status: z.string().default('published'),
 })
 
 // Union schema that accepts both modes
@@ -126,8 +121,6 @@ export const CreateTestPaperFlexibleSchema = z.object({
   title: z.string().min(1).max(255),
   level: JLPTLevelSchema,
   visibility: VisibilitySchema.default('PRIVATE'),
-  status: z.string().default('published'),
-  // Optional MCP fields - only used when creating via MCP server
   blueprintId: z.number().int().positive().optional(),
   blueprintSnapshot: z.any().optional(), // JSON
   seed: z.bigint().optional(),
@@ -144,7 +137,6 @@ export const TestPaperQuerySchema = z.object({
   search: z.string().optional(),
   level: JLPTLevelSchema.optional(),
   visibility: VisibilitySchema.optional(),
-  status: z.string().optional(),
   blueprintId: z.number().int().positive().optional(),
   sortBy: z.enum(['createdAt', 'title', 'level', 'version']).default('createdAt'),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
@@ -158,7 +150,6 @@ export type UpdateTestPaperInput = z.infer<typeof UpdateTestPaperSchema>
 export type TestPaperQuery = z.infer<typeof TestPaperQuerySchema>
 export type JLPTLevel = z.infer<typeof JLPTLevelSchema>
 export type Visibility = z.infer<typeof VisibilitySchema>
-export type TestPaperStatus = z.infer<typeof TestPaperStatusSchema>
 
 // ===== Generator Metadata Schema =====
 export const GeneratorMetaSchema = z
