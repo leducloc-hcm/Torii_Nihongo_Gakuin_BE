@@ -15,7 +15,7 @@ import {
 } from '@nestjs/common'
 import { LessonService } from './lesson.service'
 import { CreateLessonDTO, UpdateLessonDTO, QueryLessonDTO } from './lesson.dto'
-import { Auth } from 'src/shared/decorators/auth.decorator'
+import { Auth, IsPublic } from 'src/shared/decorators/auth.decorator'
 import { AuthType } from 'src/shared/constants/auth.constant'
 import { Roles } from 'src/shared/decorators/roles.decorator'
 import { RolesGuard } from 'src/shared/guards/roles.guard'
@@ -44,6 +44,7 @@ export class LessonController {
 
   @Get(':lessonId/stream')
   @Auth([AuthType.Bearer])
+  @Roles(RoleName.Admin, RoleName.Staff, RoleName.Lecturer, RoleName.Customer)
   @HttpCode(HttpStatus.OK)
   async getStreamUrl(@ActiveUser('userId') userId: number, @Param('lessonId', ParseIntPipe) lessonId: number) {
     return this.lessonService.generateStreamUrl(lessonId, userId)
@@ -77,6 +78,7 @@ export class LessonController {
   }
   @Get('public/:lessonId/stream')
   @HttpCode(HttpStatus.OK)
+  @IsPublic()
   async getPublicStreamUrl(@Param('lessonId', ParseIntPipe) lessonId: number) {
     return this.lessonService.getPublicStreamUrl(lessonId)
   }

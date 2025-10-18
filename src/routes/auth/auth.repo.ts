@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import { DeviceType, RefreshTokenType, VerificationCodeType } from 'src/routes/auth/auth.model'
 import { TypeOfVerificationCodeType } from 'src/shared/constants/auth.constant'
+import { RoleName } from 'src/shared/constants/role.constant'
 import { UserType } from 'src/shared/models/shared-user.model'
 import { WhereUniqueUserType } from 'src/shared/repositories/shared-user.repo'
 import { PrismaService } from 'src/shared/services/prisma.service'
@@ -121,6 +122,23 @@ export class AuthRepository {
   ): Promise<VerificationCodeType> {
     return this.prismaService.verificationCode.delete({
       where: uniqueValue,
+    })
+  }
+  findAllLecturers() {
+    return this.prismaService.user.findMany({
+      where: { role: { equals: RoleName.Lecturer as any }, deletedAt: null },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        lecturerProfile: {
+          select: {
+            name: true,
+            username: true,
+            avatar: true,
+          },
+        },
+      },
     })
   }
 }
