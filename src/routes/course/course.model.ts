@@ -191,12 +191,14 @@ export type CourseWithRelations = {
   status: 'DRAFT' | 'PENDING_REVIEW' | 'PUBLISHED' | 'ARCHIVED'
   createdAt: Date
   updatedAt: Date
-  lecturerId: number | null
-  lecturer: {
+  lecturerIds: number[]
+  lecturers: Array<{
     id: number
     name: string
     email: string
-  } | null
+    username: string | null
+    avatar: string | null
+  } | null>[]
   modules: Array<{
     id: number
     title: string

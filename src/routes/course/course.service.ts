@@ -3,12 +3,14 @@ import { CourseRepository } from './course.repo'
 import { CreateCourseDTO, UpdateCourseDTO, QueryCourseDTO } from './course.dto'
 import { CourseWithRelations, CourseWhereInput, CourseOrderByInput } from './course.model'
 import { S3Service } from 'src/shared/services/s3.service'
+import { LectureProfileRepository } from 'src/routes/profile/profile.repo'
 
 @Injectable()
 export class CourseService {
   constructor(
     private readonly courseRepository: CourseRepository,
     private readonly s3Service: S3Service,
+    private readonly lecturerRepository: LectureProfileRepository,
   ) {}
 
   async create(
@@ -226,14 +228,21 @@ export class CourseService {
       where,
       orderBy,
     })
-
+    const lecturerArray = await this.lecturerRepository.findLectureProfileByUserIds(
+      courses.map((course) => course.lecturerIds).flat(),
+    )
     return {
-      data: courses,
-      pagination: {
-        page,
-        limit: Number(limit),
-        total,
-        totalPages: Math.ceil(total / Number(limit)),
+      data: courses.map((course) => ({
+        ...course,
+        lecturers: lecturerArray.filter((lecturer) => course.lecturerIds.includes(lecturer.userId)),
+      })),
+      meta: {
+        pagination: {
+          page,
+          limit: Number(limit),
+          total,
+          totalPages: Math.ceil(total / Number(limit)),
+        },
       },
     }
   }
