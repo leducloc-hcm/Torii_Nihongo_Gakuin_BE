@@ -27,7 +27,6 @@ export class TestPaperService {
       title: data.title,
       level: data.level,
       visibility: data.visibility || 'PRIVATE',
-      status: data.status || 'published',
     }
 
     if (isMCPMode) {
@@ -106,7 +105,6 @@ export class TestPaperService {
     if (data.title !== undefined) updateData.title = data.title
     if (data.level !== undefined) updateData.level = data.level
     if (data.visibility !== undefined) updateData.visibility = data.visibility
-    if (data.status !== undefined) updateData.status = data.status
 
     if (data.blueprintId !== undefined) updateData.blueprintId = data.blueprintId
     if (data.blueprintSnapshot !== undefined) updateData.blueprintSnapshot = data.blueprintSnapshot
@@ -289,7 +287,6 @@ export class TestPaperService {
         model: 'placeholder',
         timestamp: new Date(),
       },
-      status: 'draft',
     }
 
     return this.createTestPaper(testPaperData)
@@ -317,7 +314,6 @@ export class TestPaperService {
       version: nextVersion,
       generatorVersion: changes.generatorVersion || original.generatorVersion || undefined,
       generatorMeta: changes.generatorMeta || original.generatorMeta || undefined,
-      status: changes.status || 'draft',
     })
   }
 

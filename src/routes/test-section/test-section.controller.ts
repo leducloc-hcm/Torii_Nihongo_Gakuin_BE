@@ -1,43 +1,42 @@
 import {
+  Body,
   Controller,
+  Delete,
   Get,
+  HttpStatus,
+  Param,
+  ParseIntPipe,
   Post,
   Put,
-  Delete,
-  Body,
-  Param,
   Query,
-  ParseIntPipe,
   UseGuards,
-  HttpStatus,
 } from '@nestjs/common'
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger'
-import { TestSectionService } from './test-section.service'
-import {
-  CreateTestSectionDto,
-  UpdateTestSectionDto,
-  TestSectionQueryDto,
-  BulkCreateTestSectionsDto,
-  ReorderTestSectionsDto,
-  BulkDeleteTestSectionsDto,
-  TestSectionStatsDto,
-  CopyTestSectionDto,
-  MoveTestSectionDto,
-  BulkCreateSectionsWithItemsDto,
-} from './test-section.dto'
-import { Auth } from '../../shared/decorators/auth.decorator'
+import { ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { AuthType } from '../../shared/constants/auth.constant'
+import { RoleName } from '../../shared/constants/role.constant'
+import { Auth } from '../../shared/decorators/auth.decorator'
 import { Roles } from '../../shared/decorators/roles.decorator'
 import { RolesGuard } from '../../shared/guards/roles.guard'
-import { RoleName } from '../../shared/constants/role.constant'
+import {
+  BulkCreateSectionsWithItemsDto,
+  BulkCreateTestSectionsDto,
+  BulkDeleteTestSectionsDto,
+  CopyTestSectionDto,
+  CreateTestSectionDto,
+  MoveTestSectionDto,
+  ReorderTestSectionsDto,
+  TestSectionQueryDto,
+  TestSectionStatsDto,
+  UpdateTestSectionDto,
+} from './test-section.dto'
 import type {
   TestSection,
-  TestSectionWithItems,
-  TestSectionWithTest,
   TestSectionBasic,
   TestSectionQuery,
+  TestSectionWithItems,
+  TestSectionWithTest,
 } from './test-section.model'
-import { Role } from '@prisma/client'
+import { TestSectionService } from './test-section.service'
 
 @ApiTags('Test Sections')
 @Controller()
