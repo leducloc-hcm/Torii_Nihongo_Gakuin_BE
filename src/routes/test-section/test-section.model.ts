@@ -9,7 +9,7 @@ export type TestSectionWithItems = Prisma.TestSectionGetPayload<{
       include: {
         question: {
           include: {
-            options: true
+            option: true
           }
         }
       }

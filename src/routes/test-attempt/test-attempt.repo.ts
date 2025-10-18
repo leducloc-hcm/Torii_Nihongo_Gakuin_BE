@@ -222,28 +222,28 @@ export class TestAttemptRepository {
     const count = await this.prisma.testAttempt.count({
       where: { id },
     })
-    return (await count) > 0
+    return count > 0
   }
 
   async userHasStartedTest(userId: number, testId: number): Promise<boolean> {
     const count = await this.prisma.testAttempt.count({
       where: { userId, testId },
     })
-    return (await count) > 0
+    return count > 0
   }
 
   async testExists(testId: number): Promise<boolean> {
     const count = await this.prisma.testPaper.count({
       where: { id: testId },
     })
-    return (await count) > 0
+    return count > 0
   }
 
   async userExists(userId: number): Promise<boolean> {
     const count = await this.prisma.user.count({
       where: { id: userId },
     })
-    return (await count) > 0
+    return count > 0
   }
 
   async isSubmitted(attemptId: number): Promise<boolean> {
@@ -251,7 +251,7 @@ export class TestAttemptRepository {
       where: { id: attemptId },
       select: { submittedAt: true },
     })
-    return (await attempt?.submittedAt) !== null
+    return attempt?.submittedAt !== null
   }
 
   // ===== Answer and Grading Methods =====
@@ -300,7 +300,7 @@ export class TestAttemptRepository {
       },
     })
 
-    return await answers.map((answer) => ({
+    return answers.map((answer) => ({
       id: answer.id,
       questionId: answer.questionId,
       selectedOptionId: answer.selectedOptionId,
@@ -463,7 +463,7 @@ export class TestAttemptRepository {
       LIMIT ${limit}
     `
 
-    return await topScores.map((entry, index) => ({
+    return topScores.map((entry, index) => ({
       rank: index + 1,
       user: {
         id: entry.userId,

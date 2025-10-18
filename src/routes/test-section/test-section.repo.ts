@@ -36,7 +36,7 @@ export class TestSectionRepository {
           include: {
             question: {
               include: {
-                options: true,
+                option: true,
               },
             },
           },
@@ -166,7 +166,7 @@ export class TestSectionRepository {
           include: {
             question: {
               include: {
-                options: true,
+                option: true,
               },
             },
           },
