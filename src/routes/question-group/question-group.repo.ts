@@ -1,14 +1,6 @@
 import { Injectable } from '@nestjs/common'
+import { QuestionGroupTypeType } from 'src/shared/constants/enum.constant'
 import { PrismaService } from 'src/shared/services/prisma.service'
-import { QuestionGroupType } from '@prisma/client'
-import {
-  QuestionGroupCreateInput,
-  QuestionGroupUpdateInput,
-  QuestionGroupWhereUniqueInput,
-  QuestionGroupWhereInput,
-  QuestionGroupOrderByInput,
-  QuestionGroupWithQuestions,
-} from './question-group.model'
 
 @Injectable()
 export class QuestionGroupRepository {
@@ -343,9 +335,9 @@ export class QuestionGroupRepository {
 
     return { existing, missing }
   }
-  async getGroupsByType(type: QuestionGroupType): Promise<any[]> {
+  async getGroupsByType(type: QuestionGroupTypeType): Promise<any[]> {
     return await this.prisma.questionGroup.findMany({
-      where: { type },
+      where: { type: type as any },
       include: this.includeQuestions,
     })
   }

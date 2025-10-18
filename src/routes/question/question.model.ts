@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import { Prisma, JLPTLevel, QuestionType, Difficulty } from '@prisma/client'
 
 export const JLPTLevelEnum = z.enum(['N5', 'N4', 'N3', 'N2', 'N1'])
 export const QuestionTypeEnum = z.enum(['VOCAB', 'KANJI', 'GRAMMAR', 'SYNONYM', 'ORDER', 'READING', 'LISTENING'])
@@ -131,11 +130,13 @@ export type QuestionWithOptions = Question & {
   } | null
 }
 
-export type QuestionCreateInput = Prisma.QuestionCreateInput
-export type QuestionUpdateInput = Prisma.QuestionUpdateInput
-export type QuestionWhereUniqueInput = Prisma.QuestionWhereUniqueInput
-export type QuestionWhereInput = Prisma.QuestionWhereInput
-export type QuestionOrderByInput = Prisma.QuestionOrderByWithRelationInput
-
-export type OptionCreateInput = Prisma.OptionCreateInput
-export type OptionUpdateInput = Prisma.OptionUpdateInput
+// Import custom types instead of Prisma types
+export type {
+  QuestionCreateData as QuestionCreateInput,
+  QuestionUpdateData as QuestionUpdateInput,
+  QuestionWhereUniqueInput,
+  QuestionWhereInput,
+  QuestionOrderByInput,
+  OptionCreateData as OptionCreateInput,
+  OptionUpdateData as OptionUpdateInput,
+} from 'src/shared/types/question.types'

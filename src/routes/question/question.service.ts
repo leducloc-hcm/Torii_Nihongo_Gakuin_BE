@@ -2,7 +2,8 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { QuestionRepository } from './question.repo'
 import { CreateQuestionDTO, UpdateQuestionDTO, QueryQuestionDTO, BulkCreateQuestionsDTO } from './question.dto'
 import { QuestionWhereInput, QuestionOrderByInput, QuestionWithOptions } from './question.model'
-import { JLPTLevel, QuestionType, Difficulty, Question } from '@prisma/client'
+import { JLPTLevelType, QuestionTypeType, DifficultyType } from 'src/shared/constants/enum.constant'
+import { QuestionType } from 'src/shared/types/question.types'
 
 @Injectable()
 export class QuestionService {
@@ -189,7 +190,7 @@ export class QuestionService {
     return this.questionRepository.update({ id }, updateData)
   }
 
-  async remove(id: number): Promise<Question> {
+  async remove(id: number): Promise<QuestionType> {
     const exists = await this.questionRepository.checkExists(id)
     if (!exists) {
       throw new NotFoundException(`Question with ID ${id} not found`)
@@ -244,17 +245,17 @@ export class QuestionService {
     return this.questionRepository.bulkCreate(questionsData)
   }
 
-  async findByType(type: QuestionType, queryDto: Omit<QueryQuestionDTO, 'type'>) {
+  async findByType(type: QuestionTypeType, queryDto: Omit<QueryQuestionDTO, 'type'>) {
     const queryWithType = { ...queryDto, type }
-    return this.findAll(queryWithType)
+    return this.findAll(queryWithType as any)
   }
 
-  async findByLevel(level: JLPTLevel, queryDto: Omit<QueryQuestionDTO, 'level'>) {
+  async findByLevel(level: JLPTLevelType, queryDto: Omit<QueryQuestionDTO, 'level'>) {
     const queryWithLevel = { ...queryDto, level }
     return this.findAll(queryWithLevel)
   }
 
-  async findByDifficulty(difficulty: Difficulty, queryDto: Omit<QueryQuestionDTO, 'difficulty'>) {
+  async findByDifficulty(difficulty: DifficultyType, queryDto: Omit<QueryQuestionDTO, 'difficulty'>) {
     const queryWithDifficulty = { ...queryDto, difficulty }
     return this.findAll(queryWithDifficulty)
   }

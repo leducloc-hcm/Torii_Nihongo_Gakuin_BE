@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import { Prisma, JLPTLevel } from '@prisma/client'
 
 export const JLPTLevelEnum = z.enum(['N5', 'N4', 'N3', 'N2', 'N1'])
 export const PlacementBlueprintSchema = z.object({
@@ -68,8 +67,29 @@ export const ActivateBlueprintSchema = z.object({
 
 export type PlacementBlueprint = z.infer<typeof PlacementBlueprintSchema>
 
-export type PlacementBlueprintCreateInput = Prisma.PlacementBlueprintCreateInput
-export type PlacementBlueprintUpdateInput = Prisma.PlacementBlueprintUpdateInput
-export type PlacementBlueprintWhereUniqueInput = Prisma.PlacementBlueprintWhereUniqueInput
-export type PlacementBlueprintWhereInput = Prisma.PlacementBlueprintWhereInput
-export type PlacementBlueprintOrderByInput = Prisma.PlacementBlueprintOrderByWithRelationInput
+export type PlacementBlueprintCreateInput = z.infer<typeof CreatePlacementBlueprintSchema>
+export type PlacementBlueprintUpdateInput = z.infer<typeof UpdatePlacementBlueprintSchema>
+export type QueryPlacementBlueprint = z.infer<typeof QueryPlacementBlueprintSchema>
+
+// Repository-specific types that include all fields
+export type PlacementBlueprintCreateData = PlacementBlueprintCreateInput & { active: boolean }
+export type PlacementBlueprintUpdateData = PlacementBlueprintUpdateInput & { active?: boolean }
+
+// Define correct types for database operations
+export type PlacementBlueprintWhereUniqueInput = {
+  id?: number
+}
+
+export type PlacementBlueprintWhereInput = {
+  id?: number | { not: number }
+  level?: 'N5' | 'N4' | 'N3' | 'N2' | 'N1'
+  active?: boolean
+  totalQuestions?: number | { gte?: number; lte?: number }
+}
+
+export type PlacementBlueprintOrderByInput = {
+  id?: 'asc' | 'desc'
+  level?: 'asc' | 'desc'
+  totalQuestions?: 'asc' | 'desc'
+  active?: 'asc' | 'desc'
+}

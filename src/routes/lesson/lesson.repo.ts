@@ -77,27 +77,27 @@ export class LessonRepository {
   }
 
   async create(data: LessonCreateInput): Promise<LessonWithRelations> {
-    return (await this.prisma.lesson.create({
+    return await this.prisma.lesson.create({
       data,
       include: this.includeRelations,
-    })) as any
+    })
   }
 
   async findOne(where: LessonWhereUniqueInput): Promise<LessonWithRelations | null> {
-    return (await this.prisma.lesson.findUnique({
+    return await this.prisma.lesson.findUnique({
       where: where as any,
       include: this.includeRelations,
-    })) as any
+    })
   }
 
   async update(params: { where: LessonWhereUniqueInput; data: LessonUpdateInput }): Promise<LessonWithRelations> {
     const { where, data } = params
 
-    return (await this.prisma.lesson.update({
+    return await this.prisma.lesson.update({
       where: where as any,
       data,
       include: this.includeRelations,
-    })) as any
+    })
   }
 
   async delete(where: LessonWhereUniqueInput): Promise<Lesson> {

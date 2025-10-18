@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import { Prisma } from '@prisma/client'
 
 export const OptionSchema = z.object({
   id: z.number().int().positive(),
@@ -64,8 +63,16 @@ export type OptionWithQuestion = Option & {
   }
 }
 
-export type OptionCreateInput = Prisma.OptionCreateInput
-export type OptionUpdateInput = Prisma.OptionUpdateInput
-export type OptionWhereUniqueInput = Prisma.OptionWhereUniqueInput
-export type OptionWhereInput = Prisma.OptionWhereInput
-export type OptionOrderByInput = Prisma.OptionOrderByWithRelationInput
+// Import custom types instead of Prisma types
+export type {
+  OptionCreateData as OptionCreateInput,
+  OptionUpdateData as OptionUpdateInput,
+  OptionWhereUniqueInput,
+  OptionWhereInput,
+} from 'src/shared/types/question.types'
+
+export type OptionOrderByInput = {
+  id?: 'asc' | 'desc'
+  questionId?: 'asc' | 'desc'
+  order?: 'asc' | 'desc'
+}

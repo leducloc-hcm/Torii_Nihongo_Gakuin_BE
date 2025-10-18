@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, BadRequestException, ConflictException }
 import { OptionRepository } from './option.repo'
 import { CreateOptionDTO, UpdateOptionDTO, QueryOptionDTO, BulkCreateOptionsDTO, ReorderOptionsDTO } from './option.dto'
 import { OptionWhereInput, OptionOrderByInput } from './option.model'
-import { Option } from '@prisma/client'
+import { OptionType } from 'src/shared/types/question.types'
 
 @Injectable()
 export class OptionService {
@@ -31,7 +31,7 @@ export class OptionService {
     }
 
     return this.optionRepository.create({
-      question: { connect: { id: questionId } },
+      questionId,
       content: createDto.content,
       isCorrect: createDto.isCorrect,
       order,
@@ -111,7 +111,7 @@ export class OptionService {
     return this.optionRepository.update({ id }, updateDto)
   }
 
-  async remove(id: number): Promise<Option> {
+  async remove(id: number): Promise<OptionType> {
     // Check if option exists
     const existingOption = await this.optionRepository.findUnique({ id }, false)
     if (!existingOption) {

@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
-import { JLPTLevel, QuestionType, Difficulty } from '@prisma/client'
+import { JLPTLevel, QuestionType, Difficulty } from 'src/shared/constants/enum.constant'
+import type { JLPTLevelType, QuestionTypeType, DifficultyType } from 'src/shared/constants/enum.constant'
 
 export class CreateTestAnswerDto {
   @ApiProperty({
@@ -101,21 +102,21 @@ export class TestAnswerQueryDto {
     example: 'VOCAB',
     description: 'Filter by question type',
   })
-  questionType?: QuestionType
+  questionType?: QuestionTypeType
 
   @ApiPropertyOptional({
     enum: JLPTLevel,
     example: 'N3',
     description: 'Filter by JLPT level',
   })
-  level?: JLPTLevel
+  level?: JLPTLevelType
 
   @ApiPropertyOptional({
     enum: Difficulty,
     example: 'MEDIUM',
     description: 'Filter by question difficulty',
   })
-  difficulty?: Difficulty
+  difficulty?: DifficultyType
 
   @ApiPropertyOptional({
     example: true,

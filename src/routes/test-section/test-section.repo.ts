@@ -15,21 +15,20 @@ import {
 export class TestSectionRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  // ===== Basic CRUD Operations =====
   async create(data: CreateTestSectionInput): Promise<TestSection> {
-    return this.prisma.testSection.create({
+    return await this.prisma.testSection.create({
       data,
     })
   }
 
   async findById(id: number): Promise<TestSection | null> {
-    return this.prisma.testSection.findUnique({
+    return await this.prisma.testSection.findUnique({
       where: { id },
     })
   }
 
   async findByIdWithItems(id: number): Promise<TestSectionWithItems | null> {
-    return this.prisma.testSection.findUnique({
+    return await this.prisma.testSection.findUnique({
       where: { id },
       include: {
         items: {
@@ -47,7 +46,7 @@ export class TestSectionRepository {
   }
 
   async findByIdWithTest(id: number): Promise<TestSectionWithTest | null> {
-    return this.prisma.testSection.findUnique({
+    return await this.prisma.testSection.findUnique({
       where: { id },
       include: {
         test: {
@@ -67,14 +66,14 @@ export class TestSectionRepository {
   }
 
   async update(id: number, data: UpdateTestSectionInput): Promise<TestSection> {
-    return this.prisma.testSection.update({
+    return await this.prisma.testSection.update({
       where: { id },
       data,
     })
   }
 
   async delete(id: number): Promise<TestSection> {
-    return this.prisma.testSection.delete({
+    return await this.prisma.testSection.delete({
       where: { id },
     })
   }
@@ -158,7 +157,7 @@ export class TestSectionRepository {
   }
 
   async findByTestIdWithItems(testId: number): Promise<TestSectionWithItems[]> {
-    return this.prisma.testSection.findMany({
+    return await this.prisma.testSection.findMany({
       where: { testId },
       orderBy: { order: 'asc' },
       include: {
@@ -195,7 +194,7 @@ export class TestSectionRepository {
   }
 
   async bulkDelete(ids: number[]): Promise<{ count: number }> {
-    return this.prisma.testSection.deleteMany({
+    return await this.prisma.testSection.deleteMany({
       where: {
         id: {
           in: ids,

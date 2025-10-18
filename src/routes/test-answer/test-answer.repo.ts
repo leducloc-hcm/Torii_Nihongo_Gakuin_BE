@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../../shared/services/prisma.service'
-import { JLPTLevel, QuestionType, Difficulty } from '@prisma/client'
+import { JLPTLevelType, QuestionTypeType, DifficultyType } from 'src/shared/constants/enum.constant'
 import {
   TestAnswer,
   TestAnswerWithDetails,

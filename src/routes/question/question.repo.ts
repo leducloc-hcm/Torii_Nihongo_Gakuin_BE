@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from 'src/shared/services/prisma.service'
-import { JLPTLevel, QuestionType, Difficulty, Question } from '@prisma/client'
+import { JLPTLevelType, QuestionTypeType, DifficultyType } from 'src/shared/constants/enum.constant'
+import { QuestionType } from 'src/shared/types/question.types'
 import {
   QuestionCreateInput,
   QuestionUpdateInput,
@@ -30,9 +31,9 @@ export class QuestionRepository {
     },
   } as const
 
-  async create(data: QuestionCreateInput): Promise<any> {
+  async create(data: QuestionCreateInput): Promise<QuestionType> {
     return await this.prisma.question.create({
-      data,
+      data: data as any,
       include: this.includeOptions,
     })
   }
@@ -119,22 +120,22 @@ export class QuestionRepository {
     })
   }
 
-  async findUnique(where: QuestionWhereUniqueInput, includeOptions = true): Promise<any | null> {
+  async findUnique(where: QuestionWhereUniqueInput, includeOptions = true): Promise<QuestionType | null> {
     if (includeOptions) {
       return await this.prisma.question.findUnique({
-        where,
+        where: where as any,
         include: this.includeOptions,
       })
     }
 
     return await this.prisma.question.findUnique({
-      where,
+      where: where as any,
     })
   }
 
-  async update(where: QuestionWhereUniqueInput, data: any): Promise<any> {
+  async update(where: QuestionWhereUniqueInput, data: any): Promise<QuestionType> {
     return await this.prisma.question.update({
-      where,
+      where: where as any,
       data,
       include: this.includeOptions,
     })
@@ -185,10 +186,10 @@ export class QuestionRepository {
     })
   }
 
-  async delete(where: QuestionWhereUniqueInput): Promise<Question> {
+  async delete(where: QuestionWhereUniqueInput): Promise<QuestionType> {
     // Options will be deleted automatically due to cascade
     return await this.prisma.question.delete({
-      where,
+      where: where as any,
     })
   }
 

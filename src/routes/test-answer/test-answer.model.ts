@@ -1,10 +1,10 @@
 import { z } from 'zod'
-import { TestAnswer } from '@prisma/client'
+import { TestAnswerType } from 'src/shared/types/question.types'
 
 // ===== Base TestAnswer Types =====
-export type { TestAnswer } from '@prisma/client'
+export type { TestAnswerType as TestAnswer } from 'src/shared/types/question.types'
 
-export interface TestAnswerWithDetails extends TestAnswer {
+export interface TestAnswerWithDetails extends TestAnswerType {
   attempt: {
     id: number
     userId: number
@@ -25,7 +25,7 @@ export interface TestAnswerWithDetails extends TestAnswer {
   }
 }
 
-export interface TestAnswerWithQuestion extends TestAnswer {
+export interface TestAnswerWithQuestion extends TestAnswerType {
   question: {
     id: number
     type: string

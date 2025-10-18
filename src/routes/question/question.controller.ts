@@ -19,7 +19,7 @@ import { AuthType } from 'src/shared/constants/auth.constant'
 import { Roles } from 'src/shared/decorators/roles.decorator'
 import { RolesGuard } from 'src/shared/guards/roles.guard'
 import { RoleName } from 'src/shared/constants/role.constant'
-import { JLPTLevel, QuestionType, Difficulty } from '@prisma/client'
+import type { JLPTLevelType, QuestionTypeType, DifficultyType } from 'src/shared/constants/enum.constant'
 
 @Controller('questions')
 @UseGuards(RolesGuard)
@@ -62,7 +62,7 @@ export class QuestionController {
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Admin, RoleName.Lecturer)
   @HttpCode(HttpStatus.OK)
-  async findByType(@Param('type') type: QuestionType, @Query() queryDto: Omit<QueryQuestionDTO, 'type'>) {
+  async findByType(@Param('type') type: QuestionTypeType, @Query() queryDto: Omit<QueryQuestionDTO, 'type'>) {
     return this.questionService.findByType(type, queryDto)
   }
 
@@ -70,7 +70,7 @@ export class QuestionController {
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Admin, RoleName.Lecturer)
   @HttpCode(HttpStatus.OK)
-  async findByLevel(@Param('level') level: JLPTLevel, @Query() queryDto: Omit<QueryQuestionDTO, 'level'>) {
+  async findByLevel(@Param('level') level: JLPTLevelType, @Query() queryDto: Omit<QueryQuestionDTO, 'level'>) {
     return this.questionService.findByLevel(level, queryDto)
   }
 
@@ -79,7 +79,7 @@ export class QuestionController {
   @Roles(RoleName.Staff, RoleName.Admin, RoleName.Lecturer)
   @HttpCode(HttpStatus.OK)
   async findByDifficulty(
-    @Param('difficulty') difficulty: Difficulty,
+    @Param('difficulty') difficulty: DifficultyType,
     @Query() queryDto: Omit<QueryQuestionDTO, 'difficulty'>,
   ) {
     return this.questionService.findByDifficulty(difficulty, queryDto)

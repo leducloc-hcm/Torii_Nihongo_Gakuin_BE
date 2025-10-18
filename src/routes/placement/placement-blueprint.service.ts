@@ -7,13 +7,14 @@ import {
   ActivateBlueprintDTO,
 } from './placement-blueprint.dto'
 import { PlacementBlueprintWhereInput, PlacementBlueprintOrderByInput } from './placement-blueprint.model'
-import { JLPTLevel, PlacementBlueprint } from '@prisma/client'
+import { JLPTLevelType } from 'src/shared/constants/enum.constant'
+import { PlacementBlueprintType } from 'src/shared/types/placement.types'
 
 @Injectable()
 export class PlacementBlueprintService {
   constructor(private readonly placementBlueprintRepository: PlacementBlueprintRepository) {}
 
-  async create(createDto: CreatePlacementBlueprintDTO): Promise<PlacementBlueprint> {
+  async create(createDto: CreatePlacementBlueprintDTO): Promise<PlacementBlueprintType> {
     const { level, totalQuestions, vocabKanji, grammar, synonym, orderSentence, readingShort, readingMedium } =
       createDto
 
@@ -78,12 +79,12 @@ export class PlacementBlueprintService {
     }
   }
 
-  async findByLevel(level: JLPTLevel, queryDto: Omit<QueryPlacementBlueprintDTO, 'level'>) {
+  async findByLevel(level: JLPTLevelType, queryDto: Omit<QueryPlacementBlueprintDTO, 'level'>) {
     const queryWithLevel = { ...queryDto, level }
     return this.findAll(queryWithLevel)
   }
 
-  async findOne(id: number): Promise<PlacementBlueprint> {
+  async findOne(id: number): Promise<PlacementBlueprintType> {
     const blueprint = await this.placementBlueprintRepository.findUnique({ id })
     if (!blueprint) {
       throw new NotFoundException(`PlacementBlueprint with ID ${id} not found`)
@@ -91,7 +92,7 @@ export class PlacementBlueprintService {
     return blueprint
   }
 
-  async update(id: number, updateDto: UpdatePlacementBlueprintDTO): Promise<PlacementBlueprint> {
+  async update(id: number, updateDto: UpdatePlacementBlueprintDTO): Promise<PlacementBlueprintType> {
     const exists = await this.placementBlueprintRepository.checkExists(id)
     if (!exists) {
       throw new NotFoundException(`PlacementBlueprint with ID ${id} not found`)
@@ -121,7 +122,7 @@ export class PlacementBlueprintService {
     return this.placementBlueprintRepository.update({ id }, updateDto)
   }
 
-  async activate(id: number, activateDto: ActivateBlueprintDTO): Promise<PlacementBlueprint> {
+  async activate(id: number, activateDto: ActivateBlueprintDTO): Promise<PlacementBlueprintType> {
     const exists = await this.placementBlueprintRepository.checkExists(id)
     if (!exists) {
       throw new NotFoundException(`PlacementBlueprint with ID ${id} not found`)
@@ -130,7 +131,7 @@ export class PlacementBlueprintService {
     return this.placementBlueprintRepository.activate(id, activateDto.activate)
   }
 
-  async remove(id: number): Promise<PlacementBlueprint> {
+  async remove(id: number): Promise<PlacementBlueprintType> {
     const exists = await this.placementBlueprintRepository.checkExists(id)
     if (!exists) {
       throw new NotFoundException(`PlacementBlueprint with ID ${id} not found`)
@@ -144,7 +145,7 @@ export class PlacementBlueprintService {
     return this.placementBlueprintRepository.delete({ id })
   }
 
-  async findActiveByLevel(level: JLPTLevel): Promise<PlacementBlueprint | null> {
+  async findActiveByLevel(level: JLPTLevelType): Promise<PlacementBlueprintType | null> {
     return this.placementBlueprintRepository.findActiveByLevel(level)
   }
 }

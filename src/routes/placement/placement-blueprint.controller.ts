@@ -25,7 +25,7 @@ import { AuthType } from 'src/shared/constants/auth.constant'
 import { Roles } from 'src/shared/decorators/roles.decorator'
 import { RolesGuard } from 'src/shared/guards/roles.guard'
 import { RoleName } from 'src/shared/constants/role.constant'
-import { JLPTLevel } from '@prisma/client'
+import type { JLPTLevelType } from 'src/shared/constants/enum.constant'
 
 @Controller('placement/blueprints')
 @UseGuards(RolesGuard)
@@ -52,7 +52,10 @@ export class PlacementBlueprintController {
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Admin, RoleName.Lecturer)
   @HttpCode(HttpStatus.OK)
-  async findByLevel(@Param('level') level: JLPTLevel, @Query() queryDto: Omit<QueryPlacementBlueprintDTO, 'level'>) {
+  async findByLevel(
+    @Param('level') level: JLPTLevelType,
+    @Query() queryDto: Omit<QueryPlacementBlueprintDTO, 'level'>,
+  ) {
     return this.placementBlueprintService.findByLevel(level, queryDto)
   }
 
@@ -60,7 +63,7 @@ export class PlacementBlueprintController {
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Admin, RoleName.Lecturer)
   @HttpCode(HttpStatus.OK)
-  async findActiveByLevel(@Param('level') level: JLPTLevel) {
+  async findActiveByLevel(@Param('level') level: JLPTLevelType) {
     return this.placementBlueprintService.findActiveByLevel(level)
   }
 

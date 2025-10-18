@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from 'src/shared/services/prisma.service'
-import { Option } from '@prisma/client'
+import { OptionType } from 'src/shared/types/question.types'
 import {
   OptionCreateInput,
   OptionUpdateInput,
@@ -52,22 +52,22 @@ export class OptionRepository {
 
   async findUnique(where: OptionWhereUniqueInput, includeQuestion = true): Promise<any | null> {
     return await this.prisma.option.findUnique({
-      where,
+      where: where as any,
       include: includeQuestion ? this.includeQuestion : undefined,
     })
   }
 
   async update(where: OptionWhereUniqueInput, data: any): Promise<any> {
     return await this.prisma.option.update({
-      where,
+      where: where as any,
       data,
       include: this.includeQuestion,
     })
   }
 
-  async delete(where: OptionWhereUniqueInput): Promise<Option> {
+  async delete(where: OptionWhereUniqueInput): Promise<OptionType> {
     return await this.prisma.option.delete({
-      where,
+      where: where as any,
     })
   }
 
@@ -75,7 +75,7 @@ export class OptionRepository {
     return await this.prisma.option.count({ where })
   }
 
-  async findByQuestionId(questionId: number): Promise<Option[]> {
+  async findByQuestionId(questionId: number): Promise<OptionType[]> {
     return await this.prisma.option.findMany({
       where: { questionId },
       orderBy: { order: 'asc' },
@@ -184,7 +184,7 @@ export class OptionRepository {
   async getOptionsByQuestion(questionId: number): Promise<{
     total: number
     correct: number
-    options: Option[]
+    options: OptionType[]
   }> {
     const [total, options] = await Promise.all([this.count({ questionId }), this.findByQuestionId(questionId)])
 

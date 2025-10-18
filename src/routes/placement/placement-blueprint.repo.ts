@@ -1,20 +1,21 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from 'src/shared/services/prisma.service'
-import { JLPTLevel, PlacementBlueprint } from '@prisma/client'
+import { JLPTLevelType } from 'src/shared/constants/enum.constant'
+import { PlacementBlueprintType } from 'src/shared/types/placement.types'
 import {
-  PlacementBlueprintCreateInput,
-  PlacementBlueprintUpdateInput,
-  PlacementBlueprintWhereUniqueInput,
-  PlacementBlueprintWhereInput,
+  PlacementBlueprintCreateData,
   PlacementBlueprintOrderByInput,
-} from './placement-blueprint.model'
+  PlacementBlueprintUpdateData,
+  PlacementBlueprintWhereInput,
+  PlacementBlueprintWhereUniqueInput,
+} from 'src/routes/placement/placement-blueprint.model'
 
 @Injectable()
 export class PlacementBlueprintRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(data: PlacementBlueprintCreateInput): Promise<PlacementBlueprint> {
-    return this.prisma.placementBlueprint.create({
+  async create(data: PlacementBlueprintCreateData): Promise<PlacementBlueprintType> {
+    return await this.prisma.placementBlueprint.create({
       data,
     })
   }
@@ -24,7 +25,7 @@ export class PlacementBlueprintRepository {
     take?: number
     where?: PlacementBlueprintWhereInput
     orderBy?: PlacementBlueprintOrderByInput
-  }): Promise<PlacementBlueprint[]> {
+  }): Promise<PlacementBlueprintType[]> {
     const { skip, take, where, orderBy } = params
 
     const findManyOptions: any = {}
@@ -45,37 +46,37 @@ export class PlacementBlueprintRepository {
       findManyOptions.orderBy = orderBy
     }
 
-    return this.prisma.placementBlueprint.findMany(findManyOptions)
+    return await this.prisma.placementBlueprint.findMany(findManyOptions)
   }
 
-  async findUnique(where: PlacementBlueprintWhereUniqueInput): Promise<PlacementBlueprint | null> {
-    return this.prisma.placementBlueprint.findUnique({
-      where,
+  async findUnique(where: PlacementBlueprintWhereUniqueInput): Promise<PlacementBlueprintType | null> {
+    return await this.prisma.placementBlueprint.findUnique({
+      where: where as any,
     })
   }
 
   async update(
     where: PlacementBlueprintWhereUniqueInput,
-    data: PlacementBlueprintUpdateInput,
-  ): Promise<PlacementBlueprint> {
-    return this.prisma.placementBlueprint.update({
-      where,
+    data: PlacementBlueprintUpdateData,
+  ): Promise<PlacementBlueprintType> {
+    return await this.prisma.placementBlueprint.update({
+      where: where as any,
       data,
     })
   }
 
-  async delete(where: PlacementBlueprintWhereUniqueInput): Promise<PlacementBlueprint> {
-    return this.prisma.placementBlueprint.delete({
-      where,
+  async delete(where: PlacementBlueprintWhereUniqueInput): Promise<PlacementBlueprintType> {
+    return await this.prisma.placementBlueprint.delete({
+      where: where as any,
     })
   }
 
   async count(where?: PlacementBlueprintWhereInput): Promise<number> {
-    return this.prisma.placementBlueprint.count({ where })
+    return await this.prisma.placementBlueprint.count({ where })
   }
 
-  async findActiveByLevel(level: JLPTLevel): Promise<PlacementBlueprint | null> {
-    return this.prisma.placementBlueprint.findFirst({
+  async findActiveByLevel(level: JLPTLevelType): Promise<PlacementBlueprintType | null> {
+    return await this.prisma.placementBlueprint.findFirst({
       where: {
         level,
         active: true,
@@ -83,7 +84,7 @@ export class PlacementBlueprintRepository {
     })
   }
 
-  async deactivateAllByLevel(level: JLPTLevel): Promise<void> {
+  async deactivateAllByLevel(level: JLPTLevelType): Promise<void> {
     await this.prisma.placementBlueprint.updateMany({
       where: {
         level,
@@ -95,7 +96,7 @@ export class PlacementBlueprintRepository {
     })
   }
 
-  async activate(id: number, activate: boolean = true): Promise<PlacementBlueprint> {
+  async activate(id: number, activate: boolean = true): Promise<PlacementBlueprintType> {
     const blueprint = await this.prisma.placementBlueprint.findUnique({
       where: { id },
       select: { level: true },
@@ -105,7 +106,7 @@ export class PlacementBlueprintRepository {
       throw new Error('Blueprint not found')
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    return await this.prisma.$transaction(async (tx) => {
       if (activate) {
         await tx.placementBlueprint.updateMany({
           where: {
@@ -118,7 +119,7 @@ export class PlacementBlueprintRepository {
         })
       }
 
-      return tx.placementBlueprint.update({
+      return await tx.placementBlueprint.update({
         where: { id },
         data: { active: activate },
       })
@@ -129,6 +130,6 @@ export class PlacementBlueprintRepository {
     const count = await this.prisma.placementBlueprint.count({
       where: { id },
     })
-    return count > 0
+    return (await count) > 0
   }
 }
