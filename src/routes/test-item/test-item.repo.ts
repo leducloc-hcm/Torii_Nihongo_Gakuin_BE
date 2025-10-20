@@ -30,8 +30,22 @@ export class TestItemRepository {
       data.order = maxOrder + 1
     }
 
+    // Create the data object with proper typing
+    const createData: any = {
+      sectionId: data.sectionId,
+      order: data.order,
+    }
+
+    if (data.questionId) {
+      createData.questionId = data.questionId
+    }
+
+    if (data.questionGroupId) {
+      createData.questionGroupId = data.questionGroupId
+    }
+
     return this.prisma.testItem.create({
-      data,
+      data: createData,
     })
   }
 
@@ -174,7 +188,24 @@ export class TestItemRepository {
     }
 
     // Use transaction to create all items
-    return this.prisma.$transaction(itemsToCreate.map((item) => this.prisma.testItem.create({ data: item })))
+    return this.prisma.$transaction(
+      itemsToCreate.map((item) => {
+        const createData: any = {
+          sectionId: item.sectionId,
+          order: item.order,
+        }
+
+        if (item.questionId) {
+          createData.questionId = item.questionId
+        }
+
+        if (item.questionGroupId) {
+          createData.questionGroupId = item.questionGroupId
+        }
+
+        return this.prisma.testItem.create({ data: createData })
+      }),
+    )
   }
 
   async bulkDelete(data: BulkDeleteTestItemsInput): Promise<{ count: number }> {
@@ -219,13 +250,20 @@ export class TestItemRepository {
     }
 
     // Create new items in target section
-    const newItems = sourceItems.map((item, index) => ({
-      sectionId: targetSectionId,
-      questionId: item.questionId,
-      order: maintainOrder ? startOrder + index : index,
-    }))
+    return this.prisma.$transaction(
+      sourceItems.map((item, index) => {
+        const createData: any = {
+          sectionId: targetSectionId,
+          order: maintainOrder ? startOrder + index : index,
+        }
 
-    return this.prisma.$transaction(newItems.map((item) => this.prisma.testItem.create({ data: item })))
+        if (item.questionId) {
+          createData.questionId = item.questionId
+        }
+
+        return this.prisma.testItem.create({ data: createData })
+      }),
+    )
   }
 
   async moveItems(itemIds: number[], data: MoveTestItemsInput): Promise<TestItem[]> {
@@ -322,7 +360,7 @@ export class TestItemRepository {
 
   // ===== Helper Methods =====
 
-  private async getMaxOrderInSection(sectionId: number): Promise<number> {
+  async getMaxOrderInSection(sectionId: number): Promise<number> {
     const result = await this.prisma.testItem.aggregate({
       where: { sectionId },
       _max: { order: true },
@@ -369,5 +407,21 @@ export class TestItemRepository {
     return await this.prisma.testItem.count({
       where: { sectionId },
     })
+  }
+
+  async questionGroupExists(questionGroupId: number): Promise<boolean> {
+    const count = await this.prisma.questionGroup.count({
+      where: { id: questionGroupId },
+    })
+    return count > 0
+  }
+
+  async getQuestionsFromGroup(questionGroupId: number): Promise<{ id: number }[]> {
+    const questions = await this.prisma.question.findMany({
+      where: { questionGroupId },
+      select: { id: true },
+      orderBy: { id: 'asc' },
+    })
+    return questions
   }
 }

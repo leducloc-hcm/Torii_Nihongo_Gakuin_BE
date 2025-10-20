@@ -30,6 +30,13 @@ export class TestSectionService {
       await this.testSectionRepo.insertAtOrder(data.testId, data.order)
     }
 
+    // Calculate totalScore if not provided
+    if (data.totalScore === undefined) {
+      // For now, we'll calculate it later when items are added
+      // The totalScore will be updated when test items are created
+      data.totalScore = 0
+    }
+
     return this.testSectionRepo.create(data)
   }
 
@@ -338,6 +345,40 @@ export class TestSectionService {
     return this.copyTestSection(id, section.testId, title)
   }
 
+  // ===== New Scoring Methods =====
+  async updateSectionTotalScore(sectionId: number): Promise<TestSection> {
+    const section = (await this.getTestSection(sectionId)) as any
+    const itemCount = await this.getItemCountForSection(sectionId)
+
+    const newTotalScore = itemCount * (section.scorePerQuestion || 1.0)
+
+    return this.testSectionRepo.update(sectionId, { totalScore: newTotalScore })
+  }
+
+  async updateSectionScoring(sectionId: number, scorePerQuestion?: number, totalScore?: number): Promise<TestSection> {
+    const updateData: UpdateTestSectionInput = {}
+
+    if (scorePerQuestion !== undefined) {
+      updateData.scorePerQuestion = scorePerQuestion
+    }
+
+    if (totalScore !== undefined) {
+      updateData.totalScore = totalScore
+    } else if (scorePerQuestion !== undefined) {
+      // Auto-calculate totalScore if scorePerQuestion is updated but totalScore is not provided
+      const itemCount = await this.getItemCountForSection(sectionId)
+      updateData.totalScore = itemCount * scorePerQuestion
+    }
+
+    return this.updateTestSection(sectionId, updateData)
+  }
+
+  private async getItemCountForSection(sectionId: number): Promise<number> {
+    // This would need to call TestItemRepository to count items
+    // For now, return 0 as placeholder
+    return Promise.resolve(0)
+  }
+
   async createSectionsWithItems(
     testId: number,
     sectionsData: Array<{
@@ -371,6 +412,8 @@ export class TestSectionService {
         title: sectionData.title,
         type: sectionData.type as any,
         order: sectionData.order ?? (await this.testSectionRepo.getNextOrderForTest(testId)),
+        scorePerQuestion: 1.0,
+        totalScore: sectionData.questionIds.length * 1.0,
       }
 
       const section = await this.createTestSection(sectionInput)

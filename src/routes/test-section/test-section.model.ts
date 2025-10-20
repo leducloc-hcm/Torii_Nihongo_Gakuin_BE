@@ -24,6 +24,8 @@ export const CreateTestSectionSchema = z.object({
   title: z.string().min(1).max(255),
   type: QuestionTypeSchema,
   order: z.number().int().min(0).default(0),
+  scorePerQuestion: z.number().min(0).default(1.0),
+  totalScore: z.number().min(0).optional(),
 })
 
 export const UpdateTestSectionSchema = CreateTestSectionSchema.partial().omit({ testId: true })

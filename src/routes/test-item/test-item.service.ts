@@ -44,13 +44,18 @@ export class TestItemService {
       throw new NotFoundException(TEST_ITEM_ERRORS.SECTION_NOT_FOUND)
     }
 
-    // Validate question exists
-    if (!(await this.testItemRepo.questionExists(data.questionId))) {
+    // Validate question exists if questionId is provided
+    if (data.questionId && !(await this.testItemRepo.questionExists(data.questionId))) {
       throw new NotFoundException(TEST_ITEM_ERRORS.QUESTION_NOT_FOUND)
     }
 
+    // Validate question group exists if questionGroupId is provided
+    if (data.questionGroupId && !(await this.testItemRepo.questionGroupExists(data.questionGroupId))) {
+      throw new NotFoundException('Question group not found')
+    }
+
     // Check for duplicate question in section
-    if (await this.testItemRepo.isQuestionInSection(data.questionId, data.sectionId)) {
+    if (data.questionId && (await this.testItemRepo.isQuestionInSection(data.questionId, data.sectionId))) {
       throw new ConflictException(TEST_ITEM_ERRORS.DUPLICATE_QUESTION)
     }
 
@@ -154,30 +159,42 @@ export class TestItemService {
       }
     }
 
-    // Validate all questions exist
-    const questionIds = [...new Set(items.map((item) => item.questionId))]
+    // Validate all questions exist (for items that have questionId)
+    const questionIds = [...new Set(items.filter((item) => item.questionId).map((item) => item.questionId!))]
     for (const questionId of questionIds) {
       if (!(await this.testItemRepo.questionExists(questionId))) {
         throw new NotFoundException(`Question ${questionId} not found`)
       }
     }
 
+    // Validate all question groups exist (for items that have questionGroupId)
+    const questionGroupIds = [
+      ...new Set(items.filter((item) => item.questionGroupId).map((item) => item.questionGroupId!)),
+    ]
+    for (const questionGroupId of questionGroupIds) {
+      if (!(await this.testItemRepo.questionGroupExists(questionGroupId))) {
+        throw new NotFoundException(`Question group ${questionGroupId} not found`)
+      }
+    }
+
     // Check for duplicate questions within same sections
     const sectionQuestions = new Map<number, Set<number>>()
     for (const item of items) {
-      if (!sectionQuestions.has(item.sectionId)) {
-        sectionQuestions.set(item.sectionId, new Set())
-      }
+      if (item.questionId) {
+        if (!sectionQuestions.has(item.sectionId)) {
+          sectionQuestions.set(item.sectionId, new Set())
+        }
 
-      const questions = sectionQuestions.get(item.sectionId)!
-      if (questions.has(item.questionId)) {
-        throw new ConflictException(`Duplicate question ${item.questionId} in section ${item.sectionId}`)
-      }
-      questions.add(item.questionId)
+        const questions = sectionQuestions.get(item.sectionId)!
+        if (questions.has(item.questionId)) {
+          throw new ConflictException(`Duplicate question ${item.questionId} in section ${item.sectionId}`)
+        }
+        questions.add(item.questionId)
 
-      // Also check existing items in database
-      if (await this.testItemRepo.isQuestionInSection(item.questionId, item.sectionId)) {
-        throw new ConflictException(`Question ${item.questionId} already exists in section ${item.sectionId}`)
+        // Also check existing items in database
+        if (await this.testItemRepo.isQuestionInSection(item.questionId, item.sectionId)) {
+          throw new ConflictException(`Question ${item.questionId} already exists in section ${item.sectionId}`)
+        }
       }
     }
 
@@ -359,7 +376,7 @@ export class TestItemService {
     }
 
     // Get starting order
-    const maxOrder = await this.testItemRepo['getMaxOrderInSection'](sectionId)
+    const maxOrder = await this.testItemRepo.getMaxOrderInSection(sectionId)
     const nextOrder = maxOrder + 1
 
     // Create items
@@ -370,5 +387,79 @@ export class TestItemService {
     }))
 
     return this.testItemRepo.bulkCreate({ items })
+  }
+
+  async createItemsFromQuestionGroups(
+    sectionId: number,
+    questionGroupIds: number[],
+    maintainOrder: boolean = true,
+  ): Promise<TestItem[]> {
+    if (questionGroupIds.length === 0) {
+      throw new BadRequestException('At least one question group ID is required')
+    }
+
+    if (questionGroupIds.length > 20) {
+      throw new BadRequestException('Maximum 20 question groups can be added at once')
+    }
+
+    // Validate section exists
+    if (!(await this.testItemRepo.sectionExists(sectionId))) {
+      throw new NotFoundException(TEST_ITEM_ERRORS.SECTION_NOT_FOUND)
+    }
+
+    // Validate all question groups exist
+    for (const questionGroupId of questionGroupIds) {
+      if (!(await this.testItemRepo.questionGroupExists(questionGroupId))) {
+        throw new NotFoundException(`Question group ${questionGroupId} not found`)
+      }
+    }
+
+    // Get starting order
+    const maxOrder = await this.testItemRepo.getMaxOrderInSection(sectionId)
+    const nextOrder = maxOrder + 1
+
+    // Create items
+    const items = questionGroupIds.map((questionGroupId, index) => ({
+      sectionId,
+      questionGroupId,
+      order: maintainOrder ? nextOrder + index : nextOrder,
+    }))
+
+    return this.testItemRepo.bulkCreate({ items })
+  }
+
+  async createItemFromQuestionGroup(
+    sectionId: number,
+    questionGroupId: number,
+    addIndividualQuestions: boolean = false,
+    order?: number,
+  ): Promise<TestItem[]> {
+    // Validate section exists
+    if (!(await this.testItemRepo.sectionExists(sectionId))) {
+      throw new NotFoundException(TEST_ITEM_ERRORS.SECTION_NOT_FOUND)
+    }
+
+    // Validate question group exists
+    if (!(await this.testItemRepo.questionGroupExists(questionGroupId))) {
+      throw new NotFoundException('Question group not found')
+    }
+
+    if (addIndividualQuestions) {
+      // Get all questions from the group and add them individually
+      const questions = await this.testItemRepo.getQuestionsFromGroup(questionGroupId)
+      const questionIds = questions.map((q) => q.id)
+      return this.createItemsForSection(sectionId, questionIds, true)
+    } else {
+      // Add the question group as a single item
+      const itemOrder = order ?? (await this.testItemRepo.getMaxOrderInSection(sectionId)) + 1
+
+      const item = await this.testItemRepo.create({
+        sectionId,
+        questionGroupId,
+        order: itemOrder,
+      })
+
+      return [item]
+    }
   }
 }
