@@ -409,4 +409,27 @@ export class AuthService {
   async getAllLecturers() {
     return this.authRepository.findAllLecturers()
   }
+  async getAllUsers() {
+    return this.authRepository.findAllUsers()
+  }
+  async disableUserAccount(userId: number) {
+    // Kiểm tra user có tồn tại không
+    const user = await this.sharedUserRepository.findUnique({ id: userId })
+    if (!user) {
+      throw EmailNotFoundException
+    }
+    // Vô hiệu hóa tài khoản
+    await this.sharedUserRepository.update({ id: userId }, { status: VerifyStatus.BANNED } as any)
+    return { message: 'Vô hiệu hóa tài khoản thành công' }
+  }
+  async enableUserAccount(userId: number) {
+    // Kiểm tra user có tồn tại không
+    const user = await this.sharedUserRepository.findUnique({ id: userId })
+    if (!user) {
+      throw EmailNotFoundException
+    }
+    // Kích hoạt tài khoản
+    await this.sharedUserRepository.update({ id: userId }, { status: VerifyStatus.VERIFIED } as any)
+    return { message: 'Kích hoạt tài khoản thành công' }
+  }
 }
