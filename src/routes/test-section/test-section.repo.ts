@@ -247,8 +247,10 @@ export class TestSectionRepository {
     const itemsByType: Record<string, number> = {}
 
     section.items.forEach((item) => {
-      const type = item.question.type
-      itemsByType[type] = (itemsByType[type] || 0) + 1
+      if (item.question) {
+        const type = item.question.type
+        itemsByType[type] = (itemsByType[type] || 0) + 1
+      }
     })
 
     return {
