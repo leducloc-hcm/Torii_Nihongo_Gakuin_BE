@@ -14,8 +14,7 @@ import {
 } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger'
 import { RolesGuard } from '../../shared/guards/roles.guard'
-import { Roles } from '../../shared/decorators/roles.decorator'
-import { Role } from '@prisma/client'
+
 import {
   CreateOnlineClassDto,
   UpdateOnlineClassDto,
@@ -26,7 +25,10 @@ import {
 } from './online-class.dto'
 import { OnlineClassService } from './online-class.service'
 import { ActiveUser } from 'src/shared/decorators/active-user.decorator'
-import { IsPublic } from 'src/shared/decorators/auth.decorator'
+import { IsPublic, Auth } from 'src/shared/decorators/auth.decorator'
+import { RoleName } from 'src/shared/constants/role.constant'
+import { Roles } from 'src/shared/decorators/roles.decorator'
+import { AuthType } from 'src/shared/constants/auth.constant'
 
 @ApiTags('Online Classes')
 @Controller('online-classes')
@@ -36,8 +38,8 @@ export class OnlineClassController {
   constructor(private readonly onlineClassService: OnlineClassService) {}
 
   @Post()
-  @UseGuards(RolesGuard)
-  @Roles(Role.LECTURER, Role.STAFF)
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Admin, RoleName.Staff, RoleName.Lecturer)
   @ApiOperation({ summary: 'Create a new online class' })
   @ApiResponse({ status: 201, description: 'Online class created successfully' })
   async createOnlineClass(
@@ -71,6 +73,8 @@ export class OnlineClassController {
   @Get()
   @ApiOperation({ summary: 'Get list of online classes' })
   @ApiResponse({ status: 200, description: 'Online classes retrieved successfully' })
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Admin, RoleName.Staff, RoleName.Lecturer)
   async getOnlineClasses(@Query() query: ClassListQueryDto, @Request() req: any) {
     try {
       const userId = req.user.id
@@ -107,6 +111,7 @@ export class OnlineClassController {
   @Get(':id')
   @ApiOperation({ summary: 'Get online class details' })
   @ApiResponse({ status: 200, description: 'Online class details retrieved successfully' })
+  @Auth([AuthType.Bearer])
   async getOnlineClassDetails(@Param('id') classId: string, @Request() req: any) {
     try {
       const userId = req.user.id
@@ -142,8 +147,8 @@ export class OnlineClassController {
   }
 
   @Put(':id')
-  @UseGuards(RolesGuard)
-  @Roles(Role.LECTURER, Role.STAFF)
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Admin, RoleName.Staff, RoleName.Lecturer)
   @ApiOperation({ summary: 'Update online class' })
   @ApiResponse({ status: 200, description: 'Online class updated successfully' })
   async updateOnlineClass(
@@ -174,8 +179,8 @@ export class OnlineClassController {
   }
 
   @Delete(':id')
-  @UseGuards(RolesGuard)
-  @Roles(Role.LECTURER, Role.STAFF)
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Admin, RoleName.Staff)
   @ApiOperation({ summary: 'Delete online class' })
   @ApiResponse({ status: 200, description: 'Online class deleted successfully' })
   async deleteOnlineClass(@ActiveUser('userId') userId: number, @Param('id') classId: string, @Request() req: any) {
@@ -202,6 +207,8 @@ export class OnlineClassController {
   @Post(':id/join')
   @ApiOperation({ summary: 'Generate join token for online class' })
   @ApiResponse({ status: 200, description: 'Join token generated successfully' })
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Customer)
   async generateJoinToken(@Param('id') classId: string, @ActiveUser('userId') userId: number) {
     try {
       const joinToken = await this.onlineClassService.generateJoinToken(classId, userId)
@@ -229,8 +236,8 @@ export class OnlineClassController {
   }
 
   @Post(':id/start')
-  @UseGuards(RolesGuard)
-  @Roles(Role.LECTURER, Role.STAFF)
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Lecturer, RoleName.Staff)
   @ApiOperation({ summary: 'Start online class session' })
   @ApiResponse({ status: 200, description: 'Online class session started successfully' })
   async startOnlineClassSession(@ActiveUser('userId') userId: number, @Param('id') classId: string) {
@@ -260,8 +267,8 @@ export class OnlineClassController {
   }
 
   @Post(':id/end')
-  @UseGuards(RolesGuard)
-  @Roles(Role.LECTURER, Role.STAFF)
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Lecturer, RoleName.Staff)
   @ApiOperation({ summary: 'End online class session' })
   @ApiResponse({ status: 200, description: 'Online class session ended successfully' })
   async endOnlineClassSession(@ActiveUser('userId') userId: number, @Param('id') classId: string) {
@@ -291,8 +298,7 @@ export class OnlineClassController {
   }
 
   @Get(':id/participants')
-  @UseGuards(RolesGuard)
-  // @Roles(Role.LECTURER, Role.STAFF)
+  @Auth([AuthType.Bearer])
   @IsPublic()
   @ApiOperation({ summary: 'Get online class participants' })
   @ApiResponse({ status: 200, description: 'Participants retrieved successfully' })
@@ -368,8 +374,8 @@ export class OnlineClassController {
   }
 
   @Post(':id/recording/start')
-  @UseGuards(RolesGuard)
-  @Roles(Role.LECTURER, Role.STAFF)
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Lecturer, RoleName.Staff)
   @ApiOperation({ summary: 'Start recording online class' })
   @ApiResponse({ status: 200, description: 'Recording started successfully' })
   async startRecording(
@@ -403,8 +409,8 @@ export class OnlineClassController {
   }
 
   @Post(':id/recording/stop')
-  @UseGuards(RolesGuard)
-  @Roles(Role.LECTURER, Role.STAFF)
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Lecturer, RoleName.Staff)
   @ApiOperation({ summary: 'Stop recording online class' })
   @ApiResponse({ status: 200, description: 'Recording stopped successfully' })
   async stopRecording(@Param('id') classId: string, @Request() req: any) {
@@ -462,8 +468,8 @@ export class OnlineClassController {
   }
 
   @Post(':id/documents/share')
-  @UseGuards(RolesGuard)
-  @Roles(Role.LECTURER, Role.STAFF)
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Lecturer, RoleName.Staff)
   @ApiOperation({ summary: 'Share document in online class' })
   @ApiResponse({ status: 200, description: 'Document shared successfully' })
   async shareDocument(@Param('id') classId: string, @Body() shareDocumentDto: ShareDocumentDto, @Request() req: any) {
@@ -519,8 +525,8 @@ export class OnlineClassController {
   }
 
   @Post(':id/participants/:participantId/action')
-  @UseGuards(RolesGuard)
-  @Roles(Role.LECTURER, Role.STAFF)
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Lecturer, RoleName.Staff)
   @ApiOperation({ summary: 'Perform action on participant' })
   @ApiResponse({ status: 200, description: 'Action performed successfully' })
   async performParticipantAction(
@@ -548,74 +554,6 @@ export class OnlineClassController {
         {
           success: false,
           message: error instanceof Error ? error.message : 'Failed to perform action on participant',
-        },
-        HttpStatus.BAD_REQUEST,
-      )
-    }
-  }
-
-  @Get(':id/analytics')
-  @UseGuards(RolesGuard)
-  @Roles(Role.LECTURER, Role.STAFF)
-  @ApiOperation({ summary: 'Get online class analytics' })
-  @ApiResponse({ status: 200, description: 'Analytics retrieved successfully' })
-  getClassAnalytics(@Param('id') classId: string, @Request() req: any) {
-    try {
-      const lecturerId = req.user.id
-      const analytics = this.onlineClassService.getClassAnalytics(classId, lecturerId)
-
-      return {
-        success: true,
-        message: 'Analytics retrieved successfully',
-        data: analytics,
-      }
-    } catch (error) {
-      throw new HttpException(
-        {
-          success: false,
-          message: error instanceof Error ? error.message : 'Failed to retrieve analytics',
-        },
-        HttpStatus.BAD_REQUEST,
-      )
-    }
-  }
-
-  @Get(':id/debug-participants')
-  @IsPublic()
-  @ApiOperation({ summary: 'Debug endpoint to check participants with detailed logging' })
-  @ApiResponse({ status: 200, description: 'Debug participants info retrieved successfully' })
-  async debugParticipants(@Param('id') classId: string) {
-    try {
-      console.log(`🐛 DEBUG: Starting participants debug for class ${classId}`)
-
-      // Get Janus participants with detailed logging
-      const janusParticipants = await this.onlineClassService.getJanusParticipants(classId)
-
-      // Also get the class details
-      const classDetails = await this.onlineClassService.getOnlineClassDetails(classId, 1) // Use dummy user ID for debug
-
-      console.log(`🐛 DEBUG: Class details:`, JSON.stringify(classDetails, null, 2))
-      console.log(`🐛 DEBUG: Janus participants result:`, JSON.stringify(janusParticipants, null, 2))
-
-      return {
-        success: true,
-        message: 'Debug participants info retrieved successfully',
-        data: {
-          classId,
-          classDetails: {
-            currentSession: classDetails?.currentSession,
-            janusRoomId: classDetails?.currentSession?.janusRoomId,
-          },
-          janusParticipants,
-          timestamp: new Date().toISOString(),
-        },
-      }
-    } catch (error) {
-      console.error(`🐛 DEBUG ERROR:`, error)
-      throw new HttpException(
-        {
-          success: false,
-          message: error instanceof Error ? error.message : 'Failed to debug participants',
         },
         HttpStatus.BAD_REQUEST,
       )

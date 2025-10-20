@@ -4,11 +4,12 @@ import { CourseService } from './course.service'
 import { CourseRepository } from './course.repo'
 import { SharedModule } from 'src/shared/shared.module'
 import { ProfileModule } from '../profile/profile.module'
+import { EnrollmentModule } from '../enrollment/enrollment.module'
 
 @Module({
-  imports: [SharedModule, ProfileModule],
+  imports: [SharedModule, ProfileModule, EnrollmentModule],
   controllers: [CourseController],
   providers: [CourseService, CourseRepository],
-  exports: [CourseService],
+  exports: [CourseService, CourseRepository],
 })
 export class CourseModule {}

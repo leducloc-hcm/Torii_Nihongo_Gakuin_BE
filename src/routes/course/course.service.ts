@@ -4,6 +4,7 @@ import { CreateCourseDTO, UpdateCourseDTO, QueryCourseDTO } from './course.dto'
 import { CourseWithRelations, CourseWhereInput, CourseOrderByInput } from './course.model'
 import { S3Service } from 'src/shared/services/s3.service'
 import { LectureProfileRepository } from 'src/routes/profile/profile.repo'
+import { EnrollmentService } from '../enrollment/enrollment.service'
 
 @Injectable()
 export class CourseService {
@@ -11,6 +12,7 @@ export class CourseService {
     private readonly courseRepository: CourseRepository,
     private readonly s3Service: S3Service,
     private readonly lecturerRepository: LectureProfileRepository,
+    private readonly enrollmentService: EnrollmentService,
   ) {}
 
   async create(
@@ -250,5 +252,8 @@ export class CourseService {
         },
       },
     }
+  }
+  async getMyCourses(userId: number) {
+    return this.enrollmentService.findMyEnrollments(userId)
   }
 }

@@ -58,13 +58,13 @@ export class CourseController {
     return this.courseService.getPublishedCourses(queryDto)
   }
 
-  //   @Get('my-courses')
-  //   @Auth([AuthType.Bearer])
-  //   @Roles(RoleName.Lecturer)
-  //   @HttpCode(HttpStatus.OK)
-  //   async findMyCourses(@ActiveUser('userId') userId: number) {
-  //
-  //   }
+  @Get('my-courses')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Lecturer)
+  @HttpCode(HttpStatus.OK)
+  async getMyCourses(@ActiveUser('userId') userId: number) {
+    return this.courseService.getMyCourses(userId)
+  }
 
   @Get(':slug')
   @HttpCode(HttpStatus.OK)
