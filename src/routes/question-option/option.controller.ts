@@ -1,25 +1,25 @@
 import {
-  Controller,
-  Get,
-  Post,
-  Put,
-  Delete,
   Body,
-  Param,
-  Query,
+  Controller,
+  Delete,
+  Get,
   HttpCode,
   HttpStatus,
-  UseGuards,
+  Param,
   ParseIntPipe,
+  Post,
+  Put,
+  Query,
+  UseGuards,
 } from '@nestjs/common'
-import { OptionService } from './option.service'
-import { CreateOptionDTO, UpdateOptionDTO, QueryOptionDTO, BulkCreateOptionsDTO, ReorderOptionsDTO } from './option.dto'
-import { Auth } from 'src/shared/decorators/auth.decorator'
+import { ApiTags } from '@nestjs/swagger'
 import { AuthType } from 'src/shared/constants/auth.constant'
+import { RoleName } from 'src/shared/constants/role.constant'
+import { Auth } from 'src/shared/decorators/auth.decorator'
 import { Roles } from 'src/shared/decorators/roles.decorator'
 import { RolesGuard } from 'src/shared/guards/roles.guard'
-import { RoleName } from 'src/shared/constants/role.constant'
-import { ApiTags } from '@nestjs/swagger'
+import { BulkCreateOptionsDTO, CreateOptionDTO, QueryOptionDTO, ReorderOptionsDTO, UpdateOptionDTO } from './option.dto'
+import { OptionService } from './option.service'
 
 @ApiTags('Question Options')
 @Controller()

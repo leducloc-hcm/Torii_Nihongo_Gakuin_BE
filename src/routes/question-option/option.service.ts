@@ -154,7 +154,7 @@ export class OptionService {
     // Assign orders if not provided
     let nextOrder = await this.optionRepository.getNextOrder(questionId)
     const optionsWithOrder = options.map((option) => ({
-      content: option.content,
+      content: option.content ?? '',
       isCorrect: option.isCorrect,
       order: option.order ?? nextOrder++,
     }))

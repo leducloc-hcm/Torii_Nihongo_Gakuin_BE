@@ -15,8 +15,8 @@ import {
 export class QuestionRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  private readonly includeOptions = {
-    options: {
+  private readonly includeWithOptions = {
+    option: {
       orderBy: {
         order: 'asc' as const,
       },
@@ -34,7 +34,16 @@ export class QuestionRepository {
   async create(data: QuestionCreateInput): Promise<QuestionType> {
     return await this.prisma.question.create({
       data: data as any,
-      include: this.includeOptions,
+      include: {
+        media: {
+          select: {
+            id: true,
+            url: true,
+            kind: true,
+            caption: true,
+          },
+        },
+      },
     })
   }
 
@@ -49,11 +58,11 @@ export class QuestionRepository {
     return await this.prisma.question.create({
       data: {
         ...questionData,
-        options: {
+        option: {
           create: options,
         },
       },
-      include: this.includeOptions,
+      include: this.includeWithOptions,
     })
   }
 
@@ -72,7 +81,7 @@ export class QuestionRepository {
         take,
         where,
         orderBy,
-        include: this.includeOptions,
+        include: this.includeWithOptions,
       })
     }
 
@@ -124,7 +133,7 @@ export class QuestionRepository {
     if (includeOptions) {
       return await this.prisma.question.findUnique({
         where: where as any,
-        include: this.includeOptions,
+        include: this.includeWithOptions,
       })
     }
 
@@ -137,7 +146,16 @@ export class QuestionRepository {
     return await this.prisma.question.update({
       where: where as any,
       data,
-      include: this.includeOptions,
+      include: {
+        media: {
+          select: {
+            id: true,
+            url: true,
+            kind: true,
+            caption: true,
+          },
+        },
+      },
     })
   }
 
@@ -181,7 +199,7 @@ export class QuestionRepository {
       // Return await updated question with options
       return await tx.question.findUnique({
         where: { id: questionId },
-        include: this.includeOptions,
+        include: this.includeWithOptions,
       })
     })
   }
@@ -265,11 +283,11 @@ export class QuestionRepository {
         const question = await tx.question.create({
           data: {
             ...questionData,
-            options: {
+            option: {
               create: options,
             },
           },
-          include: this.includeOptions,
+          include: this.includeWithOptions,
         })
 
         createdQuestions.push(question)
@@ -291,5 +309,30 @@ export class QuestionRepository {
       where: { id: mediaId },
     })
     return count > 0
+  }
+
+  async createMedia(data: {
+    url: string
+    kind: string
+    caption?: string | null
+    mimeType?: string
+    sizeByte?: number
+  }): Promise<{ id: number; url: string; kind: string; caption?: string | null }> {
+    return await this.prisma.mediaAsset.create({
+      data: {
+        url: data.url,
+        kind: data.kind as any,
+        caption: data.caption,
+        mimeType: data.mimeType,
+        sizeByte: data.sizeByte,
+        status: 'READY',
+      },
+      select: {
+        id: true,
+        url: true,
+        kind: true,
+        caption: true,
+      },
+    })
   }
 }

@@ -3,7 +3,7 @@ import { z } from 'zod'
 export const OptionSchema = z.object({
   id: z.number().int().positive(),
   questionId: z.number().int().positive(),
-  content: z.string().min(1, 'Option content is required').max(1000, 'Option content too long'),
+  content: z.string().min(1, 'Option content is required').max(1000, 'Option content too long').nullable(),
   isCorrect: z.boolean().default(false),
   order: z.number().int().min(0).default(0),
 })

@@ -311,14 +311,14 @@ export class QuestionGroupRepository {
     const count = await this.prisma.questionGroup.count({
       where: { id },
     })
-    return (await count) > 0
+    return count > 0
   }
 
   async checkMediaExists(mediaId: number): Promise<boolean> {
     const count = await this.prisma.mediaAsset.count({
       where: { id: mediaId },
     })
-    return (await count) > 0
+    return count > 0
   }
 
   async checkQuestionsExist(questionIds: number[]): Promise<{

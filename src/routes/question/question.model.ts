@@ -29,6 +29,8 @@ export const QuestionSchema = z.object({
 })
 
 export const CreateQuestionSchema = QuestionSchema.omit({ id: true, createdAt: true })
+
+export const CreateQuestionWithOptionsSchema = QuestionSchema.omit({ id: true, createdAt: true })
   .extend({
     options: z
       .array(OptionSchema.omit({ id: true }))
@@ -46,7 +48,9 @@ export const CreateQuestionSchema = QuestionSchema.omit({ id: true, createdAt: t
     },
   )
 
-export const UpdateQuestionSchema = QuestionSchema.omit({ id: true, createdAt: true })
+export const UpdateQuestionSchema = QuestionSchema.omit({ id: true, createdAt: true }).partial()
+
+export const UpdateQuestionWithOptionsSchema = QuestionSchema.omit({ id: true, createdAt: true })
   .partial()
   .extend({
     options: z.array(OptionSchema).min(2, 'At least 2 options required').max(6, 'Maximum 6 options allowed').optional(),
@@ -100,7 +104,7 @@ export const QuestionListItemSchema = QuestionSchema.extend({
 
 export const BulkCreateQuestionsSchema = z.object({
   questions: z
-    .array(CreateQuestionSchema)
+    .array(CreateQuestionWithOptionsSchema)
     .min(1, 'At least 1 question required')
     .max(50, 'Maximum 50 questions per bulk operation'),
 })
