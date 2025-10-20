@@ -11,6 +11,8 @@ import {
   Put,
   Query,
   UseGuards,
+  UseInterceptors,
+  UploadedFiles,
 } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 import { AuthType } from 'src/shared/constants/auth.constant'
@@ -20,6 +22,8 @@ import { Roles } from 'src/shared/decorators/roles.decorator'
 import { RolesGuard } from 'src/shared/guards/roles.guard'
 import { BulkCreateOptionsDTO, CreateOptionDTO, QueryOptionDTO, ReorderOptionsDTO, UpdateOptionDTO } from './option.dto'
 import { OptionService } from './option.service'
+import { FileFieldsInterceptor } from '@nestjs/platform-express'
+import { mediaUploadOptions } from 'src/shared/config/upload.config'
 
 @ApiTags('Question Options')
 @Controller()
@@ -31,8 +35,21 @@ export class OptionController {
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Admin, RoleName.Lecturer)
   @HttpCode(HttpStatus.CREATED)
-  async create(@Param('questionId', ParseIntPipe) questionId: number, @Body() createDto: CreateOptionDTO) {
-    return this.optionService.create(questionId, createDto)
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: 'image', maxCount: 1 },
+        { name: 'audio', maxCount: 1 },
+      ],
+      mediaUploadOptions,
+    ),
+  )
+  async create(
+    @Param('questionId', ParseIntPipe) questionId: number,
+    @Body() createDto: CreateOptionDTO,
+    @UploadedFiles() files?: { image?: Express.Multer.File[]; audio?: Express.Multer.File[] },
+  ) {
+    return this.optionService.create(questionId, createDto, files)
   }
 
   @Post('questions/:questionId/options/bulk')
@@ -88,8 +105,21 @@ export class OptionController {
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Admin, RoleName.Lecturer)
   @HttpCode(HttpStatus.OK)
-  async update(@Param('id', ParseIntPipe) id: number, @Body() updateDto: UpdateOptionDTO) {
-    return this.optionService.update(id, updateDto)
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: 'image', maxCount: 1 },
+        { name: 'audio', maxCount: 1 },
+      ],
+      mediaUploadOptions,
+    ),
+  )
+  async update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateDto: UpdateOptionDTO,
+    @UploadedFiles() files?: { image?: Express.Multer.File[]; audio?: Express.Multer.File[] },
+  ) {
+    return this.optionService.update(id, updateDto, files)
   }
 
   @Delete('options/:id')

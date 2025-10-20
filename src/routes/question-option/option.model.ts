@@ -10,9 +10,14 @@ export const OptionSchema = z.object({
 
 export const CreateOptionSchema = OptionSchema.omit({ id: true }).extend({
   // questionId will be provided via URL parameter
+  mediaId: z.number().int().positive().optional(),
 })
 
-export const UpdateOptionSchema = OptionSchema.omit({ id: true, questionId: true }).partial()
+export const UpdateOptionSchema = OptionSchema.omit({ id: true, questionId: true })
+  .extend({
+    mediaId: z.number().int().positive().optional(),
+  })
+  .partial()
 
 export const QueryOptionSchema = z.object({
   page: z.coerce.number().int().positive().optional().default(1),

@@ -146,6 +146,19 @@ export class OptionRepository {
     return count > 0
   }
 
+  async createMedia(url: string, mimeType: string, sizeByte: number, caption?: string) {
+    return await this.prisma.mediaAsset.create({
+      data: {
+        url,
+        mimeType,
+        sizeByte,
+        caption,
+        kind: 'OTHER',
+        status: 'READY',
+      },
+    })
+  }
+
   async getNextOrder(questionId: number): Promise<number> {
     const lastOption = await this.prisma.option.findFirst({
       where: { questionId },

@@ -341,4 +341,17 @@ export class QuestionGroupRepository {
       include: this.includeQuestions,
     })
   }
+
+  async createMedia(url: string, mimeType: string, sizeByte: number, caption?: string) {
+    return await this.prisma.mediaAsset.create({
+      data: {
+        url,
+        mimeType,
+        sizeByte,
+        caption,
+        kind: 'OTHER',
+        status: 'READY',
+      },
+    })
+  }
 }

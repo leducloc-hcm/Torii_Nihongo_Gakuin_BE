@@ -9,18 +9,57 @@ import {
   RemoveQuestionsFromGroupDTO,
 } from './question-group.dto'
 import { QuestionGroupWhereInput, QuestionGroupOrderByInput } from './question-group.model'
+import { S3Service } from 'src/shared/services/s3.service'
 
 @Injectable()
 export class QuestionGroupService {
-  constructor(private readonly questionGroupRepository: QuestionGroupRepository) {}
+  constructor(
+    private readonly questionGroupRepository: QuestionGroupRepository,
+    private readonly s3Service: S3Service,
+  ) {}
 
-  async create(createDto: CreateQuestionGroupDTO): Promise<any> {
+  async create(
+    createDto: CreateQuestionGroupDTO,
+    files?: { image?: Express.Multer.File[]; audio?: Express.Multer.File[] },
+  ): Promise<any> {
     const { questions, mediaId, metadata, ...groupData } = createDto
 
-    if (mediaId) {
-      const mediaExists = await this.questionGroupRepository.checkMediaExists(mediaId)
+    // Handle file uploads
+    let uploadedMediaId = mediaId
+
+    if (files?.image?.[0] || files?.audio?.[0]) {
+      // Upload files to S3 and create media record
+      let imageUrl: string | undefined
+      let audioUrl: string | undefined
+
+      if (files.image?.[0]) {
+        const imageResult = await this.s3Service.uploadFileToS3(files.image[0], 'question-groups/images')
+        imageUrl = imageResult.url
+      }
+
+      if (files.audio?.[0]) {
+        const audioResult = await this.s3Service.uploadFileToS3(files.audio[0], 'question-groups/audio')
+        audioUrl = audioResult.url
+      }
+
+      // Create media record in database
+      if (imageUrl || audioUrl) {
+        const primaryUrl = imageUrl || audioUrl!
+
+        const media = await this.questionGroupRepository.createMedia(
+          primaryUrl,
+          files.image?.[0]?.mimetype || files.audio?.[0]?.mimetype || 'application/octet-stream',
+          files.image?.[0]?.size || files.audio?.[0]?.size || 0,
+          undefined,
+        )
+        uploadedMediaId = media.id
+      }
+    }
+
+    if (uploadedMediaId) {
+      const mediaExists = await this.questionGroupRepository.checkMediaExists(uploadedMediaId)
       if (!mediaExists) {
-        throw new BadRequestException(`Media with ID ${mediaId} does not exist`)
+        throw new BadRequestException(`Media with ID ${uploadedMediaId} does not exist`)
       }
     }
 
@@ -37,8 +76,8 @@ export class QuestionGroupService {
       metadata: metadata || null,
     }
 
-    if (mediaId) {
-      groupCreateData.media = { connect: { id: mediaId } }
+    if (uploadedMediaId) {
+      groupCreateData.media = { connect: { id: uploadedMediaId } }
     }
 
     return this.questionGroupRepository.createWithQuestions(groupCreateData, questions || [])
@@ -115,7 +154,11 @@ export class QuestionGroupService {
     return group
   }
 
-  async update(id: number, updateDto: UpdateQuestionGroupDTO): Promise<any> {
+  async update(
+    id: number,
+    updateDto: UpdateQuestionGroupDTO,
+    files?: { image?: Express.Multer.File[]; audio?: Express.Multer.File[] },
+  ): Promise<any> {
     const exists = await this.questionGroupRepository.checkExists(id)
     if (!exists) {
       throw new NotFoundException(`Question Group with ID ${id} not found`)
@@ -123,10 +166,42 @@ export class QuestionGroupService {
 
     const { questions, mediaId, ...groupData } = updateDto
 
-    if (mediaId) {
-      const mediaExists = await this.questionGroupRepository.checkMediaExists(mediaId)
+    // Handle file uploads
+    let updatedMediaId = mediaId
+
+    if (files?.image?.[0] || files?.audio?.[0]) {
+      // Upload files to S3 and create media record
+      let imageUrl: string | undefined
+      let audioUrl: string | undefined
+
+      if (files.image?.[0]) {
+        const imageResult = await this.s3Service.uploadFileToS3(files.image[0], 'question-groups/images')
+        imageUrl = imageResult.url
+      }
+
+      if (files.audio?.[0]) {
+        const audioResult = await this.s3Service.uploadFileToS3(files.audio[0], 'question-groups/audio')
+        audioUrl = audioResult.url
+      }
+
+      // Create media record in database
+      if (imageUrl || audioUrl) {
+        const primaryUrl = imageUrl || audioUrl!
+
+        const media = await this.questionGroupRepository.createMedia(
+          primaryUrl,
+          files.image?.[0]?.mimetype || files.audio?.[0]?.mimetype || 'application/octet-stream',
+          files.image?.[0]?.size || files.audio?.[0]?.size || 0,
+          undefined,
+        )
+        updatedMediaId = media.id
+      }
+    }
+
+    if (updatedMediaId) {
+      const mediaExists = await this.questionGroupRepository.checkMediaExists(updatedMediaId)
       if (!mediaExists) {
-        throw new BadRequestException(`Media with ID ${mediaId} does not exist`)
+        throw new BadRequestException(`Media with ID ${updatedMediaId} does not exist`)
       }
     }
 
@@ -143,8 +218,8 @@ export class QuestionGroupService {
       metadata: groupData.metadata || null,
     }
 
-    if (mediaId) {
-      updateData.media = { connect: { id: mediaId } }
+    if (updatedMediaId) {
+      updateData.media = { connect: { id: updatedMediaId } }
     }
 
     return this.questionGroupRepository.updateWithQuestions(id, updateData, questions)

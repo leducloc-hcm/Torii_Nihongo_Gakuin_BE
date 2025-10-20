@@ -32,7 +32,7 @@ export interface OptionType {
   id: number
   questionId: number
   content: string | null
-  imageId: number | null
+  mediaId: number | null
   isCorrect: boolean
   order: number
 }

@@ -392,13 +392,13 @@ model Option {
   id         Int     @id @default(autoincrement())
   questionId Int
   content    String?
-  imageId    Int?
+  mediaId    Int?
   isCorrect  Boolean @default(false)
   order      Int     @default(0)
   testAnswers TestAnswer[] 
   quizAnswers QuizAnswer[]
   examAnswers ExamAnswer[]
-  image     MediaAsset? @relation(fields: [imageId], references: [id])
+  image     MediaAsset? @relation(fields: [mediaId], references: [id])
   question  Question     @relation(fields: [questionId], references: [id])
 }
 

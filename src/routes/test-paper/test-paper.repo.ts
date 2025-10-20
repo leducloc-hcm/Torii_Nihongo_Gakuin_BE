@@ -24,6 +24,29 @@ export class TestPaperRepository {
   async findById(id: number): Promise<TestPaperType | null> {
     return await this.prisma.testPaper.findUnique({
       where: { id },
+      include: {
+        sections: {
+          include: {
+            items: {
+              include: {
+                question: {
+                  include: {
+                    option: {
+                      select: {
+                        id: true,
+                        content: true,
+                        mediaId: true,
+                        order: true,
+                      },
+                    },
+                    media: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     })
   }
 
