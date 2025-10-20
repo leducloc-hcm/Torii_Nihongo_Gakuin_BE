@@ -130,6 +130,6 @@ export class PlacementBlueprintRepository {
     const count = await this.prisma.placementBlueprint.count({
       where: { id },
     })
-    return (await count) > 0
+    return count > 0
   }
 }
