@@ -4,7 +4,7 @@ import { WebSocket } from 'ws'
 @Injectable()
 export class JanusWebSocketManager implements OnModuleDestroy {
   private readonly logger = new Logger(JanusWebSocketManager.name)
-  // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
+   
   private ws: WebSocket | null = null
   private readonly pendingRequests = new Map<
     string,

@@ -204,14 +204,18 @@ export class OnlineClassController {
     }
   }
 
-  @Post(':id/join')
+  @Post(':classId/sessions/:sessionId/join')
   @ApiOperation({ summary: 'Generate join token for online class' })
   @ApiResponse({ status: 200, description: 'Join token generated successfully' })
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Customer)
-  async generateJoinToken(@Param('id') classId: string, @ActiveUser('userId') userId: number) {
+  async generateJoinToken(
+    @Param('sessionId') sessionId: string,
+    @Param('classId') classId: string,
+    @ActiveUser('userId') userId: number,
+  ) {
     try {
-      const joinToken = await this.onlineClassService.generateJoinToken(classId, userId)
+      const joinToken = await this.onlineClassService.generateJoinToken(classId, sessionId, userId)
 
       return {
         success: true,
@@ -235,15 +239,15 @@ export class OnlineClassController {
     }
   }
 
-  @Post(':id/start')
+  @Post(':sessionId/start')
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Lecturer, RoleName.Staff)
   @ApiOperation({ summary: 'Start online class session' })
   @ApiResponse({ status: 200, description: 'Online class session started successfully' })
-  async startOnlineClassSession(@ActiveUser('userId') userId: number, @Param('id') classId: string) {
+  async startOnlineClassSession(@ActiveUser('userId') userId: number, @Param('sessionId') sessionId: string) {
     try {
       const lecturerId = userId
-      const session = await this.onlineClassService.startOnlineClassSession(classId, lecturerId)
+      const session = await this.onlineClassService.startOnlineClassSession(sessionId, lecturerId)
 
       return {
         success: true,

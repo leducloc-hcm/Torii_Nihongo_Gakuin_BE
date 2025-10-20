@@ -1,6 +1,14 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common'
 import { CourseRepository } from './course.repo'
-import { CreateCourseDTO, UpdateCourseDTO, QueryCourseDTO } from './course.dto'
+import { OnlineClassRepository } from '../online-class/online-class.repo'
+import {
+  CreateCourseDTO,
+  UpdateCourseDTO,
+  QueryCourseDTO,
+  CreateClassDTO,
+  UpdateClassDTO,
+  CreateSessionDTO,
+} from './course.dto'
 import { CourseWithRelations, CourseWhereInput, CourseOrderByInput } from './course.model'
 import { S3Service } from 'src/shared/services/s3.service'
 import { LectureProfileRepository } from 'src/routes/profile/profile.repo'
@@ -10,6 +18,7 @@ import { EnrollmentService } from '../enrollment/enrollment.service'
 export class CourseService {
   constructor(
     private readonly courseRepository: CourseRepository,
+    private readonly onlineClassRepository: OnlineClassRepository,
     private readonly s3Service: S3Service,
     private readonly lecturerRepository: LectureProfileRepository,
     private readonly enrollmentService: EnrollmentService,
@@ -253,7 +262,167 @@ export class CourseService {
       },
     }
   }
-  async getMyCourses(userId: number) {
-    return this.enrollmentService.findMyEnrollments(userId)
+  async getMyCourses(
+    userId: number,
+    params: {
+      page?: number
+      limit?: number
+      expired?: boolean
+      courseType?: 'VIDEO_QUIZ' | 'VIDEO_QUIZ_LIVE' | 'LIVE_ONLY'
+      sortBy?: 'createdAt' | 'expiresAt'
+      sortOrder?: 'asc' | 'desc'
+    } = {},
+  ) {
+    // Use the enrollment service to get user's enrolled courses
+    const enrollmentsResult = await this.enrollmentService.findMyEnrollments(userId, params)
+
+    // Extract course IDs from enrollments
+    const courseIds = enrollmentsResult.data.map((enrollment) => enrollment.course.id)
+
+    if (courseIds.length === 0) {
+      return {
+        data: [],
+        meta: enrollmentsResult.meta,
+      }
+    }
+
+    // Get full course details with lecturer IDs for each course
+    const fullCoursesPromises = courseIds.map(async (courseId) => {
+      return await this.courseRepository.findOne({ id: courseId })
+    })
+
+    const fullCourses = await Promise.all(fullCoursesPromises)
+
+    // Filter out null values and get lecturer information for all courses
+    const validCourses = fullCourses.filter((course): course is CourseWithRelations => course !== null)
+    const allLecturerIds = validCourses.map((course) => course.lecturerIds || []).flat()
+
+    const lecturerArray =
+      allLecturerIds.length > 0 ? await this.lecturerRepository.findLectureProfileByUserIds(allLecturerIds) : []
+
+    // Map enrollments to include full course info with lecturers
+    const coursesWithLecturers = enrollmentsResult.data.map((enrollment) => {
+      const fullCourse = validCourses.find((course) => course.id === enrollment.course.id)
+
+      return {
+        ...enrollment,
+        course: {
+          ...enrollment.course,
+          lecturerIds: fullCourse?.lecturerIds || [],
+          lecturers: lecturerArray.filter((lecturer) => (fullCourse?.lecturerIds || []).includes(lecturer.userId)),
+        },
+      }
+    })
+
+    return {
+      data: coursesWithLecturers,
+      meta: enrollmentsResult.meta,
+    }
+  }
+
+  // Class Management Methods
+  async getCourseClasses(courseId: number) {
+    // Check if course exists
+    await this.findOne(courseId)
+
+    return this.onlineClassRepository.findByCourseId(courseId)
+  }
+  async getPublicCourseClasses(courseId: number) {
+    // Check if course exists
+    await this.findOne(courseId)
+
+    return this.onlineClassRepository.getPublicCourseClasses(courseId)
+  }
+
+  async createCourseClass(courseId: number, createClassDto: CreateClassDTO, userId: number) {
+    // Check if course exists
+    await this.findOne(courseId)
+
+    // Validate lecturer exists
+    const lecturerExists = await this.courseRepository.checkLecturerExists(createClassDto.lecturerId)
+    if (!lecturerExists) {
+      throw new BadRequestException(`Lecturer with ID ${createClassDto.lecturerId} does not exist or is not authorized`)
+    }
+
+    return this.onlineClassRepository.create({
+      title: createClassDto.title,
+      description: createClassDto.description,
+      capacity: createClassDto.capacity,
+      course: { connect: { id: courseId } },
+      lecturer: { connect: { id: createClassDto.lecturerId } },
+    })
+  }
+
+  async updateCourseClass(courseId: number, classId: number, updateClassDto: UpdateClassDTO) {
+    // Check if course exists
+    await this.findOne(courseId)
+
+    // Check if class belongs to the course
+    const belongsToCourse = await this.onlineClassRepository.checkClassBelongsToCourse(classId, courseId)
+    if (!belongsToCourse) {
+      throw new NotFoundException(`Class with ID ${classId} not found in course ${courseId}`)
+    }
+
+    // Validate lecturer exists if being updated
+    if (updateClassDto.lecturerId) {
+      const lecturerExists = await this.courseRepository.checkLecturerExists(updateClassDto.lecturerId)
+      if (!lecturerExists) {
+        throw new BadRequestException(
+          `Lecturer with ID ${updateClassDto.lecturerId} does not exist or is not authorized`,
+        )
+      }
+    }
+
+    const updateData: any = { ...updateClassDto }
+    if (updateClassDto.lecturerId) {
+      updateData.lecturer = { connect: { id: updateClassDto.lecturerId } }
+      delete updateData.lecturerId
+    }
+
+    return this.onlineClassRepository.update(classId, updateData)
+  }
+
+  async removeCourseClass(courseId: number, classId: number) {
+    // Check if course exists
+    await this.findOne(courseId)
+
+    // Check if class belongs to the course
+    const belongsToCourse = await this.onlineClassRepository.checkClassBelongsToCourse(classId, courseId)
+    if (!belongsToCourse) {
+      throw new NotFoundException(`Class with ID ${classId} not found in course ${courseId}`)
+    }
+
+    return this.onlineClassRepository.delete(classId)
+  }
+
+  async createClassSession(courseId: number, classId: number, createSessionDto: CreateSessionDTO) {
+    // Check if course exists
+    await this.findOne(courseId)
+
+    // Check if class belongs to the course
+    const belongsToCourse = await this.onlineClassRepository.checkClassBelongsToCourse(classId, courseId)
+    if (!belongsToCourse) {
+      throw new NotFoundException(`Class with ID ${classId} not found in course ${courseId}`)
+    }
+
+    return this.onlineClassRepository.createSession(classId, {
+      title: createSessionDto.title,
+      scheduledAt: new Date(createSessionDto.scheduledAt),
+      mode: createSessionDto.mode,
+      roomKey: createSessionDto.roomKey,
+    })
+  }
+
+  async getClassSessions(courseId: number, classId: number) {
+    // Check if course exists
+    await this.findOne(courseId)
+
+    // Check if class belongs to the course
+    const belongsToCourse = await this.onlineClassRepository.checkClassBelongsToCourse(classId, courseId)
+    if (!belongsToCourse) {
+      throw new NotFoundException(`Class with ID ${classId} not found in course ${courseId}`)
+    }
+
+    return this.onlineClassRepository.getClassSessions(classId)
   }
 }

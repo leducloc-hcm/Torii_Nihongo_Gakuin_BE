@@ -1,19 +1,5 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Put,
-  Delete,
-  Body,
-  Param,
-  Query,
-  HttpCode,
-  HttpStatus,
-  UseGuards,
-  ParseIntPipe,
-} from '@nestjs/common'
+import { Controller, Get, Param, Query, HttpCode, HttpStatus, UseGuards, ParseIntPipe } from '@nestjs/common'
 import { EnrollmentService } from './enrollment.service'
-import { CreateEnrollmentDTO, UpdateEnrollmentDTO, QueryEnrollmentDTO } from './enrollment.dto'
 import { Auth } from 'src/shared/decorators/auth.decorator'
 import { AuthType } from 'src/shared/constants/auth.constant'
 import { Roles } from 'src/shared/decorators/roles.decorator'

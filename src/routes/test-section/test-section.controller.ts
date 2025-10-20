@@ -92,7 +92,7 @@ export class TestSectionController {
   async getTestSectionsByTestId(
     @Param('testId', ParseIntPipe) testId: number,
     @Query('includeItems') includeItems?: string,
-  ): Promise<TestSectionBasic[] | TestSectionWithItems[]> {
+  ): Promise<TestSectionBasic[]  > {
     if (includeItems === 'true') {
       return this.testSectionService.getTestSectionsByTestIdWithItems(testId)
     }
