@@ -11,6 +11,17 @@ export class CartService {
     private readonly courseRepository: CourseRepository,
   ) {}
 
+  async initCart(userId: number): Promise<Cart> {
+    // Check if cart already exists for this user
+    const existingCart = await this.cartRepository.findByUserId(userId)
+    if (existingCart) {
+      return existingCart
+    }
+
+    // Create new empty cart for the user
+    return await this.cartRepository.create(userId)
+  }
+
   async getCart(userId: number): Promise<CartResponseDTO | null> {
     const cart = await this.cartRepository.findByUserId(userId)
     if (!cart) return null
