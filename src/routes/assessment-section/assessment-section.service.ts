@@ -23,7 +23,11 @@ export class AssessmentSectionService {
       await this.assessmentSectionRepo.insertAtOrder(data.assessmentId, data.order)
     }
 
-    // Calculate totalScore if not provided
+    const checkAssessmentId = await this.assessmentSectionRepo.checkIdAssessmentPaper(data.assessmentId)
+    if (!checkAssessmentId) {
+      throw new NotFoundException(`Assessment with ID ${data.assessmentId} not found`)
+    }
+
     if (data.totalScore === undefined) {
       // For now, we'll calculate it later when items are added
       // The totalScore will be updated when assessment items are created

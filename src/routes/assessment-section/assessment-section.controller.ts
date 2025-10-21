@@ -79,7 +79,7 @@ export class AssessmentSectionController {
     return this.assessmentSectionService.getAssessmentSections(queryDto as AssessmentSectionQuery)
   }
 
-  @Get(':assessmentId')
+  @Get(':id')
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Customer, RoleName.Admin)
   @ApiOperation({ summary: 'Get assessment section by ID' })

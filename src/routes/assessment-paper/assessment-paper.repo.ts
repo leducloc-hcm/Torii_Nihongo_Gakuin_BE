@@ -22,7 +22,6 @@ export class AssessmentPaperRepository {
         type: data.type,
         visibility: data.visibility || 'PRIVATE',
         createdBy: data.createdBy,
-        lessonId: data.lessonId || null,
         blueprintId: data.blueprintId || null,
         blueprintSnapshot: data.blueprintSnapshot || null,
         seed: data.seed || null,
@@ -36,6 +35,39 @@ export class AssessmentPaperRepository {
   async findById(id: number): Promise<AssessmentPaper | null> {
     return await this.prisma.assessmentPaper.findUnique({
       where: { id },
+      include: {
+        sections: {
+          include: {
+            items: {
+              include: {
+                question: {
+                  include: {
+                    option: true,
+                  },
+                },
+                questionGroup: {
+                  include: {
+                    media: true,
+                    questions: {
+                      include: {
+                        option: {
+                          select: {
+                            id: true,
+                            content: true,
+                            mediaId: true,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+              orderBy: { order: 'asc' },
+            },
+          },
+          orderBy: { order: 'asc' },
+        },
+      },
     })
   }
 
@@ -50,7 +82,6 @@ export class AssessmentPaperRepository {
             email: true,
           },
         },
-        lesson: true,
         blueprint: {
           select: {
             id: true,
@@ -230,12 +261,7 @@ export class AssessmentPaperRepository {
               email: true,
             },
           },
-          lesson: {
-            select: {
-              id: true,
-              title: true,
-            },
-          },
+
           blueprint: {
             select: {
               id: true,
@@ -276,13 +302,6 @@ export class AssessmentPaperRepository {
   async findByLevel(level: JLPTLevel): Promise<AssessmentPaper[]> {
     return await this.prisma.assessmentPaper.findMany({
       where: { level },
-      orderBy: { createdAt: 'desc' },
-    })
-  }
-
-  async findByLesson(lessonId: number): Promise<AssessmentPaper[]> {
-    return await this.prisma.assessmentPaper.findMany({
-      where: { lessonId },
       orderBy: { createdAt: 'desc' },
     })
   }
@@ -364,7 +383,6 @@ export class AssessmentPaperRepository {
         type: data.type || original.type,
         visibility: data.visibility || 'PRIVATE',
         createdBy: data.createdBy,
-        lessonId: original.lessonId,
         blueprintId: original.blueprintId,
         blueprintSnapshot: original.blueprintSnapshot as any,
         seed: original.seed,
@@ -527,36 +545,14 @@ export class AssessmentPaperRepository {
       select: {
         visibility: true,
         createdBy: true,
-        lesson: {
-          select: {
-            module: {
-              select: {
-                course: {
-                  select: {
-                    enrollments: {
-                      where: { userId },
-                      select: { id: true },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
       },
     })
 
     if (!assessment) return false
 
-    // Public assessments are accessible to everyone
     if (assessment.visibility === 'PUBLIC') return true
 
-    // Creator always has access
     if (assessment.createdBy === userId) return true
-
-    // If it's a lesson assessment, check enrollment
-    if (assessment.lesson?.module?.course?.enrollments && assessment.lesson.module.course.enrollments.length > 0)
-      return true
 
     return false
   }

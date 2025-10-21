@@ -23,39 +23,12 @@ import {
 export class AssessmentPaperService {
   constructor(private readonly assessmentPaperRepo: AssessmentPaperRepository) {}
 
-  async createLessonQuiz(data: CreateAssessmentPaperInput): Promise<AssessmentPaperBase> {
-    if (!data.lessonId) {
-      throw new BadRequestException('Lesson ID is required for lesson quiz creation')
-    }
-
-    // Check if lesson already has a quiz
-    const existingQuiz = await this.assessmentPaperRepo.findByLesson(data.lessonId)
-    if (existingQuiz.length > 0) {
-      throw new ConflictException(`Lesson ${data.lessonId} already has a quiz`)
-    }
-
-    // Ensure this is a QUIZ type
-    const quizData = {
-      ...data,
-      type: 'QUIZ' as const,
-      visibility: data.visibility || 'PRIVATE',
-    }
-
-    return this.createAssessmentPaper(quizData)
-  }
-
   async createAssessmentPaper(data: CreateAssessmentPaperInput): Promise<AssessmentPaperBase> {
     const titleExists = await this.assessmentPaperRepo.getTitleExists(data.title)
     if (titleExists) {
       throw new ConflictException(`Assessment paper with title "${data.title}" already exists`)
     }
 
-    // Validate lesson exists if lessonId provided
-    if (data.lessonId) {
-      // TODO: Add lesson existence check
-    }
-
-    // Validate blueprint exists if blueprintId provided
     if (data.blueprintId) {
       // TODO: Add blueprint existence check
     }
@@ -197,10 +170,6 @@ export class AssessmentPaperService {
 
   async getAssessmentPapersByLevel(level: JLPTLevel): Promise<AssessmentPaperBase[]> {
     return this.assessmentPaperRepo.findByLevel(level)
-  }
-
-  async getAssessmentPapersByLesson(lessonId: number): Promise<AssessmentPaperBase[]> {
-    return this.assessmentPaperRepo.findByLesson(lessonId)
   }
 
   async getAssessmentPapersByCreator(createdBy: number): Promise<AssessmentPaperBase[]> {

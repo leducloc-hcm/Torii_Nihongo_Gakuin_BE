@@ -37,7 +37,7 @@ export type AssessmentPaperWithSections = AssessmentPaper & {
 // ===== Zod Schemas =====
 export const JLPTLevelSchema = z.enum(['N5', 'N4', 'N3', 'N2', 'N1'])
 export const VisibilitySchema = z.enum(['PRIVATE', 'UNLISTED', 'PUBLIC'])
-export const AssessmentTypeSchema = z.enum(['QUIZ', 'TEST', 'EXAM'])
+export const AssessmentTypeSchema = z.enum(['TEST', 'EXAM'])
 
 export const AssessmentPaperBaseSchema = z.object({
   id: z.number().int().positive(),

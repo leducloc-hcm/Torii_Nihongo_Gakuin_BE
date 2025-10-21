@@ -55,6 +55,11 @@ export class AssessmentSectionRepository {
     })) as AssessmentSectionWithItems | null
   }
 
+  async checkIdAssessmentPaper(id: number) {
+    return await this.prisma.assessmentPaper.findUnique({
+      where: { id },
+    })
+  }
   async findByIdWithAssessment(id: number): Promise<AssessmentSectionWithAssessment | null> {
     return (await this.prisma.assessmentSection.findUnique({
       where: { id },

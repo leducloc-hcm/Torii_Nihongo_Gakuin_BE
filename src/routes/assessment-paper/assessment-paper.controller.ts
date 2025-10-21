@@ -44,27 +44,6 @@ import { ActiveUser } from 'src/shared/decorators/active-user.decorator'
 export class AssessmentPaperController {
   constructor(private readonly assessmentPaperService: AssessmentPaperService) {}
 
-  @Post('lesson/:lessonId/quiz')
-  @Auth([AuthType.Bearer])
-  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
-  @ApiOperation({ summary: 'Create quiz for specific lesson' })
-  @ApiResponse({ status: 201, description: 'Lesson quiz created successfully' })
-  async createLessonQuiz(
-    @ActiveUser('userId') userId: number,
-    @Param('lessonId', ParseIntPipe) lessonId: number,
-    @Body() createDto: CreateLessonQuizDto,
-  ): Promise<AssessmentPaperBase> {
-    const data = {
-      ...createDto,
-      createdBy: userId,
-      lessonId: lessonId,
-      type: 'QUIZ' as const,
-      visibility: createDto.visibility || 'PRIVATE',
-      version: 1,
-    }
-    return this.assessmentPaperService.createLessonQuiz(data)
-  }
-
   @Post()
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
@@ -128,15 +107,6 @@ export class AssessmentPaperController {
     @Param('blueprintId', ParseIntPipe) blueprintId: number,
   ): Promise<AssessmentPaperBase[]> {
     return this.assessmentPaperService.getAssessmentPapersByBlueprint(blueprintId)
-  }
-
-  @Get('lesson/:lessonId')
-  @Auth([AuthType.Bearer])
-  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Customer, RoleName.Admin)
-  @ApiOperation({ summary: 'Get assessment papers by lesson' })
-  @ApiResponse({ status: 200, description: 'Assessment papers by lesson retrieved successfully' })
-  async getAssessmentPapersByLesson(@Param('lessonId', ParseIntPipe) lessonId: number): Promise<AssessmentPaperBase[]> {
-    return this.assessmentPaperService.getAssessmentPapersByLesson(lessonId)
   }
 
   @Get('creator/:createdBy')

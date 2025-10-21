@@ -38,9 +38,6 @@ export class CreateAssessmentPaperDto extends createZodDto(CreateAssessmentPaper
   @ApiProperty({ example: 1, description: 'ID of the user creating this assessment' })
   createdBy!: number
 
-  @ApiPropertyOptional({ description: 'Lesson ID if this is a lesson quiz' })
-  lessonId?: number
-
   @ApiPropertyOptional({ description: 'Blueprint ID if generated from blueprint' })
   blueprintId?: number
 
