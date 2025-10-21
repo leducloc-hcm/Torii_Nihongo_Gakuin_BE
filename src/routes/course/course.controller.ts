@@ -28,8 +28,6 @@ import { AuthType } from 'src/shared/constants/auth.constant'
 import { Roles } from 'src/shared/decorators/roles.decorator'
 import { RolesGuard } from 'src/shared/guards/roles.guard'
 import { RoleName } from 'src/shared/constants/role.constant'
-import { FileInterceptor } from '@nestjs/platform-express'
-import { imageUploadOptions } from 'src/shared/config/upload.config'
 import { ActiveUser } from 'src/shared/decorators/active-user.decorator'
 
 @Controller('courses')
@@ -41,13 +39,8 @@ export class CourseController {
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Admin, RoleName.Staff)
   @HttpCode(HttpStatus.CREATED)
-  @UseInterceptors(FileInterceptor('thumbnail', imageUploadOptions))
-  async create(
-    @ActiveUser('userId') userId: number,
-    @Body() createCourseDto: CreateCourseDTO,
-    @UploadedFile() thumbnail?: Express.Multer.File,
-  ) {
-    return this.courseService.create(createCourseDto, userId, thumbnail)
+  async create(@ActiveUser('userId') userId: number, @Body() createCourseDto: CreateCourseDTO) {
+    return this.courseService.create(createCourseDto, userId)
   }
 
   @Get()
@@ -100,13 +93,8 @@ export class CourseController {
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Admin, RoleName.Staff)
   @HttpCode(HttpStatus.OK)
-  @UseInterceptors(FileInterceptor('thumbnail', imageUploadOptions))
-  async update(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() updateCourseDto: UpdateCourseDTO,
-    @UploadedFile() thumbnail?: Express.Multer.File,
-  ) {
-    return this.courseService.update(id, updateCourseDto, thumbnail)
+  async update(@Param('id', ParseIntPipe) id: number, @Body() updateCourseDto: UpdateCourseDTO) {
+    return this.courseService.update(id, updateCourseDto)
   }
 
   @Delete(':id')

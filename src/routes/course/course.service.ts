@@ -10,7 +10,6 @@ import {
   CreateSessionDTO,
 } from './course.dto'
 import { CourseWithRelations, CourseWhereInput, CourseOrderByInput } from './course.model'
-import { S3Service } from 'src/shared/services/s3.service'
 import { LectureProfileRepository } from 'src/routes/profile/profile.repo'
 import { EnrollmentService } from '../enrollment/enrollment.service'
 
@@ -19,16 +18,11 @@ export class CourseService {
   constructor(
     private readonly courseRepository: CourseRepository,
     private readonly onlineClassRepository: OnlineClassRepository,
-    private readonly s3Service: S3Service,
     private readonly lecturerRepository: LectureProfileRepository,
     private readonly enrollmentService: EnrollmentService,
   ) {}
 
-  async create(
-    createCourseDto: CreateCourseDTO,
-    userId: number,
-    thumbnailFile?: Express.Multer.File,
-  ): Promise<CourseWithRelations> {
+  async create(createCourseDto: CreateCourseDTO, userId: number): Promise<CourseWithRelations> {
     const { slug, lecturerIds, ...courseData } = createCourseDto
 
     // Check if slug already exists
@@ -47,17 +41,9 @@ export class CourseService {
       }
     }
 
-    // Handle thumbnail upload if provided
-    let thumbnailUrl = ''
-    if (thumbnailFile) {
-      // TODO: Upload to S3 and get URL
-      thumbnailUrl = (await this.s3Service.uploadFileToS3(thumbnailFile)).url
-    }
-
     return this.courseRepository.create({
       slug,
       ...courseData,
-      thumbnailUrl,
       lecturerIds: lecturerIds.map((id) => Number(id)),
       createdBy: userId,
     })
@@ -144,11 +130,7 @@ export class CourseService {
     return course
   }
 
-  async update(
-    id: number,
-    updateCourseDto: UpdateCourseDTO,
-    thumbnailFile?: Express.Multer.File,
-  ): Promise<CourseWithRelations> {
+  async update(id: number, updateCourseDto: UpdateCourseDTO): Promise<CourseWithRelations> {
     // Check if course exists
     const existingCourse = await this.findOne(id)
 
@@ -172,21 +154,12 @@ export class CourseService {
       }
     }
 
-    // Handle thumbnail upload if provided
-    let thumbnailUrl = ''
-    if (thumbnailFile) {
-      // TODO: Upload to S3 and get URL
-      thumbnailUrl = (await this.s3Service.uploadFileToS3(thumbnailFile)).url
-      console.log('Thumbnail file received:', thumbnailFile.originalname)
-    }
-
     const { lecturerIds, ...courseData } = updateCourseDto
 
     return this.courseRepository.update({
       where: { id },
       data: {
         ...courseData,
-        thumbnailUrl,
         ...(lecturerIds !== undefined && {
           lecturerIds: lecturerIds === null ? [] : lecturerIds.map((id) => Number(id)),
         }),
