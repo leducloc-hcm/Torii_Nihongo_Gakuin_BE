@@ -167,6 +167,8 @@ export class LessonRepository {
         data: {
           kind: MediaKind.VIDEO,
           url: uploadInfo.key,
+          lessonId: lesson.id,
+          mimeType: contentType,
         },
       })
 
@@ -175,7 +177,6 @@ export class LessonRepository {
         data: { mediaId: mediaAsset.id },
       })
     }
-
     return uploadInfo
   }
   async generatePublicStreamUrl(lessonId: number) {
