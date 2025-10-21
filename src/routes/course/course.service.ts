@@ -398,4 +398,22 @@ export class CourseService {
 
     return this.onlineClassRepository.getClassSessions(classId)
   }
+  async getMyCourseDetail(userId: number, courseId: number) {
+    // Check if user is enrolled in the course
+    const enrollment = await this.enrollmentService.findByUserAndCourse(userId, courseId)
+    if (!enrollment) {
+      throw new NotFoundException(`You are not enrolled in course with ID ${courseId}`)
+    }
+
+    // Get full course details
+    const course = await this.findOne(courseId, true)
+
+    // Get lecturer profiles
+    const lecturerArray = await this.lecturerRepository.findLectureProfileByUserIds(course.lecturerIds)
+
+    return {
+      ...course,
+      lecturers: lecturerArray,
+    }
+  }
 }

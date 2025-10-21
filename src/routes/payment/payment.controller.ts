@@ -31,15 +31,11 @@ export class PaymentController {
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Customer, RoleName.Admin, RoleName.Staff)
   @HttpCode(HttpStatus.CREATED)
-  async createPayment(
-    @ActiveUser('userId') userId: number,
-    @Body() createPaymentDto: CreatePaymentDTO,
-    @Req() req: Request,
-  ): Promise<PaymentResponseDTO> {
+  async createPayment(@ActiveUser('userId') userId: number, @Req() req: Request): Promise<PaymentResponseDTO> {
     const ipAddr =
       (req.headers['x-forwarded-for'] as string) || (req.connection.remoteAddress as string) || req.ip || '127.0.0.1'
 
-    return this.paymentService.createPayment(userId, createPaymentDto, ipAddr)
+    return this.paymentService.createPayment(userId, ipAddr)
   }
 
   @Get('vnpay/callback')
