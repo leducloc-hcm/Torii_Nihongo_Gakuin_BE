@@ -24,6 +24,29 @@ export class TestPaperRepository {
   async findById(id: number): Promise<TestPaperType | null> {
     return await this.prisma.testPaper.findUnique({
       where: { id },
+      include: {
+        sections: {
+          include: {
+            items: {
+              include: {
+                question: {
+                  include: {
+                    option: {
+                      select: {
+                        id: true,
+                        content: true,
+                        mediaId: true,
+                        order: true,
+                      },
+                    },
+                    media: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     })
   }
 
@@ -333,7 +356,7 @@ export class TestPaperRepository {
     const count = await this.prisma.testPaper.count({
       where: { id },
     })
-    return (await count) > 0
+    return count > 0
   }
 
   async existsByIds(ids: number[]): Promise<number[]> {
@@ -345,7 +368,7 @@ export class TestPaperRepository {
       },
       select: { id: true },
     })
-    return await papers.map((p) => p.id)
+    return papers.map((p) => p.id)
   }
 
   async getTitleExists(title: string, excludeId?: number): Promise<boolean> {
@@ -355,7 +378,7 @@ export class TestPaperRepository {
         ...(excludeId && { id: { not: excludeId } }),
       },
     })
-    return (await count) > 0
+    return count > 0
   }
 
   async getLatestVersion(blueprintId: number): Promise<TestPaperType | null> {

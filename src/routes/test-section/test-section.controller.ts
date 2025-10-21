@@ -60,6 +60,8 @@ export class TestSectionController {
       title: createDto.title,
       type: createDto.type,
       order: createDto.order ?? 0,
+      scorePerQuestion: createDto.scorePerQuestion ?? 1.0,
+      totalScore: createDto.totalScore,
     })
   }
 
@@ -92,7 +94,7 @@ export class TestSectionController {
   async getTestSectionsByTestId(
     @Param('testId', ParseIntPipe) testId: number,
     @Query('includeItems') includeItems?: string,
-  ): Promise<TestSectionBasic[]  > {
+  ): Promise<TestSectionBasic[]> {
     if (includeItems === 'true') {
       return this.testSectionService.getTestSectionsByTestIdWithItems(testId)
     }
@@ -156,6 +158,31 @@ export class TestSectionController {
     @Body() updateDto: UpdateTestSectionDto,
   ): Promise<TestSection> {
     return this.testSectionService.updateTestSection(id, updateDto)
+  }
+
+  @Put('test-sections/:id/scoring')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
+  @ApiOperation({ summary: 'Update test section scoring' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Test section scoring updated successfully' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Test section not found' })
+  @ApiParam({ name: 'id', description: 'Test section ID' })
+  updateSectionScoring(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { scorePerQuestion?: number; totalScore?: number },
+  ): Promise<TestSection> {
+    return this.testSectionService.updateSectionScoring(id, body.scorePerQuestion, body.totalScore)
+  }
+
+  @Post('test-sections/:id/recalculate-score')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
+  @ApiOperation({ summary: 'Recalculate total score based on current items and score per question' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Total score recalculated successfully' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Test section not found' })
+  @ApiParam({ name: 'id', description: 'Test section ID' })
+  recalculateTotalScore(@Param('id', ParseIntPipe) id: number): Promise<TestSection> {
+    return this.testSectionService.updateSectionTotalScore(id)
   }
 
   @Post('test-sections/:id/copy')
@@ -229,6 +256,8 @@ export class TestSectionController {
       title: section.title,
       type: section.type,
       order: section.order ?? 0,
+      scorePerQuestion: 1.0,
+      totalScore: 0,
     }))
     return this.testSectionService.bulkCreateTestSections(testId, sectionsWithDefaults)
   }

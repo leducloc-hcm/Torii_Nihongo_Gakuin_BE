@@ -23,15 +23,29 @@ export class TestItemRepository {
 
   // ===== Basic CRUD Operations =====
 
-  async create(data: CreateTestItemInput): Promise<TestItem> {
+  async create(data: CreateTestItemInput): Promise<any> {
     // If order not provided, assign next available order
     if (data.order === undefined) {
       const maxOrder = await this.getMaxOrderInSection(data.sectionId)
       data.order = maxOrder + 1
     }
 
+    // Create the data object with proper typing
+    const createData: any = {
+      sectionId: data.sectionId,
+      order: data.order,
+    }
+
+    if (data.questionId) {
+      createData.questionId = data.questionId
+    }
+
+    if (data.questionGroupId) {
+      createData.questionGroupId = data.questionGroupId
+    }
+
     return this.prisma.testItem.create({
-      data,
+      data: createData,
     })
   }
 
@@ -131,14 +145,14 @@ export class TestItemRepository {
     return { items: items as TestItemWithDetails[], total }
   }
 
-  async update(id: number, data: UpdateTestItemInput): Promise<TestItem> {
+  async update(id: number, data: UpdateTestItemInput): Promise<any> {
     return await this.prisma.testItem.update({
       where: { id },
       data,
     })
   }
 
-  async delete(id: number): Promise<TestItem> {
+  async delete(id: number): Promise<any> {
     return await this.prisma.testItem.delete({
       where: { id },
     })
@@ -146,7 +160,7 @@ export class TestItemRepository {
 
   // ===== Bulk Operations =====
 
-  async bulkCreate(data: BulkCreateTestItemsInput): Promise<TestItem[]> {
+  async bulkCreate(data: BulkCreateTestItemsInput): Promise<any[]> {
     const { items } = data
 
     // Group items by sectionId for efficient order assignment
@@ -174,7 +188,24 @@ export class TestItemRepository {
     }
 
     // Use transaction to create all items
-    return this.prisma.$transaction(itemsToCreate.map((item) => this.prisma.testItem.create({ data: item })))
+    return this.prisma.$transaction(
+      itemsToCreate.map((item) => {
+        const createData: any = {
+          sectionId: item.sectionId,
+          order: item.order,
+        }
+
+        if (item.questionId) {
+          createData.questionId = item.questionId
+        }
+
+        if (item.questionGroupId) {
+          createData.questionGroupId = item.questionGroupId
+        }
+
+        return this.prisma.testItem.create({ data: createData })
+      }),
+    )
   }
 
   async bulkDelete(data: BulkDeleteTestItemsInput): Promise<{ count: number }> {
@@ -186,7 +217,7 @@ export class TestItemRepository {
     return result
   }
 
-  async reorder(data: ReorderTestItemsInput): Promise<TestItem[]> {
+  async reorder(data: ReorderTestItemsInput): Promise<any[]> {
     const { updates } = data
 
     return await this.prisma.$transaction(
@@ -201,7 +232,7 @@ export class TestItemRepository {
 
   // ===== Advanced Operations =====
 
-  async copyItems(itemIds: number[], data: CopyTestItemsInput): Promise<TestItem[]> {
+  async copyItems(itemIds: number[], data: CopyTestItemsInput): Promise<any[]> {
     const { targetSectionId, maintainOrder = true } = data
 
     // Get source items
@@ -219,16 +250,23 @@ export class TestItemRepository {
     }
 
     // Create new items in target section
-    const newItems = sourceItems.map((item, index) => ({
-      sectionId: targetSectionId,
-      questionId: item.questionId,
-      order: maintainOrder ? startOrder + index : index,
-    }))
+    return this.prisma.$transaction(
+      sourceItems.map((item, index) => {
+        const createData: any = {
+          sectionId: targetSectionId,
+          order: maintainOrder ? startOrder + index : index,
+        }
 
-    return this.prisma.$transaction(newItems.map((item) => this.prisma.testItem.create({ data: item })))
+        if (item.questionId) {
+          createData.questionId = item.questionId
+        }
+
+        return this.prisma.testItem.create({ data: createData })
+      }),
+    )
   }
 
-  async moveItems(itemIds: number[], data: MoveTestItemsInput): Promise<TestItem[]> {
+  async moveItems(itemIds: number[], data: MoveTestItemsInput): Promise<any[]> {
     const { targetSectionId, newOrder } = data
 
     // Get source items
@@ -300,12 +338,14 @@ export class TestItemRepository {
     let difficultyCount = 0
 
     for (const item of items) {
-      const type = item.question.type
-      typeCount[type] = (typeCount[type] || 0) + 1
+      if (item.question) {
+        const type = item.question.type
+        typeCount[type] = (typeCount[type] || 0) + 1
 
-      if (item.question.difficulty && difficultyMap[item.question.difficulty as keyof typeof difficultyMap]) {
-        totalDifficulty += difficultyMap[item.question.difficulty as keyof typeof difficultyMap]
-        difficultyCount++
+        if (item.question.difficulty && difficultyMap[item.question.difficulty as keyof typeof difficultyMap]) {
+          totalDifficulty += difficultyMap[item.question.difficulty as keyof typeof difficultyMap]
+          difficultyCount++
+        }
       }
     }
 
@@ -322,7 +362,7 @@ export class TestItemRepository {
 
   // ===== Helper Methods =====
 
-  private async getMaxOrderInSection(sectionId: number): Promise<number> {
+  async getMaxOrderInSection(sectionId: number): Promise<number> {
     const result = await this.prisma.testItem.aggregate({
       where: { sectionId },
       _max: { order: true },
@@ -358,7 +398,7 @@ export class TestItemRepository {
     return count > 0
   }
 
-  async getBySectionId(sectionId: number): Promise<TestItem[]> {
+  async getBySectionId(sectionId: number): Promise<any[]> {
     return await this.prisma.testItem.findMany({
       where: { sectionId },
       orderBy: { order: 'asc' },
@@ -369,5 +409,21 @@ export class TestItemRepository {
     return await this.prisma.testItem.count({
       where: { sectionId },
     })
+  }
+
+  async questionGroupExists(questionGroupId: number): Promise<boolean> {
+    const count = await this.prisma.questionGroup.count({
+      where: { id: questionGroupId },
+    })
+    return count > 0
+  }
+
+  async getQuestionsFromGroup(questionGroupId: number): Promise<{ id: number }[]> {
+    const questions = await this.prisma.question.findMany({
+      where: { questionGroupId },
+      select: { id: true },
+      orderBy: { id: 'asc' },
+    })
+    return questions
   }
 }

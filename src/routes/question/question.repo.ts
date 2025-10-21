@@ -15,8 +15,8 @@ import {
 export class QuestionRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  private readonly includeOptions = {
-    options: {
+  private readonly includeWithOptions = {
+    option: {
       orderBy: {
         order: 'asc' as const,
       },
@@ -31,11 +31,24 @@ export class QuestionRepository {
     },
   } as const
 
-  async create(data: QuestionCreateInput): Promise<QuestionType> {
-    return await this.prisma.question.create({
-      data: data as any,
-      include: this.includeOptions,
-    })
+  async create(data: QuestionCreateInput): Promise<any> {
+    try {
+      return await this.prisma.question.create({
+        data: data as any,
+        include: {
+          media: {
+            select: {
+              id: true,
+              url: true,
+              kind: true,
+              caption: true,
+            },
+          },
+        },
+      })
+    } catch (error) {
+      throw new Error(`Failed to create question: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
   }
 
   async createWithOptions(
@@ -49,11 +62,11 @@ export class QuestionRepository {
     return await this.prisma.question.create({
       data: {
         ...questionData,
-        options: {
+        option: {
           create: options,
         },
       },
-      include: this.includeOptions,
+      include: this.includeWithOptions,
     })
   }
 
@@ -66,22 +79,26 @@ export class QuestionRepository {
   }): Promise<any[]> {
     const { skip, take, where, orderBy, includeOptions = false } = params
 
-    if (includeOptions) {
+    try {
+      if (includeOptions) {
+        return await this.prisma.question.findMany({
+          skip,
+          take,
+          where: where as any,
+          orderBy: orderBy as any,
+          include: this.includeWithOptions,
+        })
+      }
+
       return await this.prisma.question.findMany({
         skip,
         take,
-        where,
-        orderBy,
-        include: this.includeOptions,
+        where: where as any,
+        orderBy: orderBy as any,
       })
+    } catch (error) {
+      throw new Error(`Failed to fetch questions: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
-
-    return await this.prisma.question.findMany({
-      skip,
-      take,
-      where,
-      orderBy,
-    })
   }
 
   async findManyWithStats(params: {
@@ -89,56 +106,79 @@ export class QuestionRepository {
     take?: number
     where?: QuestionWhereInput
     orderBy?: QuestionOrderByInput
-  }) {
+  }): Promise<any[]> {
     const { skip, take, where, orderBy } = params
 
-    return await this.prisma.question.findMany({
-      skip,
-      take,
-      where,
-      orderBy,
-      include: {
-        _count: {
-          select: {
-            option: true,
+    try {
+      return await this.prisma.question.findMany({
+        skip,
+        take,
+        where: where as any,
+        orderBy: orderBy as any,
+        include: {
+          _count: {
+            select: {
+              option: true,
+            },
+          },
+          option: {
+            include: {
+              question: true,
+            },
+          },
+          media: {
+            select: {
+              id: true,
+              url: true,
+              kind: true,
+              caption: true,
+            },
           },
         },
-        option: {
-          select: {
-            isCorrect: true,
-          },
-        },
-        media: {
-          select: {
-            id: true,
-            url: true,
-            kind: true,
-            caption: true,
-          },
-        },
-      },
-    })
+      })
+    } catch (error) {
+      throw new Error(
+        `Failed to fetch questions with stats: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      )
+    }
   }
 
-  async findUnique(where: QuestionWhereUniqueInput, includeOptions = true): Promise<QuestionType | null> {
-    if (includeOptions) {
+  async findUnique(where: QuestionWhereUniqueInput, includeOptions = true): Promise<any | null> {
+    try {
+      if (includeOptions) {
+        return await this.prisma.question.findUnique({
+          where: where as any,
+          include: this.includeWithOptions,
+        })
+      }
+
       return await this.prisma.question.findUnique({
         where: where as any,
-        include: this.includeOptions,
       })
+    } catch (error) {
+      throw new Error(`Failed to find question: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
-
-    return await this.prisma.question.findUnique({
-      where: where as any,
-    })
   }
 
-  async update(where: QuestionWhereUniqueInput, data: any): Promise<QuestionType> {
-    return await this.prisma.question.update({
-      where: where as any,
-      data,
-      include: this.includeOptions,
-    })
+  async update(where: QuestionWhereUniqueInput, data: any): Promise<any> {
+    try {
+      return await this.prisma.question.update({
+        where: where as any,
+        data,
+        include: {
+          media: {
+            select: {
+              id: true,
+              url: true,
+              kind: true,
+              caption: true,
+            },
+          },
+        },
+      })
+    } catch (error) {
+      throw new Error(`Failed to update question: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
   }
 
   async updateWithOptions(
@@ -181,20 +221,28 @@ export class QuestionRepository {
       // Return await updated question with options
       return await tx.question.findUnique({
         where: { id: questionId },
-        include: this.includeOptions,
+        include: this.includeWithOptions,
       })
     })
   }
 
-  async delete(where: QuestionWhereUniqueInput): Promise<QuestionType> {
-    // Options will be deleted automatically due to cascade
-    return await this.prisma.question.delete({
-      where: where as any,
-    })
+  async delete(where: QuestionWhereUniqueInput): Promise<any> {
+    try {
+      // Options will be deleted automatically due to cascade
+      return await this.prisma.question.delete({
+        where: where as any,
+      })
+    } catch (error) {
+      throw new Error(`Failed to delete question: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
   }
 
   async count(where?: QuestionWhereInput): Promise<number> {
-    return await this.prisma.question.count({ where })
+    try {
+      return await this.prisma.question.count({ where: where as any })
+    } catch (error) {
+      throw new Error(`Failed to count questions: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
   }
 
   async getStatistics(): Promise<{
@@ -265,11 +313,11 @@ export class QuestionRepository {
         const question = await tx.question.create({
           data: {
             ...questionData,
-            options: {
+            option: {
               create: options,
             },
           },
-          include: this.includeOptions,
+          include: this.includeWithOptions,
         })
 
         createdQuestions.push(question)
@@ -287,9 +335,76 @@ export class QuestionRepository {
   }
 
   async checkMediaExists(mediaId: number): Promise<boolean> {
-    const count = await this.prisma.mediaAsset.count({
-      where: { id: mediaId },
+    try {
+      const count = await this.prisma.mediaAsset.count({
+        where: { id: mediaId },
+      })
+      return count > 0
+    } catch (error) {
+      throw new Error(`Failed to check media existence: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  // Helper method to get questions by specific filters (similar to test-section pattern)
+  async findByFilters(filters: {
+    type?: string
+    level?: string
+    difficulty?: string
+    page?: number
+    limit?: number
+    sortBy?: string
+    sortOrder?: string
+  }): Promise<{ data: any[]; total: number }> {
+    const { type, level, difficulty, page = 1, limit = 10, sortBy = 'createdAt', sortOrder = 'desc' } = filters
+
+    const skip = (page - 1) * limit
+    const where: any = {}
+
+    if (type) where.type = type
+    if (level) where.level = level
+    if (difficulty) where.difficulty = difficulty
+
+    const orderBy: any = {}
+    if (sortBy && sortOrder) {
+      orderBy[sortBy] = sortOrder
+    }
+
+    try {
+      const [data, total] = await Promise.all([
+        this.findManyWithStats({ skip, take: limit, where, orderBy }),
+        this.count(where),
+      ])
+
+      return { data, total }
+    } catch (error) {
+      throw new Error(
+        `Failed to find questions by filters: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      )
+    }
+  }
+
+  async createMedia(data: {
+    url: string
+    kind: string
+    caption?: string | null
+    mimeType?: string
+    sizeByte?: number
+  }): Promise<{ id: number; url: string; kind: string; caption?: string | null }> {
+    return await this.prisma.mediaAsset.create({
+      data: {
+        url: data.url,
+        kind: data.kind as any,
+        caption: data.caption,
+        mimeType: data.mimeType,
+        sizeByte: data.sizeByte,
+        status: 'READY',
+      },
+      select: {
+        id: true,
+        url: true,
+        kind: true,
+        caption: true,
+      },
     })
-    return count > 0
   }
 }

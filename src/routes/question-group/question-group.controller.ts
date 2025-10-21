@@ -11,6 +11,8 @@ import {
   HttpStatus,
   UseGuards,
   ParseIntPipe,
+  UseInterceptors,
+  UploadedFiles,
 } from '@nestjs/common'
 import { QuestionGroupService } from './question-group.service'
 import {
@@ -27,6 +29,8 @@ import { Roles } from 'src/shared/decorators/roles.decorator'
 import { RolesGuard } from 'src/shared/guards/roles.guard'
 import { RoleName } from 'src/shared/constants/role.constant'
 import { ApiTags } from '@nestjs/swagger'
+import { FileFieldsInterceptor } from '@nestjs/platform-express'
+import { mediaUploadOptions } from 'src/shared/config/upload.config'
 
 @ApiTags('Question Groups')
 @Controller('question-groups')
@@ -38,8 +42,20 @@ export class QuestionGroupController {
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Admin, RoleName.Lecturer)
   @HttpCode(HttpStatus.CREATED)
-  async create(@Body() createDto: CreateQuestionGroupDTO) {
-    return this.questionGroupService.create(createDto)
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: 'image', maxCount: 1 },
+        { name: 'audio', maxCount: 1 },
+      ],
+      mediaUploadOptions,
+    ),
+  )
+  async create(
+    @Body() createDto: CreateQuestionGroupDTO,
+    @UploadedFiles() files?: { image?: Express.Multer.File[]; audio?: Express.Multer.File[] },
+  ) {
+    return this.questionGroupService.create(createDto, files)
   }
 
   @Post('bulk')
@@ -94,8 +110,21 @@ export class QuestionGroupController {
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Admin, RoleName.Lecturer)
   @HttpCode(HttpStatus.OK)
-  async update(@Param('id', ParseIntPipe) id: number, @Body() updateDto: UpdateQuestionGroupDTO) {
-    return this.questionGroupService.update(id, updateDto)
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: 'image', maxCount: 1 },
+        { name: 'audio', maxCount: 1 },
+      ],
+      mediaUploadOptions,
+    ),
+  )
+  async update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateDto: UpdateQuestionGroupDTO,
+    @UploadedFiles() files?: { image?: Express.Multer.File[]; audio?: Express.Multer.File[] },
+  ) {
+    return this.questionGroupService.update(id, updateDto, files)
   }
 
   @Post(':id/questions')

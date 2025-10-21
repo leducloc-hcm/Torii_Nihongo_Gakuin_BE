@@ -388,19 +388,20 @@ model QuestionGroup {
 
   media       MediaAsset? @relation(fields: [mediaId], references: [id])
   questions   Question[]
+  testItems   TestItem[]
 }
 
 model Option {
   id         Int     @id @default(autoincrement())
   questionId Int
   content    String?
-  imageId    Int?
+  mediaId    Int?
   isCorrect  Boolean @default(false)
   order      Int     @default(0)
   testAnswers TestAnswer[] 
   quizAnswers QuizAnswer[]
   examAnswers ExamAnswer[]
-  image     MediaAsset? @relation(fields: [imageId], references: [id])
+  image     MediaAsset? @relation(fields: [mediaId], references: [id])
   question  Question     @relation(fields: [questionId], references: [id])
 }
 
@@ -427,19 +428,22 @@ model TestSection {
   title  String
   type   QuestionType
   order  Int          @default(0)
-
+  scorePerQuestion Float      @default(1.0) // điểm mỗi câu trong phần này
+  totalScore        Float? 
   test  TestPaper  @relation(fields: [testId], references: [id])
   items TestItem[]
 }
 
 model TestItem {
-  id         Int @id @default(autoincrement())
-  sectionId  Int
-  questionId Int
-  order      Int @default(0)
-
-  section  TestSection @relation(fields: [sectionId], references: [id])
-  question Question    @relation(fields: [questionId], references: [id])
+  id              Int @id @default(autoincrement())
+  sectionId       Int
+  questionId      Int?
+  questionGroupId Int?
+  order           Int @default(0)
+  
+  section       TestSection    @relation(fields: [sectionId], references: [id])
+  question      Question?      @relation(fields: [questionId], references: [id])
+  questionGroup QuestionGroup? @relation(fields: [questionGroupId], references: [id])
 }
 
 model TestAttempt {
@@ -450,7 +454,7 @@ model TestAttempt {
   submittedAt     DateTime?
   score           Float?
   levelSuggestion JLPTLevel?
-
+  earnedScore      Float?
   user    User         @relation(fields: [userId], references: [id])
   test    TestPaper    @relation(fields: [testId], references: [id])
   answers TestAnswer[]
@@ -731,7 +735,8 @@ model ExamSection {
   title  String
   type   QuestionType
   order  Int          @default(0)
-
+  scorePerQuestion Float      @default(1.0) // điểm mỗi câu trong phần này
+  totalScore        Float? 
   exam  ExamPaper  @relation(fields: [examId], references: [id])
   items ExamItem[]
 }
@@ -741,7 +746,7 @@ model ExamItem {
   sectionId  Int
   questionId Int
   order      Int @default(0)
-
+  score      Float?
   section  ExamSection @relation(fields: [sectionId], references: [id])
   question Question    @relation(fields: [questionId], references: [id])
 }

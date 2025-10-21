@@ -311,14 +311,14 @@ export class QuestionGroupRepository {
     const count = await this.prisma.questionGroup.count({
       where: { id },
     })
-    return (await count) > 0
+    return count > 0
   }
 
   async checkMediaExists(mediaId: number): Promise<boolean> {
     const count = await this.prisma.mediaAsset.count({
       where: { id: mediaId },
     })
-    return (await count) > 0
+    return count > 0
   }
 
   async checkQuestionsExist(questionIds: number[]): Promise<{
@@ -339,6 +339,19 @@ export class QuestionGroupRepository {
     return await this.prisma.questionGroup.findMany({
       where: { type: type as any },
       include: this.includeQuestions,
+    })
+  }
+
+  async createMedia(url: string, mimeType: string, sizeByte: number, caption?: string) {
+    return await this.prisma.mediaAsset.create({
+      data: {
+        url,
+        mimeType,
+        sizeByte,
+        caption,
+        kind: 'OTHER',
+        status: 'READY',
+      },
     })
   }
 }

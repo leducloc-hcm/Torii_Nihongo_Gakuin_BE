@@ -18,27 +18,42 @@ export interface TestItemWithDetails extends TestItem {
 }
 
 // ===== Zod Schemas =====
-export const CreateTestItemSchema = z.object({
-  sectionId: z.number().int().positive(),
-  questionId: z.number().int().positive(),
-  order: z.number().int().min(0).optional(),
-})
+export const CreateTestItemSchema = z
+  .object({
+    sectionId: z.number().int().positive(),
+    questionId: z.number().int().positive().optional(),
+    questionGroupId: z.number().int().positive().optional(),
+    order: z.number().int().min(0).optional(),
+  })
+  .refine((data) => data.questionId !== undefined || data.questionGroupId !== undefined, {
+    message: 'Either questionId or questionGroupId must be provided',
+  })
+  .refine((data) => !(data.questionId !== undefined && data.questionGroupId !== undefined), {
+    message: 'Cannot provide both questionId and questionGroupId',
+  })
 
-export const UpdateTestItemSchema = z.object({
-  questionId: z.number().int().positive().optional(),
-  order: z.number().int().min(0).optional(),
-})
+export const UpdateTestItemSchema = z
+  .object({
+    questionId: z.number().int().positive().optional(),
+    questionGroupId: z.number().int().positive().optional(),
+    order: z.number().int().min(0).optional(),
+  })
+  .refine((data) => !(data.questionId !== undefined && data.questionGroupId !== undefined), {
+    message: 'Cannot provide both questionId and questionGroupId',
+  })
 
 export const TestItemQuerySchema = z.object({
   sectionId: z.number().int().positive().optional(),
   questionId: z.number().int().positive().optional(),
+  questionGroupId: z.number().int().positive().optional(),
   minOrder: z.number().int().min(0).optional(),
   maxOrder: z.number().int().min(0).optional(),
   includeQuestion: z.boolean().optional(),
   includeSection: z.boolean().optional(),
+  includeQuestionGroup: z.boolean().optional(),
   page: z.number().int().min(1).optional(),
   limit: z.number().int().min(1).max(100).optional(),
-  sortBy: z.enum(['id', 'order', 'questionId']).optional(),
+  sortBy: z.enum(['id', 'order', 'questionId', 'questionGroupId']).optional(),
   sortOrder: z.enum(['asc', 'desc']).optional(),
 })
 

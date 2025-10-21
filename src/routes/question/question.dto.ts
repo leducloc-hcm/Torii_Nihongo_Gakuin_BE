@@ -1,7 +1,9 @@
 import { createZodDto } from 'nestjs-zod'
 import {
   CreateQuestionSchema,
+  CreateQuestionWithOptionsSchema,
   UpdateQuestionSchema,
+  UpdateQuestionWithOptionsSchema,
   QueryQuestionSchema,
   QuestionResponseSchema,
   QuestionListItemSchema,
@@ -10,7 +12,9 @@ import {
 } from './question.model'
 
 export class CreateQuestionDTO extends createZodDto(CreateQuestionSchema) {}
+export class CreateQuestionWithOptionsDTO extends createZodDto(CreateQuestionWithOptionsSchema) {}
 export class UpdateQuestionDTO extends createZodDto(UpdateQuestionSchema) {}
+export class UpdateQuestionWithOptionsDTO extends createZodDto(UpdateQuestionWithOptionsSchema) {}
 export class QueryQuestionDTO extends createZodDto(QueryQuestionSchema) {}
 export class QuestionResponseDTO extends createZodDto(QuestionResponseSchema) {}
 export class QuestionListItemDTO extends createZodDto(QuestionListItemSchema) {}

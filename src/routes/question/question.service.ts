@@ -4,24 +4,60 @@ import { CreateQuestionDTO, UpdateQuestionDTO, QueryQuestionDTO, BulkCreateQuest
 import { QuestionWhereInput, QuestionOrderByInput, QuestionWithOptions } from './question.model'
 import { JLPTLevelType, QuestionTypeType, DifficultyType } from 'src/shared/constants/enum.constant'
 import { QuestionType } from 'src/shared/types/question.types'
+import { S3Service } from 'src/shared/services/s3.service'
 
 @Injectable()
 export class QuestionService {
-  constructor(private readonly questionRepository: QuestionRepository) {}
+  constructor(
+    private readonly questionRepository: QuestionRepository,
+    private readonly s3Service: S3Service,
+  ) {}
 
-  async create(createDto: CreateQuestionDTO): Promise<any> {
-    const { options, mediaId, metadata, ...questionData } = createDto
+  async create(
+    createDto: CreateQuestionDTO,
+    files?: { image?: Express.Multer.File[]; audio?: Express.Multer.File[] },
+  ): Promise<any> {
+    const { mediaId, metadata, ...questionData } = createDto
 
-    if (mediaId) {
-      const mediaExists = await this.questionRepository.checkMediaExists(mediaId)
-      if (!mediaExists) {
-        throw new BadRequestException(`Media with ID ${mediaId} does not exist`)
+    // Handle file uploads
+    let uploadedMediaId = mediaId
+
+    if (files?.image?.[0] || files?.audio?.[0]) {
+      // Upload files to S3 and create media record
+      let imageUrl: string | undefined
+      let audioUrl: string | undefined
+
+      if (files.image?.[0]) {
+        const imageResult = await this.s3Service.uploadFileToS3(files.image[0], 'questions/images')
+        imageUrl = imageResult.url
+      }
+
+      if (files.audio?.[0]) {
+        const audioResult = await this.s3Service.uploadFileToS3(files.audio[0], 'questions/audio')
+        audioUrl = audioResult.url
+      }
+
+      // Create media record in database
+      if (imageUrl || audioUrl) {
+        const primaryUrl = imageUrl || audioUrl!
+        const mediaData = {
+          url: primaryUrl,
+          kind: imageUrl ? 'IMAGE' : 'AUDIO',
+          caption: null,
+          mimeType: files.image?.[0]?.mimetype || files.audio?.[0]?.mimetype,
+          sizeByte: files.image?.[0]?.size || files.audio?.[0]?.size,
+        }
+
+        const media = await this.questionRepository.createMedia(mediaData)
+        uploadedMediaId = media.id
       }
     }
 
-    const correctOptions = options.filter((opt) => opt.isCorrect)
-    if (correctOptions.length === 0) {
-      throw new BadRequestException('At least one option must be correct')
+    if (uploadedMediaId) {
+      const mediaExists = await this.questionRepository.checkMediaExists(uploadedMediaId)
+      if (!mediaExists) {
+        throw new BadRequestException(`Media with ID ${uploadedMediaId} does not exist`)
+      }
     }
 
     const questionCreateData: any = {
@@ -29,22 +65,45 @@ export class QuestionService {
       metadata: metadata || null,
     }
 
-    if (mediaId) {
-      questionCreateData.media = { connect: { id: mediaId } }
+    if (uploadedMediaId) {
+      questionCreateData.media = { connect: { id: uploadedMediaId } }
     }
 
-    return this.questionRepository.createWithOptions(
-      questionCreateData,
-      options.map((opt, index) => ({
-        content: opt.content,
-        isCorrect: opt.isCorrect,
-        order: opt.order ?? index,
-      })),
-    )
+    return this.questionRepository.create(questionCreateData)
   }
 
-  async findAll(queryDto: QueryQuestionDTO) {
-    const { page, limit, type, level, difficulty, readingLength, keyword, tags, hasMedia, sortBy, sortOrder } = queryDto
+  async findAll(queryDto: QueryQuestionDTO): Promise<{
+    data: any[]
+    pagination: {
+      total: number
+      page: number
+      limit: number
+      totalPages: number
+      hasNext: boolean
+      hasPrev: boolean
+    }
+  }> {
+    const {
+      page = 1,
+      limit = 10,
+      type,
+      level,
+      difficulty,
+      readingLength,
+      keyword,
+      tags,
+      hasMedia,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+    } = queryDto
+
+    if (page < 1) {
+      throw new BadRequestException('Page must be greater than 0')
+    }
+
+    if (limit < 1 || limit > 100) {
+      throw new BadRequestException('Limit must be between 1 and 100')
+    }
 
     const skip = (page - 1) * limit
 
@@ -97,34 +156,39 @@ export class QuestionService {
       orderBy[sortBy] = sortOrder
     }
 
-    const [questions, total] = await Promise.all([
-      this.questionRepository.findManyWithStats({
-        skip,
-        take: limit,
-        where,
-        orderBy,
-      }),
-      this.questionRepository.count(where),
-    ])
+    try {
+      const [questions, total] = await Promise.all([
+        this.questionRepository.findManyWithStats({
+          skip,
+          take: limit,
+          where,
+          orderBy,
+        }),
+        this.questionRepository.count(where),
+      ])
 
-    // Transform questions to include stats
-    const transformedQuestions = questions.map((question) => ({
-      ...question,
-      optionsCount: question._count?.option || 0,
-      correctOptionsCount: question.option?.filter((opt) => opt.isCorrect).length || 0,
-      hasMedia: !!question.mediaId,
-    }))
+      // Transform questions to include stats
+      const transformedQuestions = questions.map((question) => ({
+        ...question,
+        correctOptionsCount: question.option?.filter((opt) => opt.isCorrect).length || 0,
+        hasMedia: !!question.mediaId,
+      }))
 
-    return {
-      data: transformedQuestions,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-        hasNext: page * limit < total,
-        hasPrev: page > 1,
-      },
+      return {
+        data: transformedQuestions,
+        pagination: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+          hasNext: page * limit < total,
+          hasPrev: page > 1,
+        },
+      }
+    } catch (error) {
+      throw new BadRequestException(
+        `Failed to fetch questions: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      )
     }
   }
 
@@ -136,46 +200,57 @@ export class QuestionService {
     return question
   }
 
-  async update(id: number, updateDto: UpdateQuestionDTO): Promise<any> {
+  async update(
+    id: number,
+    updateDto: UpdateQuestionDTO,
+    files?: { image?: Express.Multer.File[]; audio?: Express.Multer.File[] },
+  ): Promise<any> {
     const exists = await this.questionRepository.checkExists(id)
     if (!exists) {
       throw new NotFoundException(`Question with ID ${id} not found`)
     }
 
-    const { options, mediaId, ...questionData } = updateDto
+    const { mediaId, ...questionData } = updateDto
 
-    if (mediaId) {
-      const mediaExists = await this.questionRepository.checkMediaExists(mediaId)
-      if (!mediaExists) {
-        throw new BadRequestException(`Media with ID ${mediaId} does not exist`)
+    // Handle file uploads
+    let updatedMediaId = mediaId
+
+    if (files?.image?.[0] || files?.audio?.[0]) {
+      // Upload files to S3 and create media record
+      let imageUrl: string | undefined
+      let audioUrl: string | undefined
+
+      if (files.image?.[0]) {
+        const imageResult = await this.s3Service.uploadFileToS3(files.image[0], 'questions/images')
+        imageUrl = imageResult.url
+      }
+
+      if (files.audio?.[0]) {
+        const audioResult = await this.s3Service.uploadFileToS3(files.audio[0], 'questions/audio')
+        audioUrl = audioResult.url
+      }
+
+      // Create media record in database
+      if (imageUrl || audioUrl) {
+        const primaryUrl = imageUrl || audioUrl!
+        const mediaData = {
+          url: primaryUrl,
+          kind: imageUrl ? 'IMAGE' : 'AUDIO',
+          caption: null,
+          mimeType: files.image?.[0]?.mimetype || files.audio?.[0]?.mimetype,
+          sizeByte: files.image?.[0]?.size || files.audio?.[0]?.size,
+        }
+
+        const media = await this.questionRepository.createMedia(mediaData)
+        updatedMediaId = media.id
       }
     }
 
-    // Validate at least one correct option if options are provided
-    if (options) {
-      const correctOptions = options.filter((opt) => opt.isCorrect)
-      if (correctOptions.length === 0) {
-        throw new BadRequestException('At least one option must be correct')
+    if (updatedMediaId) {
+      const mediaExists = await this.questionRepository.checkMediaExists(updatedMediaId)
+      if (!mediaExists) {
+        throw new BadRequestException(`Media with ID ${updatedMediaId} does not exist`)
       }
-
-      const updateData: any = {
-        ...questionData,
-        metadata: questionData.metadata || null,
-      }
-
-      if (mediaId) {
-        updateData.media = { connect: { id: mediaId } }
-      }
-
-      return this.questionRepository.updateWithOptions(
-        id,
-        updateData,
-        options.map((opt, index) => ({
-          content: opt.content,
-          isCorrect: opt.isCorrect,
-          order: opt.order ?? index,
-        })),
-      )
     }
 
     const updateData: any = {
@@ -183,14 +258,14 @@ export class QuestionService {
       metadata: questionData.metadata || null,
     }
 
-    if (mediaId) {
-      updateData.media = { connect: { id: mediaId } }
+    if (updatedMediaId) {
+      updateData.media = { connect: { id: updatedMediaId } }
     }
 
     return this.questionRepository.update({ id }, updateData)
   }
 
-  async remove(id: number): Promise<QuestionType> {
+  async remove(id: number): Promise<any> {
     const exists = await this.questionRepository.checkExists(id)
     if (!exists) {
       throw new NotFoundException(`Question with ID ${id} not found`)
@@ -258,5 +333,37 @@ export class QuestionService {
   async findByDifficulty(difficulty: DifficultyType, queryDto: Omit<QueryQuestionDTO, 'difficulty'>) {
     const queryWithDifficulty = { ...queryDto, difficulty }
     return this.findAll(queryWithDifficulty)
+  }
+
+  // Additional helper methods for consistency with test-section pattern
+  async getQuestionsByFilters(filters: {
+    type?: QuestionTypeType
+    level?: JLPTLevelType
+    difficulty?: DifficultyType
+    page?: number
+    limit?: number
+    sortBy?: string
+    sortOrder?: string
+  }) {
+    const result = await this.questionRepository.findByFilters(filters as any)
+
+    const transformedData = result.data.map((question) => ({
+      ...question,
+      optionsCount: question._count?.option || 0,
+      correctOptionsCount: question.option?.filter((opt: any) => opt.isCorrect).length || 0,
+      hasMedia: !!question.mediaId,
+    }))
+
+    return {
+      data: transformedData,
+      pagination: {
+        total: result.total,
+        page: filters.page || 1,
+        limit: filters.limit || 10,
+        totalPages: Math.ceil(result.total / (filters.limit || 10)),
+        hasNext: (filters.page || 1) * (filters.limit || 10) < result.total,
+        hasPrev: (filters.page || 1) > 1,
+      },
+    }
   }
 }

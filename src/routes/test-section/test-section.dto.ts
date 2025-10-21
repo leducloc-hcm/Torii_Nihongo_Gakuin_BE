@@ -24,6 +24,12 @@ export class CreateTestSectionDto {
 
   @ApiPropertyOptional({ default: 0, description: 'Display order within the test' })
   order?: number
+
+  @ApiPropertyOptional({ default: 1.0, description: 'Score per question in this section' })
+  scorePerQuestion?: number
+
+  @ApiPropertyOptional({ description: 'Total score for this section (auto-calculated if not provided)' })
+  totalScore?: number
 }
 
 // ===== Update TestSection DTO =====
@@ -36,6 +42,12 @@ export class UpdateTestSectionDto extends createZodDto(UpdateTestSectionSchema) 
 
   @ApiPropertyOptional({ description: 'Display order within the test' })
   order?: number
+
+  @ApiPropertyOptional({ description: 'Score per question in this section' })
+  scorePerQuestion?: number
+
+  @ApiPropertyOptional({ description: 'Total score for this section (auto-calculated if not provided)' })
+  totalScore?: number
 }
 
 export class TestSectionQueryDto {

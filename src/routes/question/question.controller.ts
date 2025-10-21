@@ -11,6 +11,8 @@ import {
   HttpStatus,
   UseGuards,
   ParseIntPipe,
+  UseInterceptors,
+  UploadedFiles,
 } from '@nestjs/common'
 import { QuestionService } from './question.service'
 import { CreateQuestionDTO, UpdateQuestionDTO, QueryQuestionDTO, BulkCreateQuestionsDTO } from './question.dto'
@@ -20,6 +22,8 @@ import { Roles } from 'src/shared/decorators/roles.decorator'
 import { RolesGuard } from 'src/shared/guards/roles.guard'
 import { RoleName } from 'src/shared/constants/role.constant'
 import type { JLPTLevelType, QuestionTypeType, DifficultyType } from 'src/shared/constants/enum.constant'
+import { FileFieldsInterceptor } from '@nestjs/platform-express'
+import { imageUploadOptions, mediaUploadOptions } from 'src/shared/config/upload.config'
 
 @Controller('questions')
 @UseGuards(RolesGuard)
@@ -30,8 +34,20 @@ export class QuestionController {
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Admin, RoleName.Lecturer)
   @HttpCode(HttpStatus.CREATED)
-  async create(@Body() createDto: CreateQuestionDTO) {
-    return this.questionService.create(createDto)
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: 'image', maxCount: 1 },
+        { name: 'audio', maxCount: 1 },
+      ],
+      mediaUploadOptions,
+    ),
+  )
+  async create(
+    @Body() createDto: CreateQuestionDTO,
+    @UploadedFiles() files?: { image?: Express.Multer.File[]; audio?: Express.Multer.File[] },
+  ) {
+    return this.questionService.create(createDto, files)
   }
 
   @Post('bulk')
@@ -97,8 +113,21 @@ export class QuestionController {
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Admin, RoleName.Lecturer)
   @HttpCode(HttpStatus.OK)
-  async update(@Param('id', ParseIntPipe) id: number, @Body() updateDto: UpdateQuestionDTO) {
-    return this.questionService.update(id, updateDto)
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: 'image', maxCount: 1 },
+        { name: 'audio', maxCount: 1 },
+      ],
+      mediaUploadOptions,
+    ),
+  )
+  async update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateDto: UpdateQuestionDTO,
+    @UploadedFiles() files?: { image?: Express.Multer.File[]; audio?: Express.Multer.File[] },
+  ) {
+    return this.questionService.update(id, updateDto, files)
   }
 
   @Delete(':id')

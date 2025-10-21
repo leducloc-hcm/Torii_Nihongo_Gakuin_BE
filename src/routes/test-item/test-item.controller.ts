@@ -26,6 +26,8 @@ import {
   TestItemResponseDto,
   TestItemListResponseDto,
   CreateItemsForSectionDto,
+  CreateItemsFromQuestionGroupDto,
+  BulkCreateItemsFromQuestionGroupsDto,
 } from './test-item.dto'
 
 @ApiTags('Test Items')
@@ -299,7 +301,7 @@ export class TestItemController {
   @Post('section/:sectionId/questions')
   @ApiOperation({
     summary: 'Add multiple questions to a section',
-    description: 'Create multiple test items by adding questions to a specific section',
+    description: 'Create multiple test items by adding questions or question groups to a specific section',
   })
   @ApiParam({ name: 'sectionId', description: 'Test section ID' })
   @ApiResponse({
@@ -308,12 +310,87 @@ export class TestItemController {
     type: [TestItemResponseDto],
   })
   @ApiResponse({ status: 400, description: 'Invalid input or bulk limit exceeded' })
-  @ApiResponse({ status: 404, description: 'Section or question not found' })
+  @ApiResponse({ status: 404, description: 'Section, question, or question group not found' })
   @ApiResponse({ status: 409, description: 'Question already exists in section' })
   async createItemsForSection(
     @Param('sectionId', ParseIntPipe) sectionId: number,
     @Body() createDto: CreateItemsForSectionDto,
   ) {
-    return this.testItemService.createItemsForSection(sectionId, createDto.questionIds, createDto.maintainOrder)
+    const results: any[] = []
+
+    // Handle individual questions
+    if (createDto.questionIds && createDto.questionIds.length > 0) {
+      const questionItems = await this.testItemService.createItemsForSection(
+        sectionId,
+        createDto.questionIds,
+        createDto.maintainOrder,
+      )
+      results.push(...questionItems)
+    }
+
+    // Handle question groups
+    if (createDto.questionGroupIds && createDto.questionGroupIds.length > 0) {
+      const groupItems = await this.testItemService.createItemsFromQuestionGroups(
+        sectionId,
+        createDto.questionGroupIds,
+        createDto.maintainOrder,
+      )
+      results.push(...groupItems)
+    }
+
+    return results
+  }
+
+  @Post('section/:sectionId/question-groups')
+  @ApiOperation({
+    summary: 'Add question groups to a section',
+    description: 'Create test items from question groups, either as groups or individual questions',
+  })
+  @ApiParam({ name: 'sectionId', description: 'Test section ID' })
+  @ApiResponse({
+    status: 201,
+    description: 'Test items created successfully',
+    type: [TestItemResponseDto],
+  })
+  @ApiResponse({ status: 400, description: 'Invalid input or bulk limit exceeded' })
+  @ApiResponse({ status: 404, description: 'Section or question group not found' })
+  async createItemsFromQuestionGroup(
+    @Param('sectionId', ParseIntPipe) sectionId: number,
+    @Body() createDto: CreateItemsFromQuestionGroupDto,
+  ) {
+    return this.testItemService.createItemFromQuestionGroup(
+      sectionId,
+      createDto.questionGroupId,
+      createDto.addIndividualQuestions,
+      createDto.order,
+    )
+  }
+
+  @Post('question-groups/bulk')
+  @ApiOperation({
+    summary: 'Bulk create test items from question groups',
+    description: 'Create multiple test items from question groups in batch (max 20)',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Test items created successfully',
+    type: [TestItemResponseDto],
+  })
+  @ApiResponse({ status: 400, description: 'Invalid input data or bulk limit exceeded' })
+  @ApiResponse({ status: 404, description: 'Section or question group not found' })
+  async bulkCreateFromQuestionGroups(@Body() bulkCreateDto: BulkCreateItemsFromQuestionGroupsDto) {
+    const results: any[] = []
+
+    for (const item of bulkCreateDto.items) {
+      const createdItems = await this.testItemService.createItemFromQuestionGroup(
+        item.sectionId,
+        item.questionGroupId,
+        item.addIndividualQuestions,
+        item.order,
+      )
+      results.push(...createdItems)
+    }
+
+    return results
   }
 }

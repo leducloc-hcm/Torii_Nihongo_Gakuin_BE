@@ -8,11 +8,17 @@ export class CreateTestItemDto {
   })
   sectionId!: number
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 456,
-    description: 'ID of the question for this test item',
+    description: 'ID of the question for this test item (either questionId or questionGroupId is required)',
   })
-  questionId!: number
+  questionId?: number
+
+  @ApiPropertyOptional({
+    example: 789,
+    description: 'ID of the question group for this test item (either questionId or questionGroupId is required)',
+  })
+  questionGroupId?: number
 
   @ApiPropertyOptional({
     example: 1,
@@ -29,6 +35,12 @@ export class UpdateTestItemDto {
     description: 'New question ID for this test item',
   })
   questionId?: number
+
+  @ApiPropertyOptional({
+    example: 321,
+    description: 'New question group ID for this test item',
+  })
+  questionGroupId?: number
 
   @ApiPropertyOptional({
     example: 2,
@@ -50,6 +62,12 @@ export class TestItemQueryDto {
     description: 'Filter by question ID',
   })
   questionId?: number
+
+  @ApiPropertyOptional({
+    example: 789,
+    description: 'Filter by question group ID',
+  })
+  questionGroupId?: number
 
   @ApiPropertyOptional({
     example: 0,
@@ -263,12 +281,19 @@ export class TestItemListResponseDto {
 
 // ===== Create Items for Section DTO =====
 export class CreateItemsForSectionDto {
-  @ApiProperty({
+  @ApiPropertyOptional({
     type: [Number],
     example: [1, 2, 3, 4, 5],
     description: 'Array of question IDs to add to the section (max 50)',
   })
-  questionIds!: number[]
+  questionIds?: number[]
+
+  @ApiPropertyOptional({
+    type: [Number],
+    example: [10, 11, 12],
+    description: 'Array of question group IDs to add to the section (max 20)',
+  })
+  questionGroupIds?: number[]
 
   @ApiPropertyOptional({
     example: true,
@@ -276,4 +301,45 @@ export class CreateItemsForSectionDto {
     description: 'Whether to maintain question order as provided',
   })
   maintainOrder?: boolean
+}
+
+// ===== Create Items from Question Group DTO =====
+export class CreateItemsFromQuestionGroupDto {
+  @ApiProperty({
+    example: 123,
+    description: 'Section ID to add the question group to',
+  })
+  sectionId!: number
+
+  @ApiProperty({
+    example: 456,
+    description: 'Question group ID to add to the section',
+  })
+  questionGroupId!: number
+
+  @ApiPropertyOptional({
+    example: true,
+    default: false,
+    description: 'Whether to add individual questions from the group or the group itself',
+  })
+  addIndividualQuestions?: boolean
+
+  @ApiPropertyOptional({
+    example: 1,
+    description: 'Order of the item within the section (auto-assigned if not provided)',
+  })
+  order?: number
+}
+
+// ===== Bulk Create Items from Question Groups DTO =====
+export class BulkCreateItemsFromQuestionGroupsDto {
+  @ApiProperty({
+    type: [CreateItemsFromQuestionGroupDto],
+    example: [
+      { sectionId: 123, questionGroupId: 456, addIndividualQuestions: false },
+      { sectionId: 123, questionGroupId: 789, addIndividualQuestions: true },
+    ],
+    description: 'Array of question group items to create (max 20)',
+  })
+  items!: CreateItemsFromQuestionGroupDto[]
 }

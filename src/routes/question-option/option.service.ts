@@ -3,39 +3,73 @@ import { OptionRepository } from './option.repo'
 import { CreateOptionDTO, UpdateOptionDTO, QueryOptionDTO, BulkCreateOptionsDTO, ReorderOptionsDTO } from './option.dto'
 import { OptionWhereInput, OptionOrderByInput } from './option.model'
 import { OptionType } from 'src/shared/types/question.types'
+import { S3Service } from 'src/shared/services/s3.service'
 
 @Injectable()
 export class OptionService {
-  constructor(private readonly optionRepository: OptionRepository) {}
+  constructor(
+    private readonly optionRepository: OptionRepository,
+    private readonly s3Service: S3Service,
+  ) {}
 
-  async create(questionId: number, createDto: CreateOptionDTO): Promise<any> {
-    // Validate question exists
+  async create(
+    questionId: number,
+    createDto: CreateOptionDTO,
+    files?: { image?: Express.Multer.File[]; audio?: Express.Multer.File[] },
+  ): Promise<any> {
+    // 1️⃣ Kiểm tra câu hỏi tồn tại
     const questionExists = await this.optionRepository.checkQuestionExists(questionId)
     if (!questionExists) {
       throw new NotFoundException(`Question with ID ${questionId} not found`)
     }
 
-    // Get next order if not provided
-    const order = createDto.order ?? (await this.optionRepository.getNextOrder(questionId))
+    // 2️⃣ Convert kiểu dữ liệu (fix lỗi "Expected Boolean, provided String")
+    const isCorrect =
+      String(createDto.isCorrect).toLowerCase() === 'true' || createDto.isCorrect === true ? true : false
+    const order = createDto.order ? Number(createDto.order) : await this.optionRepository.getNextOrder(questionId)
 
-    // Check if this will be a correct option and validate business rules
-    if (createDto.isCorrect) {
-      // Allow multiple correct options - no validation needed
-    } else {
-      // If this is not correct, ensure at least one correct option exists or will exist
-      const { hasCorrectOption } = await this.optionRepository.validateCorrectOptions(questionId)
-      if (!hasCorrectOption) {
-        // This is fine - they might add correct options later
-        // Or this might be the first option and they'll mark another as correct
+    // 3️⃣ Upload file nếu có
+    let uploadedMediaId = createDto.mediaId
+    if (files?.image?.[0] || files?.audio?.[0]) {
+      let imageUrl: string | undefined
+      let audioUrl: string | undefined
+
+      if (files.image?.[0]) {
+        const imageResult = await this.s3Service.uploadFileToS3(files.image[0], 'options/images')
+        imageUrl = imageResult.url
+      }
+
+      if (files.audio?.[0]) {
+        const audioResult = await this.s3Service.uploadFileToS3(files.audio[0], 'options/audio')
+        audioUrl = audioResult.url
+      }
+
+      if (imageUrl || audioUrl) {
+        const primaryUrl = imageUrl || audioUrl!
+        const media = await this.optionRepository.createMedia(
+          primaryUrl,
+          files.image?.[0]?.mimetype || files.audio?.[0]?.mimetype || 'application/octet-stream',
+          files.image?.[0]?.size || files.audio?.[0]?.size || 0,
+          undefined,
+        )
+        uploadedMediaId = media.id
       }
     }
 
-    return this.optionRepository.create({
+    // 4️⃣ Chuẩn bị dữ liệu
+    const optionData: any = {
       questionId,
       content: createDto.content,
-      isCorrect: createDto.isCorrect,
+      isCorrect,
       order,
-    })
+    }
+
+    if (uploadedMediaId) {
+      optionData.mediaId = uploadedMediaId
+    }
+
+    // 5️⃣ Gọi repository tạo record
+    return this.optionRepository.create(optionData)
   }
 
   async findByQuestion(questionId: number, queryDto: QueryOptionDTO) {
@@ -92,11 +126,47 @@ export class OptionService {
     return option
   }
 
-  async update(id: number, updateDto: UpdateOptionDTO): Promise<any> {
+  async update(
+    id: number,
+    updateDto: UpdateOptionDTO,
+    files?: { image?: Express.Multer.File[]; audio?: Express.Multer.File[] },
+  ): Promise<any> {
     // Check if option exists
     const existingOption = await this.optionRepository.findUnique({ id }, false)
     if (!existingOption) {
       throw new NotFoundException(`Option with ID ${id} not found`)
+    }
+
+    // Handle file uploads
+    let uploadedMediaId = updateDto.mediaId
+
+    if (files?.image?.[0] || files?.audio?.[0]) {
+      // Upload files to S3 and create media record
+      let imageUrl: string | undefined
+      let audioUrl: string | undefined
+
+      if (files.image?.[0]) {
+        const imageResult = await this.s3Service.uploadFileToS3(files.image[0], 'options/images')
+        imageUrl = imageResult.url
+      }
+
+      if (files.audio?.[0]) {
+        const audioResult = await this.s3Service.uploadFileToS3(files.audio[0], 'options/audio')
+        audioUrl = audioResult.url
+      }
+
+      // Create media record in database
+      if (imageUrl || audioUrl) {
+        const primaryUrl = imageUrl || audioUrl!
+
+        const media = await this.optionRepository.createMedia(
+          primaryUrl,
+          files.image?.[0]?.mimetype || files.audio?.[0]?.mimetype || 'application/octet-stream',
+          files.image?.[0]?.size || files.audio?.[0]?.size || 0,
+          undefined,
+        )
+        uploadedMediaId = media.id
+      }
     }
 
     // If updating isCorrect to false, validate at least one correct option will remain
@@ -108,7 +178,12 @@ export class OptionService {
       }
     }
 
-    return this.optionRepository.update({ id }, updateDto)
+    const updateData = { ...updateDto }
+    if (uploadedMediaId) {
+      updateData.mediaId = uploadedMediaId
+    }
+
+    return this.optionRepository.update({ id }, updateData)
   }
 
   async remove(id: number): Promise<OptionType> {
@@ -154,7 +229,7 @@ export class OptionService {
     // Assign orders if not provided
     let nextOrder = await this.optionRepository.getNextOrder(questionId)
     const optionsWithOrder = options.map((option) => ({
-      content: option.content,
+      content: option.content ?? '',
       isCorrect: option.isCorrect,
       order: option.order ?? nextOrder++,
     }))
