@@ -64,6 +64,8 @@ model User {
   aiMessages AIChatMessage[]
 
   assessmentPaper AssessmentPaper[]
+  quiz           Quiz[]
+  quizAttempts   QuizAttempt[]
   Class Class[]
 
 
@@ -277,7 +279,7 @@ model Lesson {
   module      Module       @relation(fields: [moduleId], references: [id])
   media   MediaAsset[]
   liveSession LiveSession?
-  assessmentPaper AssessmentPaper?
+  quiz        Quiz?
   notes       LessonNote[]
 }
 
@@ -366,6 +368,8 @@ model Question {
   option            Option[]        
   assessmentAnswers AssessmentAnswer[]
   assessmentItems  AssessmentItem[]
+  quizItems       QuizItem[]
+  quizAnswers     QuizAnswer[]
 }
 
 model QuestionGroup {
@@ -391,6 +395,7 @@ model Option {
   isCorrect  Boolean @default(false)
   order      Int     @default(0)
   assessmentAnswers AssessmentAnswer[]
+  quizAnswers     QuizAnswer[]
   image     MediaAsset? @relation(fields: [mediaId], references: [id])
   question  Question     @relation(fields: [questionId], references: [id])
 }
@@ -403,12 +408,8 @@ model AssessmentPaper {
   visibility Visibility    @default(PRIVATE)
 
   createdBy  Int
-  author     User?          @relation(fields: [createdBy], references: [id])
+  author     User          @relation(fields: [createdBy], references: [id])
   createdAt  DateTime      @default(now())
-
-  // liên kết đặc thù
-  lessonId   Int?       @unique                         // dùng cho QUIZ gắn với Lesson
-  lesson     Lesson?       @relation(fields: [lessonId], references: [id])
 
   blueprintId       Int?                        // thay cho TestPaper.blueprintId
   blueprint         PlacementBlueprint? @relation(fields: [blueprintId], references: [id])
@@ -459,7 +460,7 @@ model AssessmentAttempt {
   earnedScore     Float?
 
   assessment AssessmentPaper  @relation(fields: [assessmentId], references: [id])
-  user       User?        @relation(fields: [userId], references: [id])
+  user       User        @relation(fields: [userId], references: [id])
   answers    AssessmentAnswer[]
 
   @@unique([userId, assessmentId]) 
@@ -477,6 +478,55 @@ model AssessmentAnswer {
   attempt        AssessmentAttempt @relation(fields: [attemptId], references: [id])
   question       Question          @relation(fields: [questionId], references: [id])
   selectedOption Option?           @relation(fields: [selectedOptionId], references: [id])
+}
+
+model Quiz {
+  id        Int      @id @default(autoincrement())
+  lessonId  Int?     @unique
+  title     String
+  createdAt DateTime @default(now())
+  createdBy  Int
+  author    User    @relation(fields: [createdBy], references: [id])
+
+  lesson   Lesson?       @relation(fields: [lessonId], references: [id])
+  items    QuizItem[]
+  attempts QuizAttempt[]
+}
+
+model QuizItem {
+  id         Int @id @default(autoincrement())
+  quizId     Int
+  questionId Int
+  order      Int @default(0)
+
+  quiz     Quiz     @relation(fields: [quizId], references: [id])
+  question Question @relation(fields: [questionId], references: [id])
+}
+
+model QuizAttempt {
+  id          Int       @id @default(autoincrement())
+  quizId      Int
+  userId      Int
+  startedAt   DateTime  @default(now())
+  submittedAt DateTime?
+  score       Float?
+
+  quiz    Quiz         @relation(fields: [quizId], references: [id])
+  user    User         @relation(fields: [userId], references: [id])
+  answers QuizAnswer[]
+}
+
+model QuizAnswer {
+  id               Int      @id @default(autoincrement())
+  attemptId        Int
+  questionId       Int
+  selectedOptionId Int?
+  isCorrect        Boolean?
+  explanation      String?
+
+  attempt        QuizAttempt @relation(fields: [attemptId], references: [id])
+  question       Question    @relation(fields: [questionId], references: [id])
+  selectedOption Option?     @relation(fields: [selectedOptionId], references: [id])
 }
 
 // ===== Live Classes (WebRTC 2D/3D) =====
@@ -966,7 +1016,6 @@ enum JLPTLevel {
 }
 
 enum AssessmentType {
-  QUIZ
   TEST
   EXAM
 }
