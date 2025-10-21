@@ -153,16 +153,22 @@ export const ParticipantActionSchema = z.object({
 
 // Online Class Response Schema (with relations)
 export const OnlineClassResponseSchema = OnlineClassSchema.extend({
-  currentSession: z
-    .object({
-      id: z.string(),
-      roomKey: z.string(),
-      startedAt: z.coerce.date(),
-      participantCount: z.number(),
-      isRecording: z.boolean(),
-      janusRoomId: z.number().optional(),
-    })
-    .optional(),
+  sessions: z
+    .array(
+      z.object({
+        id: z.string(),
+        roomKey: z.string(),
+        scheduledAt: z.coerce.date(),
+        endedAt: z.coerce.date().nullable().optional(),
+        participantCount: z.number().optional(),
+        isRecording: z.boolean().optional(),
+        janusRoomId: z.number().nullable().optional(),
+        mode: z.enum(['MODE2D', 'MODE3D']).optional(),
+        recordingUrl: z.string().nullable().optional(),
+      }),
+    )
+    .optional()
+    .default([]),
   lecturer: z
     .object({
       id: z.number(),

@@ -2,8 +2,6 @@ import { z } from 'zod'
 
 // Create Payment Schema
 export const CreatePaymentSchema = z.object({
-  returnUrl: z.string().url().optional(),
-  language: z.enum(['vn', 'en']).default('vn'),
   couponCode: z.string().optional(),
 })
 

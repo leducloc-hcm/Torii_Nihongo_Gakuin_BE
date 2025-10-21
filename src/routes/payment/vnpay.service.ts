@@ -32,15 +32,8 @@ export class VNPayService {
   /**
    * Create VNPay payment URL
    */
-  createPaymentUrl(params: {
-    orderId: string
-    amount: number
-    orderInfo: string
-    ipAddr: string
-    returnUrl?: string
-    language?: string
-  }): string {
-    const { orderId, amount, orderInfo, ipAddr, returnUrl, language = 'vn' } = params
+  createPaymentUrl(params: { orderId: string; amount: number; orderInfo: string; ipAddr: string }): string {
+    const { orderId, amount, orderInfo, ipAddr } = params
 
     const date = new Date()
     const createDate = this.formatDate(date)
@@ -54,10 +47,10 @@ export class VNPayService {
       vnp_CreateDate: createDate,
       vnp_CurrCode: 'VND',
       vnp_IpAddr: ipAddr,
-      vnp_Locale: language,
+      vnp_Locale: 'vn',
       vnp_OrderInfo: orderInfo,
       vnp_OrderType: 'other',
-      vnp_ReturnUrl: returnUrl || this.vnpayConfig.returnUrl,
+      vnp_ReturnUrl: this.vnpayConfig.returnUrl,
       vnp_TxnRef: orderId,
       vnp_ExpireDate: expireDate,
     }
