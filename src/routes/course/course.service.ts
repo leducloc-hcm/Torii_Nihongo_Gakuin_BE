@@ -96,9 +96,14 @@ export class CourseService {
       where,
       orderBy,
     })
-
+    const lecturerArray = await this.lecturerRepository.findLectureProfileByUserIds(
+      courses.map((course) => course.lecturerIds).flat(),
+    )
     return {
-      data: courses,
+      data: courses.map((course) => ({
+        ...course,
+        lecturers: lecturerArray.filter((lecturer) => course.lecturerIds.includes(lecturer.userId)),
+      })),
       meta: {
         page,
         limit: Number(limit),

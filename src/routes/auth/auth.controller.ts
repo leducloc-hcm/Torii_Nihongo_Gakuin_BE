@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Ip, Post, Query, Req, Res } from '@nestjs/common'
+import { Body, Controller, Get, HttpCode, HttpStatus, Ip, Post, Put, Query, Req, Res, UseGuards } from '@nestjs/common'
 import { Role } from '@prisma/client'
 import type { Response } from 'express'
 import { ZodSerializerDto } from 'nestjs-zod'
@@ -28,8 +28,10 @@ import { Roles } from 'src/shared/decorators/roles.decorator'
 import { UserAgent } from 'src/shared/decorators/user-agent.decorator'
 import { EmptyBodyDTO } from 'src/shared/dtos/request.dto'
 import { MessageResDTO } from 'src/shared/dtos/response.dto'
+import { RolesGuard } from 'src/shared/guards/roles.guard'
 
 @Controller('auth')
+@UseGuards(RolesGuard)
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
@@ -146,5 +148,29 @@ export class AuthController {
   @Roles(RoleName.Admin, RoleName.Staff)
   getAllLecturers() {
     return this.authService.getAllLecturers()
+  }
+
+  @Get('/user/all')
+  @ZodSerializerDto(MessageResDTO)
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Admin, RoleName.Staff)
+  getAllUsers() {
+    return this.authService.getAllUsers()
+  }
+  @Put('/user/disable/:id')
+  @ZodSerializerDto(MessageResDTO)
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Admin)
+  disableUserAccount(@Req() req) {
+    const userId = parseInt(req.params.id, 10)
+    return this.authService.disableUserAccount(userId)
+  }
+  @Put('/user/enable/:id')
+  @ZodSerializerDto(MessageResDTO)
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Admin)
+  enableUserAccount(@Req() req) {
+    const userId = parseInt(req.params.id, 10)
+    return this.authService.enableUserAccount(userId)
   }
 }
