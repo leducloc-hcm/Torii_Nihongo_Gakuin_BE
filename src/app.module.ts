@@ -23,6 +23,8 @@ import { AssessmentAnswerModule } from './routes/assessment-answer/assessment-an
 import { WebsocketsModule } from './websockets/websockets.module'
 import { OnlineClassModule } from './routes/online-class/online-class.module'
 import { QuestionGroupModule } from 'src/routes/question-group/question-group.module'
+import { CartModule } from './routes/cart/cart.module'
+import { PaymentModule } from './routes/payment/payment.module'
 
 @Module({
   imports: [
@@ -48,6 +50,8 @@ import { QuestionGroupModule } from 'src/routes/question-group/question-group.mo
     AssessmentAnswerModule,
     WebsocketsModule,
     OnlineClassModule,
+    CartModule,
+    PaymentModule,
   ],
   controllers: [AppController],
   providers: [AppService],

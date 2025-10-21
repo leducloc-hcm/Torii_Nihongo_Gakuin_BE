@@ -395,15 +395,15 @@ export class OnlineClassService {
     }
   }
 
-  async generateJoinToken(classId: string, userId: number): Promise<JoinClassTokenDto> {
+  async generateJoinToken(classId: string, sessionId: string, userId: number): Promise<JoinClassTokenDto> {
     try {
+      const sessionIdInt = parseInt(sessionId)
       const classIdInt = parseInt(classId)
-
       // Check access permissions Tam thoi bo qua
-      // const hasAccess = await this.checkClassAccess(classIdInt, userId)
-      // if (!hasAccess) {
-      //   throw new ForbiddenException('Access denied to this class')
-      // }
+      const hasAccess = await this.checkClassAccess(sessionIdInt, userId)
+      if (!hasAccess) {
+        throw new ForbiddenException('Access denied to this class')
+      }
 
       // Get class details with active session
       const onlineClass = await this.prisma.class.findUnique({
@@ -416,9 +416,7 @@ export class OnlineClassService {
           },
           course: true,
           sessions: {
-            where: { endedAt: null },
-            orderBy: { scheduledAt: 'desc' },
-            take: 1,
+            where: { id: sessionIdInt },
           },
         },
       })
@@ -577,7 +575,7 @@ export class OnlineClassService {
   }
 
   async startOnlineClassSession(
-    classId: string,
+    sessionId: string,
     lecturerId: number,
   ): Promise<{
     sessionId: string
@@ -587,11 +585,11 @@ export class OnlineClassService {
     janusServer: string
   }> {
     try {
-      const classIdInt = parseInt(classId)
+      const sessionIdInt = parseInt(sessionId)
 
       // Verify lecturer permission
       const onlineClass = await this.prisma.class.findUnique({
-        where: { id: classIdInt },
+        where: { id: sessionIdInt },
       })
 
       if (!onlineClass || onlineClass.lecturerId !== lecturerId) {
@@ -599,16 +597,16 @@ export class OnlineClassService {
       }
 
       // Check if there's already an active session
-      // const activeSession = await this.prisma.liveSession.findFirst({
-      //   where: {
-      //     classId: classIdInt,
-      //     endedAt: null,
-      //   },
-      // })
+      const activeSession = await this.prisma.liveSession.findFirst({
+        where: {
+          id: sessionIdInt,
+          endedAt: null,
+        },
+      })
 
-      // if (activeSession) {
-      //   throw new BadRequestException('Class session is already active')
-      // }
+      if (activeSession) {
+        throw new BadRequestException('Class session is already active')
+      }
 
       // Create Janus room via JanusService
       const roomKey = this.generateRoomKey()
@@ -620,13 +618,13 @@ export class OnlineClassService {
         fir_freq: 10,
         videocodec: 'vp8',
         audiocodec: 'opus',
-        record: true, // Enable recording if needed
+        record: true,
       })
 
-      // Create new session with Janus room ID
-      const session = await this.prisma.liveSession.create({
+      // Update this session with Janus room ID
+      const session = await this.prisma.liveSession.update({
+        where: { id: sessionIdInt },
         data: {
-          classId: classIdInt,
           title: onlineClass.title,
           scheduledAt: new Date(),
           mode: LiveMode.MODE2D,
@@ -635,12 +633,7 @@ export class OnlineClassService {
         },
       })
 
-      // Notify enrolled students that class has started
-      await this.notifyStudentsClassStarted(classIdInt, onlineClass.title)
-
-      this.logger.log(
-        `Started online class session ${session.id} for class ${classId} with Janus room ${janusRoom.room}`,
-      )
+      this.logger.log(`Started online class session ${session.id}  with Janus room ${janusRoom.room}`)
 
       return {
         sessionId: session.id.toString(),

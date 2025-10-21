@@ -1,5 +1,4 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Ip, Post, Put, Query, Req, Res, UseGuards } from '@nestjs/common'
-import { Role } from '@prisma/client'
 import type { Response } from 'express'
 import { ZodSerializerDto } from 'nestjs-zod'
 import {

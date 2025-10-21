@@ -52,6 +52,7 @@ model User {
   points      PointsLedger[]
   streak      Streak?
   redemptions RewardRedemption[]
+  cart        Cart?
   orders      Order[]
   reviews     Review[]
 
@@ -250,6 +251,7 @@ model Course {
   enrollments Enrollment[]
   reviews     Review[]
   orderItems  OrderItem[]
+  cartItems   CartItem[]
 
   Class Class[]
 }
@@ -822,7 +824,29 @@ model RewardRedemption {
   reward Reward @relation(fields: [rewardId], references: [id])
 }
 
-// ===== Commerce, Coupons, Affiliates =====
+// ===== Commerce, Cart, Orders, Coupons, Affiliates =====
+model Cart {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items CartItem[]
+}
+
+model CartItem {
+  id       Int @id @default(autoincrement())
+  cartId   Int
+  courseId Int
+  quantity Int @default(1)
+
+  cart   Cart   @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [courseId], references: [id])
+
+  @@unique([cartId, courseId])
+}
+
 model Order {
   id            Int           @id @default(autoincrement())
   userId        Int

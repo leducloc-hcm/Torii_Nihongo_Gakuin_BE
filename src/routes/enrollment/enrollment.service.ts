@@ -138,7 +138,7 @@ export class EnrollmentService {
   ) {
     const { page = 1, limit = 10, expired, courseType, sortBy = 'createdAt', sortOrder = 'desc' } = params
 
-    const skip = (page - 1) * limit
+    const skip = (page - 1) * Number(limit)
 
     const orderBy: EnrollmentOrderByInput = {}
     if (sortBy === 'createdAt') {
@@ -149,7 +149,7 @@ export class EnrollmentService {
 
     const { enrollments, total } = await this.enrollmentRepository.findMyEnrollments(userId, {
       skip,
-      take: limit,
+      take: Number(limit),
       expired,
       courseType,
       orderBy,
@@ -159,9 +159,9 @@ export class EnrollmentService {
       data: enrollments,
       meta: {
         page,
-        limit,
+        limit: Number(limit),
         total,
-        totalPages: Math.ceil(total / limit),
+        totalPages: Math.ceil(total / Number(limit)),
       },
     }
   }

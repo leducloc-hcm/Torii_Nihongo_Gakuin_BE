@@ -36,6 +36,7 @@ import { EmailService } from 'src/shared/services/email.service'
 import { ProfileService } from '../profile/profile.service'
 import { RoleName } from 'src/shared/constants/role.constant'
 import { CreateStaffAccountBodyDTO } from './auth.dto'
+import { CartService } from '../cart/cart.service'
 
 @Injectable()
 export class AuthService {
@@ -47,6 +48,7 @@ export class AuthService {
     private readonly tokenService: TokenService,
     private readonly twoFactorService: TwoFactorService,
     private readonly profileService: ProfileService,
+    private readonly cartService: CartService,
   ) {}
 
   async validateVerificationCode({
@@ -94,11 +96,17 @@ export class AuthService {
           },
         }),
       ])
-      await this.profileService.createProfile({
-        email: body.email,
-        name: body.name,
-        role: RoleName.Customer,
-      })
+
+      // Create profile and initialize cart for the new user
+      await Promise.all([
+        this.profileService.createProfile({
+          email: body.email,
+          name: body.name,
+          role: RoleName.Customer,
+        }),
+        this.cartService.initCart(user.id),
+      ])
+
       return user
     } catch (error) {
       if (isUniqueConstraintPrismaError(error)) {
@@ -376,19 +384,29 @@ export class AuthService {
     try {
       const tempPassword = 'defaultPassword123@@'
       const hashedPassword = await this.hashingService.hash(tempPassword)
-      await Promise.all([
-        this.authRepository.createUser({
-          email,
-          name,
-          password: hashedPassword,
-          status: VerifyStatus.VERIFIED,
-        }),
-        await this.profileService.createProfile({
-          email,
-          name,
-          role,
-        }),
-      ])
+      // Kiểm tra user đã tồn tại chưa
+      const existingUser = await this.sharedUserRepository.findUnique({
+        email,
+      })
+      if (existingUser) {
+        throw EmailAlreadyExistsException
+      }
+
+      const user = await this.authRepository.createUserWithRole({
+        email,
+        name,
+        role,
+        password: hashedPassword,
+        status: VerifyStatus.VERIFIED,
+      })
+
+      // Create profile and initialize cart for the new staff/lecturer account
+      await this.profileService.createProfile({
+        email,
+        name,
+        role,
+      })
+
       // Gửi email thông báo tạo tài khoản thành công
       const { error } = await this.emailService.sendAccountCreated({
         email,
