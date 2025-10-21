@@ -204,44 +204,47 @@ export interface TestAnswerWhereInput {
   isCorrect?: boolean | null
 }
 
-// TestAttempt Type Definition
-export interface TestAttemptType {
+// AssessmentAttempt Type Definition
+export interface AssessmentAttemptType {
   id: number
   userId: number
-  testId: number
+  assessmentId: number
   startedAt: Date
   submittedAt: Date | null
   score: number | null
+  earnedScore: number | null
   levelSuggestion: JLPTLevelType | null
 }
 
-export interface TestAttemptCreateData {
+export interface AssessmentAttemptCreateData {
   userId: number
-  testId: number
+  assessmentId: number
   startedAt?: Date
   submittedAt?: Date | null
   score?: number | null
+  earnedScore?: number | null
   levelSuggestion?: JLPTLevelType | null
 }
 
-export interface TestAttemptUpdateData {
+export interface AssessmentAttemptUpdateData {
   userId?: number
-  testId?: number
+  assessmentId?: number
   startedAt?: Date
   submittedAt?: Date | null
   score?: number | null
+  earnedScore?: number | null
   levelSuggestion?: JLPTLevelType | null
 }
 
-export interface TestAttemptWhereUniqueInput {
+export interface AssessmentAttemptWhereUniqueInput {
   id?: number
-  userId_testId?: { userId: number; testId: number }
+  userId_assessmentId?: { userId: number; assessmentId: number }
 }
 
-export interface TestAttemptWhereInput {
+export interface AssessmentAttemptWhereInput {
   id?: number
   userId?: number
-  testId?: number
+  assessmentId?: number
   submittedAt?: Date | null
   score?: number | { gte?: number; lte?: number }
 }

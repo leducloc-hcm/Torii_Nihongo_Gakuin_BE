@@ -1,0 +1,461 @@
+import { Injectable } from '@nestjs/common'
+import { PrismaService } from '../../shared/services/prisma.service'
+import { AssessmentSection, QuestionType } from '@prisma/client'
+import {
+  AssessmentSectionBase,
+  AssessmentSectionWithItems,
+  AssessmentSectionWithAssessment,
+  AssessmentSectionBasic,
+  CreateAssessmentSectionInput,
+  UpdateAssessmentSectionInput,
+  AssessmentSectionQuery,
+} from './assessment-section.model'
+
+@Injectable()
+export class AssessmentSectionRepository {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async create(data: CreateAssessmentSectionInput): Promise<AssessmentSection> {
+    return await this.prisma.assessmentSection.create({
+      data,
+    })
+  }
+
+  async findById(id: number): Promise<AssessmentSection | null> {
+    return await this.prisma.assessmentSection.findUnique({
+      where: { id },
+    })
+  }
+
+  async findByIdWithItems(id: number): Promise<AssessmentSectionWithItems | null> {
+    return (await this.prisma.assessmentSection.findUnique({
+      where: { id },
+      include: {
+        items: {
+          include: {
+            question: {
+              include: {
+                option: true,
+              },
+            },
+            questionGroup: {
+              include: {
+                media: true,
+                questions: {
+                  include: {
+                    option: true,
+                  },
+                },
+              },
+            },
+          },
+          orderBy: { order: 'asc' },
+        },
+      },
+    })) as AssessmentSectionWithItems | null
+  }
+
+  async findByIdWithAssessment(id: number): Promise<AssessmentSectionWithAssessment | null> {
+    return (await this.prisma.assessmentSection.findUnique({
+      where: { id },
+      include: {
+        assessment: {
+          select: {
+            id: true,
+            title: true,
+            level: true,
+            type: true,
+          },
+        },
+        _count: {
+          select: {
+            items: true,
+          },
+        },
+      },
+    })) as AssessmentSectionWithAssessment | null
+  }
+
+  async update(id: number, data: UpdateAssessmentSectionInput): Promise<AssessmentSection> {
+    return await this.prisma.assessmentSection.update({
+      where: { id },
+      data,
+    })
+  }
+
+  async delete(id: number): Promise<AssessmentSection> {
+    return await this.prisma.assessmentSection.delete({
+      where: { id },
+    })
+  }
+
+  async findMany(query: AssessmentSectionQuery): Promise<{
+    data: AssessmentSectionBasic[]
+    pagination: {
+      page: number
+      limit: number
+      total: number
+      totalPages: number
+      hasNext: boolean
+      hasPrev: boolean
+    }
+  }> {
+    const { page = 1, limit = 20, search, type, assessmentId, sortBy = 'order', sortOrder = 'asc' } = query
+
+    const skip = (page - 1) * limit
+
+    const where: any = {}
+
+    if (search) {
+      where.title = {
+        contains: search,
+        mode: 'insensitive',
+      }
+    }
+
+    if (type) where.type = type
+    if (assessmentId) where.assessmentId = assessmentId
+
+    const orderBy: any = {}
+    if (sortBy && sortOrder) {
+      orderBy[sortBy] = sortOrder
+    }
+
+    const [data, total] = await Promise.all([
+      this.prisma.assessmentSection.findMany({
+        where,
+        skip: Number(skip),
+        take: Number(limit),
+        orderBy,
+        include: {
+          _count: {
+            select: {
+              items: true,
+            },
+          },
+        },
+      }),
+      this.prisma.assessmentSection.count({ where }),
+    ])
+
+    return {
+      data: data as AssessmentSectionBasic[],
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasNext: page * limit < total,
+        hasPrev: page > 1,
+      },
+    }
+  }
+
+  // ===== Assessment-specific Operations =====
+  async findByAssessmentId(assessmentId: number): Promise<AssessmentSectionBasic[]> {
+    const result = await this.prisma.assessmentSection.findMany({
+      where: { assessmentId },
+      orderBy: { order: 'asc' },
+      include: {
+        _count: {
+          select: {
+            items: true,
+          },
+        },
+      },
+    })
+    return result as AssessmentSectionBasic[]
+  }
+
+  async findByAssessmentIdWithItems(assessmentId: number): Promise<AssessmentSectionWithItems[]> {
+    return (await this.prisma.assessmentSection.findMany({
+      where: { assessmentId },
+      orderBy: { order: 'asc' },
+      include: {
+        items: {
+          include: {
+            question: {
+              include: {
+                option: true,
+              },
+            },
+            questionGroup: {
+              include: {
+                media: true,
+                questions: {
+                  include: {
+                    option: true,
+                  },
+                },
+              },
+            },
+          },
+          orderBy: { order: 'asc' },
+        },
+      },
+    })) as AssessmentSectionWithItems[]
+  }
+
+  // ===== Bulk Operations =====
+  async bulkCreate(
+    assessmentId: number,
+    sections: Omit<CreateAssessmentSectionInput, 'assessmentId'>[],
+  ): Promise<AssessmentSection[]> {
+    const sectionsWithAssessmentId = sections.map((section) => ({
+      ...section,
+      assessmentId,
+    }))
+
+    const result = await this.prisma.$transaction(
+      sectionsWithAssessmentId.map((section) =>
+        this.prisma.assessmentSection.create({
+          data: section,
+        }),
+      ),
+    )
+
+    return result
+  }
+
+  async bulkDelete(ids: number[]): Promise<{ count: number }> {
+    return await this.prisma.assessmentSection.deleteMany({
+      where: {
+        id: {
+          in: ids,
+        },
+      },
+    })
+  }
+
+  async reorderSections(updates: Array<{ id: number; order: number }>): Promise<void> {
+    await this.prisma.$transaction(
+      updates.map(({ id, order }) =>
+        this.prisma.assessmentSection.update({
+          where: { id },
+          data: { order },
+        }),
+      ),
+    )
+  }
+
+  // ===== Statistics =====
+  async getStatistics(id: number): Promise<{
+    totalItems: number
+    itemsByType: Record<string, number>
+    totalScore: number
+    scorePerQuestion: number
+  }> {
+    const section = await this.prisma.assessmentSection.findUnique({
+      where: { id },
+      include: {
+        items: {
+          include: {
+            question: {
+              select: {
+                type: true,
+              },
+            },
+            questionGroup: {
+              select: {
+                type: true,
+              },
+            },
+          },
+        },
+      },
+    })
+
+    if (!section) {
+      return {
+        totalItems: 0,
+        itemsByType: {},
+        totalScore: 0,
+        scorePerQuestion: 0,
+      }
+    }
+
+    const totalItems = section.items.length
+    const itemsByType: Record<string, number> = {}
+
+    section.items.forEach((item) => {
+      let type: string | undefined
+
+      if (item.question) {
+        type = item.question.type
+      } else if (item.questionGroup) {
+        type = item.questionGroup.type
+      }
+
+      if (type) {
+        itemsByType[type] = (itemsByType[type] || 0) + 1
+      }
+    })
+
+    return {
+      totalItems,
+      itemsByType,
+      totalScore: section.totalScore || 0,
+      scorePerQuestion: section.scorePerQuestion,
+    }
+  }
+
+  // ===== Copy Operations =====
+  async copySection(id: number, targetAssessmentId: number, newTitle?: string): Promise<AssessmentSection> {
+    const originalSection = await this.findByIdWithItems(id)
+    if (!originalSection) {
+      throw new Error('Section not found')
+    }
+
+    // Get the next order for the target assessment
+    const lastSection = await this.prisma.assessmentSection.findFirst({
+      where: { assessmentId: targetAssessmentId },
+      orderBy: { order: 'desc' },
+    })
+
+    const nextOrder = lastSection ? lastSection.order + 1 : 0
+
+    // Create the new section
+    const newSection = await this.prisma.assessmentSection.create({
+      data: {
+        assessmentId: targetAssessmentId,
+        title: newTitle || `${originalSection.title} (Copy)`,
+        type: originalSection.type,
+        order: nextOrder,
+        scorePerQuestion: originalSection.scorePerQuestion,
+        totalScore: originalSection.totalScore,
+      },
+    })
+
+    // Copy all items
+    if (originalSection.items.length > 0) {
+      await this.prisma.assessmentItem.createMany({
+        data: originalSection.items.map((item, index) => ({
+          sectionId: newSection.id,
+          questionId: item.questionId,
+          questionGroupId: item.questionGroupId,
+          order: index,
+          score: item.score,
+        })),
+      })
+    }
+
+    return newSection
+  }
+
+  // ===== Move Operations =====
+  async moveSection(id: number, targetAssessmentId: number): Promise<AssessmentSection> {
+    // Get the next order for the target assessment
+    const lastSection = await this.prisma.assessmentSection.findFirst({
+      where: { assessmentId: targetAssessmentId },
+      orderBy: { order: 'desc' },
+    })
+
+    const nextOrder = lastSection ? lastSection.order + 1 : 0
+
+    return this.prisma.assessmentSection.update({
+      where: { id },
+      data: {
+        assessmentId: targetAssessmentId,
+        order: nextOrder,
+      },
+    })
+  }
+
+  // ===== Validation Helpers =====
+  async exists(id: number): Promise<boolean> {
+    const count = await this.prisma.assessmentSection.count({
+      where: { id },
+    })
+    return count > 0
+  }
+
+  async existsByIds(ids: number[]): Promise<number[]> {
+    const sections = await this.prisma.assessmentSection.findMany({
+      where: {
+        id: {
+          in: ids,
+        },
+      },
+      select: { id: true },
+    })
+    return sections.map((s) => s.id)
+  }
+
+  async getTitleExistsInAssessment(assessmentId: number, title: string, excludeId?: number): Promise<boolean> {
+    const count = await this.prisma.assessmentSection.count({
+      where: {
+        assessmentId,
+        title,
+        ...(excludeId && { id: { not: excludeId } }),
+      },
+    })
+    return count > 0
+  }
+
+  async getNextOrderForAssessment(assessmentId: number): Promise<number> {
+    const lastSection = await this.prisma.assessmentSection.findFirst({
+      where: { assessmentId },
+      orderBy: { order: 'desc' },
+    })
+    return lastSection ? lastSection.order + 1 : 0
+  }
+
+  // ===== Order Management =====
+  async updateOrdersAfterDelete(assessmentId: number, deletedOrder: number): Promise<void> {
+    await this.prisma.assessmentSection.updateMany({
+      where: {
+        assessmentId,
+        order: {
+          gt: deletedOrder,
+        },
+      },
+      data: {
+        order: {
+          decrement: 1,
+        },
+      },
+    })
+  }
+
+  async insertAtOrder(assessmentId: number, insertOrder: number): Promise<void> {
+    await this.prisma.assessmentSection.updateMany({
+      where: {
+        assessmentId,
+        order: {
+          gte: insertOrder,
+        },
+      },
+      data: {
+        order: {
+          increment: 1,
+        },
+      },
+    })
+  }
+
+  // ===== Assessment Items Count =====
+  async getItemCountForSection(sectionId: number): Promise<number> {
+    return await this.prisma.assessmentItem.count({
+      where: { sectionId },
+    })
+  }
+
+  // ===== Section by Type =====
+  async findByAssessmentIdAndType(assessmentId: number, type: QuestionType): Promise<AssessmentSectionBasic[]> {
+    const result = await this.prisma.assessmentSection.findMany({
+      where: {
+        assessmentId,
+        type,
+      },
+      orderBy: { order: 'asc' },
+      include: {
+        _count: {
+          select: {
+            items: true,
+          },
+        },
+      },
+    })
+    return result as AssessmentSectionBasic[]
+  }
+}

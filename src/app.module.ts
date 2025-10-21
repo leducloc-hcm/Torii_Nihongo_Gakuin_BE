@@ -15,11 +15,11 @@ import { NotificationModule } from './routes/notification/notification.module'
 import { PlacementBlueprintModule } from './routes/placement/placement-blueprint.module'
 import { QuestionModule } from './routes/question/question.module'
 import { OptionModule } from './routes/question-option/option.module'
-import { TestPaperModule } from './routes/test-paper/test-paper.module'
-import { TestSectionModule } from './routes/test-section/test-section.module'
-import { TestItemModule } from './routes/test-item/test-item.module'
-import { TestAttemptModule } from './routes/test-attempt/test-attempt.module'
-import { TestAnswerModule } from './routes/test-answer/test-answer.module'
+import { AssessmentPaperModule } from './routes/assessment-paper/assessment-paper.module'
+import { AssessmentSectionModule } from './routes/assessment-section/assessment-section.module'
+import { AssessmentItemModule } from './routes/assessment-item/assessment-item.module'
+import { AssessmentAttemptModule } from './routes/assessment-attempt/assessment-attempt.module'
+import { AssessmentAnswerModule } from './routes/assessment-answer/assessment-answer.module'
 import { WebsocketsModule } from './websockets/websockets.module'
 import { OnlineClassModule } from './routes/online-class/online-class.module'
 import { QuestionGroupModule } from 'src/routes/question-group/question-group.module'
@@ -41,11 +41,11 @@ import { QuestionGroupModule } from 'src/routes/question-group/question-group.mo
     PlacementBlueprintModule,
     QuestionModule,
     OptionModule,
-    TestPaperModule,
-    TestSectionModule,
-    TestItemModule,
-    TestAttemptModule,
-    TestAnswerModule,
+    AssessmentPaperModule,
+    AssessmentSectionModule,
+    AssessmentItemModule,
+    AssessmentAttemptModule,
+    AssessmentAnswerModule,
     WebsocketsModule,
     OnlineClassModule,
   ],
