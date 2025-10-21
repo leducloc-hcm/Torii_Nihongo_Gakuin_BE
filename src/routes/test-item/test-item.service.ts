@@ -38,7 +38,7 @@ export class TestItemService {
 
   // ===== Basic CRUD Operations =====
 
-  async create(data: CreateTestItemInput): Promise<TestItem> {
+  async create(data: CreateTestItemInput): Promise<any> {
     // Validate section exists
     if (!(await this.testItemRepo.sectionExists(data.sectionId))) {
       throw new NotFoundException(TEST_ITEM_ERRORS.SECTION_NOT_FOUND)
@@ -103,7 +103,7 @@ export class TestItemService {
     }
   }
 
-  async update(id: number, data: UpdateTestItemInput): Promise<TestItem> {
+  async update(id: number, data: UpdateTestItemInput): Promise<any> {
     // Check if item exists
     if (!(await this.testItemRepo.exists(id))) {
       throw new NotFoundException(TEST_ITEM_ERRORS.NOT_FOUND)
@@ -130,7 +130,7 @@ export class TestItemService {
     return this.testItemRepo.update(id, data)
   }
 
-  async delete(id: number): Promise<TestItem> {
+  async delete(id: number): Promise<any> {
     if (!(await this.testItemRepo.exists(id))) {
       throw new NotFoundException(TEST_ITEM_ERRORS.NOT_FOUND)
     }
@@ -140,7 +140,7 @@ export class TestItemService {
 
   // ===== Bulk Operations =====
 
-  async bulkCreate(data: BulkCreateTestItemsInput): Promise<TestItem[]> {
+  async bulkCreate(data: BulkCreateTestItemsInput): Promise<any[]> {
     const { items } = data
 
     if (items.length === 0) {
@@ -222,7 +222,7 @@ export class TestItemService {
     return this.testItemRepo.bulkDelete(data)
   }
 
-  async reorder(data: ReorderTestItemsInput): Promise<TestItem[]> {
+  async reorder(data: ReorderTestItemsInput): Promise<any[]> {
     const { updates } = data
 
     if (updates.length === 0) {
@@ -249,7 +249,7 @@ export class TestItemService {
 
   // ===== Advanced Operations =====
 
-  async copyItems(itemIds: number[], data: CopyTestItemsInput): Promise<TestItem[]> {
+  async copyItems(itemIds: number[], data: CopyTestItemsInput): Promise<any[]> {
     const { targetSectionId } = data
 
     if (itemIds.length === 0) {
@@ -271,7 +271,7 @@ export class TestItemService {
     return this.testItemRepo.copyItems(itemIds, data)
   }
 
-  async moveItems(itemIds: number[], data: MoveTestItemsInput): Promise<TestItem[]> {
+  async moveItems(itemIds: number[], data: MoveTestItemsInput): Promise<any[]> {
     const { targetSectionId } = data
 
     if (itemIds.length === 0) {
@@ -312,7 +312,7 @@ export class TestItemService {
     return this.testItemRepo.getStatsBySection(sectionId)
   }
 
-  async getBySectionId(sectionId: number): Promise<TestItem[]> {
+  async getBySectionId(sectionId: number): Promise<any[]> {
     // Validate section exists
     if (!(await this.testItemRepo.sectionExists(sectionId))) {
       throw new NotFoundException(TEST_ITEM_ERRORS.SECTION_NOT_FOUND)
@@ -346,11 +346,7 @@ export class TestItemService {
   }
 
   // ===== Convenience Methods =====
-  async createItemsForSection(
-    sectionId: number,
-    questionIds: number[],
-    maintainOrder: boolean = true,
-  ): Promise<TestItem[]> {
+  async createItemsForSection(sectionId: number, questionIds: number[], maintainOrder: boolean = true): Promise<any[]> {
     if (questionIds.length === 0) {
       throw new BadRequestException('At least one question ID is required')
     }
@@ -393,7 +389,7 @@ export class TestItemService {
     sectionId: number,
     questionGroupIds: number[],
     maintainOrder: boolean = true,
-  ): Promise<TestItem[]> {
+  ): Promise<any[]> {
     if (questionGroupIds.length === 0) {
       throw new BadRequestException('At least one question group ID is required')
     }
@@ -433,7 +429,7 @@ export class TestItemService {
     questionGroupId: number,
     addIndividualQuestions: boolean = false,
     order?: number,
-  ): Promise<TestItem[]> {
+  ): Promise<any[]> {
     // Validate section exists
     if (!(await this.testItemRepo.sectionExists(sectionId))) {
       throw new NotFoundException(TEST_ITEM_ERRORS.SECTION_NOT_FOUND)

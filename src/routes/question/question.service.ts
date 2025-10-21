@@ -72,8 +72,38 @@ export class QuestionService {
     return this.questionRepository.create(questionCreateData)
   }
 
-  async findAll(queryDto: QueryQuestionDTO) {
-    const { page, limit, type, level, difficulty, readingLength, keyword, tags, hasMedia, sortBy, sortOrder } = queryDto
+  async findAll(queryDto: QueryQuestionDTO): Promise<{
+    data: any[]
+    pagination: {
+      total: number
+      page: number
+      limit: number
+      totalPages: number
+      hasNext: boolean
+      hasPrev: boolean
+    }
+  }> {
+    const {
+      page = 1,
+      limit = 10,
+      type,
+      level,
+      difficulty,
+      readingLength,
+      keyword,
+      tags,
+      hasMedia,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+    } = queryDto
+
+    if (page < 1) {
+      throw new BadRequestException('Page must be greater than 0')
+    }
+
+    if (limit < 1 || limit > 100) {
+      throw new BadRequestException('Limit must be between 1 and 100')
+    }
 
     const skip = (page - 1) * limit
 
@@ -126,34 +156,39 @@ export class QuestionService {
       orderBy[sortBy] = sortOrder
     }
 
-    const [questions, total] = await Promise.all([
-      this.questionRepository.findManyWithStats({
-        skip,
-        take: limit,
-        where,
-        orderBy,
-      }),
-      this.questionRepository.count(where),
-    ])
+    try {
+      const [questions, total] = await Promise.all([
+        this.questionRepository.findManyWithStats({
+          skip,
+          take: limit,
+          where,
+          orderBy,
+        }),
+        this.questionRepository.count(where),
+      ])
 
-    // Transform questions to include stats
-    const transformedQuestions = questions.map((question) => ({
-      ...question,
-      optionsCount: question._count?.option || 0,
-      correctOptionsCount: question.option?.filter((opt) => opt.isCorrect).length || 0,
-      hasMedia: !!question.mediaId,
-    }))
+      // Transform questions to include stats
+      const transformedQuestions = questions.map((question) => ({
+        ...question,
+        correctOptionsCount: question.option?.filter((opt) => opt.isCorrect).length || 0,
+        hasMedia: !!question.mediaId,
+      }))
 
-    return {
-      data: transformedQuestions,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-        hasNext: page * limit < total,
-        hasPrev: page > 1,
-      },
+      return {
+        data: transformedQuestions,
+        pagination: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+          hasNext: page * limit < total,
+          hasPrev: page > 1,
+        },
+      }
+    } catch (error) {
+      throw new BadRequestException(
+        `Failed to fetch questions: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      )
     }
   }
 
@@ -230,7 +265,7 @@ export class QuestionService {
     return this.questionRepository.update({ id }, updateData)
   }
 
-  async remove(id: number): Promise<QuestionType> {
+  async remove(id: number): Promise<any> {
     const exists = await this.questionRepository.checkExists(id)
     if (!exists) {
       throw new NotFoundException(`Question with ID ${id} not found`)
@@ -298,5 +333,37 @@ export class QuestionService {
   async findByDifficulty(difficulty: DifficultyType, queryDto: Omit<QueryQuestionDTO, 'difficulty'>) {
     const queryWithDifficulty = { ...queryDto, difficulty }
     return this.findAll(queryWithDifficulty)
+  }
+
+  // Additional helper methods for consistency with test-section pattern
+  async getQuestionsByFilters(filters: {
+    type?: QuestionTypeType
+    level?: JLPTLevelType
+    difficulty?: DifficultyType
+    page?: number
+    limit?: number
+    sortBy?: string
+    sortOrder?: string
+  }) {
+    const result = await this.questionRepository.findByFilters(filters as any)
+
+    const transformedData = result.data.map((question) => ({
+      ...question,
+      optionsCount: question._count?.option || 0,
+      correctOptionsCount: question.option?.filter((opt: any) => opt.isCorrect).length || 0,
+      hasMedia: !!question.mediaId,
+    }))
+
+    return {
+      data: transformedData,
+      pagination: {
+        total: result.total,
+        page: filters.page || 1,
+        limit: filters.limit || 10,
+        totalPages: Math.ceil(result.total / (filters.limit || 10)),
+        hasNext: (filters.page || 1) * (filters.limit || 10) < result.total,
+        hasPrev: (filters.page || 1) > 1,
+      },
+    }
   }
 }
