@@ -809,4 +809,49 @@ export class OnlineClassService {
       throw new BadRequestException('Failed to retrieve assigned online classes')
     }
   }
+  async getAllOnlineClasses() {
+    try {
+      const classes = await this.prisma.class.findMany({
+        include: {
+          lecturer: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              lecturerProfile: {
+                select: {
+                  name: true,
+                  bio: true,
+                  avatar: true,
+                },
+              },
+            },
+          },
+          course: {
+            select: {
+              id: true,
+              title: true,
+              level: true,
+              thumbnailUrl: true,
+            },
+          },
+          sessions: {
+            orderBy: { scheduledAt: 'asc' },
+          },
+          _count: {
+            select: {
+              sessions: true,
+              members: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      })
+
+      return classes
+    } catch (error) {
+      this.logger.error('Failed to get assigned online classes:', error)
+      throw new BadRequestException('Failed to retrieve assigned online classes')
+    }
+  }
 }
