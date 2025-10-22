@@ -32,6 +32,7 @@ export class AssessmentAttemptRepository {
       user?: boolean
       assessment?: boolean
       answers?: boolean
+      assessmentWithScoreProfile?: boolean
     },
   ): Promise<AssessmentAttemptWithDetails | null> {
     return this.prisma.assessmentAttempt.findUnique({
@@ -46,18 +47,34 @@ export class AssessmentAttemptRepository {
               },
             }
           : false,
-        assessment: includeRelations?.assessment
-          ? {
-              select: {
-                id: true,
-                title: true,
-                level: true,
-                _count: {
-                  select: { sections: { where: { items: { some: {} } } } },
+        assessment:
+          includeRelations?.assessment || includeRelations?.assessmentWithScoreProfile
+            ? {
+                select: {
+                  id: true,
+                  title: true,
+                  type: true,
+                  level: true,
+                  scoreProfile: includeRelations?.assessmentWithScoreProfile
+                    ? {
+                        select: {
+                          id: true,
+                          name: true,
+                          level: true,
+                          maxTotal: true,
+                          minTotalPass: true,
+                          minBucketPass: true,
+                          maxBucket: true,
+                          mappings: true,
+                        },
+                      }
+                    : false,
+                  _count: {
+                    select: { sections: { where: { items: { some: {} } } } },
+                  },
                 },
-              },
-            }
-          : false,
+              }
+            : false,
         answers: includeRelations?.answers
           ? {
               include: {
@@ -316,6 +333,71 @@ export class AssessmentAttemptRepository {
     }))
   }
 
+  async getAttemptAnswersWithScores(attemptId: number): Promise<
+    Array<{
+      id: number
+      questionId: number
+      selectedOptionId: number | null
+      isCorrect: boolean
+      timeSpentSec: number | null
+      scorePerQuestion: number
+      question: {
+        type: string
+        section: {
+          type: string
+        }
+      }
+    }>
+  > {
+    // Get the attempt to find the assessment ID
+    const attempt = await this.prisma.assessmentAttempt.findUnique({
+      where: { id: attemptId },
+      select: { assessmentId: true },
+    })
+
+    if (!attempt) return []
+
+    // Get answers with question details, section info, and score per question
+    const answers = await this.prisma.assessmentAnswer.findMany({
+      where: { attemptId },
+      include: {
+        question: {
+          include: {
+            assessmentItems: {
+              where: { section: { assessmentId: attempt.assessmentId } },
+              select: {
+                scorePerQuestion: true,
+                section: {
+                  select: {
+                    type: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        selectedOption: {
+          select: { isCorrect: true },
+        },
+      },
+    })
+
+    return answers.map((answer) => ({
+      id: answer.id,
+      questionId: answer.questionId,
+      selectedOptionId: answer.selectedOptionId,
+      timeSpentSec: answer.timeSpentSec,
+      isCorrect: answer.selectedOption?.isCorrect || false,
+      scorePerQuestion: answer.question.assessmentItems[0]?.scorePerQuestion || 1,
+      question: {
+        type: answer.question.type,
+        section: {
+          type: answer.question.assessmentItems[0]?.section.type || 'UNKNOWN',
+        },
+      },
+    }))
+  }
+
   async calculateSectionScores(attemptId: number): Promise<SectionScore[]> {
     const answers = await this.getAttemptAnswers(attemptId)
 
@@ -485,6 +567,16 @@ export class AssessmentAttemptRepository {
         score: { not: null },
       },
       orderBy: { score: 'desc' },
+    })
+  }
+
+  async getUserLatestAttempt(userId: number, assessmentId: number): Promise<AssessmentAttempt | null> {
+    return await this.prisma.assessmentAttempt.findFirst({
+      where: {
+        userId,
+        assessmentId,
+      },
+      orderBy: { startedAt: 'desc' },
     })
   }
 

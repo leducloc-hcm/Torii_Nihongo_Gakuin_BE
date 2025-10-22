@@ -21,10 +21,15 @@ export type ScoreProfileBasic = ScoreProfile & {
 export const JLPTLevelSchema = z.enum(['N5', 'N4', 'N3', 'N2', 'N1'])
 
 // Mappings validation schema - ensures valid question types to bucket mappings
-export const ScoreMappingsSchema = z.record(
-  z.enum(['VOCAB', 'GRAMMAR', 'KANJI', 'READING', 'LISTENING', 'SYNONYM', 'ORDER_SENTENCE']),
-  z.enum(['KNOWLEDGE', 'READING', 'LISTENING']),
-)
+export const ScoreMappingsSchema = z
+  .union([
+    z.record(
+      z.enum(['VOCAB', 'GRAMMAR', 'KANJI', 'READING', 'LISTENING', 'SYNONYM', 'ORDER_SENTENCE']),
+      z.enum(['KNOWLEDGE', 'READING', 'LISTENING']),
+    ),
+    z.object({}).optional(),
+  ])
+  .default({})
 
 export const CreateScoreProfileSchema = z.object({
   name: z.string().min(1).max(255),

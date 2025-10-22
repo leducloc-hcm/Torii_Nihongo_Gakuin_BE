@@ -1,12 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { z } from 'zod'
-import {
-  CreateScoreProfileSchema,
-  UpdateScoreProfileSchema,
-  ScoreProfileQuerySchema,
-  JLPTLevelSchema,
-  ScoreMappingsSchema,
-} from './score-profile.model'
+import { CreateScoreProfileSchema, UpdateScoreProfileSchema, ScoreProfileQuerySchema } from './score-profile.model'
 
 // ===== Create ScoreProfile DTO =====
 export class CreateScoreProfileDto {
@@ -21,7 +15,7 @@ export class CreateScoreProfileDto {
     example: 'N4',
     description: 'JLPT level (optional)',
   })
-  level?: z.infer<typeof JLPTLevelSchema>
+  level?: string
 
   @ApiPropertyOptional({
     example: 180,
@@ -55,6 +49,8 @@ export class CreateScoreProfileDto {
   notes?: string
 
   @ApiProperty({
+    type: 'object',
+    additionalProperties: { type: 'string' },
     example: {
       VOCAB: 'KNOWLEDGE',
       GRAMMAR: 'KNOWLEDGE',
@@ -63,7 +59,7 @@ export class CreateScoreProfileDto {
     },
     description: 'Mapping of question types to score buckets',
   })
-  mappings!: z.infer<typeof ScoreMappingsSchema>
+  mappings!: Record<string, string>
 }
 
 // ===== Update ScoreProfile DTO =====
@@ -79,7 +75,7 @@ export class UpdateScoreProfileDto {
     example: 'N4',
     description: 'Updated JLPT level',
   })
-  level?: z.infer<typeof JLPTLevelSchema>
+  level?: string
 
   @ApiPropertyOptional({
     example: 200,
@@ -112,6 +108,8 @@ export class UpdateScoreProfileDto {
   notes?: string
 
   @ApiPropertyOptional({
+    type: 'object',
+    additionalProperties: { type: 'string' },
     example: {
       VOCAB: 'KNOWLEDGE',
       GRAMMAR: 'KNOWLEDGE',
@@ -121,7 +119,7 @@ export class UpdateScoreProfileDto {
     },
     description: 'Updated question type to bucket mappings',
   })
-  mappings?: z.infer<typeof ScoreMappingsSchema>
+  mappings?: Record<string, string>
 }
 
 // ===== Query ScoreProfile DTO =====
@@ -136,7 +134,7 @@ export class ScoreProfileQueryDto {
     enum: ['N5', 'N4', 'N3', 'N2', 'N1'],
     description: 'Filter by JLPT level',
   })
-  level?: z.infer<typeof JLPTLevelSchema>
+  level?: string
 
   @ApiPropertyOptional({
     example: 'JLPT',
@@ -266,7 +264,7 @@ export class CreateDefaultProfilesDto {
     enum: ['N5', 'N4', 'N3', 'N2', 'N1'],
     description: 'Create default profile for specific level only',
   })
-  level?: z.infer<typeof JLPTLevelSchema>
+  level?: string
 
   @ApiPropertyOptional({
     example: false,

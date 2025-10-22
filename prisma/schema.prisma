@@ -465,11 +465,7 @@ model AssessmentAttempt {
   assessment AssessmentPaper  @relation(fields: [assessmentId], references: [id])
   user       User        @relation(fields: [userId], references: [id])
   answers    AssessmentAnswer[]
-
-  @@unique([userId, assessmentId]) 
-}
-
-model AssessmentAnswer {
+}model AssessmentAnswer {
   id               Int      @id @default(autoincrement())
   attemptId        Int
   questionId       Int

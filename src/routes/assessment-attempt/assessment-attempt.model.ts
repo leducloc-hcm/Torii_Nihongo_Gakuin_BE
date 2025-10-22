@@ -12,7 +12,18 @@ export type AssessmentAttemptBase = AssessmentAttempt
 // ===== Extended Types with Relations =====
 export type AssessmentAttemptWithDetails = AssessmentAttempt & {
   user: Pick<User, 'id' | 'name' | 'email'>
-  assessment: Pick<AssessmentPaper, 'id' | 'title' | 'level' | 'type'>
+  assessment: Pick<AssessmentPaper, 'id' | 'title' | 'level' | 'type'> & {
+    scoreProfile?: {
+      id: number
+      name: string
+      level: JLPTLevel | null
+      maxTotal: number | null
+      minTotalPass: number | null
+      minBucketPass: number | null
+      maxBucket: number | null
+      mappings: any // JSON mapping of question types to buckets
+    }
+  }
   answers: (AssessmentAnswer & {
     question: Question & {
       assessmentItems: {

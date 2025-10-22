@@ -45,11 +45,6 @@ export class AssessmentAttemptService {
       throw new NotFoundException(ASSESSMENT_ATTEMPT_ERRORS.USER_NOT_FOUND)
     }
 
-    // Check if user has already started this assessment
-    if (await this.assessmentAttemptRepo.userHasStartedAssessment(userId, data.assessmentId)) {
-      throw new ConflictException(ASSESSMENT_ATTEMPT_ERRORS.ALREADY_STARTED)
-    }
-
     return this.assessmentAttemptRepo.startAttempt(userId, data)
   }
 
@@ -93,6 +88,11 @@ export class AssessmentAttemptService {
   }
 
   async submitAssessment(attemptId: number, data: SubmitAssessmentAttemptInput): Promise<AssessmentAttempt> {
+    // Validate input data
+    if (!data) {
+      throw new BadRequestException('Request body is required')
+    }
+
     // Validate attempt exists
     if (!(await this.assessmentAttemptRepo.exists(attemptId))) {
       throw new NotFoundException(ASSESSMENT_ATTEMPT_ERRORS.NOT_FOUND)
@@ -104,8 +104,8 @@ export class AssessmentAttemptService {
     }
 
     // Validate answers format
-    if (!data.answers || data.answers.length === 0) {
-      throw new BadRequestException('At least one answer is required')
+    if (!data.answers || !Array.isArray(data.answers) || data.answers.length === 0) {
+      throw new BadRequestException('At least one answer is required and answers must be an array')
     }
 
     return this.assessmentAttemptRepo.submitAttempt(attemptId, data)
@@ -114,8 +114,11 @@ export class AssessmentAttemptService {
   // ===== Grading and Scoring =====
 
   async gradeAttempt(attemptId: number): Promise<AssessmentAttemptWithStats> {
-    // Validate attempt exists
-    const attempt = await this.assessmentAttemptRepo.findById(attemptId, { assessment: true })
+    // Validate attempt exists and get assessment with scoreProfile
+    const attempt = await this.assessmentAttemptRepo.findById(attemptId, {
+      assessment: true,
+      assessmentWithScoreProfile: true,
+    })
     if (!attempt) {
       throw new NotFoundException(ASSESSMENT_ATTEMPT_ERRORS.NOT_FOUND)
     }
@@ -125,23 +128,58 @@ export class AssessmentAttemptService {
       throw new BadRequestException(ASSESSMENT_ATTEMPT_ERRORS.SUBMISSION_REQUIRED)
     }
 
-    // Calculate section scores
-    const sectionScores = await this.calculateSectionScores(attemptId, attempt.assessment.level)
+    const assessmentType = attempt.assessment.type
+    const scoreProfile = attempt.assessment.scoreProfile
 
-    // Calculate overall statistics
-    const totalQuestions = sectionScores.reduce((sum, section) => sum + section.totalQuestions, 0)
-    const correctAnswers = sectionScores.reduce((sum, section) => sum + section.correctAnswers, 0)
-    const accuracy = totalQuestions > 0 ? (correctAnswers / totalQuestions) * 100 : 0
+    // Ensure scoreProfile exists
+    if (!scoreProfile) {
+      throw new BadRequestException('Assessment must have a score profile configured')
+    }
 
-    // Evaluate JLPT level
-    const levelEvaluation = evaluateJLPTLevel(sectionScores, attempt.assessment.level)
+    let finalScore: number
+    let levelEvaluation: any
+    let sectionScores: SectionScore[] = []
+    let totalQuestions = 0
+    let correctAnswers = 0
+
+    if (assessmentType === 'TEST') {
+      // TEST scoring: simple sum using scorePerQuestion
+      const testResult = await this.calculateTestScore(attemptId)
+      finalScore = testResult.totalScore
+      totalQuestions = testResult.totalQuestions
+      correctAnswers = testResult.correctAnswers
+
+      // For TEST, create simple level evaluation
+      const accuracy = totalQuestions > 0 ? (correctAnswers / totalQuestions) * 100 : 0
+      levelEvaluation = {
+        currentLevel: attempt.assessment.level,
+        totalScore: finalScore,
+        totalPassed: scoreProfile.minTotalPass ? finalScore >= scoreProfile.minTotalPass : true,
+        sectionsPassed: true, // TEST doesn't have section requirements
+        suggestedLevel: null, // No level suggestion for TEST
+        recommendation: `Test completed with score: ${finalScore}/${scoreProfile.maxTotal || 100}`,
+      }
+    } else {
+      // EXAM scoring: bucket-based JLPT with ScoreProfile
+      const examResult = await this.calculateExamScore(attemptId, scoreProfile, attempt.assessment.level)
+      finalScore = examResult.totalScore
+      sectionScores = examResult.sectionScores
+      totalQuestions = sectionScores.reduce((sum, section) => sum + section.totalQuestions, 0)
+      correctAnswers = sectionScores.reduce((sum, section) => sum + section.correctAnswers, 0)
+
+      // Use comprehensive JLPT evaluation
+      levelEvaluation = this.evaluateExamLevel(sectionScores, scoreProfile, attempt.assessment.level)
+    }
 
     // Update attempt with score and level suggestion
     const gradedAttempt = await this.assessmentAttemptRepo.gradeAttempt(
       attemptId,
-      accuracy,
+      finalScore,
       levelEvaluation.suggestedLevel,
     )
+
+    // Calculate accuracy
+    const accuracy = totalQuestions > 0 ? (correctAnswers / totalQuestions) * 100 : 0
 
     // Return detailed stats
     return {
@@ -216,6 +254,178 @@ export class AssessmentAttemptService {
     return sectionScores
   }
 
+  // ===== New Scoring Methods =====
+
+  /**
+   * Calculate TEST score: simple sum using scorePerQuestion
+   */
+  private async calculateTestScore(attemptId: number): Promise<{
+    totalScore: number
+    totalQuestions: number
+    correctAnswers: number
+  }> {
+    const answersWithScores = await this.assessmentAttemptRepo.getAttemptAnswersWithScores(attemptId)
+
+    let totalScore = 0
+    let totalQuestions = 0
+    let correctAnswers = 0
+
+    for (const answer of answersWithScores) {
+      totalQuestions++
+      if (answer.isCorrect) {
+        correctAnswers++
+        totalScore += answer.scorePerQuestion || 1 // Default to 1 if not set
+      }
+    }
+
+    return {
+      totalScore,
+      totalQuestions,
+      correctAnswers,
+    }
+  }
+
+  /**
+   * Calculate EXAM score: bucket-based JLPT with ScoreProfile
+   */
+  private async calculateExamScore(
+    attemptId: number,
+    scoreProfile: any,
+    assessmentLevel: JLPTLevel,
+  ): Promise<{
+    totalScore: number
+    sectionScores: SectionScore[]
+  }> {
+    const answersWithScores = await this.assessmentAttemptRepo.getAttemptAnswersWithScores(attemptId)
+
+    // Group answers by bucket using ScoreProfile mappings
+    const bucketGroups = new Map<
+      string,
+      {
+        correct: number
+        total: number
+        totalPossibleScore: number
+      }
+    >()
+
+    // Initialize buckets
+    const buckets = ['KNOWLEDGE', 'READING', 'LISTENING']
+    buckets.forEach((bucket) => {
+      bucketGroups.set(bucket, { correct: 0, total: 0, totalPossibleScore: 0 })
+    })
+
+    // Process answers according to mappings
+    for (const answer of answersWithScores) {
+      const questionType = answer.question.type
+      const bucket = scoreProfile.mappings[questionType] || 'KNOWLEDGE' // Default bucket
+      const scorePerQuestion = answer.scorePerQuestion || 1
+
+      const current = bucketGroups.get(bucket)!
+      current.total++
+      current.totalPossibleScore += scorePerQuestion
+
+      if (answer.isCorrect) {
+        current.correct++
+      }
+    }
+
+    // Calculate scaled scores for each bucket
+    const sectionScores: SectionScore[] = []
+    let totalScore = 0
+
+    for (const [bucketName, stats] of bucketGroups) {
+      if (stats.total > 0) {
+        const rawScore = stats.correct / stats.total
+        // Scale to maxBucket (default 60 for JLPT)
+        const scaledScore = Math.round(rawScore * (scoreProfile.maxBucket || 60))
+
+        // Check if bucket passes minimum requirement
+        const minBucketPass = scoreProfile.minBucketPass || 19
+        const passed = scaledScore >= minBucketPass
+
+        sectionScores.push({
+          sectionType: bucketName,
+          correctAnswers: stats.correct,
+          totalQuestions: stats.total,
+          rawScore,
+          scaledScore,
+          passed,
+        })
+
+        totalScore += scaledScore
+      }
+    }
+
+    return {
+      totalScore,
+      sectionScores,
+    }
+  }
+
+  /**
+   * Evaluate EXAM level with ScoreProfile criteria
+   */
+  private evaluateExamLevel(sectionScores: SectionScore[], scoreProfile: any, currentLevel: JLPTLevel): any {
+    const totalScore = sectionScores.reduce((sum, section) => sum + section.scaledScore, 0)
+    const maxTotal = scoreProfile.maxTotal || 180
+    const minTotalPass = scoreProfile.minTotalPass || 100
+
+    // Check if total score meets minimum requirement
+    const totalPassed = totalScore >= minTotalPass
+
+    // Check if each section meets minimum requirement
+    const sectionsPassed = sectionScores.every((section) => section.passed)
+
+    const passed = totalPassed && sectionsPassed
+
+    // Suggest appropriate level
+    let suggestedLevel: JLPTLevel | null = null
+    let recommendation = ''
+
+    if (passed) {
+      // If passed current level, suggest next level up (if available)
+      const levels: JLPTLevel[] = ['N5', 'N4', 'N3', 'N2', 'N1']
+      const currentIndex = levels.indexOf(currentLevel)
+
+      if (currentIndex > 0) {
+        suggestedLevel = levels[currentIndex - 1]
+        recommendation = `Chúc mừng! Bạn đã vượt qua ${currentLevel}. Bạn sẵn sàng thử thách ${suggestedLevel}.`
+      } else {
+        recommendation = `Xuất sắc! Bạn đã thành thạo ${currentLevel}, cấp độ JLPT cao nhất.`
+      }
+    } else {
+      // If failed, analyze what went wrong and suggest improvement
+      if (!totalPassed && !sectionsPassed) {
+        recommendation = `Cần cải thiện tất cả các mảng. Tổng điểm (${totalScore}/${maxTotal}) và điểm từng phần đều cần nâng cao.`
+      } else if (!totalPassed) {
+        recommendation = `Cần cải thiện kết quả tổng thể. Điểm hiện tại: ${totalScore}/${maxTotal} (tối thiểu: ${minTotalPass}).`
+      } else if (!sectionsPassed) {
+        recommendation = `Tổng điểm ổn, nhưng một số phần cần cải thiện. Kiểm tra yêu cầu từng phần.`
+      }
+
+      // Suggest staying at current level or going down if score is very low
+      const scorePercentage = totalScore / maxTotal
+      if (scorePercentage < 0.3 && currentLevel !== 'N5') {
+        const levels: JLPTLevel[] = ['N5', 'N4', 'N3', 'N2', 'N1']
+        const currentIndex = levels.indexOf(currentLevel)
+        suggestedLevel = levels[currentIndex + 1]
+        recommendation += ` Nên bắt đầu với ${suggestedLevel} để xây dựng nền tảng vững chắc hơn.`
+      } else {
+        suggestedLevel = currentLevel
+        recommendation += ` Tiếp tục luyện tập với tài liệu cấp độ ${currentLevel}.`
+      }
+    }
+
+    return {
+      currentLevel,
+      totalScore,
+      totalPassed,
+      sectionsPassed,
+      suggestedLevel,
+      recommendation,
+    }
+  }
+
   // ===== Statistics and Analytics =====
 
   async getAssessmentStatistics(assessmentId: number) {
@@ -224,10 +434,6 @@ export class AssessmentAttemptService {
 
   async getLeaderboard(assessmentId: number, limit: number = 10) {
     return await this.assessmentAttemptRepo.getLeaderboard(assessmentId, limit)
-  }
-
-  async getUserBestAttempt(userId: number, assessmentId: number): Promise<AssessmentAttempt | null> {
-    return await this.assessmentAttemptRepo.getUserBestAttempt(userId, assessmentId)
   }
 
   async getUserAttemptCount(userId: number, assessmentId: number): Promise<number> {
@@ -240,34 +446,98 @@ export class AssessmentAttemptService {
   ): Promise<{
     canStart: boolean
     reason?: string
-    existingAttempt?: AssessmentAttempt
+    attemptCount?: number
+    lastAttempt?: AssessmentAttempt
   }> {
     if (!(await this.assessmentAttemptRepo.assessmentExists(assessmentId))) {
       return { canStart: false, reason: ASSESSMENT_ATTEMPT_ERRORS.ASSESSMENT_NOT_FOUND }
     }
 
-    const hasStarted = await this.assessmentAttemptRepo.userHasStartedAssessment(userId, assessmentId)
-    if (hasStarted) {
-      const existingAttempt = await this.assessmentAttemptRepo.findMany({
-        userId,
-        assessmentId,
-        page: 1,
-        limit: 1,
-        sortBy: 'startedAt',
-        sortOrder: 'desc',
-        includeAnswers: false,
-        includeUser: false,
-        includeAssessment: false,
-      })
+    if (!(await this.assessmentAttemptRepo.userExists(userId))) {
+      return { canStart: false, reason: ASSESSMENT_ATTEMPT_ERRORS.USER_NOT_FOUND }
+    }
 
+    // Get user's attempt history for this assessment
+    const attemptCount = await this.assessmentAttemptRepo.getUserAttemptCount(userId, assessmentId)
+    const lastAttempt = await this.assessmentAttemptRepo.getUserLatestAttempt(userId, assessmentId)
+
+    // Always allow starting new attempts (no limit)
+    return {
+      canStart: true,
+      attemptCount,
+      lastAttempt: lastAttempt || undefined,
+    }
+  }
+
+  // ===== New Methods for Multiple Attempts =====
+
+  async getUserAttempts(userId: number, assessmentId: number): Promise<AssessmentAttempt[]> {
+    const result = await this.assessmentAttemptRepo.findMany({
+      userId,
+      assessmentId,
+      page: 1,
+      limit: 100, // Get all attempts
+      sortBy: 'startedAt',
+      sortOrder: 'desc',
+      includeAnswers: false,
+      includeUser: false,
+      includeAssessment: false,
+    })
+    return result.attempts
+  }
+
+  async getUserBestAttempt(userId: number, assessmentId: number): Promise<AssessmentAttempt | null> {
+    return await this.assessmentAttemptRepo.getUserBestAttempt(userId, assessmentId)
+  }
+
+  async getUserLatestAttempt(userId: number, assessmentId: number): Promise<AssessmentAttempt | null> {
+    return await this.assessmentAttemptRepo.getUserLatestAttempt(userId, assessmentId)
+  }
+
+  async getUserAttemptStats(
+    userId: number,
+    assessmentId: number,
+  ): Promise<{
+    totalAttempts: number
+    bestScore: number | null
+    latestScore: number | null
+    averageScore: number | null
+    improvementRate: number | null
+  }> {
+    const attempts = await this.getUserAttempts(userId, assessmentId)
+
+    if (attempts.length === 0) {
       return {
-        canStart: false,
-        reason: ASSESSMENT_ATTEMPT_ERRORS.ALREADY_STARTED,
-        existingAttempt: existingAttempt.attempts[0] || undefined,
+        totalAttempts: 0,
+        bestScore: null,
+        latestScore: null,
+        averageScore: null,
+        improvementRate: null,
       }
     }
 
-    return { canStart: true }
+    const completedAttempts = attempts.filter((a) => a.score !== null)
+    const scores = completedAttempts.map((a) => a.score!).filter((s) => s !== null)
+
+    const bestScore = scores.length > 0 ? Math.max(...scores) : null
+    const latestScore = attempts[0]?.score || null
+    const averageScore = scores.length > 0 ? scores.reduce((sum, score) => sum + score, 0) / scores.length : null
+
+    // Calculate improvement rate (latest vs first)
+    let improvementRate: number | null = null
+    if (scores.length >= 2) {
+      const firstScore = scores[scores.length - 1]
+      const currentScore = scores[0]
+      improvementRate = ((currentScore - firstScore) / firstScore) * 100
+    }
+
+    return {
+      totalAttempts: attempts.length,
+      bestScore,
+      latestScore,
+      averageScore,
+      improvementRate,
+    }
   }
 
   async getAttemptProgress(attemptId: number): Promise<{

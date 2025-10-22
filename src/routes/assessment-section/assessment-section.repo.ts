@@ -105,7 +105,7 @@ export class AssessmentSectionRepository {
       hasPrev: boolean
     }
   }> {
-    const { page = 1, limit = 20, search, type, assessmentId, sortBy = 'order', sortOrder = 'asc' } = query
+    const { page = 1, limit = 20, search, type, assessmentId, sortBy = 'id', sortOrder = 'asc' } = query
 
     const skip = (page - 1) * limit
 

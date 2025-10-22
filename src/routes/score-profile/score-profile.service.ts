@@ -19,9 +19,16 @@ export class ScoreProfileService {
 
   // ===== CREATE OPERATIONS =====
   async create(createDto: CreateScoreProfileDto): Promise<ScoreProfileResponseDto> {
+    // Validate level
+    const validLevel =
+      createDto.level && ['N5', 'N4', 'N3', 'N2', 'N1'].includes(createDto.level)
+        ? (createDto.level as 'N5' | 'N4' | 'N3' | 'N2' | 'N1')
+        : undefined
+
     // Validate score values
     const validation = validateScoreValues({
       ...createDto,
+      level: validLevel,
       maxBucket: createDto.maxBucket || 60,
     })
     if (validation.length > 0) {
@@ -43,6 +50,7 @@ export class ScoreProfileService {
     const profile = await this.scoreProfileRepo.create(
       {
         ...createDto,
+        level: validLevel,
         maxBucket: createDto.maxBucket || 60,
       },
       { _count: true },
@@ -58,7 +66,11 @@ export class ScoreProfileService {
   }> {
     const { level, overwrite = false } = createDto
 
-    const result = await this.scoreProfileRepo.createDefaultProfiles(level as any, overwrite)
+    // Validate level if provided
+    const validLevel =
+      level && ['N5', 'N4', 'N3', 'N2', 'N1'].includes(level) ? (level as 'N5' | 'N4' | 'N3' | 'N2' | 'N1') : undefined
+
+    const result = await this.scoreProfileRepo.createDefaultProfiles(validLevel, overwrite)
 
     const createdProfiles = level ? [`JLPT ${level} profiles`] : ['JLPT N5', 'JLPT N4', 'JLPT N3', 'JLPT N2', 'JLPT N1']
 
@@ -80,10 +92,15 @@ export class ScoreProfileService {
   }
 
   async findMany(query: ScoreProfileQueryDto): Promise<ScoreProfileListResponseDto> {
-    const { includeCount = true, sortBy, sortOrder, ...otherQuery } = query
+    const { includeCount = true, sortBy, sortOrder, level, ...otherQuery } = query
+
+    // Validate level if provided
+    const validLevel =
+      level && ['N5', 'N4', 'N3', 'N2', 'N1'].includes(level) ? (level as 'N5' | 'N4' | 'N3' | 'N2' | 'N1') : undefined
 
     const queryData = {
       ...otherQuery,
+      level: validLevel,
       sortBy: sortBy as any,
       sortOrder: sortOrder as any,
     }
@@ -151,7 +168,18 @@ export class ScoreProfileService {
       }
     }
 
-    const updated = await this.scoreProfileRepo.update(id, updateDto, { _count: true })
+    // Validate level if provided
+    const validLevel =
+      updateDto.level && ['N5', 'N4', 'N3', 'N2', 'N1'].includes(updateDto.level)
+        ? (updateDto.level as 'N5' | 'N4' | 'N3' | 'N2' | 'N1')
+        : undefined
+
+    const updateData = {
+      ...updateDto,
+      level: validLevel,
+    }
+
+    const updated = await this.scoreProfileRepo.update(id, updateData, { _count: true })
     return this._transformToResponseDto(updated)
   }
 

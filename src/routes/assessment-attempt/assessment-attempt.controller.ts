@@ -33,7 +33,6 @@ export class AssessmentAttemptController {
   })
   @ApiResponse({ status: 400, description: 'Invalid assessment ID' })
   @ApiResponse({ status: 404, description: 'Assessment not found' })
-  @ApiResponse({ status: 409, description: 'User has already started this assessment' })
   async startAssessment(
     @Request() req: any, // Would need proper user extraction from JWT
     @Body() startAssessmentDto: StartAssessmentAttemptDto,
@@ -199,7 +198,7 @@ export class AssessmentAttemptController {
     type: AssessmentAttemptResponseDto,
   })
   @ApiResponse({ status: 404, description: 'No attempts found' })
-  async getUserBestAttempt(
+  async getOldUserBestAttempt_DEPRECATED(
     @Param('userId', ParseIntPipe) userId: number,
     @Param('assessmentId', ParseIntPipe) assessmentId: number,
   ) {
@@ -310,5 +309,109 @@ export class AssessmentAttemptController {
   })
   async analyzeLevelReadiness(@Param('userId', ParseIntPipe) userId: number, @Param('level') level: JLPTLevel) {
     return this.assessmentAttemptService.analyzeLevelReadiness(userId, level)
+  }
+
+  // ===== Multiple Attempts Management =====
+
+  @Get('user/:userId/assessment/:assessmentId/attempts')
+  @ApiOperation({
+    summary: 'Get all user attempts for an assessment',
+    description: 'Retrieve all attempts made by a user for a specific assessment',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'User attempts retrieved successfully',
+    type: [AssessmentAttemptResponseDto],
+  })
+  async getUserAttempts(
+    @Param('userId', ParseIntPipe) userId: number,
+    @Param('assessmentId', ParseIntPipe) assessmentId: number,
+  ) {
+    return this.assessmentAttemptService.getUserAttempts(userId, assessmentId)
+  }
+
+  @Get('user/:userId/assessment/:assessmentId/best')
+  @ApiOperation({
+    summary: 'Get user best attempt for an assessment',
+    description: 'Retrieve the highest scoring attempt for a user and assessment',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Best attempt retrieved successfully',
+    type: AssessmentAttemptResponseDto,
+  })
+  async getUserBestAttempt(
+    @Param('userId', ParseIntPipe) userId: number,
+    @Param('assessmentId', ParseIntPipe) assessmentId: number,
+  ) {
+    return this.assessmentAttemptService.getUserBestAttempt(userId, assessmentId)
+  }
+
+  @Get('user/:userId/assessment/:assessmentId/latest')
+  @ApiOperation({
+    summary: 'Get user latest attempt for an assessment',
+    description: 'Retrieve the most recent attempt for a user and assessment',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Latest attempt retrieved successfully',
+    type: AssessmentAttemptResponseDto,
+  })
+  async getUserLatestAttempt(
+    @Param('userId', ParseIntPipe) userId: number,
+    @Param('assessmentId', ParseIntPipe) assessmentId: number,
+  ) {
+    return this.assessmentAttemptService.getUserLatestAttempt(userId, assessmentId)
+  }
+
+  @Get('user/:userId/assessment/:assessmentId/stats')
+  @ApiOperation({
+    summary: 'Get user attempt statistics',
+    description: 'Get comprehensive statistics for all attempts by a user on an assessment',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'User attempt statistics retrieved successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        totalAttempts: { type: 'number' },
+        bestScore: { type: 'number', nullable: true },
+        latestScore: { type: 'number', nullable: true },
+        averageScore: { type: 'number', nullable: true },
+        improvementRate: { type: 'number', nullable: true },
+      },
+    },
+  })
+  async getUserAttemptStats(
+    @Param('userId', ParseIntPipe) userId: number,
+    @Param('assessmentId', ParseIntPipe) assessmentId: number,
+  ) {
+    return this.assessmentAttemptService.getUserAttemptStats(userId, assessmentId)
+  }
+
+  @Get('user/:userId/assessment/:assessmentId/can-start')
+  @ApiOperation({
+    summary: 'Check if user can start assessment',
+    description: 'Check if user can start a new attempt for an assessment (now always allows multiple attempts)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Check completed successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        canStart: { type: 'boolean' },
+        reason: { type: 'string' },
+        attemptCount: { type: 'number' },
+        lastAttempt: { type: 'object' },
+      },
+    },
+  })
+  async canStartAssessment(
+    @Param('userId', ParseIntPipe) userId: number,
+    @Param('assessmentId', ParseIntPipe) assessmentId: number,
+  ) {
+    return this.assessmentAttemptService.canStartAssessment(userId, assessmentId)
   }
 }
