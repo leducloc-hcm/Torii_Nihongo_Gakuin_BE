@@ -65,13 +65,33 @@ export class OnlineClassRepository {
       data,
       include: {
         lecturer: {
-          include: {
-            lecturerProfile: true,
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            lecturerProfile: {
+              select: {
+                name: true,
+                bio: true,
+                avatar: true,
+              },
+            },
           },
         },
-        course: true,
-        sessions: true,
-        members: true,
+        course: {
+          select: {
+            id: true,
+            title: true,
+            level: true,
+            thumbnailUrl: true,
+          },
+        },
+        _count: {
+          select: {
+            sessions: true,
+            members: true,
+          },
+        },
       },
     })
   }

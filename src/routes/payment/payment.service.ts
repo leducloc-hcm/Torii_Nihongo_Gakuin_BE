@@ -14,9 +14,7 @@ export class PaymentService {
     private readonly vnpayService: VNPayService,
   ) {}
 
-  async createPayment(userId: number, createPaymentDto: CreatePaymentDTO, ipAddr: string): Promise<PaymentResponseDTO> {
-    const { returnUrl, language = 'vn', couponCode } = createPaymentDto
-
+  async createPayment(userId: number, ipAddr: string): Promise<PaymentResponseDTO> {
     // Validate cart
     const cartValidation = await this.cartService.validateCartForCheckout(userId)
     if (!cartValidation.isValid) {
@@ -29,40 +27,7 @@ export class PaymentService {
       throw new BadRequestException('Cart is empty or has no amount to pay')
     }
 
-    let totalAmount = cartSummary.totalAmount
-    let appliedCoupon: any = null
-
-    // Apply coupon if provided
-    if (couponCode) {
-      const coupon = await this.prisma.promotion.findFirst({
-        where: {
-          code: couponCode,
-          active: true,
-          OR: [{ startsAt: null }, { startsAt: { lte: new Date() } }],
-          AND: [
-            {
-              OR: [{ endsAt: null }, { endsAt: { gte: new Date() } }],
-            },
-            {
-              OR: [{ maxUsage: null }, { used: { lt: this.prisma.promotion.fields.maxUsage } }],
-            },
-          ],
-        },
-      })
-
-      if (!coupon) {
-        throw new BadRequestException('Invalid or expired coupon code')
-      }
-
-      // Calculate discount
-      if (coupon.discountPct) {
-        totalAmount = Math.round((totalAmount * (100 - coupon.discountPct)) / 100)
-      } else if (coupon.discountAmt) {
-        totalAmount = Math.max(0, totalAmount - coupon.discountAmt)
-      }
-
-      appliedCoupon = coupon
-    }
+    const totalAmount = cartSummary.totalAmount
 
     // Create order in database
     const order = await this.prisma.order.create({
@@ -70,7 +35,6 @@ export class PaymentService {
         userId,
         totalAmount,
         status: 'PENDING',
-        couponId: appliedCoupon?.id,
         items: {
           create: cartSummary.items.map((item) => ({
             type: 'COURSE',
@@ -102,8 +66,6 @@ export class PaymentService {
       amount: totalAmount,
       orderInfo,
       ipAddr,
-      returnUrl,
-      language,
     })
 
     this.logger.log(`Created payment for order ${order.id}, amount: ${totalAmount}`)

@@ -37,171 +37,21 @@ import { AuthType } from 'src/shared/constants/auth.constant'
 export class OnlineClassController {
   constructor(private readonly onlineClassService: OnlineClassService) {}
 
-  @Post()
+  @Get('my-classes')
   @Auth([AuthType.Bearer])
-  @Roles(RoleName.Admin, RoleName.Staff, RoleName.Lecturer)
-  @ApiOperation({ summary: 'Create a new online class' })
-  @ApiResponse({ status: 201, description: 'Online class created successfully' })
-  async createOnlineClass(
-    @ActiveUser('userId') userId: number,
-    @Body() createClassDto: CreateOnlineClassDto,
-    @Request() req: any,
-  ) {
-    try {
-      const lecturerId = userId
-      const onlineClass = await this.onlineClassService.createOnlineClass({
-        ...createClassDto,
-        lecturerId,
-      })
-
-      return {
-        success: true,
-        message: 'Online class created successfully',
-        data: onlineClass,
-      }
-    } catch (error) {
-      throw new HttpException(
-        {
-          success: false,
-          message: error instanceof Error ? error.message : 'Failed to create online class',
-        },
-        HttpStatus.BAD_REQUEST,
-      )
-    }
+  @Roles(RoleName.Customer)
+  @ApiOperation({ summary: 'Get my enrolled online class detail' })
+  @ApiResponse({ status: 200, description: 'My enrolled online class retrieved successfully' })
+  async getMyEnrolledOnlineClass(@ActiveUser('userId') userId: number) {
+    return this.onlineClassService.getMyEnrolledOnlineClass(userId)
   }
-
-  @Get()
-  @ApiOperation({ summary: 'Get list of online classes' })
-  @ApiResponse({ status: 200, description: 'Online classes retrieved successfully' })
+  @Get('my-assigned-classes')
   @Auth([AuthType.Bearer])
-  @Roles(RoleName.Admin, RoleName.Staff, RoleName.Lecturer)
-  async getOnlineClasses(@Query() query: ClassListQueryDto, @Request() req: any) {
-    try {
-      const userId = req.user.id
-      const userRole = req.user.role
-
-      const classes = await this.onlineClassService.getOnlineClasses({
-        ...query,
-        userId,
-        userRole,
-      })
-
-      return {
-        success: true,
-        message: 'Online classes retrieved successfully',
-        data: classes.classes,
-        pagination: {
-          total: classes.total,
-          page: query.page || 1,
-          limit: query.limit || 10,
-          totalPages: Math.ceil(classes.total / (query.limit || 10)),
-        },
-      }
-    } catch (error) {
-      throw new HttpException(
-        {
-          success: false,
-          message: error instanceof Error ? error.message : 'Failed to retrieve online classes',
-        },
-        HttpStatus.BAD_REQUEST,
-      )
-    }
-  }
-
-  @Get(':id')
-  @ApiOperation({ summary: 'Get online class details' })
-  @ApiResponse({ status: 200, description: 'Online class details retrieved successfully' })
-  @Auth([AuthType.Bearer])
-  async getOnlineClassDetails(@Param('id') classId: string, @Request() req: any) {
-    try {
-      const userId = req.user.id
-      const onlineClass = await this.onlineClassService.getOnlineClassDetails(classId, userId)
-
-      if (!onlineClass) {
-        throw new HttpException(
-          {
-            success: false,
-            message: 'Online class not found',
-          },
-          HttpStatus.NOT_FOUND,
-        )
-      }
-
-      return {
-        success: true,
-        message: 'Online class details retrieved successfully',
-        data: onlineClass,
-      }
-    } catch (error) {
-      if (error instanceof HttpException) {
-        throw error
-      }
-      throw new HttpException(
-        {
-          success: false,
-          message: error instanceof Error ? error.message : 'Failed to retrieve online class details',
-        },
-        HttpStatus.BAD_REQUEST,
-      )
-    }
-  }
-
-  @Put(':id')
-  @Auth([AuthType.Bearer])
-  @Roles(RoleName.Admin, RoleName.Staff, RoleName.Lecturer)
-  @ApiOperation({ summary: 'Update online class' })
-  @ApiResponse({ status: 200, description: 'Online class updated successfully' })
-  async updateOnlineClass(
-    @ActiveUser('userId') userId: number,
-    @Param('id') classId: string,
-    @Body() updateClassDto: UpdateOnlineClassDto,
-    @Request() req: any,
-  ) {
-    try {
-      const userRole = req.user.role
-
-      const updatedClass = await this.onlineClassService.updateOnlineClass(classId, updateClassDto, userId, userRole)
-
-      return {
-        success: true,
-        message: 'Online class updated successfully',
-        data: updatedClass,
-      }
-    } catch (error) {
-      throw new HttpException(
-        {
-          success: false,
-          message: error instanceof Error ? error.message : 'Failed to update online class',
-        },
-        HttpStatus.BAD_REQUEST,
-      )
-    }
-  }
-
-  @Delete(':id')
-  @Auth([AuthType.Bearer])
-  @Roles(RoleName.Admin, RoleName.Staff)
-  @ApiOperation({ summary: 'Delete online class' })
-  @ApiResponse({ status: 200, description: 'Online class deleted successfully' })
-  async deleteOnlineClass(@ActiveUser('userId') userId: number, @Param('id') classId: string, @Request() req: any) {
-    try {
-      const userRole = req.user.role
-
-      await this.onlineClassService.deleteOnlineClass(classId, userId, userRole)
-
-      return {
-        success: true,
-        message: 'Online class deleted successfully',
-      }
-    } catch (error) {
-      throw new HttpException(
-        {
-          success: false,
-          message: error instanceof Error ? error.message : 'Failed to delete online class',
-        },
-        HttpStatus.BAD_REQUEST,
-      )
-    }
+  @Roles(RoleName.Lecturer)
+  @ApiOperation({ summary: 'Get my assigned online classes' })
+  @ApiResponse({ status: 200, description: 'My assigned online classes retrieved successfully' })
+  async getMyAssignedOnlineClasses(@ActiveUser('userId') userId: number) {
+    return this.onlineClassService.getMyAssignedOnlineClasses(userId)
   }
 
   @Post(':classId/sessions/:sessionId/join')

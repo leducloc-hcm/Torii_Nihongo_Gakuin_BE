@@ -80,6 +80,16 @@ export class CourseController {
       sortOrder,
     })
   }
+  @Get('my-enrolled-courses/:courseId')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Customer)
+  @HttpCode(HttpStatus.OK)
+  async getMyEnrolledCourseDetail(
+    @ActiveUser('userId') userId: number,
+    @Param('courseId', ParseIntPipe) courseId: number,
+  ) {
+    return this.courseService.getMyCourseDetail(userId, courseId)
+  }
 
   @Get(':slug')
   @HttpCode(HttpStatus.OK)
