@@ -1,13 +1,10 @@
-// ===== AssessmentItem Repository =====
-// Database operations for AssessmentItem entity
-// Handles CRUD operations, bulk operations, and complex queries
-
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../../shared/services/prisma.service'
 import { AssessmentItem } from '@prisma/client'
 import {
   AssessmentItemWithDetails,
   CreateAssessmentItemInput,
+  CreateAssessmentItemWithTypeInput,
   UpdateAssessmentItemInput,
   AssessmentItemQuery,
   ReorderAssessmentItemsInput,
@@ -16,13 +13,14 @@ import {
   CopyAssessmentItemsInput,
   MoveAssessmentItemsInput,
   AssessmentItemStats,
+  getScorePerQuestion,
+  validateScorePerQuestion,
+  ASSESSMENT_ITEM_CONSTRAINTS,
 } from './assessment-item.model'
 
 @Injectable()
 export class AssessmentItemRepository {
   constructor(private readonly prisma: PrismaService) {}
-
-  // ===== Basic CRUD Operations =====
 
   async create(data: CreateAssessmentItemInput): Promise<AssessmentItem> {
     // If order not provided, assign next available order
@@ -30,6 +28,9 @@ export class AssessmentItemRepository {
       const maxOrder = await this.getMaxOrderInSection(data.sectionId)
       data.order = maxOrder + 1
     }
+
+    // Get assessment type for scoring validation
+    const assessmentType = data.assessmentType || (await this.getAssessmentType(data.sectionId)) || 'TEST'
 
     // Create the data object with proper typing
     const createData: any = {
@@ -45,8 +46,60 @@ export class AssessmentItemRepository {
       createData.questionGroupId = data.questionGroupId
     }
 
-    if (data.score) {
-      createData.score = data.score
+    if (data.name) {
+      createData.name = data.name
+    }
+
+    if (data.timeLimitSec) {
+      createData.timeLimitSec = data.timeLimitSec
+    }
+
+    // Handle scorePerQuestion based on assessment type
+    try {
+      const scorePerQuestion = getScorePerQuestion(assessmentType, data.scorePerQuestion)
+      createData.scorePerQuestion = scorePerQuestion
+    } catch (error) {
+      throw new Error(`Invalid scorePerQuestion for ${assessmentType} type: ${error.message}`)
+    }
+
+    return this.prisma.assessmentItem.create({
+      data: createData,
+    })
+  }
+
+  async createWithTypeValidation(data: CreateAssessmentItemWithTypeInput): Promise<AssessmentItem> {
+    // Validate scorePerQuestion based on assessment type
+    const validation = validateScorePerQuestion(data.assessmentType, data.scorePerQuestion)
+    if (!validation.isValid) {
+      throw new Error(validation.error || 'Invalid scorePerQuestion')
+    }
+
+    // If order not provided, assign next available order
+    if (data.order === undefined) {
+      const maxOrder = await this.getMaxOrderInSection(data.sectionId)
+      data.order = maxOrder + 1
+    }
+
+    const createData: any = {
+      sectionId: data.sectionId,
+      order: data.order,
+      scorePerQuestion: validation.defaultValue,
+    }
+
+    if (data.questionId) {
+      createData.questionId = data.questionId
+    }
+
+    if (data.questionGroupId) {
+      createData.questionGroupId = data.questionGroupId
+    }
+
+    if (data.name) {
+      createData.name = data.name
+    }
+
+    if (data.timeLimitSec) {
+      createData.timeLimitSec = data.timeLimitSec
     }
 
     return this.prisma.assessmentItem.create({
@@ -174,9 +227,54 @@ export class AssessmentItemRepository {
   }
 
   async update(id: number, data: UpdateAssessmentItemInput): Promise<AssessmentItem> {
+    // If scorePerQuestion is being updated, validate it against assessment type
+    if (data.scorePerQuestion !== undefined) {
+      const item = await this.findById(id)
+      if (!item) {
+        throw new Error('Assessment item not found')
+      }
+
+      const assessmentType = data.assessmentType || (await this.getAssessmentType(item.sectionId)) || 'TEST'
+
+      // Validate scorePerQuestion based on assessment type
+      const validation = validateScorePerQuestion(assessmentType, data.scorePerQuestion)
+      if (!validation.isValid) {
+        throw new Error(validation.error || 'Invalid scorePerQuestion')
+      }
+
+      // Update with validated value
+      data.scorePerQuestion = validation.defaultValue
+    }
+
+    // Remove assessmentType from data as it's not a database field
+    const { assessmentType, ...updateData } = data
+
     return await this.prisma.assessmentItem.update({
       where: { id },
-      data,
+      data: updateData,
+    })
+  }
+
+  async updateScoring(id: number, scorePerQuestion: number, assessmentType?: 'TEST' | 'EXAM'): Promise<AssessmentItem> {
+    // Get current item to fetch assessment type if not provided
+    const item = await this.findById(id)
+    if (!item) {
+      throw new Error('Assessment item not found')
+    }
+
+    const finalAssessmentType = assessmentType || (await this.getAssessmentType(item.sectionId)) || 'TEST'
+
+    // Validate scorePerQuestion for the assessment type
+    const validation = validateScorePerQuestion(finalAssessmentType, scorePerQuestion)
+    if (!validation.isValid) {
+      throw new Error(validation.error || 'Invalid scorePerQuestion for assessment type')
+    }
+
+    return await this.prisma.assessmentItem.update({
+      where: { id },
+      data: {
+        scorePerQuestion: validation.defaultValue,
+      },
     })
   }
 
@@ -231,8 +329,16 @@ export class AssessmentItemRepository {
           createData.questionGroupId = item.questionGroupId
         }
 
-        if (item.score) {
-          createData.score = item.score
+        if (item.name) {
+          createData.name = item.name
+        }
+
+        if (item.timeLimitSec) {
+          createData.timeLimitSec = item.timeLimitSec
+        }
+
+        if (item.scorePerQuestion !== undefined) {
+          createData.scorePerQuestion = item.scorePerQuestion
         }
 
         return this.prisma.assessmentItem.create({ data: createData })
@@ -297,10 +403,6 @@ export class AssessmentItemRepository {
           createData.questionGroupId = item.questionGroupId
         }
 
-        if (item.score) {
-          createData.score = item.score
-        }
-
         return this.prisma.assessmentItem.create({ data: createData })
       }),
     )
@@ -351,12 +453,6 @@ export class AssessmentItemRepository {
       }),
       this.prisma.assessmentItem.aggregate({
         where: { sectionId },
-        _avg: {
-          score: true,
-        },
-        _sum: {
-          score: true,
-        },
       }),
     ])
 
@@ -374,7 +470,6 @@ export class AssessmentItemRepository {
     })
 
     const typeCount: Record<string, number> = {}
-    let totalScore = 0
 
     for (const item of items) {
       if (item.question) {
@@ -384,24 +479,132 @@ export class AssessmentItemRepository {
         const type = item.questionGroup.type
         typeCount[type] = (typeCount[type] || 0) + 1
       }
-
-      if (item.score) {
-        totalScore += item.score
-      }
     }
 
     const estimatedDurationMinutes = totalItems * 1.5 // Rough estimate: 1.5 minutes per item
 
+    // Calculate total score based on assessment type
+    const section = await this.prisma.assessmentSection.findUnique({
+      where: { id: sectionId },
+      include: {
+        assessment: {
+          select: { type: true },
+        },
+      },
+    })
+
+    let totalScore = 0
+    let avgScore = 0
+
+    if (section?.assessment.type === 'EXAM') {
+      // For EXAM type, calculate total score
+      for (const item of items) {
+        const scorePerQuestion = item.scorePerQuestion || 1.0
+        let questionCount = 1
+
+        if (item.questionGroupId) {
+          // Count questions in group
+          const questionGroup = await this.prisma.questionGroup.findUnique({
+            where: { id: item.questionGroupId },
+            include: { questions: { select: { id: true } } },
+          })
+          questionCount = questionGroup?.questions.length || 1
+        }
+
+        totalScore += scorePerQuestion * questionCount
+      }
+
+      avgScore = totalItems > 0 ? totalScore / totalItems : 0
+    }
+
     return {
       totalItems,
       itemsByType: typeCount,
-      totalScore: avgStats._sum.score || totalScore,
-      avgScore: avgStats._avg.score || undefined,
+      totalScore,
+      avgScore: avgScore > 0 ? avgScore : undefined,
       estimatedDurationMinutes,
     }
   }
 
   // ===== Helper Methods =====
+
+  async getAssessmentType(sectionId: number): Promise<'TEST' | 'EXAM' | null> {
+    const section = await this.prisma.assessmentSection.findUnique({
+      where: { id: sectionId },
+      include: {
+        assessment: {
+          select: { type: true },
+        },
+      },
+    })
+
+    return section?.assessment.type as 'TEST' | 'EXAM' | null
+  }
+
+  async getQuestionCountInGroup(questionGroupId: number): Promise<number> {
+    const questionGroup = await this.prisma.questionGroup.findUnique({
+      where: { id: questionGroupId },
+      include: {
+        questions: {
+          select: { id: true },
+        },
+      },
+    })
+
+    return questionGroup?.questions.length || 0
+  }
+
+  async calculateItemTotalScore(item: AssessmentItemWithDetails, assessmentType?: 'TEST' | 'EXAM'): Promise<number> {
+    // If assessment type not provided, fetch it
+    if (!assessmentType) {
+      assessmentType = (await this.getAssessmentType(item.sectionId)) || 'TEST'
+    }
+
+    // For TEST type: use scorePerQuestion but don't calculate total score for assessment grading
+    // (scorePerQuestion is stored for individual question scoring but total assessment score stays 0)
+    if (assessmentType === 'TEST') {
+      return 0 // TEST assessments don't contribute to total score calculation
+    }
+
+    // For EXAM type, calculate score based on scorePerQuestion * questionCount
+    const scorePerQuestion = item.scorePerQuestion || 0
+    let questionCount = 1
+
+    if (item.questionId) {
+      questionCount = 1
+    } else if (item.questionGroupId) {
+      questionCount = await this.getQuestionCountInGroup(item.questionGroupId)
+    }
+
+    return scorePerQuestion * questionCount
+  }
+
+  async calculateItemScoring(item: AssessmentItemWithDetails, assessmentType?: 'TEST' | 'EXAM') {
+    // If assessment type not provided, fetch it
+    if (!assessmentType) {
+      assessmentType = (await this.getAssessmentType(item.sectionId)) || 'TEST'
+    }
+
+    let questionCount = 1
+    if (item.questionId) {
+      questionCount = 1
+    } else if (item.questionGroupId) {
+      questionCount = await this.getQuestionCountInGroup(item.questionGroupId)
+    }
+
+    const scorePerQuestion =
+      item.scorePerQuestion ||
+      (assessmentType === 'TEST' ? ASSESSMENT_ITEM_CONSTRAINTS.DEFAULT_TEST_SCORE_PER_QUESTION : 0)
+    const totalScore = assessmentType === 'TEST' ? 0 : scorePerQuestion * questionCount
+
+    return {
+      totalQuestions: questionCount,
+      totalScore,
+      scorePerQuestion,
+      isTestType: assessmentType === 'TEST',
+      assessmentType,
+    }
+  }
 
   async getMaxOrderInSection(sectionId: number): Promise<number> {
     const result = await this.prisma.assessmentItem.aggregate({

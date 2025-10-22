@@ -11,10 +11,11 @@ import {
   HttpStatus,
   HttpCode,
 } from '@nestjs/common'
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger'
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiProperty } from '@nestjs/swagger'
 import { AssessmentItemService } from './assessment-item.service'
 import {
   CreateAssessmentItemDto,
+  CreateAssessmentItemWithTypeDto,
   UpdateAssessmentItemDto,
   AssessmentItemQueryDto,
   ReorderAssessmentItemsDto,
@@ -28,6 +29,10 @@ import {
   CreateItemsForSectionDto,
   CreateItemsFromQuestionGroupDto,
   BulkCreateItemsFromQuestionGroupsDto,
+  UpdateItemScoringDto,
+  ItemScoringResponseDto,
+  SectionScoringResponseDto,
+  AssessmentItemScoringValidationDto,
 } from './assessment-item.dto'
 
 @ApiTags('Assessment Items')
@@ -52,6 +57,22 @@ export class AssessmentItemController {
   @ApiResponse({ status: 409, description: 'Question already exists in section' })
   async createAssessmentItem(@Body() createAssessmentItemDto: CreateAssessmentItemDto) {
     return this.assessmentItemService.createAssessmentItem(createAssessmentItemDto as any)
+  }
+
+  @Post('with-type-validation')
+  @ApiOperation({
+    summary: 'Create assessment item with type validation',
+    description: 'Create assessment item with explicit type validation for TEST/EXAM scoring rules',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Assessment item created successfully with type validation',
+    type: AssessmentItemResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Invalid input or scoring validation failed' })
+  @ApiResponse({ status: 404, description: 'Section, question, or question group not found' })
+  async createAssessmentItemWithTypeValidation(@Body() createDto: CreateAssessmentItemWithTypeDto) {
+    return this.assessmentItemService.createAssessmentItemWithTypeValidation(createDto as any)
   }
 
   @Get()
@@ -408,5 +429,76 @@ export class AssessmentItemController {
     }
 
     return results
+  }
+
+  // ===== Scoring Operations =====
+
+  @Get(':id/scoring')
+  @ApiOperation({
+    summary: 'Get scoring information for an assessment item',
+    description: 'Returns total score, question count, and assessment type information',
+  })
+  @ApiParam({ name: 'id', description: 'Assessment item ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Item scoring information retrieved successfully',
+    type: ItemScoringResponseDto,
+  })
+  @ApiResponse({ status: 404, description: 'Assessment item not found' })
+  async getItemScoring(@Param('id', ParseIntPipe) id: number) {
+    return await this.assessmentItemService.getItemTotalScore(id)
+  }
+
+  @Put(':id/scoring')
+  @ApiOperation({
+    summary: 'Update scoring for an assessment item',
+    description: 'Update score per question for this item (only allowed for EXAM type assessments)',
+  })
+  @ApiParam({ name: 'id', description: 'Assessment item ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Item scoring updated successfully',
+    type: AssessmentItemResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Cannot set scoring for TEST type assessments' })
+  @ApiResponse({ status: 404, description: 'Assessment item not found' })
+  async updateItemScoring(@Param('id', ParseIntPipe) id: number, @Body() updateDto: UpdateItemScoringDto) {
+    return await this.assessmentItemService.updateItemScoring(id, updateDto.scorePerQuestion)
+  }
+
+  @Get('section/:sectionId/scoring')
+  @ApiOperation({
+    summary: 'Get total scoring information for a section',
+    description: 'Calculate total score for all items in a section',
+  })
+  @ApiParam({ name: 'sectionId', description: 'Assessment section ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Section scoring information retrieved successfully',
+    type: SectionScoringResponseDto,
+  })
+  @ApiResponse({ status: 404, description: 'Section not found' })
+  async getSectionScoring(@Param('sectionId', ParseIntPipe) sectionId: number) {
+    return await this.assessmentItemService.calculateSectionTotalScore(sectionId)
+  }
+
+  @Get('section/:sectionId/validate-scoring')
+  @ApiOperation({
+    summary: 'Validate score per question for assessment type',
+    description: 'Check if a scorePerQuestion value is valid for the assessment type',
+  })
+  @ApiParam({ name: 'sectionId', description: 'Assessment section ID' })
+  @ApiQuery({ name: 'scorePerQuestion', required: false, type: Number, description: 'Score per question to validate' })
+  @ApiResponse({
+    status: 200,
+    description: 'Validation result returned',
+    type: AssessmentItemScoringValidationDto,
+  })
+  @ApiResponse({ status: 404, description: 'Section or assessment not found' })
+  async validateScorePerQuestion(
+    @Param('sectionId', ParseIntPipe) sectionId: number,
+    @Query('scorePerQuestion') scorePerQuestion?: number,
+  ) {
+    return await this.assessmentItemService.validateScorePerQuestionForAssessment(sectionId, scorePerQuestion)
   }
 }

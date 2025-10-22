@@ -30,18 +30,12 @@ export const AssessmentSectionBaseSchema = z.object({
   assessmentId: z.number().int().positive(),
   title: z.string().min(1).max(255),
   type: QuestionTypeSchema,
-  order: z.number().int().min(0),
-  scorePerQuestion: z.number().min(0),
-  totalScore: z.number().min(0).nullable(),
 })
 
 export const CreateAssessmentSectionSchema = z.object({
   assessmentId: z.number().int().positive(),
   title: z.string().min(1).max(255),
   type: QuestionTypeSchema,
-  order: z.number().int().min(0).default(0),
-  scorePerQuestion: z.number().min(0).default(1.0),
-  totalScore: z.number().min(0).nullable().optional(),
 })
 
 export const UpdateAssessmentSectionSchema = CreateAssessmentSectionSchema.partial().omit({ assessmentId: true })
@@ -52,7 +46,7 @@ export const AssessmentSectionQuerySchema = z.object({
   search: z.string().optional(),
   type: QuestionTypeSchema.optional(),
   assessmentId: z.number().int().positive().optional(),
-  sortBy: z.enum(['order', 'title', 'type', 'scorePerQuestion']).default('order'),
+  sortBy: z.enum(['id', 'title', 'type']).default('id'),
   sortOrder: z.enum(['asc', 'desc']).default('asc'),
 })
 
@@ -90,8 +84,6 @@ export type BulkDeleteAssessmentSectionsInput = z.infer<typeof BulkDeleteAssessm
 export const AssessmentSectionStatsSchema = z.object({
   totalItems: z.number().int().min(0),
   itemsByType: z.record(z.string(), z.number().int().min(0)),
-  totalScore: z.number().min(0),
-  scorePerQuestion: z.number().min(0),
   estimatedDurationMinutes: z.number().optional(),
 })
 

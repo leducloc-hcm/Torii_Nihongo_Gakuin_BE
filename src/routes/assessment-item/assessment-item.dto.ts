@@ -3,12 +3,14 @@ import { z } from 'zod'
 import {
   CreateAssessmentItemSchema,
   UpdateAssessmentItemSchema,
+  CreateAssessmentItemWithTypeSchema,
   AssessmentItemQuerySchema,
   BulkCreateAssessmentItemsSchema,
   BulkDeleteAssessmentItemsSchema,
   ReorderAssessmentItemsSchema,
   CopyAssessmentItemsSchema,
   MoveAssessmentItemsSchema,
+  AssessmentTypeSchema,
 } from './assessment-item.model'
 
 // ===== Create AssessmentItem DTO =====
@@ -39,10 +41,82 @@ export class CreateAssessmentItemDto {
   order?: number
 
   @ApiPropertyOptional({
-    example: 1.0,
-    description: 'Score assigned to this specific item (optional)',
+    example: 'Vocabulary Question Set',
+    description: 'Optional name for this assessment item',
   })
-  score?: number
+  name?: string
+
+  @ApiPropertyOptional({
+    example: 300,
+    description: 'Time limit for this item in seconds',
+  })
+  timeLimitSec?: number
+
+  @ApiPropertyOptional({
+    example: 1.0,
+    description: 'Score per question in this item (defaults to 1 for TEST type, required for EXAM type)',
+  })
+  scorePerQuestion?: number
+
+  @ApiPropertyOptional({
+    enum: ['TEST', 'EXAM'],
+    example: 'TEST',
+    description: 'Assessment type for validation (inferred from paper if not provided)',
+  })
+  assessmentType?: z.infer<typeof AssessmentTypeSchema>
+}
+
+// ===== Create AssessmentItem with Type Validation DTO =====
+export class CreateAssessmentItemWithTypeDto {
+  @ApiProperty({
+    example: 123,
+    description: 'ID of the assessment section this item belongs to',
+  })
+  sectionId!: number
+
+  @ApiPropertyOptional({
+    example: 456,
+    description: 'ID of the question for this assessment item (either questionId or questionGroupId is required)',
+  })
+  questionId?: number
+
+  @ApiPropertyOptional({
+    example: 789,
+    description: 'ID of the question group for this assessment item (either questionId or questionGroupId is required)',
+  })
+  questionGroupId?: number
+
+  @ApiPropertyOptional({
+    example: 1,
+    default: 0,
+    description: 'Order of the item within the section (auto-assigned if not provided)',
+  })
+  order?: number
+
+  @ApiPropertyOptional({
+    example: 'Vocabulary Question Set',
+    description: 'Optional name for this assessment item',
+  })
+  name?: string
+
+  @ApiPropertyOptional({
+    example: 300,
+    description: 'Time limit for this item in seconds',
+  })
+  timeLimitSec?: number
+
+  @ApiPropertyOptional({
+    example: 1.0,
+    description: 'Score per question (defaults to 1 for TEST type, required for EXAM type)',
+  })
+  scorePerQuestion?: number
+
+  @ApiProperty({
+    enum: ['TEST', 'EXAM'],
+    example: 'TEST',
+    description: 'Assessment type - TEST: scorePerQuestion defaults to 1, EXAM: scorePerQuestion is required',
+  })
+  assessmentType!: z.infer<typeof AssessmentTypeSchema>
 }
 
 // ===== Update AssessmentItem DTO =====
@@ -66,10 +140,29 @@ export class UpdateAssessmentItemDto {
   order?: number
 
   @ApiPropertyOptional({
-    example: 2.0,
-    description: 'New score for this assessment item',
+    example: 'Updated Vocabulary Set',
+    description: 'New name for this assessment item',
   })
-  score?: number
+  name?: string
+
+  @ApiPropertyOptional({
+    example: 600,
+    description: 'New time limit for this item in seconds',
+  })
+  timeLimitSec?: number
+
+  @ApiPropertyOptional({
+    example: 2.0,
+    description: 'New score per question for this assessment item (validation depends on assessment type)',
+  })
+  scorePerQuestion?: number
+
+  @ApiPropertyOptional({
+    enum: ['TEST', 'EXAM'],
+    example: 'TEST',
+    description: 'Assessment type for validation (used to validate scorePerQuestion)',
+  })
+  assessmentType?: z.infer<typeof AssessmentTypeSchema>
 }
 
 // ===== Query AssessmentItems DTO =====
@@ -256,8 +349,14 @@ export class AssessmentItemResponseDto {
   @ApiProperty({ example: 0, description: 'Order within section' })
   order!: number
 
-  @ApiPropertyOptional({ example: 1.0, description: 'Score for this item' })
-  score?: number | null
+  @ApiPropertyOptional({ example: 'Vocabulary Set 1', description: 'Name of this item' })
+  name?: string | null
+
+  @ApiPropertyOptional({ example: 300, description: 'Time limit in seconds' })
+  timeLimitSec?: number | null
+
+  @ApiPropertyOptional({ example: 1.0, description: 'Score per question for this item' })
+  scorePerQuestion?: number | null
 
   @ApiPropertyOptional({
     description: 'Question details (when includeQuestion=true)',
@@ -390,4 +489,86 @@ export class BulkCreateItemsFromQuestionGroupsDto {
     description: 'Array of question group items to create (max 20)',
   })
   items!: CreateItemsFromQuestionGroupDto[]
+}
+
+// ===== Scoring DTOs =====
+export class UpdateItemScoringDto {
+  @ApiProperty({
+    example: 2.0,
+    description: 'New score per question (only allowed for EXAM type assessments)',
+  })
+  scorePerQuestion!: number
+
+  @ApiPropertyOptional({
+    enum: ['TEST', 'EXAM'],
+    example: 'EXAM',
+    description: 'Assessment type for validation',
+  })
+  assessmentType?: z.infer<typeof AssessmentTypeSchema>
+}
+
+export class ItemScoringResponseDto {
+  @ApiProperty({ example: 1, description: 'Assessment item ID' })
+  id!: number
+
+  @ApiProperty({ example: 5, description: 'Total number of questions in this item' })
+  totalQuestions!: number
+
+  @ApiProperty({ example: 10.0, description: 'Total score for this item (0 for TEST type)' })
+  totalScore!: number
+
+  @ApiProperty({ example: 2.0, description: 'Score per question' })
+  scorePerQuestion!: number
+
+  @ApiProperty({ example: true, description: 'Whether this is a TEST type assessment' })
+  isTestType!: boolean
+
+  @ApiProperty({
+    enum: ['TEST', 'EXAM'],
+    example: 'TEST',
+    description: 'Assessment type',
+  })
+  assessmentType!: 'TEST' | 'EXAM'
+}
+
+export class SectionScoringResponseDto {
+  @ApiProperty({ example: 123, description: 'Section ID' })
+  sectionId!: number
+
+  @ApiProperty({ example: 15, description: 'Total number of questions in section' })
+  totalQuestions!: number
+
+  @ApiProperty({ example: 30.0, description: 'Total score for section (0 for TEST type)' })
+  totalScore!: number
+
+  @ApiProperty({ example: 2.0, description: 'Average score per question' })
+  avgScorePerQuestion!: number
+
+  @ApiProperty({ example: 5, description: 'Number of items in section' })
+  totalItems!: number
+
+  @ApiProperty({
+    enum: ['TEST', 'EXAM'],
+    example: 'EXAM',
+    description: 'Assessment type',
+  })
+  assessmentType!: 'TEST' | 'EXAM'
+}
+
+export class AssessmentItemScoringValidationDto {
+  @ApiProperty({ example: true, description: 'Whether the scoring is valid' })
+  isValid!: boolean
+
+  @ApiPropertyOptional({ example: 'scorePerQuestion is required for EXAM type assessments' })
+  error?: string
+
+  @ApiPropertyOptional({ example: 1.0, description: 'Default or validated score per question value' })
+  defaultValue?: number
+
+  @ApiProperty({
+    enum: ['TEST', 'EXAM'],
+    example: 'TEST',
+    description: 'Assessment type used for validation',
+  })
+  assessmentType!: 'TEST' | 'EXAM'
 }

@@ -1,5 +1,13 @@
 import { z } from 'zod'
-import { AssessmentPaper, AssessmentSection, AssessmentAttempt, User, Lesson, PlacementBlueprint } from '@prisma/client'
+import {
+  AssessmentPaper,
+  AssessmentSection,
+  AssessmentAttempt,
+  User,
+  Lesson,
+  PlacementBlueprint,
+  ScoreProfile,
+} from '@prisma/client'
 
 // ===== Base Types from Prisma =====
 export type AssessmentPaperBase = AssessmentPaper
@@ -9,6 +17,7 @@ export type AssessmentPaperWithRelations = AssessmentPaper & {
   author: Pick<User, 'id' | 'name' | 'email'>
   lesson?: Lesson | null
   blueprint?: PlacementBlueprint | null
+  scoreProfile: Pick<ScoreProfile, 'id' | 'name' | 'level' | 'maxTotal' | 'mappings'>
   sections: (AssessmentSection & {
     items: any[]
   })[]
@@ -21,6 +30,7 @@ export type AssessmentPaperBasic = AssessmentPaper & {
   author: Pick<User, 'id' | 'name' | 'email'>
   lesson?: Pick<Lesson, 'id' | 'title'> | null
   blueprint?: Pick<PlacementBlueprint, 'id' | 'level'> | null
+  scoreProfile: Pick<ScoreProfile, 'id' | 'name' | 'level'>
   _count: {
     sections: number
     attempts: number
@@ -29,6 +39,7 @@ export type AssessmentPaperBasic = AssessmentPaper & {
 
 export type AssessmentPaperWithSections = AssessmentPaper & {
   author: Pick<User, 'id' | 'name' | 'email'>
+  scoreProfile: Pick<ScoreProfile, 'id' | 'name' | 'level'>
   sections: (AssessmentSection & {
     items: any[]
   })[]
@@ -47,6 +58,7 @@ export const AssessmentPaperBaseSchema = z.object({
   visibility: VisibilitySchema,
   createdBy: z.number().int().positive(),
   createdAt: z.date(),
+  scoreProfileId: z.number().int().positive(),
   lessonId: z.number().int().positive().nullable(),
   blueprintId: z.number().int().positive().nullable(),
   blueprintSnapshot: z.any().nullable(), // JSON
@@ -63,6 +75,7 @@ export const CreateAssessmentPaperManualSchema = z.object({
   type: AssessmentTypeSchema,
   visibility: VisibilitySchema.default('PRIVATE'),
   createdBy: z.number().int().positive(),
+  scoreProfileId: z.number().int().positive(),
   lessonId: z.number().int().positive().optional(),
 })
 
@@ -73,6 +86,7 @@ export const CreateAssessmentPaperBlueprintSchema = z.object({
   type: AssessmentTypeSchema,
   visibility: VisibilitySchema.default('PRIVATE'),
   createdBy: z.number().int().positive(),
+  scoreProfileId: z.number().int().positive(),
   blueprintId: z.number().int().positive(),
   blueprintSnapshot: z.any().nullable().optional(), // JSON snapshot of blueprint
   seed: z.bigint().nullable().optional(),
@@ -88,6 +102,7 @@ export const CreateAssessmentPaperSchema = z.object({
   type: AssessmentTypeSchema,
   visibility: VisibilitySchema.default('PRIVATE'),
   createdBy: z.number().int().positive(),
+  scoreProfileId: z.number().int().positive(),
   lessonId: z.number().int().positive().optional(),
   blueprintId: z.number().int().positive().optional(),
   blueprintSnapshot: z.any().optional(), // JSON

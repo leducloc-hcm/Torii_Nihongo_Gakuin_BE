@@ -22,12 +22,10 @@ import {
   AssessmentSectionQueryDto,
   AssessmentSectionStatsDto,
   BulkCreateAssessmentSectionsDto,
-  BulkCreateSectionsWithItemsDto,
   BulkDeleteAssessmentSectionsDto,
   CopyAssessmentSectionDto,
   CreateAssessmentSectionDto,
   MoveAssessmentSectionDto,
-  ReorderAssessmentSectionsDto,
   UpdateAssessmentSectionDto,
 } from './assessment-section.dto'
 import type {
@@ -54,9 +52,6 @@ export class AssessmentSectionController {
       assessmentId: createDto.assessmentId,
       title: createDto.title,
       type: createDto.type,
-      order: createDto.order ?? 0,
-      scorePerQuestion: createDto.scorePerQuestion ?? 1.0,
-      totalScore: createDto.totalScore,
     })
   }
 
@@ -144,31 +139,6 @@ export class AssessmentSectionController {
     return this.assessmentSectionService.updateAssessmentSection(id, updateDto)
   }
 
-  @Put(':id/scoring')
-  @Auth([AuthType.Bearer])
-  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
-  @ApiOperation({ summary: 'Update assessment section scoring' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Assessment section scoring updated successfully' })
-  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Assessment section not found' })
-  @ApiParam({ name: 'id', description: 'Assessment section ID' })
-  async updateSectionScoring(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() body: { scorePerQuestion?: number; totalScore?: number },
-  ): Promise<AssessmentSection> {
-    return this.assessmentSectionService.updateSectionScoring(id, body.scorePerQuestion, body.totalScore)
-  }
-
-  @Post(':id/recalculate-score')
-  @Auth([AuthType.Bearer])
-  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
-  @ApiOperation({ summary: 'Recalculate total score based on current items and score per question' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Total score recalculated successfully' })
-  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Assessment section not found' })
-  @ApiParam({ name: 'id', description: 'Assessment section ID' })
-  async recalculateTotalScore(@Param('id', ParseIntPipe) id: number): Promise<AssessmentSection> {
-    return this.assessmentSectionService.updateSectionTotalScore(id)
-  }
-
   @Post(':id/copy')
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
@@ -236,26 +206,11 @@ export class AssessmentSectionController {
     @Param('assessmentId', ParseIntPipe) assessmentId: number,
     @Body() bulkCreateDto: BulkCreateAssessmentSectionsDto,
   ): Promise<{ created: AssessmentSection[]; failed: Array<{ section: any; error: string }> }> {
-    const sectionsWithDefaults = bulkCreateDto.sections.map((section) => ({
+    const sectionsData = bulkCreateDto.sections.map((section) => ({
       title: section.title,
       type: section.type,
-      order: section.order ?? 0,
-      scorePerQuestion: 1.0,
-      totalScore: 0,
     }))
-    return this.assessmentSectionService.bulkCreateAssessmentSections(assessmentId, sectionsWithDefaults)
-  }
-
-  @Put('reorder')
-  @Auth([AuthType.Bearer])
-  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
-  @ApiOperation({ summary: 'Reorder assessment sections' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Sections reordered successfully' })
-  async reorderAssessmentSections(@Body() reorderDto: ReorderAssessmentSectionsDto): Promise<{
-    updated: number
-    failed: Array<{ id: number; error: string }>
-  }> {
-    return this.assessmentSectionService.reorderAssessmentSections(reorderDto.sections)
+    return this.assessmentSectionService.bulkCreateAssessmentSections(assessmentId, sectionsData)
   }
 
   @Delete('bulk')
@@ -270,28 +225,6 @@ export class AssessmentSectionController {
     return this.assessmentSectionService.bulkDeleteAssessmentSections(bulkDeleteDto.ids)
   }
 
-  @Post('assessment-papers/:assessmentId/sections/bulk-with-items')
-  @Auth([AuthType.Bearer])
-  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
-  @ApiOperation({
-    summary: 'Create multiple assessment sections with items',
-    description: 'Create multiple assessment sections and their associated assessment items in a single operation',
-  })
-  @ApiParam({ name: 'assessmentId', description: 'Assessment paper ID' })
-  @ApiResponse({
-    status: HttpStatus.CREATED,
-    description: 'Sections and items created successfully',
-    type: [AssessmentSectionStatsDto],
-  })
-  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid input or bulk limit exceeded' })
-  @ApiResponse({ status: HttpStatus.CONFLICT, description: 'Section title already exists or duplicate questions' })
-  async createSectionsWithItems(
-    @Param('assessmentId', ParseIntPipe) assessmentId: number,
-    @Body() createDto: BulkCreateSectionsWithItemsDto,
-  ) {
-    return this.assessmentSectionService.createSectionsWithItems(assessmentId, createDto.sections)
-  }
-
   @Get('assessment-papers/:assessmentId/sections/by-type/:type')
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Customer, RoleName.Admin)
@@ -304,17 +237,5 @@ export class AssessmentSectionController {
     @Param('type') type: string,
   ): Promise<AssessmentSectionBasic[]> {
     return this.assessmentSectionService.getSectionsByAssessmentIdAndType(assessmentId, type)
-  }
-
-  @Put('bulk-scoring')
-  @Auth([AuthType.Bearer])
-  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
-  @ApiOperation({ summary: 'Bulk update scoring for multiple sections' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Bulk scoring update completed' })
-  async bulkUpdateSectionScoring(@Body() body: { sectionIds: number[]; scorePerQuestion: number }): Promise<{
-    updated: number
-    failed: Array<{ id: number; error: string }>
-  }> {
-    return this.assessmentSectionService.bulkUpdateSectionScoring(body.sectionIds, body.scorePerQuestion)
   }
 }

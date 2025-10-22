@@ -17,21 +17,9 @@ export class AssessmentSectionService {
 
   // ===== Basic CRUD Operations =====
   async createAssessmentSection(data: CreateAssessmentSectionInput): Promise<AssessmentSection> {
-    if (data.order === undefined) {
-      data.order = await this.assessmentSectionRepo.getNextOrderForAssessment(data.assessmentId)
-    } else {
-      await this.assessmentSectionRepo.insertAtOrder(data.assessmentId, data.order)
-    }
-
     const checkAssessmentId = await this.assessmentSectionRepo.checkIdAssessmentPaper(data.assessmentId)
     if (!checkAssessmentId) {
       throw new NotFoundException(`Assessment with ID ${data.assessmentId} not found`)
-    }
-
-    if (data.totalScore === undefined) {
-      // For now, we'll calculate it later when items are added
-      // The totalScore will be updated when assessment items are created
-      data.totalScore = 0
     }
 
     return this.assessmentSectionRepo.create(data)
@@ -80,15 +68,6 @@ export class AssessmentSectionService {
       }
     }
 
-    // Handle order updates
-    if (data.order !== undefined && data.order !== existingSection.order) {
-      // Remove section from current position
-      await this.assessmentSectionRepo.updateOrdersAfterDelete(existingSection.assessmentId, existingSection.order)
-
-      // Insert at new position
-      await this.assessmentSectionRepo.insertAtOrder(existingSection.assessmentId, data.order)
-    }
-
     return this.assessmentSectionRepo.update(id, data)
   }
 
@@ -100,7 +79,6 @@ export class AssessmentSectionService {
 
     try {
       await this.assessmentSectionRepo.delete(id)
-      await this.assessmentSectionRepo.updateOrdersAfterDelete(section.assessmentId, section.order)
     } catch (error: any) {
       if (error.code === 'P2003') {
         throw new BadRequestException('Cannot delete assessment section because it has associated assessment items')
@@ -149,38 +127,16 @@ export class AssessmentSectionService {
           continue
         }
 
-        if (section.order === undefined) {
-          section.order = await this.assessmentSectionRepo.getNextOrderForAssessment(assessmentId)
-        }
+        const createdSection = await this.assessmentSectionRepo.create({
+          ...section,
+          assessmentId,
+        })
+        created.push(createdSection)
       } catch (error: any) {
         failed.push({
           section,
           error: error.message,
         })
-      }
-    }
-
-    const validSections = sections.filter((section) => !failed.some((f) => f.section === section))
-
-    if (validSections.length > 0) {
-      try {
-        const createdSections = await this.assessmentSectionRepo.bulkCreate(assessmentId, validSections)
-        created.push(...createdSections)
-      } catch (error: any) {
-        for (const section of validSections) {
-          try {
-            const createdSection = await this.assessmentSectionRepo.create({
-              ...section,
-              assessmentId,
-            })
-            created.push(createdSection)
-          } catch (individualError: any) {
-            failed.push({
-              section,
-              error: individualError.message,
-            })
-          }
-        }
       }
     }
 
@@ -209,46 +165,6 @@ export class AssessmentSectionService {
       }
       throw error
     }
-  }
-
-  async reorderAssessmentSections(
-    updates: Array<{ id: number; order: number }>,
-  ): Promise<{ updated: number; failed: Array<{ id: number; error: string }> }> {
-    const failed: Array<{ id: number; error: string }> = []
-    let updated = 0
-
-    for (const update of updates) {
-      const exists = await this.assessmentSectionRepo.exists(update.id)
-      if (!exists) {
-        failed.push({
-          id: update.id,
-          error: `Section with ID ${update.id} not found`,
-        })
-      }
-    }
-
-    const validUpdates = updates.filter((update) => !failed.some((f) => f.id === update.id))
-
-    if (validUpdates.length > 0) {
-      try {
-        await this.assessmentSectionRepo.reorderSections(validUpdates)
-        updated = validUpdates.length
-      } catch (error: any) {
-        for (const update of validUpdates) {
-          try {
-            await this.assessmentSectionRepo.update(update.id, { order: update.order })
-            updated++
-          } catch (individualError: any) {
-            failed.push({
-              id: update.id,
-              error: individualError.message,
-            })
-          }
-        }
-      }
-    }
-
-    return { updated, failed }
   }
 
   async copyAssessmentSection(id: number, targetAssessmentId: number, newTitle?: string): Promise<AssessmentSection> {
@@ -285,16 +201,12 @@ export class AssessmentSectionService {
       throw new ConflictException(`Section with title "${section.title}" already exists in target assessment`)
     }
 
-    await this.assessmentSectionRepo.updateOrdersAfterDelete(section.assessmentId, section.order)
-
     return this.assessmentSectionRepo.moveSection(id, targetAssessmentId)
   }
 
   async getAssessmentSectionStatistics(id: number): Promise<{
     totalItems: number
     itemsByType: Record<string, number>
-    totalScore: number
-    scorePerQuestion: number
   }> {
     const exists = await this.assessmentSectionRepo.exists(id)
     if (!exists) {
@@ -304,20 +216,9 @@ export class AssessmentSectionService {
     return this.assessmentSectionRepo.getStatistics(id)
   }
 
-  async validateSectionOrder(assessmentId: number, order: number, excludeId?: number): Promise<boolean> {
-    const sections = await this.assessmentSectionRepo.findByAssessmentId(assessmentId)
-    const existingSection = sections.find((s) => s.order === order && (!excludeId || s.id !== excludeId))
-    return !existingSection
-  }
-
   async validateSectionAccess(id: number, userId: number): Promise<AssessmentSection> {
     const section = await this.getAssessmentSection(id)
     return section
-  }
-
-  async getMaxOrderForAssessment(assessmentId: number): Promise<number> {
-    const sections = await this.assessmentSectionRepo.findByAssessmentId(assessmentId)
-    return sections.length > 0 ? Math.max(...sections.map((s) => s.order)) : -1
   }
 
   async getSectionsByType(assessmentId: number, type: string): Promise<AssessmentSectionBasic[]> {
@@ -327,7 +228,7 @@ export class AssessmentSectionService {
         type: type as any,
         page: 1,
         limit: 1000,
-        sortBy: 'order',
+        sortBy: 'id',
         sortOrder: 'asc',
       })
       .then((result) => result.data)
@@ -349,41 +250,8 @@ export class AssessmentSectionService {
     return this.copyAssessmentSection(id, section.assessmentId, title)
   }
 
-  // ===== New Scoring Methods =====
-  async updateSectionTotalScore(sectionId: number): Promise<AssessmentSection> {
-    const section = (await this.getAssessmentSection(sectionId)) as any
-    const itemCount = await this.getItemCountForSection(sectionId)
-
-    const newTotalScore = itemCount * (section.scorePerQuestion || 1.0)
-
-    return this.assessmentSectionRepo.update(sectionId, { totalScore: newTotalScore })
-  }
-
-  async updateSectionScoring(
-    sectionId: number,
-    scorePerQuestion?: number,
-    totalScore?: number,
-  ): Promise<AssessmentSection> {
-    const updateData: UpdateAssessmentSectionInput = {}
-
-    if (scorePerQuestion !== undefined) {
-      updateData.scorePerQuestion = scorePerQuestion
-    }
-
-    if (totalScore !== undefined) {
-      updateData.totalScore = totalScore
-    } else if (scorePerQuestion !== undefined) {
-      // Auto-calculate totalScore if scorePerQuestion is updated but totalScore is not provided
-      const itemCount = await this.getItemCountForSection(sectionId)
-      updateData.totalScore = itemCount * scorePerQuestion
-    }
-
-    return this.updateAssessmentSection(sectionId, updateData)
-  }
-
-  private async getItemCountForSection(sectionId: number): Promise<number> {
-    // Use the repository method for counting items
-    return this.assessmentSectionRepo.getItemCountForSection(sectionId)
+  async getSectionsByAssessmentIdAndType(assessmentId: number, type: string): Promise<AssessmentSectionBasic[]> {
+    return this.assessmentSectionRepo.findByAssessmentIdAndType(assessmentId, type as any)
   }
 
   async createSectionsWithItems(
@@ -391,7 +259,6 @@ export class AssessmentSectionService {
     sectionsData: Array<{
       title: string
       type: string
-      order?: number
       questionIds?: number[]
       questionGroupIds?: number[]
     }>,
@@ -404,10 +271,6 @@ export class AssessmentSectionService {
       throw new BadRequestException('Maximum 10 sections can be created at once')
     }
 
-    // Validate unique question IDs and question group IDs
-    const allQuestionIds = [...new Set(sectionsData.flatMap((s) => s.questionIds || []))]
-    const allQuestionGroupIds = [...new Set(sectionsData.flatMap((s) => s.questionGroupIds || []))]
-
     for (const sectionData of sectionsData) {
       const titleExists = await this.assessmentSectionRepo.getTitleExistsInAssessment(assessmentId, sectionData.title)
       if (titleExists) {
@@ -418,62 +281,18 @@ export class AssessmentSectionService {
     const createdSections: AssessmentSection[] = []
 
     for (const sectionData of sectionsData) {
-      const totalQuestions = (sectionData.questionIds?.length || 0) + (sectionData.questionGroupIds?.length || 0)
-
       const sectionInput: CreateAssessmentSectionInput = {
         assessmentId,
         title: sectionData.title,
         type: sectionData.type as any,
-        order: sectionData.order ?? (await this.assessmentSectionRepo.getNextOrderForAssessment(assessmentId)),
-        scorePerQuestion: 1.0,
-        totalScore: totalQuestions * 1.0,
       }
 
       const section = await this.createAssessmentSection(sectionInput)
       createdSections.push(section)
 
-      if (totalQuestions > 0) {
-        // This would need the AssessmentItemService to be injected
-        // For now, we'll just store the section and let the caller handle items
-        // TODO: Integrate with AssessmentItemService for full transaction
-      }
+      // TODO: Integrate with AssessmentItemService for full transaction
     }
 
     return createdSections
-  }
-
-  // ===== Assessment-specific methods =====
-  async getSectionsByAssessmentIdAndType(assessmentId: number, type: string): Promise<AssessmentSectionBasic[]> {
-    return this.assessmentSectionRepo.findByAssessmentIdAndType(assessmentId, type as any)
-  }
-
-  async calculateAssessmentSectionScore(sectionId: number): Promise<{ totalScore: number; itemCount: number }> {
-    const statistics = await this.getAssessmentSectionStatistics(sectionId)
-    return {
-      totalScore: statistics.totalScore,
-      itemCount: statistics.totalItems,
-    }
-  }
-
-  async bulkUpdateSectionScoring(
-    sectionIds: number[],
-    scorePerQuestion: number,
-  ): Promise<{ updated: number; failed: Array<{ id: number; error: string }> }> {
-    const failed: Array<{ id: number; error: string }> = []
-    let updated = 0
-
-    for (const sectionId of sectionIds) {
-      try {
-        await this.updateSectionScoring(sectionId, scorePerQuestion)
-        updated++
-      } catch (error: any) {
-        failed.push({
-          id: sectionId,
-          error: error.message,
-        })
-      }
-    }
-
-    return { updated, failed }
   }
 }

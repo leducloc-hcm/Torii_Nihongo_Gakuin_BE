@@ -228,7 +228,12 @@ export class AssessmentPaperController {
     @Body() generateDto: GenerateFromBlueprintDto,
     @Request() req: any,
   ): Promise<AssessmentPaperBase> {
-    return this.assessmentPaperService.generateFromBlueprint(blueprintId, req.user.id, generateDto)
+    return this.assessmentPaperService.generateFromBlueprint(
+      blueprintId,
+      req.user.id,
+      generateDto.scoreProfileId,
+      generateDto,
+    )
   }
 
   @Post('bulk-delete')

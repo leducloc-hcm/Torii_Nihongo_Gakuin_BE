@@ -22,6 +22,7 @@ export class AssessmentPaperRepository {
         type: data.type,
         visibility: data.visibility || 'PRIVATE',
         createdBy: data.createdBy,
+        scoreProfileId: data.scoreProfileId,
         blueprintId: data.blueprintId || null,
         blueprintSnapshot: data.blueprintSnapshot || null,
         seed: data.seed || null,
@@ -36,6 +37,15 @@ export class AssessmentPaperRepository {
     return await this.prisma.assessmentPaper.findUnique({
       where: { id },
       include: {
+        scoreProfile: {
+          select: {
+            id: true,
+            name: true,
+            level: true,
+            maxTotal: true,
+            mappings: true,
+          },
+        },
         sections: {
           include: {
             items: {
@@ -62,10 +72,8 @@ export class AssessmentPaperRepository {
                   },
                 },
               },
-              orderBy: { order: 'asc' },
             },
           },
-          orderBy: { order: 'asc' },
         },
       },
     })
@@ -80,6 +88,15 @@ export class AssessmentPaperRepository {
             id: true,
             name: true,
             email: true,
+          },
+        },
+        scoreProfile: {
+          select: {
+            id: true,
+            name: true,
+            level: true,
+            maxTotal: true,
+            mappings: true,
           },
         },
         blueprint: {
@@ -129,7 +146,6 @@ export class AssessmentPaperRepository {
               orderBy: { order: 'asc' },
             },
           },
-          orderBy: { order: 'asc' },
         },
         attempts: {
           include: {
@@ -159,6 +175,13 @@ export class AssessmentPaperRepository {
             email: true,
           },
         },
+        scoreProfile: {
+          select: {
+            id: true,
+            name: true,
+            level: true,
+          },
+        },
         sections: {
           include: {
             items: {
@@ -182,7 +205,6 @@ export class AssessmentPaperRepository {
               orderBy: { order: 'asc' },
             },
           },
-          orderBy: { order: 'asc' },
         },
       },
     })) as AssessmentPaperWithSections
@@ -261,7 +283,13 @@ export class AssessmentPaperRepository {
               email: true,
             },
           },
-
+          scoreProfile: {
+            select: {
+              id: true,
+              name: true,
+              level: true,
+            },
+          },
           blueprint: {
             select: {
               id: true,
@@ -368,6 +396,7 @@ export class AssessmentPaperRepository {
       type?: AssessmentType
       visibility?: Visibility
       createdBy: number
+      scoreProfileId?: number
       includeAttempts?: boolean
     },
   ): Promise<AssessmentPaper> {
@@ -383,6 +412,7 @@ export class AssessmentPaperRepository {
         type: data.type || original.type,
         visibility: data.visibility || 'PRIVATE',
         createdBy: data.createdBy,
+        scoreProfileId: data.scoreProfileId || original.scoreProfileId,
         blueprintId: original.blueprintId,
         blueprintSnapshot: original.blueprintSnapshot as any,
         seed: original.seed,
@@ -399,9 +429,6 @@ export class AssessmentPaperRepository {
           assessmentId: clonedPaper.id,
           title: section.title,
           type: section.type,
-          order: section.order,
-          scorePerQuestion: section.scorePerQuestion,
-          totalScore: section.totalScore,
         },
       })
 
@@ -412,7 +439,6 @@ export class AssessmentPaperRepository {
             questionId: item.questionId,
             questionGroupId: item.questionGroupId,
             order: item.order,
-            score: item.score,
           },
         })
       }
@@ -601,7 +627,6 @@ export class AssessmentPaperRepository {
               orderBy: { order: 'asc' },
             },
           },
-          orderBy: { order: 'asc' },
         },
       },
     })

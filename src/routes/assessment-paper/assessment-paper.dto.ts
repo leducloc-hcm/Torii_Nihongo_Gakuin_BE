@@ -38,6 +38,9 @@ export class CreateAssessmentPaperDto extends createZodDto(CreateAssessmentPaper
   @ApiProperty({ example: 1, description: 'ID of the user creating this assessment' })
   createdBy!: number
 
+  @ApiProperty({ example: 1, description: 'ID of the score profile to use for this assessment' })
+  scoreProfileId!: number
+
   @ApiPropertyOptional({ description: 'Blueprint ID if generated from blueprint' })
   blueprintId?: number
 
@@ -221,6 +224,7 @@ export class BulkUpdateVisibilityDto extends createZodDto(BulkUpdateVisibilitySc
 
 export const GenerateFromBlueprintSchema = z.object({
   title: z.string().min(1).max(255).optional(),
+  scoreProfileId: z.number().int().positive(),
   seed: z.bigint().optional(),
   generatorVersion: z.string().optional(),
   generatorMeta: GeneratorMetaSchema.optional(),
@@ -229,6 +233,9 @@ export const GenerateFromBlueprintSchema = z.object({
 export class GenerateFromBlueprintDto extends createZodDto(GenerateFromBlueprintSchema) {
   @ApiPropertyOptional({ example: 'Generated Assessment from Blueprint' })
   title?: string
+
+  @ApiProperty({ example: 1, description: 'Score profile ID for assessment scoring' })
+  scoreProfileId!: number
 
   @ApiPropertyOptional({ description: 'Random seed for deterministic generation' })
   seed?: bigint

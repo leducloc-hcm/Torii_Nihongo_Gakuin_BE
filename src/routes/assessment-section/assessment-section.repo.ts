@@ -160,7 +160,6 @@ export class AssessmentSectionRepository {
   async findByAssessmentId(assessmentId: number): Promise<AssessmentSectionBasic[]> {
     const result = await this.prisma.assessmentSection.findMany({
       where: { assessmentId },
-      orderBy: { order: 'asc' },
       include: {
         _count: {
           select: {
@@ -175,7 +174,6 @@ export class AssessmentSectionRepository {
   async findByAssessmentIdWithItems(assessmentId: number): Promise<AssessmentSectionWithItems[]> {
     return (await this.prisma.assessmentSection.findMany({
       where: { assessmentId },
-      orderBy: { order: 'asc' },
       include: {
         items: {
           include: {
@@ -232,23 +230,9 @@ export class AssessmentSectionRepository {
     })
   }
 
-  async reorderSections(updates: Array<{ id: number; order: number }>): Promise<void> {
-    await this.prisma.$transaction(
-      updates.map(({ id, order }) =>
-        this.prisma.assessmentSection.update({
-          where: { id },
-          data: { order },
-        }),
-      ),
-    )
-  }
-
-  // ===== Statistics =====
   async getStatistics(id: number): Promise<{
     totalItems: number
     itemsByType: Record<string, number>
-    totalScore: number
-    scorePerQuestion: number
   }> {
     const section = await this.prisma.assessmentSection.findUnique({
       where: { id },
@@ -274,8 +258,6 @@ export class AssessmentSectionRepository {
       return {
         totalItems: 0,
         itemsByType: {},
-        totalScore: 0,
-        scorePerQuestion: 0,
       }
     }
 
@@ -299,8 +281,6 @@ export class AssessmentSectionRepository {
     return {
       totalItems,
       itemsByType,
-      totalScore: section.totalScore || 0,
-      scorePerQuestion: section.scorePerQuestion,
     }
   }
 
@@ -314,20 +294,13 @@ export class AssessmentSectionRepository {
     // Get the next order for the target assessment
     const lastSection = await this.prisma.assessmentSection.findFirst({
       where: { assessmentId: targetAssessmentId },
-      orderBy: { order: 'desc' },
     })
 
-    const nextOrder = lastSection ? lastSection.order + 1 : 0
-
-    // Create the new section
     const newSection = await this.prisma.assessmentSection.create({
       data: {
         assessmentId: targetAssessmentId,
         title: newTitle || `${originalSection.title} (Copy)`,
         type: originalSection.type,
-        order: nextOrder,
-        scorePerQuestion: originalSection.scorePerQuestion,
-        totalScore: originalSection.totalScore,
       },
     })
 
@@ -338,8 +311,6 @@ export class AssessmentSectionRepository {
           sectionId: newSection.id,
           questionId: item.questionId,
           questionGroupId: item.questionGroupId,
-          order: index,
-          score: item.score,
         })),
       })
     }
@@ -352,16 +323,12 @@ export class AssessmentSectionRepository {
     // Get the next order for the target assessment
     const lastSection = await this.prisma.assessmentSection.findFirst({
       where: { assessmentId: targetAssessmentId },
-      orderBy: { order: 'desc' },
     })
-
-    const nextOrder = lastSection ? lastSection.order + 1 : 0
 
     return this.prisma.assessmentSection.update({
       where: { id },
       data: {
         assessmentId: targetAssessmentId,
-        order: nextOrder,
       },
     })
   }
@@ -397,28 +364,13 @@ export class AssessmentSectionRepository {
     return count > 0
   }
 
-  async getNextOrderForAssessment(assessmentId: number): Promise<number> {
-    const lastSection = await this.prisma.assessmentSection.findFirst({
-      where: { assessmentId },
-      orderBy: { order: 'desc' },
-    })
-    return lastSection ? lastSection.order + 1 : 0
-  }
-
   // ===== Order Management =====
   async updateOrdersAfterDelete(assessmentId: number, deletedOrder: number): Promise<void> {
     await this.prisma.assessmentSection.updateMany({
       where: {
         assessmentId,
-        order: {
-          gt: deletedOrder,
-        },
       },
-      data: {
-        order: {
-          decrement: 1,
-        },
-      },
+      data: {},
     })
   }
 
@@ -426,15 +378,8 @@ export class AssessmentSectionRepository {
     await this.prisma.assessmentSection.updateMany({
       where: {
         assessmentId,
-        order: {
-          gte: insertOrder,
-        },
       },
-      data: {
-        order: {
-          increment: 1,
-        },
-      },
+      data: {},
     })
   }
 
@@ -452,7 +397,6 @@ export class AssessmentSectionRepository {
         assessmentId,
         type,
       },
-      orderBy: { order: 'asc' },
       include: {
         _count: {
           select: {

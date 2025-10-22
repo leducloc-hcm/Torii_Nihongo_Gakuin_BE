@@ -413,6 +413,8 @@ model AssessmentPaper {
   author     User          @relation(fields: [createdBy], references: [id])
   createdAt  DateTime      @default(now())
 
+  scoreProfileId   Int
+  scoreProfile     ScoreProfile @relation(fields: [scoreProfileId], references: [id])
   blueprintId       Int?                        // thay cho TestPaper.blueprintId
   blueprint         PlacementBlueprint? @relation(fields: [blueprintId], references: [id])
   blueprintSnapshot Json?
@@ -430,9 +432,6 @@ model AssessmentSection {
   assessmentId   Int
   title          String
   type           QuestionType
-  order          Int           @default(0)
-  scorePerQuestion Float       @default(1.0)
-  totalScore     Float?
 
   assessment AssessmentPaper @relation(fields: [assessmentId], references: [id])
   items      AssessmentItem[]
@@ -441,10 +440,12 @@ model AssessmentSection {
 model AssessmentItem {
   id              Int  @id @default(autoincrement())
   sectionId       Int
+  name            String?
+  timeLimitSec    Int?
   questionId      Int?
   questionGroupId Int?
+  scorePerQuestion Float?
   order           Int  @default(0)
-  score           Float?
 
   section       AssessmentSection @relation(fields: [sectionId], references: [id])
   question      Question?         @relation(fields: [questionId], references: [id])
@@ -480,6 +481,26 @@ model AssessmentAnswer {
   attempt        AssessmentAttempt @relation(fields: [attemptId], references: [id])
   question       Question          @relation(fields: [questionId], references: [id])
   selectedOption Option?           @relation(fields: [selectedOptionId], references: [id])
+}
+
+model ScoreProfile {
+  id              Int            @id @default(autoincrement())
+  name            String         // "JLPT N4 đơn giản", "JLPT N5 default", "Test 100 điểm"
+  level           JLPTLevel?     // optional
+  maxTotal        Int?           // tổng điểm tối đa (vd 180 hay 100)
+  minTotalPass    Int?           // điểm tối thiểu để đậu (vd ≥90)
+  minBucketPass   Int?           // điểm tối thiểu mỗi phần (vd ≥19)
+  maxBucket       Int?           @default(60) // mỗi bucket tối đa bao nhiêu
+  notes           String?
+
+  // JSON quy định phần nào thuộc bucket nào
+  // ví dụ:
+  // { "VOCAB": "KNOWLEDGE", "GRAMMAR": "KNOWLEDGE", "READING": "READING", "LISTENING": "LISTENING" }
+  mappings        Json
+
+  papers          AssessmentPaper[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 }
 
 model Quiz {

@@ -4,6 +4,7 @@ import {
   AssessmentItemBase,
   AssessmentItemWithDetails,
   CreateAssessmentItemInput,
+  CreateAssessmentItemWithTypeInput,
   UpdateAssessmentItemInput,
   AssessmentItemQuery,
   ReorderAssessmentItemsInput,
@@ -14,6 +15,8 @@ import {
   AssessmentItemStats,
   ASSESSMENT_ITEM_ERRORS,
   ASSESSMENT_ITEM_CONSTRAINTS,
+  validateScorePerQuestion,
+  getScorePerQuestion,
 } from './assessment-item.model'
 import { AssessmentItem } from '@prisma/client'
 
@@ -61,12 +64,42 @@ export class AssessmentItemService {
       throw new BadRequestException(ASSESSMENT_ITEM_ERRORS.INVALID_ORDER)
     }
 
-    // Set order if not provided
-    if (data.order === undefined) {
-      data.order = await this.assessmentItemRepo.getNextOrderForSection(data.sectionId)
+    return this.assessmentItemRepo.create(data)
+  }
+
+  async createAssessmentItemWithTypeValidation(data: CreateAssessmentItemWithTypeInput): Promise<AssessmentItem> {
+    // Validate section exists
+    if (!(await this.assessmentItemRepo.sectionExists(data.sectionId))) {
+      throw new NotFoundException(ASSESSMENT_ITEM_ERRORS.SECTION_NOT_FOUND)
     }
 
-    return this.assessmentItemRepo.create(data)
+    // Validate question exists if questionId is provided
+    if (data.questionId && !(await this.assessmentItemRepo.questionExists(data.questionId))) {
+      throw new NotFoundException(ASSESSMENT_ITEM_ERRORS.QUESTION_NOT_FOUND)
+    }
+
+    // Validate question group exists if questionGroupId is provided
+    if (data.questionGroupId && !(await this.assessmentItemRepo.questionGroupExists(data.questionGroupId))) {
+      throw new NotFoundException(ASSESSMENT_ITEM_ERRORS.QUESTION_GROUP_NOT_FOUND)
+    }
+
+    // Check for duplicate question in section
+    if (data.questionId && (await this.assessmentItemRepo.isQuestionInSection(data.questionId, data.sectionId))) {
+      throw new ConflictException(ASSESSMENT_ITEM_ERRORS.DUPLICATE_QUESTION)
+    }
+
+    // Validate order
+    if (data.order !== undefined && (data.order < 0 || data.order > ASSESSMENT_ITEM_CONSTRAINTS.MAX_ORDER)) {
+      throw new BadRequestException(ASSESSMENT_ITEM_ERRORS.INVALID_ORDER)
+    }
+
+    // Validate scorePerQuestion based on assessment type
+    const validation = validateScorePerQuestion(data.assessmentType, data.scorePerQuestion)
+    if (!validation.isValid) {
+      throw new BadRequestException(validation.error || 'Invalid scorePerQuestion for assessment type')
+    }
+
+    return this.assessmentItemRepo.createWithTypeValidation(data)
   }
 
   async getAssessmentItem(
@@ -356,7 +389,115 @@ export class AssessmentItemService {
     return sectionIds.length === 1 ? sectionIds[0] : null
   }
 
-  // ===== Convenience Methods =====
+  // ===== Scoring and Assessment Type Methods =====
+
+  async getItemTotalScore(itemId: number): Promise<{
+    id: number
+    totalScore: number
+    totalQuestions: number
+    scorePerQuestion: number
+    assessmentType: 'TEST' | 'EXAM'
+    isTestType: boolean
+  }> {
+    const item = await this.assessmentItemRepo.findById(itemId, { section: true })
+    if (!item) {
+      throw new NotFoundException(ASSESSMENT_ITEM_ERRORS.NOT_FOUND)
+    }
+
+    const scoring = await this.assessmentItemRepo.calculateItemScoring(item)
+
+    return {
+      id: itemId,
+      totalScore: scoring.totalScore,
+      totalQuestions: scoring.totalQuestions,
+      scorePerQuestion: scoring.scorePerQuestion,
+      assessmentType: scoring.assessmentType,
+      isTestType: scoring.isTestType,
+    }
+  }
+
+  async updateItemScoring(itemId: number, scorePerQuestion: number): Promise<AssessmentItem> {
+    // Check if item exists and get assessment type
+    const item = await this.assessmentItemRepo.findById(itemId)
+    if (!item) {
+      throw new NotFoundException(ASSESSMENT_ITEM_ERRORS.NOT_FOUND)
+    }
+
+    const assessmentType = await this.assessmentItemRepo.getAssessmentType(item.sectionId)
+    if (!assessmentType) {
+      throw new NotFoundException('Assessment paper not found for this item')
+    }
+
+    // For TEST type: allow updating scorePerQuestion (though it doesn't affect total assessment scoring)
+    // For EXAM type: validate and update scorePerQuestion
+    const validation = validateScorePerQuestion(assessmentType, scorePerQuestion)
+    if (!validation.isValid) {
+      throw new BadRequestException(validation.error || 'Invalid scorePerQuestion for assessment type')
+    }
+
+    return this.assessmentItemRepo.updateScoring(itemId, scorePerQuestion, assessmentType)
+  }
+
+  async calculateSectionTotalScore(sectionId: number): Promise<{
+    sectionId: number
+    totalScore: number
+    totalQuestions: number
+    avgScorePerQuestion: number
+    totalItems: number
+    assessmentType: 'TEST' | 'EXAM'
+  }> {
+    // Validate section exists
+    if (!(await this.assessmentItemRepo.sectionExists(sectionId))) {
+      throw new NotFoundException(ASSESSMENT_ITEM_ERRORS.SECTION_NOT_FOUND)
+    }
+
+    const assessmentType = await this.assessmentItemRepo.getAssessmentType(sectionId)
+    if (!assessmentType) {
+      throw new NotFoundException('Assessment paper not found for this section')
+    }
+
+    const items = await this.assessmentItemRepo.getBySectionId(sectionId)
+    let totalScore = 0
+    let totalQuestions = 0
+
+    for (const item of items) {
+      const scoring = await this.assessmentItemRepo.calculateItemScoring(item, assessmentType)
+      totalScore += scoring.totalScore
+      totalQuestions += scoring.totalQuestions
+    }
+
+    const avgScorePerQuestion = totalQuestions > 0 ? totalScore / totalQuestions : 0
+
+    return {
+      sectionId,
+      totalScore,
+      totalQuestions,
+      avgScorePerQuestion,
+      totalItems: items.length,
+      assessmentType,
+    }
+  }
+
+  async validateScorePerQuestionForAssessment(
+    sectionId: number,
+    scorePerQuestion?: number,
+  ): Promise<{
+    isValid: boolean
+    error?: string
+    defaultValue?: number
+    assessmentType: 'TEST' | 'EXAM'
+  }> {
+    const assessmentType = await this.assessmentItemRepo.getAssessmentType(sectionId)
+    if (!assessmentType) {
+      throw new NotFoundException('Assessment paper not found for this section')
+    }
+
+    const validation = validateScorePerQuestion(assessmentType, scorePerQuestion)
+    return {
+      ...validation,
+      assessmentType,
+    }
+  }
   async createItemsForSection(
     sectionId: number,
     questionIds: number[],

@@ -21,15 +21,6 @@ export class CreateAssessmentSectionDto {
 
   @ApiProperty({ enum: ['VOCAB', 'KANJI', 'GRAMMAR', 'SYNONYM', 'ORDER', 'READING', 'LISTENING'], example: 'VOCAB' })
   type!: z.infer<typeof QuestionTypeSchema>
-
-  @ApiPropertyOptional({ default: 0, description: 'Display order within the assessment' })
-  order?: number
-
-  @ApiPropertyOptional({ default: 1.0, description: 'Score per question in this section' })
-  scorePerQuestion?: number
-
-  @ApiPropertyOptional({ description: 'Total score for this section (auto-calculated if not provided)' })
-  totalScore?: number
 }
 
 // ===== Update AssessmentSection DTO =====
@@ -39,15 +30,6 @@ export class UpdateAssessmentSectionDto extends createZodDto(UpdateAssessmentSec
 
   @ApiPropertyOptional({ enum: ['VOCAB', 'KANJI', 'GRAMMAR', 'SYNONYM', 'ORDER', 'READING', 'LISTENING'] })
   type?: z.infer<typeof QuestionTypeSchema>
-
-  @ApiPropertyOptional({ description: 'Display order within the assessment' })
-  order?: number
-
-  @ApiPropertyOptional({ description: 'Score per question in this section' })
-  scorePerQuestion?: number
-
-  @ApiPropertyOptional({ description: 'Total score for this section' })
-  totalScore?: number
 }
 
 export class AssessmentSectionQueryDto {
@@ -66,8 +48,8 @@ export class AssessmentSectionQueryDto {
   @ApiPropertyOptional({ description: 'Filter by assessment ID' })
   assessmentId?: number
 
-  @ApiPropertyOptional({ enum: ['order', 'title', 'type', 'scorePerQuestion'], default: 'order' })
-  sortBy?: string = 'order'
+  @ApiPropertyOptional({ enum: ['id', 'title', 'type'], default: 'id' })
+  sortBy?: string = 'id'
 
   @ApiPropertyOptional({ enum: ['asc', 'desc'], default: 'asc' })
   sortOrder?: string = 'asc'
@@ -79,18 +61,6 @@ export class BulkCreateAssessmentSectionsDto {
     description: 'Array of assessment sections to create (max 50)',
   })
   sections!: CreateAssessmentSectionDto[]
-}
-
-export class ReorderAssessmentSectionsDto {
-  @ApiProperty({
-    type: [Object],
-    example: [
-      { id: 1, order: 0 },
-      { id: 2, order: 1 },
-    ],
-    description: 'Array of section ID and new order pairs',
-  })
-  sections!: Array<{ id: number; order: number }>
 }
 
 export class BulkDeleteAssessmentSectionsDto {
@@ -112,12 +82,6 @@ export class AssessmentSectionStatsDto {
     description: 'Number of items by question type',
   })
   itemsByType!: Record<string, number>
-
-  @ApiProperty({ example: 15.0, description: 'Total score for this section' })
-  totalScore!: number
-
-  @ApiProperty({ example: 1.0, description: 'Score per question' })
-  scorePerQuestion!: number
 
   @ApiPropertyOptional({ example: 25, description: 'Estimated completion time in minutes' })
   estimatedDurationMinutes?: number
@@ -152,9 +116,6 @@ export class CreateAssessmentSectionWithItemsDto {
   @ApiProperty({ enum: ['VOCAB', 'KANJI', 'GRAMMAR', 'SYNONYM', 'ORDER', 'READING', 'LISTENING'], example: 'VOCAB' })
   type!: z.infer<typeof QuestionTypeSchema>
 
-  @ApiPropertyOptional({ default: 0, description: 'Display order within the assessment' })
-  order?: number
-
   @ApiProperty({
     type: [Number],
     example: [1, 2, 3],
@@ -181,30 +142,16 @@ export class BulkCreateSectionsWithItemsDto {
       {
         title: 'Vocabulary Section',
         type: 'VOCAB',
-        order: 0,
         questionIds: [1, 2, 3],
         questionGroupIds: [1],
       },
       {
         title: 'Grammar Section',
         type: 'GRAMMAR',
-        order: 1,
         questionIds: [4, 5, 6],
       },
     ],
     description: 'Array of sections to create with their items (max 10)',
   })
   sections!: CreateAssessmentSectionWithItemsDto[]
-}
-
-// ===== Update Section Scoring DTO =====
-export class UpdateSectionScoringDto {
-  @ApiPropertyOptional({ description: 'Score per question in this section' })
-  scorePerQuestion?: number
-
-  @ApiPropertyOptional({ description: 'Total score for this section' })
-  totalScore?: number
-
-  @ApiPropertyOptional({ default: false, description: 'Auto-calculate total score based on item count' })
-  autoCalculate?: boolean
 }

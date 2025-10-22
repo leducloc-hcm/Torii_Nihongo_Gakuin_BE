@@ -20,6 +20,7 @@ import { AssessmentSectionModule } from './routes/assessment-section/assessment-
 import { AssessmentItemModule } from './routes/assessment-item/assessment-item.module'
 import { AssessmentAttemptModule } from './routes/assessment-attempt/assessment-attempt.module'
 import { AssessmentAnswerModule } from './routes/assessment-answer/assessment-answer.module'
+import { ScoreProfileModule } from './routes/score-profile/score-profile.module'
 import { WebsocketsModule } from './websockets/websockets.module'
 import { OnlineClassModule } from './routes/online-class/online-class.module'
 import { QuestionGroupModule } from 'src/routes/question-group/question-group.module'
@@ -48,6 +49,7 @@ import { PaymentModule } from './routes/payment/payment.module'
     AssessmentItemModule,
     AssessmentAttemptModule,
     AssessmentAnswerModule,
+    ScoreProfileModule,
     WebsocketsModule,
     OnlineClassModule,
     CartModule,

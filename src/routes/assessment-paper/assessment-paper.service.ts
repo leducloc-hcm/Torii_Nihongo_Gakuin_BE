@@ -41,6 +41,7 @@ export class AssessmentPaperService {
       type: data.type,
       visibility: data.visibility || 'PRIVATE',
       createdBy: data.createdBy,
+      scoreProfileId: data.scoreProfileId,
       lessonId: data.lessonId,
       version: 1, // Default version
     }
@@ -295,6 +296,7 @@ export class AssessmentPaperService {
   async generateFromBlueprint(
     blueprintId: number,
     createdBy: number,
+    scoreProfileId: number,
     options: {
       title?: string
       seed?: bigint
@@ -311,6 +313,7 @@ export class AssessmentPaperService {
       type: 'TEST',
       visibility: 'PRIVATE',
       createdBy,
+      scoreProfileId,
       blueprintId,
       seed: options.seed || BigInt(Math.floor(Math.random() * 1000000)),
       version: 1,
