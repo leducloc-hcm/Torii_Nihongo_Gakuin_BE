@@ -37,13 +37,21 @@ import { AuthType } from 'src/shared/constants/auth.constant'
 export class OnlineClassController {
   constructor(private readonly onlineClassService: OnlineClassService) {}
 
+  @Get('all-classes')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Staff)
+  @ApiOperation({ summary: 'Get all online classes' })
+  @ApiResponse({ status: 200, description: 'Online classes retrieved successfully' })
+  async getAllOnlineClasses() {
+    return await this.onlineClassService.getAllOnlineClasses()
+  }
   @Get('my-classes')
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Customer)
   @ApiOperation({ summary: 'Get my enrolled online class detail' })
   @ApiResponse({ status: 200, description: 'My enrolled online class retrieved successfully' })
   async getMyEnrolledOnlineClass(@ActiveUser('userId') userId: number) {
-    return this.onlineClassService.getMyEnrolledOnlineClass(userId)
+    return await this.onlineClassService.getMyEnrolledOnlineClass(userId)
   }
   @Get('my-assigned-classes')
   @Auth([AuthType.Bearer])
@@ -51,7 +59,7 @@ export class OnlineClassController {
   @ApiOperation({ summary: 'Get my assigned online classes' })
   @ApiResponse({ status: 200, description: 'My assigned online classes retrieved successfully' })
   async getMyAssignedOnlineClasses(@ActiveUser('userId') userId: number) {
-    return this.onlineClassService.getMyAssignedOnlineClasses(userId)
+    return await this.onlineClassService.getMyAssignedOnlineClasses(userId)
   }
 
   @Post(':classId/sessions/:sessionId/join')

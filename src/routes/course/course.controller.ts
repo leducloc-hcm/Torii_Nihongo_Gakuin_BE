@@ -88,7 +88,7 @@ export class CourseController {
     @ActiveUser('userId') userId: number,
     @Param('courseId', ParseIntPipe) courseId: number,
   ) {
-    return this.courseService.getMyCourseDetail(userId, courseId)
+    return await this.courseService.getMyCourseDetail(userId, courseId)
   }
 
   @Get(':slug')
