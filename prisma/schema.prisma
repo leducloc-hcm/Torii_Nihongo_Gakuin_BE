@@ -465,7 +465,8 @@ model AssessmentAttempt {
   assessment AssessmentPaper  @relation(fields: [assessmentId], references: [id])
   user       User        @relation(fields: [userId], references: [id])
   answers    AssessmentAnswer[]
-}model AssessmentAnswer {
+}
+model AssessmentAnswer {
   id               Int      @id @default(autoincrement())
   attemptId        Int
   questionId       Int
