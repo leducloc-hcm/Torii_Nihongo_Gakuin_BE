@@ -29,7 +29,6 @@ import {
 export class ScoreProfileController {
   constructor(private readonly scoreProfileService: ScoreProfileService) {}
 
-  // ===== CREATE OPERATIONS =====
   @Post()
   @ApiOperation({
     summary: 'Create new score profile',
@@ -210,9 +209,8 @@ export class ScoreProfileController {
     return this.scoreProfileService.update(id, updateDto)
   }
 
-  // ===== DELETE OPERATIONS =====
   @Delete(':id')
-  @HttpCode(HttpStatus.NO_CONTENT)
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Delete score profile',
     description: 'Deletes score profile if not used by any assessment papers',

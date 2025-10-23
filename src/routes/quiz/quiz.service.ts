@@ -107,6 +107,7 @@ export class QuizService {
       {
         title: newTitle,
         lessonId: originalQuiz.lessonId || undefined,
+        timeLimitSec: originalQuiz.timeLimitSec,
       },
       userId,
     )

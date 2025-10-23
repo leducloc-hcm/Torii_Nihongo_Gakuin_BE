@@ -32,11 +32,13 @@ export interface QuizStats {
 export const CreateQuizSchema = z.object({
   title: z.string().min(1).max(255),
   lessonId: z.number().int().positive().optional(),
+  timeLimitSec: z.number().int().positive(),
 })
 
 export const UpdateQuizSchema = z.object({
   title: z.string().min(1).max(255).optional(),
   lessonId: z.number().int().positive().optional().nullable(),
+  timeLimitSec: z.number().int().positive().optional(),
 })
 
 export const QuizQuerySchema = z.object({

@@ -27,6 +27,7 @@ import { QuestionGroupModule } from 'src/routes/question-group/question-group.mo
 import { CartModule } from './routes/cart/cart.module'
 import { PaymentModule } from './routes/payment/payment.module'
 import { QuizModule } from './routes/quiz/quiz.module'
+import { QuizItemModule } from './routes/quiz-item/quiz-item.module'
 
 @Module({
   imports: [
@@ -56,6 +57,7 @@ import { QuizModule } from './routes/quiz/quiz.module'
     CartModule,
     PaymentModule,
     QuizModule,
+    QuizItemModule,
   ],
   controllers: [AppController],
   providers: [AppService],

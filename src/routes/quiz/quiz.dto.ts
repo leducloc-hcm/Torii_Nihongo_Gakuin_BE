@@ -16,6 +16,12 @@ export class CreateQuizDto extends createZodDto(CreateQuizSchema) {
     example: 1,
   })
   lessonId?: number
+
+  @ApiProperty({
+    description: 'Time limit in seconds',
+    example: 1800,
+  })
+  timeLimitSec!: number
 }
 
 export class UpdateQuizDto extends createZodDto(UpdateQuizSchema) {
@@ -31,6 +37,12 @@ export class UpdateQuizDto extends createZodDto(UpdateQuizSchema) {
     example: 1,
   })
   lessonId?: number | null
+
+  @ApiPropertyOptional({
+    description: 'Time limit in seconds',
+    example: 1800,
+  })
+  timeLimitSec?: number
 }
 
 export class QuizQueryDto extends createZodDto(QuizQuerySchema) {

@@ -20,6 +20,7 @@ export class QuizRepository {
       data: {
         title: data.title,
         lessonId: data.lessonId || null,
+        timeLimitSec: data.timeLimitSec,
         createdBy,
       },
     })
@@ -137,6 +138,7 @@ export class QuizRepository {
       data: {
         title: data.title,
         lessonId: data.lessonId,
+        timeLimitSec: data.timeLimitSec,
       },
     })
   }
@@ -209,26 +211,22 @@ export class QuizRepository {
   async getQuizStats(quizId: number): Promise<QuizStats> {
     const attempts = await this.prisma.quizAttempt.findMany({
       where: { quizId },
-      select: { score: true, submittedAt: true },
+      select: { submittedAt: true },
     })
 
     const totalAttempts = attempts.length
     const completedAttempts = attempts.filter((a) => a.submittedAt).length
-    const scores = attempts.filter((a) => a.score !== null).map((a) => a.score!)
 
-    const averageScore = scores.length > 0 ? scores.reduce((sum, score) => sum + score, 0) / scores.length : 0
-    const highestScore = scores.length > 0 ? Math.max(...scores) : 0
-    const lowestScore = scores.length > 0 ? Math.min(...scores) : 0
-    const passRate = scores.length > 0 ? scores.filter((score) => score >= 70).length / scores.length : 0
+    // Since we don't have score anymore, we return basic stats
     const completionRate = totalAttempts > 0 ? completedAttempts / totalAttempts : 0
 
     return {
       totalAttempts,
       completedAttempts,
-      averageScore: Math.round(averageScore * 100) / 100,
-      highestScore,
-      lowestScore,
-      passRate: Math.round(passRate * 100) / 100,
+      averageScore: 0,
+      highestScore: 0,
+      lowestScore: 0,
+      passRate: 0,
       completionRate: Math.round(completionRate * 100) / 100,
     }
   }
