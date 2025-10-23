@@ -28,6 +28,7 @@ import { CartModule } from './routes/cart/cart.module'
 import { PaymentModule } from './routes/payment/payment.module'
 import { QuizModule } from './routes/quiz/quiz.module'
 import { QuizItemModule } from './routes/quiz-item/quiz-item.module'
+import { QuizAttemptModule } from './routes/quiz-attempt/quiz-attempt.module'
 
 @Module({
   imports: [
@@ -58,6 +59,7 @@ import { QuizItemModule } from './routes/quiz-item/quiz-item.module'
     PaymentModule,
     QuizModule,
     QuizItemModule,
+    QuizAttemptModule,
   ],
   controllers: [AppController],
   providers: [AppService],
