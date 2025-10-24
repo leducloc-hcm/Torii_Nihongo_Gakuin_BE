@@ -219,8 +219,8 @@ export class ScoreProfileController {
   @ApiResponse({ status: 204, description: 'Score profile deleted successfully' })
   @ApiResponse({ status: 404, description: 'Score profile not found' })
   @ApiResponse({ status: 409, description: 'Profile is in use by assessment papers' })
-  async delete(@Param('id', ParseIntPipe) id: number): Promise<void> {
-    await this.scoreProfileService.delete(id)
+  async delete(@Param('id', ParseIntPipe) id: number) {
+    return this.scoreProfileService.delete(id)
   }
 
   @Delete('bulk/delete')

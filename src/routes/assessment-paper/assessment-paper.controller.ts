@@ -263,7 +263,7 @@ export class AssessmentPaperController {
   @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
   @ApiOperation({ summary: 'Delete assessment paper' })
   @ApiResponse({ status: 200, description: 'Assessment paper deleted successfully' })
-  async deleteAssessmentPaper(@Param('id', ParseIntPipe) id: number): Promise<void> {
-    await this.assessmentPaperService.deleteAssessmentPaper(id)
+  async deleteAssessmentPaper(@Param('id', ParseIntPipe) id: number) {
+    return this.assessmentPaperService.deleteAssessmentPaper(id)
   }
 }

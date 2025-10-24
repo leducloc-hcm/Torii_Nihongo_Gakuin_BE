@@ -192,7 +192,7 @@ export class AssessmentSectionController {
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Assessment section not found' })
   @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Cannot delete section with assessment items' })
   @ApiParam({ name: 'id', description: 'Assessment section ID' })
-  async deleteAssessmentSection(@Param('id', ParseIntPipe) id: number): Promise<void> {
+  async deleteAssessmentSection(@Param('id', ParseIntPipe) id: number) {
     return this.assessmentSectionService.deleteAssessmentSection(id)
   }
 

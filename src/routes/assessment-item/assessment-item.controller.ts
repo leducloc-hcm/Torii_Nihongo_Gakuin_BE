@@ -164,7 +164,7 @@ export class AssessmentItemController {
   @ApiResponse({ status: 404, description: 'Assessment item not found' })
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteAssessmentItem(@Param('id', ParseIntPipe) id: number) {
-    await this.assessmentItemService.deleteAssessmentItem(id)
+    return this.assessmentItemService.deleteAssessmentItem(id)
   }
 
   // ===== Bulk Operations =====
