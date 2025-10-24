@@ -127,6 +127,7 @@ export class OptionController {
   @Roles(RoleName.Staff, RoleName.Admin)
   @HttpCode(HttpStatus.OK)
   async remove(@Param('id', ParseIntPipe) id: number) {
-    return this.optionService.remove(id)
+    await this.optionService.remove(id)
+    return { message: 'Option deleted successfully' }
   }
 }

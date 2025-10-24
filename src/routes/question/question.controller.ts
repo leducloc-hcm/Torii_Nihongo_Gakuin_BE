@@ -135,6 +135,7 @@ export class QuestionController {
   @Roles(RoleName.Staff, RoleName.Admin)
   @HttpCode(HttpStatus.OK)
   async remove(@Param('id', ParseIntPipe) id: number) {
-    return this.questionService.remove(id)
+    await this.questionService.remove(id)
+    return { message: 'Question deleted successfully' }
   }
 }

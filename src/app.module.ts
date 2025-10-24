@@ -29,6 +29,7 @@ import { PaymentModule } from './routes/payment/payment.module'
 import { QuizModule } from './routes/quiz/quiz.module'
 import { QuizItemModule } from './routes/quiz-item/quiz-item.module'
 import { QuizAttemptModule } from './routes/quiz-attempt/quiz-attempt.module'
+import { QuizAnswerModule } from './routes/quiz-answer/quiz-answer.module'
 
 @Module({
   imports: [
@@ -60,6 +61,7 @@ import { QuizAttemptModule } from './routes/quiz-attempt/quiz-attempt.module'
     QuizModule,
     QuizItemModule,
     QuizAttemptModule,
+    QuizAnswerModule,
   ],
   controllers: [AppController],
   providers: [AppService],

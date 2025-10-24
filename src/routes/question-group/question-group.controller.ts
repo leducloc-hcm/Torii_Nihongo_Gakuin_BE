@@ -151,6 +151,7 @@ export class QuestionGroupController {
   @Roles(RoleName.Staff, RoleName.Admin)
   @HttpCode(HttpStatus.OK)
   async remove(@Param('id', ParseIntPipe) id: number) {
-    return this.questionGroupService.remove(id)
+    await this.questionGroupService.remove(id)
+    return { message: 'Question group deleted successfully' }
   }
 }
