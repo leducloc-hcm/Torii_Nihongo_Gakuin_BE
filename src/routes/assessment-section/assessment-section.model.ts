@@ -24,7 +24,7 @@ export type AssessmentSectionBasic = AssessmentSection & {
   }
 }
 
-export const QuestionTypeSchema = z.enum(['VOCAB', 'KANJI', 'GRAMMAR', 'SYNONYM', 'ORDER', 'READING', 'LISTENING'])
+export const QuestionTypeSchema = z.enum(['VOCAB', 'GRAMMAR', 'READING', 'LISTENING'])
 
 export const CreateAssessmentSectionSchema = z.object({
   assessmentId: z.number().int().positive(),

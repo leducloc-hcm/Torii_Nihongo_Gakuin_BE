@@ -14,6 +14,24 @@ export class AssessmentPaperRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(data: CreateAssessmentPaperInput): Promise<AssessmentPaper> {
+    // If scoreProfileId is provided, get sections from score profile
+    let sectionsToCreate: any[] = []
+
+    if (data.scoreProfileId) {
+      const scoreProfile = await this.prisma.scoreProfile.findUnique({
+        where: { id: data.scoreProfileId },
+        include: { sections: true },
+      })
+
+      if (scoreProfile && scoreProfile.sections.length > 0) {
+        sectionsToCreate = scoreProfile.sections.map((section) => ({
+          title: section.title,
+          type: section.type,
+          timeLimitSec: section.defaultTimeSec,
+        }))
+      }
+    }
+
     return await this.prisma.assessmentPaper.create({
       data: {
         title: data.title,
@@ -25,6 +43,14 @@ export class AssessmentPaperRepository {
         seed: data.seed || null,
         version: data.version || 1,
         generatorVersion: data.generatorVersion || null,
+        ...(sectionsToCreate.length > 0 && {
+          sections: {
+            create: sectionsToCreate,
+          },
+        }),
+      },
+      include: {
+        sections: true,
       },
     })
   }
@@ -39,7 +65,6 @@ export class AssessmentPaperRepository {
             name: true,
             level: true,
             maxTotal: true,
-            mappings: true,
           },
         },
         sections: {
@@ -97,7 +122,6 @@ export class AssessmentPaperRepository {
             name: true,
             level: true,
             maxTotal: true,
-            mappings: true,
           },
         },
         blueprint: {

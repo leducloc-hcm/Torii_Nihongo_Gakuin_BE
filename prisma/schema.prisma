@@ -426,8 +426,8 @@ model AssessmentPaper {
   author     User          @relation(fields: [createdBy], references: [id])
   createdAt  DateTime      @default(now())
 
-  scoreProfileId   Int
-  scoreProfile     ScoreProfile @relation(fields: [scoreProfileId], references: [id])
+  scoreProfileId   Int?
+  scoreProfile     ScoreProfile? @relation(fields: [scoreProfileId], references: [id])
   blueprintId       Int?                        // thay cho TestPaper.blueprintId
   blueprint         PlacementBlueprint? @relation(fields: [blueprintId], references: [id])
   blueprintSnapshot Json?
@@ -445,11 +445,12 @@ model AssessmentSection {
   assessmentId   Int
   title          String
   timeLimitSec    Int?
-  type           QuestionType
+  type           AssessmentSectionType
 
   assessment AssessmentPaper @relation(fields: [assessmentId], references: [id])
   items      AssessmentItem[]
 }
+
 
 model AssessmentItem {
   id              Int  @id @default(autoincrement())
@@ -495,23 +496,30 @@ model AssessmentAnswer {
 
 model ScoreProfile {
   id              Int            @id @default(autoincrement())
-  name            String         // "JLPT N4 đơn giản", "JLPT N5 default", "Test 100 điểm"
-  level           JLPTLevel?     // optional
-  maxTotal        Int?           // tổng điểm tối đa (vd 180 hay 100)
-  minTotalPass    Int?           // điểm tối thiểu để đậu (vd ≥90)
-  minBucketPass   Int?           // điểm tối thiểu mỗi phần (vd ≥19)
-  maxBucket       Int?           @default(60) // mỗi bucket tối đa bao nhiêu
-  notes           String?
-
-  // JSON quy định phần nào thuộc bucket nào
-  // ví dụ:
-  // { "VOCAB": "KNOWLEDGE", "GRAMMAR": "KNOWLEDGE", "READING": "READING", "LISTENING": "LISTENING" }
-  mappings        Json
+  name            String        
+  level           JLPTLevel?    
+  maxTotal        Int?          
+  minTotalPass    Int?           
 
   papers          AssessmentPaper[]
+  sections        ScoreProfileSection[]
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 }
+
+model ScoreProfileSection {
+  id          Int                    @id @default(autoincrement())
+  type        AssessmentSectionType  
+  title       String                 
+  maxScore    Int                    
+  weight      Float?                
+  minPass     Int?       
+  defaultTimeSec Int?            
+
+  profileId   Int
+  profile     ScoreProfile           @relation(fields: [profileId], references: [id])
+}
+
 
 model Quiz {
   id        Int      @id @default(autoincrement())
@@ -1078,12 +1086,17 @@ enum AssessmentType {
   EXAM
 }
 
+enum AssessmentSectionType {
+  VOCAB
+  GRAMMAR
+  READING
+  LISTENING
+}
+
 enum QuestionType {
   VOCAB
   KANJI
   GRAMMAR
-  SYNONYM
-  ORDER
   READING
   LISTENING
 }
@@ -1092,7 +1105,6 @@ enum QuestionGroupType {
   VOCAB           
   KANJI
   GRAMMAR
-  CLOZE
   READING_SHORT
   READING_MEDIUM
   READING_LONG

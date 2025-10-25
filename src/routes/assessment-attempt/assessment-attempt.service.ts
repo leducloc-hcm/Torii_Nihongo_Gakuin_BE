@@ -286,7 +286,7 @@ export class AssessmentAttemptService {
   }
 
   /**
-   * Calculate EXAM score: bucket-based JLPT with ScoreProfile
+   * Calculate EXAM score: using ScoreProfile sections
    */
   private async calculateExamScore(
     attemptId: number,
@@ -298,66 +298,56 @@ export class AssessmentAttemptService {
   }> {
     const answersWithScores = await this.assessmentAttemptRepo.getAttemptAnswersWithScores(attemptId)
 
-    // Group answers by bucket using ScoreProfile mappings
-    const bucketGroups = new Map<
-      string,
-      {
-        correct: number
-        total: number
-        totalPossibleScore: number
-      }
-    >()
+    // Get score profile sections
+    const sections = scoreProfile.sections || []
+    if (sections.length === 0) {
+      throw new Error('Score profile has no sections defined')
+    }
 
-    // Initialize buckets
-    const buckets = ['KNOWLEDGE', 'READING', 'LISTENING']
-    buckets.forEach((bucket) => {
-      bucketGroups.set(bucket, { correct: 0, total: 0, totalPossibleScore: 0 })
-    })
+    // Group answers by section type
+    const answersBySection = new Map<string, { correct: number; total: number }>()
 
-    // Process answers according to mappings
     for (const answer of answersWithScores) {
-      const questionType = answer.question.type
-      const bucket = scoreProfile.mappings[questionType] || 'KNOWLEDGE' // Default bucket
-      const scorePerQuestion = answer.scorePerQuestion || 1
+      const sectionType = answer.question.type
+      const current = answersBySection.get(sectionType) || { correct: 0, total: 0 }
 
-      const current = bucketGroups.get(bucket)!
       current.total++
-      current.totalPossibleScore += scorePerQuestion
-
       if (answer.isCorrect) {
         current.correct++
       }
+
+      answersBySection.set(sectionType, current)
     }
 
-    // Calculate scaled scores for each bucket
+    // Calculate score for each section
     const sectionScores: SectionScore[] = []
     let totalScore = 0
 
-    for (const [bucketName, stats] of bucketGroups) {
-      if (stats.total > 0) {
-        const rawScore = stats.correct / stats.total
-        // Scale to maxBucket (default 60 for JLPT)
-        const scaledScore = Math.round(rawScore * (scoreProfile.maxBucket || 60))
+    for (const section of sections) {
+      const stats = answersBySection.get(section.type) || { correct: 0, total: 0 }
 
-        // Check if bucket passes minimum requirement
-        const minBucketPass = scoreProfile.minBucketPass || 19
-        const passed = scaledScore >= minBucketPass
+      // Calculate earned score (weighted if weight is provided)
+      const rawScore = stats.total > 0 ? stats.correct / stats.total : 0
+      const scaledScore = rawScore * section.maxScore
+      const earnedScore = section.weight ? scaledScore * section.weight : scaledScore
 
-        sectionScores.push({
-          sectionType: bucketName,
-          correctAnswers: stats.correct,
-          totalQuestions: stats.total,
-          rawScore,
-          scaledScore,
-          passed,
-        })
+      // Check if section passed
+      const passed = section.minPass ? earnedScore >= section.minPass : true
 
-        totalScore += scaledScore
-      }
+      sectionScores.push({
+        sectionType: section.type,
+        correctAnswers: stats.correct,
+        totalQuestions: stats.total,
+        rawScore,
+        scaledScore: Math.round(earnedScore * 100) / 100,
+        passed,
+      })
+
+      totalScore += earnedScore
     }
 
     return {
-      totalScore,
+      totalScore: Math.round(totalScore * 100) / 100,
       sectionScores,
     }
   }
@@ -383,29 +373,38 @@ export class AssessmentAttemptService {
     let recommendation = ''
 
     if (passed) {
-      // If passed current level, suggest next level up (if available)
-      const levels: JLPTLevel[] = ['N5', 'N4', 'N3', 'N2', 'N1']
-      const currentIndex = levels.indexOf(currentLevel)
-
-      if (currentIndex > 0) {
-        suggestedLevel = levels[currentIndex - 1]
-        recommendation = `Chúc mừng! Bạn đã vượt qua ${currentLevel}. Bạn sẵn sàng thử thách ${suggestedLevel}.`
+      // Excellent performance (>= 85%) - suggest higher level
+      const scorePercentage = totalScore / maxTotal
+      if (scorePercentage >= 0.85) {
+        const levels: JLPTLevel[] = ['N5', 'N4', 'N3', 'N2', 'N1']
+        const currentIndex = levels.indexOf(currentLevel)
+        if (currentIndex > 0) {
+          suggestedLevel = levels[currentIndex - 1]
+          recommendation = `Xuất sắc! Bạn đã đạt ${Math.round(scorePercentage * 100)}% điểm ${currentLevel}. Bạn sẵn sàng thử thách ${suggestedLevel}.`
+        } else {
+          recommendation = `Hoàn hảo! Bạn đã thành thạo ${currentLevel}, cấp độ JLPT cao nhất.`
+        }
       } else {
-        recommendation = `Xuất sắc! Bạn đã thành thạo ${currentLevel}, cấp độ JLPT cao nhất.`
+        // Passed but not excellent - stay at current level
+        recommendation = `Chúc mừng! Bạn đã vượt qua ${currentLevel}. Tiếp tục luyện tập để nâng cao trước khi thử cấp độ cao hơn.`
       }
     } else {
-      // If failed, analyze what went wrong and suggest improvement
+      // Failed - analyze what went wrong
       if (!totalPassed && !sectionsPassed) {
-        recommendation = `Cần cải thiện tất cả các mảng. Tổng điểm (${totalScore}/${maxTotal}) và điểm từng phần đều cần nâng cao.`
+        recommendation = `Cần cải thiện tất cả các mảng. Tổng điểm (${Math.round(totalScore)}/${maxTotal}) và điểm từng phần đều cần nâng cao.`
       } else if (!totalPassed) {
-        recommendation = `Cần cải thiện kết quả tổng thể. Điểm hiện tại: ${totalScore}/${maxTotal} (tối thiểu: ${minTotalPass}).`
+        recommendation = `Cần cải thiện kết quả tổng thể. Điểm hiện tại: ${Math.round(totalScore)}/${maxTotal} (tối thiểu: ${minTotalPass}).`
       } else if (!sectionsPassed) {
-        recommendation = `Tổng điểm ổn, nhưng một số phần cần cải thiện. Kiểm tra yêu cầu từng phần.`
+        const failedSections = sectionScores
+          .filter((s) => !s.passed)
+          .map((s) => s.sectionType)
+          .join(', ')
+        recommendation = `Tổng điểm đạt yêu cầu, nhưng các phần sau cần cải thiện: ${failedSections}.`
       }
 
-      // Suggest staying at current level or going down if score is very low
+      // Suggest appropriate level based on performance
       const scorePercentage = totalScore / maxTotal
-      if (scorePercentage < 0.3 && currentLevel !== 'N5') {
+      if (scorePercentage < 0.4 && currentLevel !== 'N5') {
         const levels: JLPTLevel[] = ['N5', 'N4', 'N3', 'N2', 'N1']
         const currentIndex = levels.indexOf(currentLevel)
         suggestedLevel = levels[currentIndex + 1]
@@ -418,7 +417,7 @@ export class AssessmentAttemptService {
 
     return {
       currentLevel,
-      totalScore,
+      totalScore: Math.round(totalScore * 100) / 100,
       totalPassed,
       sectionsPassed,
       suggestedLevel,
