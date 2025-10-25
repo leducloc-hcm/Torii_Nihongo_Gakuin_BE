@@ -41,6 +41,7 @@ export class AssessmentSectionController {
       assessmentId: createDto.assessmentId,
       title: createDto.title,
       type: createDto.type,
+      timeLimitSec: createDto.timeLimitSec,
     })
   }
 

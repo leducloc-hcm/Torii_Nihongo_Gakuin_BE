@@ -50,13 +50,11 @@ export class AssessmentSectionService {
   }
 
   async updateAssessmentSection(id: number, data: UpdateAssessmentSectionInput): Promise<AssessmentSection> {
-    // Check if section exists
     const existingSection = await this.assessmentSectionRepo.findById(id)
     if (!existingSection) {
       throw new NotFoundException(`Assessment section with ID ${id} not found`)
     }
 
-    // Validate title uniqueness if title is being updated
     if (data.title) {
       const titleExists = await this.assessmentSectionRepo.getTitleExistsInAssessment(
         existingSection.assessmentId,
