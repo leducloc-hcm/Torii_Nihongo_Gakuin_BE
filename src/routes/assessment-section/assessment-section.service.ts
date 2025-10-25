@@ -249,10 +249,6 @@ export class AssessmentSectionService {
     return this.copyAssessmentSection(id, section.assessmentId, title)
   }
 
-  async getSectionsByAssessmentIdAndType(assessmentId: number, type: string): Promise<AssessmentSectionBasic[]> {
-    return this.assessmentSectionRepo.findByAssessmentIdAndType(assessmentId, type as any)
-  }
-
   async createSectionsWithItems(
     assessmentId: number,
     sectionsData: Array<{
