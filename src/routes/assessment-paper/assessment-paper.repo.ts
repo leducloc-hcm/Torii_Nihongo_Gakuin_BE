@@ -65,6 +65,7 @@ export class AssessmentPaperRepository {
                                 mediaId: true,
                               },
                             },
+                            media: true,
                           },
                         },
                       },

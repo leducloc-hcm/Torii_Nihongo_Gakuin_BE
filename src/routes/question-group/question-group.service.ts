@@ -137,7 +137,7 @@ export class QuestionGroupService {
   }
 
   async findOne(id: number): Promise<any> {
-    const group = await this.questionGroupRepository.findUnique({ id }, true)
+    const group = await this.questionGroupRepository.findUnique({ id })
     if (!group) {
       throw new NotFoundException(`Question Group with ID ${id} not found`)
     }

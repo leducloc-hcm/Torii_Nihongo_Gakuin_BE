@@ -253,7 +253,25 @@ export class QuestionGroupRepository {
         include: {
           questions: {
             include: {
-              question: true,
+              question: {
+                include: {
+                  option: {
+                    select: {
+                      id: true,
+                      content: true,
+                      mediaId: true,
+                      image: {
+                        select: {
+                          id: true,
+                          url: true,
+                          kind: true,
+                          sizeByte: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
             },
             orderBy: {
               order: 'asc',
@@ -270,19 +288,7 @@ export class QuestionGroupRepository {
 
       if (!group) return null
 
-      return {
-        id: group.id,
-        type: group.type,
-        title: group.title,
-        passage: group.passage,
-        mediaId: group.mediaId,
-        order: group.order,
-        metadata: group.metadata,
-        createdAt: group.createdAt,
-        questions: this.transformQuestions(group.questions),
-        media: group.media,
-        questionsCount: group._count.questions,
-      }
+      return group
     }
 
     return await this.prisma.questionGroup.findUnique({
