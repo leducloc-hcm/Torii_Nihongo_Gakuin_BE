@@ -713,11 +713,20 @@ export class OnlineClassService {
       if (enrolledCourseIds.length === 0) {
         return []
       }
-
+      const enrolledClass = await this.prisma.classMember.findMany({
+        where: {
+          userId: userId,
+        },
+        select: {
+          classId: true,
+        },
+      })
+      const enrolledClassIds = enrolledClass.map((c) => c.classId)
       // Get all classes for enrolled courses
       const classes = await this.prisma.class.findMany({
         where: {
           courseId: { in: enrolledCourseIds },
+          id: { in: enrolledClassIds },
           isActive: true,
         },
         include: {
