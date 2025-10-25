@@ -38,6 +38,7 @@ interface ChatMessage {
   senderId: string
   senderName: string
   recipientId?: string
+  recipientName?: string
   timestamp: number
 }
 
@@ -58,6 +59,8 @@ interface Poll {
   isActive: boolean
   allowMultiple: boolean
   totalVotes: number
+  duration?: number // Duration in seconds
+  endsAt?: number // Timestamp when poll ends
 }
 
 @WebSocketGateway({ namespace: 'webrtc', cors: { origin: '*' } })
@@ -73,6 +76,8 @@ export class WebRTCGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly socketMeta = new Map<string, { classId: string; userId: string; displayName: string; role: Role }>()
   // Poll tracking: classId -> (pollId -> poll)
   private readonly classPolls = new Map<string, Map<string, Poll>>()
+  // Active user sessions: classId_userId -> socketId (to prevent multiple tabs)
+  private readonly activeSessions = new Map<string, string>()
 
   handleConnection(client: Socket) {
     const { classId, userId, role, displayName, avatar } = client.handshake.query as Record<string, string>
@@ -83,6 +88,29 @@ export class WebRTCGateway implements OnGatewayConnection, OnGatewayDisconnect {
       client.disconnect()
       return
     }
+
+    // Check for existing session (prevent multiple tabs)
+    const sessionKey = `${classId}_${userId}`
+    const existingSocketId = this.activeSessions.get(sessionKey)
+
+    if (existingSocketId && existingSocketId !== client.id) {
+      // Check if existing socket is still connected
+      const existingSocket = this.server.sockets.sockets.get(existingSocketId)
+
+      if (existingSocket && existingSocket.connected) {
+        // Disconnect the existing socket
+        this.logger.warn(
+          `🚫 User ${displayName} (${userId}) already connected to class ${classId}. Disconnecting old connection.`,
+        )
+        existingSocket.emit('error', {
+          message: 'You have joined this class from another tab/window. This connection will be closed.',
+        })
+        existingSocket.disconnect(true)
+      }
+    }
+
+    // Register new session
+    this.activeSessions.set(sessionKey, client.id)
 
     const roleSafe = (role === 'lecturer' ? 'lecturer' : 'customer') as Role
     this.socketMeta.set(client.id, { classId, userId, displayName, role: roleSafe })
@@ -148,6 +176,14 @@ export class WebRTCGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (!meta) return
     const { classId, userId, displayName } = meta
 
+    // Remove active session
+    const sessionKey = `${classId}_${userId}`
+    const activeSocketId = this.activeSessions.get(sessionKey)
+    if (activeSocketId === client.id) {
+      this.activeSessions.delete(sessionKey)
+      this.logger.log(`✅ Removed active session for ${displayName} (${userId}) in class ${classId}`)
+    }
+
     const classMap = this.classParticipants.get(classId)
     if (classMap) {
       classMap.delete(userId)
@@ -166,7 +202,12 @@ export class WebRTCGateway implements OnGatewayConnection, OnGatewayDisconnect {
   handleSendMessage(
     @ConnectedSocket() client: Socket,
     @MessageBody()
-    payload: { message: string; type?: 'public' | 'private'; recipientId?: string },
+    payload: {
+      message: string
+      type?: 'public' | 'private'
+      recipientId?: string
+      recipientName?: string
+    },
   ) {
     const meta = this.socketMeta.get(client.id)
     if (!meta) return
@@ -179,13 +220,24 @@ export class WebRTCGateway implements OnGatewayConnection, OnGatewayDisconnect {
       senderId: userId,
       senderName: displayName,
       recipientId: payload.recipientId,
+      recipientName: payload.recipientName,
       timestamp: Date.now(),
     }
 
     if (msg.type === 'private' && msg.recipientId) {
-      // Emit only to sender and recipient in the class room
-      this.server.to(`class_${classId}`).emit('chat-message', msg)
+      // Emit only to sender and recipient (find their socket IDs)
+      const recipientSocketId = Array.from(this.socketMeta.entries()).find(
+        ([_, m]) => m.userId === msg.recipientId && m.classId === classId,
+      )?.[0]
+
+      // Send to recipient
+      if (recipientSocketId) {
+        this.server.to(recipientSocketId).emit('chat-message', msg)
+      }
+      // Also send back to sender
+      client.emit('chat-message', msg)
     } else {
+      // Public message - send to everyone in class
       this.server.to(`class_${classId}`).emit('chat-message', msg)
     }
   }
@@ -226,7 +278,12 @@ export class WebRTCGateway implements OnGatewayConnection, OnGatewayDisconnect {
   handleCreatePoll(
     @ConnectedSocket() client: Socket,
     @MessageBody()
-    payload: { question: string; options: string[]; allowMultiple: boolean },
+    payload: {
+      question: string
+      options: string[]
+      allowMultiple: boolean
+      duration?: number
+    },
   ) {
     const meta = this.socketMeta.get(client.id)
     if (!meta) {
@@ -261,6 +318,10 @@ export class WebRTCGateway implements OnGatewayConnection, OnGatewayDisconnect {
       voters: [],
     }))
 
+    // Calculate endsAt if duration is provided
+    const now = Date.now()
+    const endsAt = payload.duration ? now + payload.duration * 1000 : undefined
+
     // Create poll
     const poll: Poll = {
       id: pollId,
@@ -268,14 +329,30 @@ export class WebRTCGateway implements OnGatewayConnection, OnGatewayDisconnect {
       options: pollOptions,
       creatorId: userId,
       creatorName: displayName,
-      createdAt: Date.now(),
+      createdAt: now,
       isActive: true,
       allowMultiple: payload.allowMultiple,
       totalVotes: 0,
+      duration: payload.duration,
+      endsAt,
     }
 
     // Store poll
     pollMap.set(pollId, poll)
+
+    // Auto-close poll after duration expires
+    if (payload.duration) {
+      setTimeout(() => {
+        const currentPoll = pollMap.get(pollId)
+        if (currentPoll && currentPoll.isActive) {
+          currentPoll.isActive = false
+          pollMap.set(pollId, currentPoll)
+          this.logger.log(`⏱️ Poll ${pollId} auto-closed after ${payload.duration}s`)
+          // Notify everyone
+          this.server.to(`class_${classId}`).emit('poll-closed', pollId)
+        }
+      }, payload.duration * 1000)
+    }
 
     this.logger.log(`📊 ✅ Poll created with ID: ${pollId}. Broadcasting to class_${classId}`)
 
