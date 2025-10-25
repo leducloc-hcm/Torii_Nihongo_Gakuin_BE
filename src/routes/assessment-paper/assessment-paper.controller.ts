@@ -9,237 +9,68 @@ import {
   Query,
   ParseIntPipe,
   UseGuards,
-  Request,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common'
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger'
 import { AssessmentPaperService } from './assessment-paper.service'
-import {
-  CreateAssessmentPaperDto,
-  CreateLessonQuizDto,
-  UpdateAssessmentPaperDto,
-  AssessmentPaperQueryDto,
-  BulkDeleteAssessmentPaperDto,
-  CloneAssessmentPaperDto,
-  AssessmentPaperStatsDto,
-  BulkUpdateVisibilityDto,
-  GenerateFromBlueprintDto,
-} from './assessment-paper.dto'
+import { CreateAssessmentPaperDto, UpdateAssessmentPaperDto, AssessmentPaperQueryDto } from './assessment-paper.dto'
 import { Auth } from '../../shared/decorators/auth.decorator'
 import { AuthType } from '../../shared/constants/auth.constant'
 import { Roles } from '../../shared/decorators/roles.decorator'
 import { RolesGuard } from '../../shared/guards/roles.guard'
 import { RoleName } from '../../shared/constants/role.constant'
-import type {
-  AssessmentPaperBase,
-  AssessmentPaperBasic,
-  AssessmentPaperWithRelations,
-  AssessmentPaperWithSections,
-} from './assessment-paper.model'
 import { ActiveUser } from 'src/shared/decorators/active-user.decorator'
 
-@ApiTags('Assessment Papers')
 @Controller('assessment-papers')
 @UseGuards(RolesGuard)
-@ApiBearerAuth()
 export class AssessmentPaperController {
   constructor(private readonly assessmentPaperService: AssessmentPaperService) {}
 
   @Post()
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
-  async createAssessmentPaper(
-    @ActiveUser('userId') userId: number,
-    @Body() createDto: CreateAssessmentPaperDto,
-  ): Promise<AssessmentPaperBase> {
-    const data = { ...createDto, createdBy: userId }
-    return this.assessmentPaperService.createAssessmentPaper(data)
+  @HttpCode(HttpStatus.CREATED)
+  async create(@ActiveUser('userId') userId: number, @Body() createDto: CreateAssessmentPaperDto) {
+    return this.assessmentPaperService.createAssessmentPaper({ ...createDto, createdBy: userId })
   }
 
   @Get()
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Customer, RoleName.Admin)
-  @ApiOperation({ summary: 'Get all assessment papers with pagination' })
-  @ApiResponse({ status: 200, description: 'Assessment papers retrieved successfully' })
-  async getAssessmentPapers(@Query() queryDto: AssessmentPaperQueryDto): Promise<{
-    data: AssessmentPaperBasic[]
-    pagination: {
-      total: number
-      page: number
-      limit: number
-      totalPages: number
-      hasNext: boolean
-      hasPrev: boolean
-    }
-  }> {
+  @HttpCode(HttpStatus.OK)
+  async findAll(@Query() queryDto: AssessmentPaperQueryDto) {
     return this.assessmentPaperService.getAssessmentPapers(queryDto)
-  }
-
-  @Get('public')
-  @ApiOperation({ summary: 'Get public assessment papers' })
-  @ApiResponse({ status: 200, description: 'Public assessment papers retrieved successfully' })
-  async getPublicAssessments(
-    @Query('level') level?: string,
-    @Query('type') type?: string,
-  ): Promise<AssessmentPaperBase[]> {
-    return this.assessmentPaperService.getPublicAssessments(level as any, type as any)
-  }
-
-  @Get('search')
-  @Auth([AuthType.Bearer])
-  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Customer, RoleName.Admin)
-  @ApiOperation({ summary: 'Search assessment papers by content' })
-  @ApiResponse({ status: 200, description: 'Search results retrieved successfully' })
-  async searchAssessmentPapers(
-    @Query('q') searchTerm: string,
-    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
-  ): Promise<AssessmentPaperBase[]> {
-    return this.assessmentPaperService.searchAssessmentPapers(searchTerm, limit)
-  }
-
-  @Get('blueprint/:blueprintId')
-  @Auth([AuthType.Bearer])
-  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
-  @ApiOperation({ summary: 'Get assessment papers by blueprint' })
-  @ApiResponse({ status: 200, description: 'Assessment papers by blueprint retrieved successfully' })
-  async getAssessmentPapersByBlueprint(
-    @Param('blueprintId', ParseIntPipe) blueprintId: number,
-  ): Promise<AssessmentPaperBase[]> {
-    return this.assessmentPaperService.getAssessmentPapersByBlueprint(blueprintId)
-  }
-
-  @Get('creator/:createdBy')
-  @Auth([AuthType.Bearer])
-  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
-  @ApiOperation({ summary: 'Get assessment papers by creator' })
-  @ApiResponse({ status: 200, description: 'Assessment papers by creator retrieved successfully' })
-  async getAssessmentPapersByCreator(
-    @Param('createdBy', ParseIntPipe) createdBy: number,
-  ): Promise<AssessmentPaperBase[]> {
-    return this.assessmentPaperService.getAssessmentPapersByCreator(createdBy)
   }
 
   @Get(':id')
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Customer, RoleName.Admin)
-  @ApiOperation({ summary: 'Get assessment paper by ID' })
-  @ApiResponse({ status: 200, description: 'Assessment paper retrieved successfully' })
-  async getAssessmentPaper(@Param('id', ParseIntPipe) id: number): Promise<AssessmentPaperBase> {
+  @HttpCode(HttpStatus.OK)
+  async findOne(@Param('id', ParseIntPipe) id: number) {
     return this.assessmentPaperService.getAssessmentPaper(id)
   }
 
   @Get(':id/details')
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
-  @ApiOperation({ summary: 'Get assessment paper with full relations' })
-  @ApiResponse({ status: 200, description: 'Assessment paper details retrieved successfully' })
-  async getAssessmentPaperWithRelations(@Param('id', ParseIntPipe) id: number): Promise<AssessmentPaperWithRelations> {
+  @HttpCode(HttpStatus.OK)
+  async getDetails(@Param('id', ParseIntPipe) id: number) {
     return this.assessmentPaperService.getAssessmentPaperWithRelations(id)
-  }
-
-  @Get(':id/sections')
-  @Auth([AuthType.Bearer])
-  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
-  async getAssessmentPaperWithSections(@Param('id', ParseIntPipe) id: number): Promise<AssessmentPaperWithSections> {
-    return this.assessmentPaperService.getAssessmentPaperWithSections(id)
-  }
-
-  @Get(':id/statistics')
-  @Auth([AuthType.Bearer])
-  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
-  async getAssessmentPaperStatistics(@Param('id', ParseIntPipe) id: number): Promise<AssessmentPaperStatsDto> {
-    return this.assessmentPaperService.getAssessmentPaperStatistics(id)
-  }
-
-  @Get(':id/validate')
-  @Auth([AuthType.Bearer])
-  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
-  async validateAssessmentContent(@Param('id', ParseIntPipe) id: number): Promise<{
-    isValid: boolean
-    errors: string[]
-    warnings: string[]
-  }> {
-    return this.assessmentPaperService.validateAssessmentContent(id)
-  }
-
-  @Get(':id/attempt')
-  @Auth([AuthType.Bearer])
-  @Roles(RoleName.Customer, RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
-  async getAssessmentPaperForAttempt(
-    @Param('id', ParseIntPipe) id: number,
-    @Request() req: any,
-  ): Promise<AssessmentPaperBase> {
-    return this.assessmentPaperService.getAssessmentPaperForAttempt(id, req.user.id)
   }
 
   @Put(':id')
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
-  async updateAssessmentPaper(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() updateDto: UpdateAssessmentPaperDto,
-  ): Promise<AssessmentPaperBase> {
+  @HttpCode(HttpStatus.OK)
+  async update(@Param('id', ParseIntPipe) id: number, @Body() updateDto: UpdateAssessmentPaperDto) {
     return this.assessmentPaperService.updateAssessmentPaper(id, updateDto)
-  }
-
-  @Post(':id/clone')
-  @Auth([AuthType.Bearer])
-  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
-  async cloneAssessmentPaper(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() cloneDto: CloneAssessmentPaperDto,
-    @Request() req: any,
-  ): Promise<AssessmentPaperBase> {
-    return this.assessmentPaperService.cloneAssessmentPaper(id, req.user.id, cloneDto)
-  }
-
-  @Post(':id/new-version')
-  @Auth([AuthType.Bearer])
-  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
-  async createNewVersion(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() changes: UpdateAssessmentPaperDto,
-  ): Promise<AssessmentPaperBase> {
-    return this.assessmentPaperService.createNewVersion(id, changes)
-  }
-
-  @Post('blueprint/:blueprintId/generate')
-  @Auth([AuthType.Bearer])
-  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
-  async generateFromBlueprint(
-    @Param('blueprintId', ParseIntPipe) blueprintId: number,
-    @Body() generateDto: GenerateFromBlueprintDto,
-    @Request() req: any,
-  ): Promise<AssessmentPaperBase> {
-    return this.assessmentPaperService.generateFromBlueprint(
-      blueprintId,
-      req.user.id,
-      generateDto.scoreProfileId,
-      generateDto,
-    )
-  }
-
-  @Post('bulk-delete')
-  @Auth([AuthType.Bearer])
-  @Roles(RoleName.Staff, RoleName.Admin)
-  async bulkDeleteAssessmentPapers(
-    @Body() bulkDeleteDto: BulkDeleteAssessmentPaperDto,
-  ): Promise<{ deleted: number; failed: number[] }> {
-    return this.assessmentPaperService.bulkDeleteAssessmentPapers(bulkDeleteDto.ids)
-  }
-
-  @Post('bulk-update-visibility')
-  @Auth([AuthType.Bearer])
-  @Roles(RoleName.Staff, RoleName.Admin)
-  async bulkUpdateVisibility(
-    @Body() bulkUpdateDto: BulkUpdateVisibilityDto,
-  ): Promise<{ updated: number; failed: number[] }> {
-    return this.assessmentPaperService.bulkUpdateVisibility(bulkUpdateDto.ids, bulkUpdateDto.visibility)
   }
 
   @Delete(':id')
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
-  async deleteAssessmentPaper(@Param('id', ParseIntPipe) id: number) {
+  @HttpCode(HttpStatus.OK)
+  async remove(@Param('id', ParseIntPipe) id: number) {
     return this.assessmentPaperService.deleteAssessmentPaper(id)
   }
 }

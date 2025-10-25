@@ -71,7 +71,7 @@ export class AssessmentSectionService {
     return this.assessmentSectionRepo.update(id, data)
   }
 
-  async deleteAssessmentSection(id: number): Promise<void> {
+  async deleteAssessmentSection(id: number) {
     const section = await this.assessmentSectionRepo.findById(id)
     if (!section) {
       throw new NotFoundException(`Assessment section with ID ${id} not found`)
@@ -79,6 +79,7 @@ export class AssessmentSectionService {
 
     try {
       await this.assessmentSectionRepo.delete(id)
+      return { message: 'Assessment section deleted successfully' }
     } catch (error: any) {
       if (error.code === 'P2003') {
         throw new BadRequestException('Cannot delete assessment section because it has associated assessment items')
