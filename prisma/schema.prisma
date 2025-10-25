@@ -444,6 +444,7 @@ model AssessmentSection {
   id             Int           @id @default(autoincrement())
   assessmentId   Int
   title          String
+  timeLimitSec    Int?
   type           QuestionType
 
   assessment AssessmentPaper @relation(fields: [assessmentId], references: [id])
@@ -454,7 +455,6 @@ model AssessmentItem {
   id              Int  @id @default(autoincrement())
   sectionId       Int
   name            String?
-  timeLimitSec    Int?
   questionId      Int?
   questionGroupId Int?
   scorePerQuestion Float?

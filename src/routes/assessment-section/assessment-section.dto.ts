@@ -10,6 +10,7 @@ export class CreateAssessmentSectionDto {
   assessmentId!: number
   title!: string
   type!: z.infer<typeof QuestionTypeSchema>
+  timeLimitSec!: number
 }
 
 export class UpdateAssessmentSectionDto extends createZodDto(UpdateAssessmentSectionSchema) {}

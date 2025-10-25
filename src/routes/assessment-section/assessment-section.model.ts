@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { AssessmentSection, AssessmentItem, Question, AssessmentPaper } from '@prisma/client'
+import { time } from 'console'
 
 export type AssessmentSectionBase = AssessmentSection
 
@@ -29,6 +30,7 @@ export const CreateAssessmentSectionSchema = z.object({
   assessmentId: z.number().int().positive(),
   title: z.string().min(1).max(255),
   type: QuestionTypeSchema,
+  timeLimitSec: z.number().int().positive().optional(),
 })
 
 export const UpdateAssessmentSectionSchema = CreateAssessmentSectionSchema.partial().omit({ assessmentId: true })

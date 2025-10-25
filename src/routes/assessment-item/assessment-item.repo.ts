@@ -9,7 +9,6 @@ export interface CreateAssessmentItemInput {
   questionGroupId?: number
   order?: number
   name?: string
-  timeLimitSec?: number
   scorePerQuestion?: number
 }
 
@@ -18,7 +17,6 @@ export interface UpdateAssessmentItemInput {
   questionGroupId?: number
   order?: number
   name?: string
-  timeLimitSec?: number
   scorePerQuestion?: number
 }
 
@@ -54,7 +52,6 @@ export class AssessmentItemRepository {
         questionGroupId: data.questionGroupId,
         order: data.order,
         name: data.name,
-        timeLimitSec: data.timeLimitSec,
         scorePerQuestion: data.scorePerQuestion,
       },
       include: {
