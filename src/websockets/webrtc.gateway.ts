@@ -41,6 +41,25 @@ interface ChatMessage {
   timestamp: number
 }
 
+interface PollOption {
+  id: string
+  text: string
+  votes: number
+  voters: string[]
+}
+
+interface Poll {
+  id: string
+  question: string
+  options: PollOption[]
+  creatorId: string
+  creatorName: string
+  createdAt: number
+  isActive: boolean
+  allowMultiple: boolean
+  totalVotes: number
+}
+
 @WebSocketGateway({ namespace: 'webrtc', cors: { origin: '*' } })
 export class WebRTCGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
@@ -52,6 +71,8 @@ export class WebRTCGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly classParticipants = new Map<string, Map<string, ParticipantInfo>>()
   // Socket mapping
   private readonly socketMeta = new Map<string, { classId: string; userId: string; displayName: string; role: Role }>()
+  // Poll tracking: classId -> (pollId -> poll)
+  private readonly classPolls = new Map<string, Map<string, Poll>>()
 
   handleConnection(client: Socket) {
     const { classId, userId, role, displayName, avatar } = client.handshake.query as Record<string, string>
@@ -199,5 +220,176 @@ export class WebRTCGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     this.server.to(`class_${classId}`).emit('hand-lowered', { userId, displayName })
+  }
+
+  @SubscribeMessage('create-poll')
+  handleCreatePoll(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    payload: { question: string; options: string[]; allowMultiple: boolean },
+  ) {
+    const meta = this.socketMeta.get(client.id)
+    if (!meta) {
+      this.logger.warn('❌ create-poll: No meta found for client', client.id)
+      return
+    }
+    const { classId, userId, displayName, role } = meta
+
+    // Only lecturers can create polls
+    if (role !== 'lecturer') {
+      this.logger.warn(`❌ create-poll: Non-lecturer tried to create poll: ${displayName}`)
+      client.emit('error', { message: 'Only lecturers can create polls' })
+      return
+    }
+
+    this.logger.log(`📊 Creating poll in class ${classId} by ${displayName}:`, payload)
+
+    // Ensure class poll map exists
+    if (!this.classPolls.has(classId)) {
+      this.classPolls.set(classId, new Map<string, Poll>())
+    }
+    const pollMap = this.classPolls.get(classId)!
+
+    // Generate unique poll ID
+    const pollId = `poll_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+
+    // Create poll options
+    const pollOptions: PollOption[] = payload.options.map((optionText) => ({
+      id: `opt_${Math.random().toString(36).slice(2, 8)}`,
+      text: optionText,
+      votes: 0,
+      voters: [],
+    }))
+
+    // Create poll
+    const poll: Poll = {
+      id: pollId,
+      question: payload.question,
+      options: pollOptions,
+      creatorId: userId,
+      creatorName: displayName,
+      createdAt: Date.now(),
+      isActive: true,
+      allowMultiple: payload.allowMultiple,
+      totalVotes: 0,
+    }
+
+    // Store poll
+    pollMap.set(pollId, poll)
+
+    this.logger.log(`📊 ✅ Poll created with ID: ${pollId}. Broadcasting to class_${classId}`)
+
+    // Broadcast to ALL clients in the room (including creator)
+    this.server.to(`class_${classId}`).emit('poll-created', poll)
+
+    this.logger.log(`📊 Broadcasted poll-created event to class_${classId}`)
+  }
+
+  @SubscribeMessage('vote-poll')
+  handleVotePoll(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    payload: { pollId: string; optionId: string },
+  ) {
+    const meta = this.socketMeta.get(client.id)
+    if (!meta) return
+    const { classId, userId, displayName } = meta
+
+    this.logger.log(`📊 Vote received from ${displayName}: pollId=${payload.pollId}, optionId=${payload.optionId}`)
+
+    const pollMap = this.classPolls.get(classId)
+    if (!pollMap) {
+      this.logger.warn('❌ vote-poll: No polls found for class', classId)
+      return
+    }
+
+    const poll = pollMap.get(payload.pollId)
+    if (!poll) {
+      this.logger.warn('❌ vote-poll: Poll not found', payload.pollId)
+      return
+    }
+
+    if (!poll.isActive) {
+      this.logger.warn('❌ vote-poll: Poll is not active', payload.pollId)
+      client.emit('error', { message: 'This poll is closed' })
+      return
+    }
+
+    const option = poll.options.find((o) => o.id === payload.optionId)
+    if (!option) {
+      this.logger.warn('❌ vote-poll: Option not found', payload.optionId)
+      return
+    }
+
+    // Check if user already voted
+    const hasVoted = poll.options.some((o) => o.voters.includes(userId))
+
+    if (!poll.allowMultiple && hasVoted) {
+      // Remove previous vote if not allowing multiple
+      poll.options.forEach((o) => {
+        const voterIndex = o.voters.indexOf(userId)
+        if (voterIndex > -1) {
+          o.voters.splice(voterIndex, 1)
+          o.votes--
+          poll.totalVotes--
+        }
+      })
+    }
+
+    // Add vote
+    if (!option.voters.includes(userId)) {
+      option.voters.push(userId)
+      option.votes++
+      poll.totalVotes++
+    }
+
+    // Update poll
+    pollMap.set(payload.pollId, poll)
+
+    this.logger.log(`📊 ✅ Vote recorded. Broadcasting poll-updated to class_${classId}`)
+
+    // Broadcast updated poll
+    this.server.to(`class_${classId}`).emit('poll-updated', poll)
+  }
+
+  @SubscribeMessage('close-poll')
+  handleClosePoll(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    payload: { pollId: string },
+  ) {
+    const meta = this.socketMeta.get(client.id)
+    if (!meta) return
+    const { classId, userId, role } = meta
+
+    // Only lecturers can close polls
+    if (role !== 'lecturer') {
+      this.logger.warn('❌ close-poll: Non-lecturer tried to close poll')
+      client.emit('error', { message: 'Only lecturers can close polls' })
+      return
+    }
+
+    this.logger.log(`📊 Closing poll ${payload.pollId} in class ${classId}`)
+
+    const pollMap = this.classPolls.get(classId)
+    if (!pollMap) {
+      this.logger.warn('❌ close-poll: No polls found for class', classId)
+      return
+    }
+
+    const poll = pollMap.get(payload.pollId)
+    if (!poll) {
+      this.logger.warn('❌ close-poll: Poll not found', payload.pollId)
+      return
+    }
+
+    // Mark poll as inactive
+    poll.isActive = false
+    pollMap.set(payload.pollId, poll)
+
+    this.logger.log(`📊 ✅ Poll closed. Broadcasting poll-closed to class_${classId}`)
+
+    // Broadcast poll closed
+    this.server.to(`class_${classId}`).emit('poll-closed', payload.pollId)
   }
 }
