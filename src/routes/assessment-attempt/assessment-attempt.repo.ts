@@ -63,9 +63,7 @@ export class AssessmentAttemptRepository {
                           level: true,
                           maxTotal: true,
                           minTotalPass: true,
-                          minBucketPass: true,
-                          maxBucket: true,
-                          mappings: true,
+                          sections: true,
                         },
                       }
                     : false,

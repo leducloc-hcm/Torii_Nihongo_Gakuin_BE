@@ -397,22 +397,4 @@ export class AssessmentSectionRepository {
       where: { sectionId },
     })
   }
-
-  // ===== Section by Type =====
-  async findByAssessmentIdAndType(assessmentId: number, type: QuestionType): Promise<AssessmentSectionBasic[]> {
-    const result = await this.prisma.assessmentSection.findMany({
-      where: {
-        assessmentId,
-        type,
-      },
-      include: {
-        _count: {
-          select: {
-            items: true,
-          },
-        },
-      },
-    })
-    return result as AssessmentSectionBasic[]
-  }
 }
