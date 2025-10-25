@@ -75,9 +75,6 @@ export class AssessmentItemResponse {
   @ApiPropertyOptional({ example: 'Reading Comprehension' })
   name?: string | null
 
-  @ApiPropertyOptional({ example: 300 })
-  timeLimitSec?: number | null
-
   @ApiPropertyOptional({ example: 1.0 })
   scorePerQuestion?: number | null
 
@@ -135,7 +132,6 @@ export const CreateAssessmentItemSchema = z
     questionGroupId: z.number().int().positive().optional(),
     order: z.number().int().min(0).default(0),
     name: z.string().optional(),
-    timeLimitSec: z.number().int().min(0).optional(),
     scorePerQuestion: z.number().min(0).optional(),
     assessmentType: AssessmentTypeSchema.optional(),
   })
@@ -152,7 +148,6 @@ export const UpdateAssessmentItemSchema = z
     questionGroupId: z.number().int().positive().optional(),
     order: z.number().int().min(0).optional(),
     name: z.string().optional(),
-    timeLimitSec: z.number().int().min(0).optional(),
     scorePerQuestion: z.number().min(0).optional(),
     assessmentType: AssessmentTypeSchema.optional(),
   })
@@ -163,7 +158,7 @@ export const UpdateAssessmentItemSchema = z
       }
       return true
     },
-    { message: 'Cannot provide both questionId and questionGroupId' }
+    { message: 'Cannot provide both questionId and questionGroupId' },
   )
 
 export const AssessmentItemQuerySchema = z.object({
