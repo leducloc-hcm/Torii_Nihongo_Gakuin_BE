@@ -352,42 +352,54 @@ model PlacementBlueprint {
 model Question {
   id               Int              @id @default(autoincrement())
   type             QuestionType
-  subType          QuestionSubtype? 
   level            JLPTLevel
   difficulty       Difficulty        @default(MEDIUM)
-  stem             String
-  passage          String?
+  stem             String           
+  passage          String?           
   mediaId          Int?
-  explanation      String?
-  tags             String[]
-  metadata         Json?
+  explanation      String?           
   createdAt        DateTime          @default(now())
   readingLength    ReadingLength?
-  tokenCount       Int?
-  questionGroupId  Int?
   media            MediaAsset?       @relation(fields: [mediaId], references: [id])
-  questionGroup    QuestionGroup?    @relation(fields: [questionGroupId], references: [id])
-  option            Option[]        
+
+  groups           QuestionGroupQuestion[]
+
+  option            Option[]
   assessmentAnswers AssessmentAnswer[]
-  assessmentItems  AssessmentItem[]
-  quizItems       QuizItem[]
-  quizAnswers     QuizAnswer[]
+  assessmentItems   AssessmentItem[]
+  quizItems         QuizItem[]
+  quizAnswers       QuizAnswer[]
 }
 
 model QuestionGroup {
   id          Int       @id @default(autoincrement())
   type        QuestionGroupType
   title       String?
-  passage     String?
+  passage     String?          
   mediaId     Int?
   order       Int?
   metadata    Json?
   createdAt   DateTime  @default(now())
 
   media       MediaAsset? @relation(fields: [mediaId], references: [id])
-  questions   Question[]
+
+  questions   QuestionGroupQuestion[]
+
   assessmentItems AssessmentItem[]
   quizItems       QuizItem[]
+}
+
+model QuestionGroupQuestion {
+  questionId Int
+  groupId    Int
+  order      Int?         
+  score      Float?       
+  createdAt  DateTime     @default(now())
+
+  question   Question      @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  group      QuestionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@id([questionId, groupId]) 
 }
 
 model Option {
@@ -1087,16 +1099,6 @@ enum QuestionGroupType {
   LISTENING
 }
 
-enum QuestionSubtype {
-  SINGLE_CHOICE     // Một đáp án đúng (multiple choice cơ bản)
-  MULTI_CHOICE      // Nhiều đáp án đúng (checkbox style)
-  TRUE_FALSE        // Đúng / Sai
-  CLOZE             // Điền chỗ trống (fill-in-the-blank)
-  IMAGE_CHOICE      // Đáp án là hình ảnh
-  AUDIO_CHOICE      // Đáp án là file âm thanh
-  MATCHING          // Nối cặp (ví dụ ghép từ và nghĩa)
-  ORDERING          // Sắp xếp câu / từ đúng thứ tự
-}
 
 enum Difficulty {
   EASY

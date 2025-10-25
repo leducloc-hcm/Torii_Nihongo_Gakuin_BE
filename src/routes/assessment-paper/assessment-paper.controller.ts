@@ -47,8 +47,6 @@ export class AssessmentPaperController {
   @Post()
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
-  @ApiOperation({ summary: 'Create new assessment paper' })
-  @ApiResponse({ status: 201, description: 'Assessment paper created successfully' })
   async createAssessmentPaper(
     @ActiveUser('userId') userId: number,
     @Body() createDto: CreateAssessmentPaperDto,
@@ -141,8 +139,6 @@ export class AssessmentPaperController {
   @Get(':id/sections')
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
-  @ApiOperation({ summary: 'Get assessment paper with sections' })
-  @ApiResponse({ status: 200, description: 'Assessment paper sections retrieved successfully' })
   async getAssessmentPaperWithSections(@Param('id', ParseIntPipe) id: number): Promise<AssessmentPaperWithSections> {
     return this.assessmentPaperService.getAssessmentPaperWithSections(id)
   }
@@ -150,8 +146,6 @@ export class AssessmentPaperController {
   @Get(':id/statistics')
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
-  @ApiOperation({ summary: 'Get assessment paper statistics' })
-  @ApiResponse({ status: 200, type: AssessmentPaperStatsDto })
   async getAssessmentPaperStatistics(@Param('id', ParseIntPipe) id: number): Promise<AssessmentPaperStatsDto> {
     return this.assessmentPaperService.getAssessmentPaperStatistics(id)
   }
@@ -159,8 +153,6 @@ export class AssessmentPaperController {
   @Get(':id/validate')
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
-  @ApiOperation({ summary: 'Validate assessment paper content' })
-  @ApiResponse({ status: 200, description: 'Assessment paper validation completed' })
   async validateAssessmentContent(@Param('id', ParseIntPipe) id: number): Promise<{
     isValid: boolean
     errors: string[]
@@ -172,8 +164,6 @@ export class AssessmentPaperController {
   @Get(':id/attempt')
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Customer, RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
-  @ApiOperation({ summary: 'Get assessment paper for student attempt (without answers)' })
-  @ApiResponse({ status: 200, description: 'Assessment paper for attempt retrieved successfully' })
   async getAssessmentPaperForAttempt(
     @Param('id', ParseIntPipe) id: number,
     @Request() req: any,
@@ -184,8 +174,6 @@ export class AssessmentPaperController {
   @Put(':id')
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
-  @ApiOperation({ summary: 'Update assessment paper' })
-  @ApiResponse({ status: 200, description: 'Assessment paper updated successfully' })
   async updateAssessmentPaper(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateDto: UpdateAssessmentPaperDto,
@@ -196,8 +184,6 @@ export class AssessmentPaperController {
   @Post(':id/clone')
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
-  @ApiOperation({ summary: 'Clone assessment paper' })
-  @ApiResponse({ status: 201, description: 'Assessment paper cloned successfully' })
   async cloneAssessmentPaper(
     @Param('id', ParseIntPipe) id: number,
     @Body() cloneDto: CloneAssessmentPaperDto,
@@ -209,8 +195,6 @@ export class AssessmentPaperController {
   @Post(':id/new-version')
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
-  @ApiOperation({ summary: 'Create new version of assessment paper' })
-  @ApiResponse({ status: 201, description: 'New version created successfully' })
   async createNewVersion(
     @Param('id', ParseIntPipe) id: number,
     @Body() changes: UpdateAssessmentPaperDto,
@@ -221,8 +205,6 @@ export class AssessmentPaperController {
   @Post('blueprint/:blueprintId/generate')
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
-  @ApiOperation({ summary: 'Generate assessment paper from blueprint' })
-  @ApiResponse({ status: 201, description: 'Assessment paper generated from blueprint successfully' })
   async generateFromBlueprint(
     @Param('blueprintId', ParseIntPipe) blueprintId: number,
     @Body() generateDto: GenerateFromBlueprintDto,
@@ -239,8 +221,6 @@ export class AssessmentPaperController {
   @Post('bulk-delete')
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Admin)
-  @ApiOperation({ summary: 'Bulk delete assessment papers' })
-  @ApiResponse({ status: 200, description: 'Bulk delete completed' })
   async bulkDeleteAssessmentPapers(
     @Body() bulkDeleteDto: BulkDeleteAssessmentPaperDto,
   ): Promise<{ deleted: number; failed: number[] }> {
@@ -250,8 +230,6 @@ export class AssessmentPaperController {
   @Post('bulk-update-visibility')
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Admin)
-  @ApiOperation({ summary: 'Bulk update assessment paper visibility' })
-  @ApiResponse({ status: 200, description: 'Bulk visibility update completed' })
   async bulkUpdateVisibility(
     @Body() bulkUpdateDto: BulkUpdateVisibilityDto,
   ): Promise<{ updated: number; failed: number[] }> {
@@ -261,8 +239,6 @@ export class AssessmentPaperController {
   @Delete(':id')
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
-  @ApiOperation({ summary: 'Delete assessment paper' })
-  @ApiResponse({ status: 200, description: 'Assessment paper deleted successfully' })
   async deleteAssessmentPaper(@Param('id', ParseIntPipe) id: number) {
     return this.assessmentPaperService.deleteAssessmentPaper(id)
   }

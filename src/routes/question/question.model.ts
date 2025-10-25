@@ -21,10 +21,7 @@ export const QuestionSchema = z.object({
   passage: z.string().max(5000, 'Passage too long').optional().nullable(),
   mediaId: z.number().int().positive().optional().nullable(),
   explanation: z.string().max(2000, 'Explanation too long').optional().nullable(),
-  tags: z.array(z.string()).default([]),
-  metadata: z.record(z.any()).optional().nullable(),
   readingLength: ReadingLengthEnum.optional().nullable(),
-  tokenCount: z.number().int().min(0).optional().nullable(),
   createdAt: z.date(),
 })
 
@@ -75,9 +72,8 @@ export const QueryQuestionSchema = z.object({
   type: QuestionTypeEnum.optional(),
   level: JLPTLevelEnum.optional(),
   difficulty: DifficultyEnum.optional(),
-  readingLength: ReadingLengthEnum.nullable(),
+  readingLength: ReadingLengthEnum.optional().nullable(),
   keyword: z.string().optional(),
-  tags: z.string().optional(), // comma-separated tags
   hasMedia: z.coerce.boolean().optional(),
   sortBy: z.enum(['createdAt', 'level', 'difficulty', 'type']).optional().default('createdAt'),
   sortOrder: z.enum(['asc', 'desc']).optional().default('desc'),

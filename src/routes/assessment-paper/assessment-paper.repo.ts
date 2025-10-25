@@ -60,11 +60,15 @@ export class AssessmentPaperRepository {
                     media: true,
                     questions: {
                       include: {
-                        option: {
-                          select: {
-                            id: true,
-                            content: true,
-                            mediaId: true,
+                        question: {
+                          include: {
+                            option: {
+                              select: {
+                                id: true,
+                                content: true,
+                                mediaId: true,
+                              },
+                            },
                           },
                         },
                       },
@@ -129,13 +133,15 @@ export class AssessmentPaperRepository {
                     media: true,
                     questions: {
                       include: {
-                        option: {
-                          select: {
-                            id: true,
-                            content: true,
-                            mediaId: true,
-                            order: true,
-                            isCorrect: false, // Hide correct answers for security
+                        question: {
+                          include: {
+                            option: {
+                              select: {
+                                id: true,
+                                content: true,
+                                mediaId: true,
+                              },
+                            },
                           },
                         },
                       },
@@ -196,7 +202,11 @@ export class AssessmentPaperRepository {
                     media: true,
                     questions: {
                       include: {
-                        option: true,
+                        question: {
+                          include: {
+                            option: true,
+                          },
+                        },
                       },
                     },
                   },
@@ -610,13 +620,16 @@ export class AssessmentPaperRepository {
                     media: true,
                     questions: {
                       include: {
-                        option: {
-                          select: {
-                            id: true,
-                            content: true,
-                            mediaId: true,
-                            order: true,
-                            // Don't include isCorrect for security
+                        question: {
+                          include: {
+                            option: {
+                              select: {
+                                id: true,
+                                content: true,
+                                mediaId: true,
+                                order: true,
+                              },
+                            },
                           },
                         },
                       },

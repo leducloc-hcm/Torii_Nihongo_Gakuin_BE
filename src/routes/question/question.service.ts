@@ -17,7 +17,7 @@ export class QuestionService {
     createDto: CreateQuestionDTO,
     files?: { image?: Express.Multer.File[]; audio?: Express.Multer.File[] },
   ): Promise<any> {
-    const { mediaId, metadata, ...questionData } = createDto
+    const { mediaId, ...questionData } = createDto
 
     // Handle file uploads
     let uploadedMediaId = mediaId
@@ -62,7 +62,6 @@ export class QuestionService {
 
     const questionCreateData: any = {
       ...questionData,
-      metadata: metadata || null,
     }
 
     if (uploadedMediaId) {
@@ -91,7 +90,6 @@ export class QuestionService {
       difficulty,
       readingLength,
       keyword,
-      tags,
       hasMedia,
       sortBy = 'createdAt',
       sortOrder = 'desc',
@@ -121,8 +119,8 @@ export class QuestionService {
       where.difficulty = difficulty
     }
 
-    // Note: readingLength filtering temporarily disabled due to Prisma type issues
-    // if (readingLength !== undefined) {
+    // Note: readingLength filter may need adjustment based on Prisma schema
+    // if (readingLength !== undefined && readingLength !== null) {
     //   where.readingLength = readingLength
     // }
 
@@ -132,18 +130,6 @@ export class QuestionService {
         { passage: { contains: keyword, mode: 'insensitive' } },
         { explanation: { contains: keyword, mode: 'insensitive' } },
       ]
-    }
-
-    if (tags) {
-      const tagArray = tags
-        .split(',')
-        .map((tag) => tag.trim())
-        .filter(Boolean)
-      if (tagArray.length > 0) {
-        where.tags = {
-          hasEvery: tagArray,
-        }
-      }
     }
 
     if (hasMedia !== undefined) {
@@ -255,7 +241,6 @@ export class QuestionService {
 
     const updateData: any = {
       ...questionData,
-      metadata: questionData.metadata || null,
     }
 
     if (updatedMediaId) {
@@ -296,11 +281,10 @@ export class QuestionService {
     }
 
     const questionsData = questions.map((question) => {
-      const { options, mediaId, metadata, ...questionData } = question
+      const { options, mediaId, ...questionData } = question
 
       const questionCreateData: any = {
         ...questionData,
-        metadata: metadata || null,
       }
 
       if (mediaId) {

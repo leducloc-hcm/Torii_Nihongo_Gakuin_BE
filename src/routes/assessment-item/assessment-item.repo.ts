@@ -503,10 +503,14 @@ export class AssessmentItemRepository {
         let questionCount = 1
 
         if (item.questionGroupId) {
-          // Count questions in group
+          // Count questions in group (many-to-many relation)
           const questionGroup = await this.prisma.questionGroup.findUnique({
             where: { id: item.questionGroupId },
-            include: { questions: { select: { id: true } } },
+            include: {
+              questions: {
+                select: { questionId: true },
+              },
+            },
           })
           questionCount = questionGroup?.questions.length || 1
         }
@@ -546,7 +550,7 @@ export class AssessmentItemRepository {
       where: { id: questionGroupId },
       include: {
         questions: {
-          select: { id: true },
+          select: { questionId: true },
         },
       },
     })
@@ -694,11 +698,15 @@ export class AssessmentItemRepository {
   }
 
   async getQuestionsFromGroup(questionGroupId: number): Promise<{ id: number }[]> {
-    const questions = await this.prisma.question.findMany({
-      where: { questionGroupId },
-      select: { id: true },
-      orderBy: { id: 'asc' },
+    // Get questions through many-to-many relation
+    const questionGroupQuestions = await this.prisma.questionGroupQuestion.findMany({
+      where: { groupId: questionGroupId },
+      select: {
+        questionId: true,
+      },
+      orderBy: { order: 'asc' },
     })
-    return questions
+
+    return questionGroupQuestions.map((qgq) => ({ id: qgq.questionId }))
   }
 }

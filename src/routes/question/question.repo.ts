@@ -36,6 +36,11 @@ export class QuestionRepository {
       return await this.prisma.question.create({
         data: data as any,
         include: {
+          option: {
+            orderBy: {
+              order: 'asc',
+            },
+          },
           media: {
             select: {
               id: true,
@@ -166,6 +171,11 @@ export class QuestionRepository {
         where: where as any,
         data,
         include: {
+          option: {
+            orderBy: {
+              order: 'asc',
+            },
+          },
           media: {
             select: {
               id: true,

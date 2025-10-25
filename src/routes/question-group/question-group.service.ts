@@ -24,7 +24,23 @@ export class QuestionGroupService {
   ): Promise<any> {
     const { questions, mediaId, metadata, ...groupData } = createDto
 
-    // Handle file uploads
+    let parsedQuestions: number[] = []
+    if (questions) {
+      if (Array.isArray(questions)) {
+        parsedQuestions = questions.map((q) => (typeof q === 'string' ? parseInt(q, 10) : q))
+      } else if (typeof questions === 'string') {
+        try {
+          const parsed = JSON.parse(questions)
+          parsedQuestions = Array.isArray(parsed) ? parsed.map((q) => Number(q)) : [Number(questions)]
+        } catch {
+          parsedQuestions = [parseInt(questions, 10)]
+        }
+      } else {
+        parsedQuestions = [questions as number]
+      }
+      parsedQuestions = parsedQuestions.filter((q) => !isNaN(q))
+    }
+
     let uploadedMediaId = mediaId
 
     if (files?.image?.[0] || files?.audio?.[0]) {
@@ -64,8 +80,8 @@ export class QuestionGroupService {
     }
 
     // Validate questions exist if provided
-    if (questions && questions.length > 0) {
-      const { existing, missing } = await this.questionGroupRepository.checkQuestionsExist(questions)
+    if (parsedQuestions && parsedQuestions.length > 0) {
+      const { existing, missing } = await this.questionGroupRepository.checkQuestionsExist(parsedQuestions)
       if (missing.length > 0) {
         throw new BadRequestException(`Questions with IDs [${missing.join(', ')}] do not exist`)
       }
@@ -80,13 +96,11 @@ export class QuestionGroupService {
       groupCreateData.media = { connect: { id: uploadedMediaId } }
     }
 
-    return this.questionGroupRepository.createWithQuestions(groupCreateData, questions || [])
+    return this.questionGroupRepository.createWithQuestions(groupCreateData, parsedQuestions || [])
   }
 
   async findAll(queryDto: QueryQuestionGroupDTO) {
     const { page, limit, type, hasMedia, hasPassage, keyword, sortBy, sortOrder } = queryDto
-
-    const skip = (page - 1) * limit
 
     const where: any = {}
 
@@ -109,41 +123,17 @@ export class QuestionGroupService {
       ]
     }
 
-    // Build order by clause
     const orderBy: any = {}
     if (sortBy && sortOrder) {
       orderBy[sortBy] = sortOrder
     }
 
-    const [groups, total] = await Promise.all([
-      this.questionGroupRepository.findManyWithStats({
-        skip,
-        take: limit,
-        where,
-        orderBy,
-      }),
-      this.questionGroupRepository.count(where),
-    ])
-
-    // Transform groups to include stats
-    const transformedGroups = groups.map((group) => ({
-      ...group,
-      questionsCount: group._count?.questions || 0,
-      hasMedia: !!group.mediaId,
-      hasPassage: !!group.passage,
-    }))
-
-    return {
-      data: transformedGroups,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-        hasNext: page * limit < total,
-        hasPrev: page > 1,
-      },
-    }
+    return this.questionGroupRepository.findManyWithPagination({
+      page,
+      limit,
+      where,
+      orderBy,
+    })
   }
 
   async findOne(id: number): Promise<any> {
@@ -165,6 +155,27 @@ export class QuestionGroupService {
     }
 
     const { questions, mediaId, ...groupData } = updateDto
+
+    // Parse questions - handle form-data where questions might be string or string[]
+    let parsedQuestions: number[] | undefined
+    if (questions) {
+      if (Array.isArray(questions)) {
+        // If array, convert each element to number
+        parsedQuestions = questions.map((q) => (typeof q === 'string' ? parseInt(q, 10) : q))
+      } else if (typeof questions === 'string') {
+        // If single string, try to parse as JSON array first, otherwise convert to number
+        try {
+          const parsed = JSON.parse(questions)
+          parsedQuestions = Array.isArray(parsed) ? parsed.map((q) => Number(q)) : [Number(questions)]
+        } catch {
+          parsedQuestions = [parseInt(questions, 10)]
+        }
+      } else {
+        parsedQuestions = [questions as number]
+      }
+      // Filter out NaN values
+      parsedQuestions = parsedQuestions.filter((q) => !isNaN(q))
+    }
 
     // Handle file uploads
     let updatedMediaId = mediaId
@@ -206,8 +217,8 @@ export class QuestionGroupService {
     }
 
     // Validate questions exist if provided
-    if (questions && questions.length > 0) {
-      const { existing, missing } = await this.questionGroupRepository.checkQuestionsExist(questions)
+    if (parsedQuestions && parsedQuestions.length > 0) {
+      const { existing, missing } = await this.questionGroupRepository.checkQuestionsExist(parsedQuestions)
       if (missing.length > 0) {
         throw new BadRequestException(`Questions with IDs [${missing.join(', ')}] do not exist`)
       }
@@ -222,7 +233,7 @@ export class QuestionGroupService {
       updateData.media = { connect: { id: updatedMediaId } }
     }
 
-    return this.questionGroupRepository.updateWithQuestions(id, updateData, questions)
+    return this.questionGroupRepository.updateWithQuestions(id, updateData, parsedQuestions)
   }
 
   async remove(id: number): Promise<any> {

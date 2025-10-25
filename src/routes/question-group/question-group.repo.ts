@@ -6,49 +6,93 @@ import { PrismaService } from 'src/shared/services/prisma.service'
 export class QuestionGroupRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  private readonly includeQuestions = {
-    questions: {
-      select: {
-        id: true,
-        stem: true,
-        type: true,
-        level: true,
-        difficulty: true,
-      },
-      orderBy: {
-        id: 'asc' as const,
-      },
-    },
-    media: {
-      select: {
-        id: true,
-        url: true,
-        kind: true,
-        caption: true,
-      },
-    },
-  } as const
+  // Helper function to transform question data from many-to-many relation
+  private transformQuestions(questionGroupQuestions: any[]) {
+    return questionGroupQuestions.map((qgq) => ({
+      id: qgq.question.id,
+      stem: qgq.question.stem,
+      type: qgq.question.type,
+      level: qgq.question.level,
+      difficulty: qgq.question.difficulty,
+      order: qgq.order,
+      score: qgq.score,
+    }))
+  }
 
   async create(data: any): Promise<any> {
-    return await this.prisma.questionGroup.create({
+    const group = await this.prisma.questionGroup.create({
       data,
-      include: this.includeQuestions,
     })
+
+    return {
+      id: group.id,
+      type: group.type,
+      title: group.title,
+      passage: group.passage,
+      mediaId: group.mediaId,
+      order: group.order,
+      metadata: group.metadata,
+      createdAt: group.createdAt,
+      questions: [],
+      media: null,
+      questionsCount: 0,
+    }
   }
 
   async createWithQuestions(groupData: any, questionIds: number[] = []): Promise<any> {
-    return await this.prisma.questionGroup.create({
+    const group = await this.prisma.questionGroup.create({
       data: {
         ...groupData,
-        questions:
-          questionIds.length > 0
-            ? {
-                connect: questionIds.map((id) => ({ id })),
-              }
-            : undefined,
       },
-      include: this.includeQuestions,
     })
+
+    // Create many-to-many relations if questionIds provided
+    if (questionIds.length > 0) {
+      await this.prisma.questionGroupQuestion.createMany({
+        data: questionIds.map((questionId, index) => ({
+          groupId: group.id,
+          questionId,
+          order: index + 1,
+        })),
+      })
+    }
+
+    // Fetch the complete group with questions
+    const groupWithQuestions = await this.prisma.questionGroup.findUnique({
+      where: { id: group.id },
+      include: {
+        questions: {
+          include: {
+            question: true,
+          },
+          orderBy: {
+            order: 'asc',
+          },
+        },
+        media: true,
+        _count: {
+          select: {
+            questions: true,
+          },
+        },
+      },
+    })
+
+    if (!groupWithQuestions) return null
+
+    return {
+      id: groupWithQuestions.id,
+      type: groupWithQuestions.type,
+      title: groupWithQuestions.title,
+      passage: groupWithQuestions.passage,
+      mediaId: groupWithQuestions.mediaId,
+      order: groupWithQuestions.order,
+      metadata: groupWithQuestions.metadata,
+      createdAt: groupWithQuestions.createdAt,
+      questions: this.transformQuestions(groupWithQuestions.questions),
+      media: groupWithQuestions.media,
+      questionsCount: groupWithQuestions._count.questions,
+    }
   }
 
   async findMany(params: {
@@ -61,18 +105,47 @@ export class QuestionGroupRepository {
     const { skip, take, where, orderBy, includeQuestions = false } = params
 
     if (includeQuestions) {
-      return await this.prisma.questionGroup.findMany({
-        skip,
-        take,
+      const groups = await this.prisma.questionGroup.findMany({
+        ...(skip !== undefined && { skip }),
+        ...(take !== undefined && { take }),
         where,
         orderBy,
-        include: this.includeQuestions,
+        include: {
+          questions: {
+            include: {
+              question: true,
+            },
+            orderBy: {
+              order: 'asc',
+            },
+          },
+          media: true,
+          _count: {
+            select: {
+              questions: true,
+            },
+          },
+        },
       })
+
+      return groups.map((group) => ({
+        id: group.id,
+        type: group.type,
+        title: group.title,
+        passage: group.passage,
+        mediaId: group.mediaId,
+        order: group.order,
+        metadata: group.metadata,
+        createdAt: group.createdAt,
+        questions: this.transformQuestions(group.questions),
+        media: group.media,
+        questionsCount: group._count.questions,
+      }))
     }
 
     return await this.prisma.questionGroup.findMany({
-      skip,
-      take,
+      ...(skip !== undefined && { skip }),
+      ...(take !== undefined && { take }),
       where,
       orderBy,
     })
@@ -104,12 +177,112 @@ export class QuestionGroupRepository {
     })
   }
 
+  async findManyWithPagination(params: { page?: number; limit?: number; where?: any; orderBy?: any }): Promise<{
+    data: any[]
+    pagination: {
+      page: number
+      limit: number
+      total: number
+      totalPages: number
+      hasNext: boolean
+      hasPrev: boolean
+    }
+  }> {
+    const { page = 1, limit = 10, where, orderBy } = params
+
+    const skip = (page - 1) * limit
+
+    const [data, total] = await Promise.all([
+      this.prisma.questionGroup.findMany({
+        skip,
+        take: Number(limit),
+        where,
+        orderBy,
+        include: {
+          _count: {
+            select: {
+              questions: true,
+            },
+          },
+          media: {
+            select: {
+              id: true,
+              url: true,
+              kind: true,
+              caption: true,
+            },
+          },
+        },
+      }),
+      this.prisma.questionGroup.count({ where }),
+    ])
+
+    // Transform data to include questionsCount, hasMedia, hasPassage
+    const transformedData = data.map((group) => ({
+      id: group.id,
+      type: group.type,
+      title: group.title,
+      passage: group.passage,
+      mediaId: group.mediaId,
+      order: group.order,
+      metadata: group.metadata,
+      createdAt: group.createdAt,
+      questionsCount: group._count.questions,
+      hasMedia: !!group.mediaId,
+      hasPassage: !!group.passage,
+      media: group.media,
+    }))
+
+    return {
+      data: transformedData,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasNext: page * limit < total,
+        hasPrev: page > 1,
+      },
+    }
+  }
+
   async findUnique(where: any, includeQuestions = true): Promise<any | null> {
     if (includeQuestions) {
-      return await this.prisma.questionGroup.findUnique({
+      const group = await this.prisma.questionGroup.findUnique({
         where,
-        include: this.includeQuestions,
+        include: {
+          questions: {
+            include: {
+              question: true,
+            },
+            orderBy: {
+              order: 'asc',
+            },
+          },
+          media: true,
+          _count: {
+            select: {
+              questions: true,
+            },
+          },
+        },
       })
+
+      if (!group) return null
+
+      return {
+        id: group.id,
+        type: group.type,
+        title: group.title,
+        passage: group.passage,
+        mediaId: group.mediaId,
+        order: group.order,
+        metadata: group.metadata,
+        createdAt: group.createdAt,
+        questions: this.transformQuestions(group.questions),
+        media: group.media,
+        questionsCount: group._count.questions,
+      }
     }
 
     return await this.prisma.questionGroup.findUnique({
@@ -118,11 +291,47 @@ export class QuestionGroupRepository {
   }
 
   async update(where: any, data: any): Promise<any> {
-    return await this.prisma.questionGroup.update({
+    const group = await this.prisma.questionGroup.update({
       where,
       data,
-      include: this.includeQuestions,
     })
+
+    // Fetch with relations
+    const groupWithQuestions = await this.prisma.questionGroup.findUnique({
+      where: { id: group.id },
+      include: {
+        questions: {
+          include: {
+            question: true,
+          },
+          orderBy: {
+            order: 'asc',
+          },
+        },
+        media: true,
+        _count: {
+          select: {
+            questions: true,
+          },
+        },
+      },
+    })
+
+    if (!groupWithQuestions) return null
+
+    return {
+      id: groupWithQuestions.id,
+      type: groupWithQuestions.type,
+      title: groupWithQuestions.title,
+      passage: groupWithQuestions.passage,
+      mediaId: groupWithQuestions.mediaId,
+      order: groupWithQuestions.order,
+      metadata: groupWithQuestions.metadata,
+      createdAt: groupWithQuestions.createdAt,
+      questions: this.transformQuestions(groupWithQuestions.questions),
+      media: groupWithQuestions.media,
+      questionsCount: groupWithQuestions._count.questions,
+    }
   }
 
   async updateWithQuestions(groupId: number, groupData: any, questionIds?: number[]): Promise<any> {
@@ -137,35 +346,67 @@ export class QuestionGroupRepository {
 
       // Update questions if provided
       if (questionIds !== undefined) {
-        // First, disconnect all questions
-        await tx.question.updateMany({
-          where: { questionGroupId: groupId },
-          data: { questionGroupId: null },
+        // First, delete all existing relations
+        await tx.questionGroupQuestion.deleteMany({
+          where: { groupId },
         })
 
-        // Then connect new questions
+        // Then create new relations
         if (questionIds.length > 0) {
-          await tx.question.updateMany({
-            where: { id: { in: questionIds } },
-            data: { questionGroupId: groupId },
+          await tx.questionGroupQuestion.createMany({
+            data: questionIds.map((questionId, index) => ({
+              groupId,
+              questionId,
+              order: index + 1,
+            })),
           })
         }
       }
 
-      // Return await updated group with questions
-      return await tx.questionGroup.findUnique({
+      // Return updated group with questions
+      const group = await tx.questionGroup.findUnique({
         where: { id: groupId },
-        include: this.includeQuestions,
+        include: {
+          questions: {
+            include: {
+              question: true,
+            },
+            orderBy: {
+              order: 'asc',
+            },
+          },
+          media: true,
+          _count: {
+            select: {
+              questions: true,
+            },
+          },
+        },
       })
+
+      if (!group) return null
+
+      return {
+        id: group.id,
+        type: group.type,
+        title: group.title,
+        passage: group.passage,
+        mediaId: group.mediaId,
+        order: group.order,
+        metadata: group.metadata,
+        createdAt: group.createdAt,
+        questions: this.transformQuestions(group.questions),
+        media: group.media,
+        questionsCount: group._count.questions,
+      }
     })
   }
 
   async delete(where: any): Promise<any> {
     return await this.prisma.$transaction(async (tx) => {
-      // First, disconnect all questions from this group
-      await tx.question.updateMany({
-        where: { questionGroupId: where.id },
-        data: { questionGroupId: null },
+      // Delete all QuestionGroupQuestion relations first (cascade will handle this, but explicit is better)
+      await tx.questionGroupQuestion.deleteMany({
+        where: { groupId: where.id },
       })
 
       // Then delete the group
@@ -255,17 +496,56 @@ export class QuestionGroupRepository {
         const group = await tx.questionGroup.create({
           data: {
             ...groupData,
-            questions:
-              questionIds.length > 0
-                ? {
-                    connect: questionIds.map((id) => ({ id })),
-                  }
-                : undefined,
           },
-          include: this.includeQuestions,
         })
 
-        createdGroups.push(group)
+        // Create many-to-many relations
+        if (questionIds.length > 0) {
+          await tx.questionGroupQuestion.createMany({
+            data: questionIds.map((questionId, index) => ({
+              groupId: group.id,
+              questionId,
+              order: index + 1,
+            })),
+          })
+        }
+
+        // Fetch with questions
+        const groupWithQuestions = await tx.questionGroup.findUnique({
+          where: { id: group.id },
+          include: {
+            questions: {
+              include: {
+                question: true,
+              },
+              orderBy: {
+                order: 'asc',
+              },
+            },
+            media: true,
+            _count: {
+              select: {
+                questions: true,
+              },
+            },
+          },
+        })
+
+        if (groupWithQuestions) {
+          createdGroups.push({
+            id: groupWithQuestions.id,
+            type: groupWithQuestions.type,
+            title: groupWithQuestions.title,
+            passage: groupWithQuestions.passage,
+            mediaId: groupWithQuestions.mediaId,
+            order: groupWithQuestions.order,
+            metadata: groupWithQuestions.metadata,
+            createdAt: groupWithQuestions.createdAt,
+            questions: this.transformQuestions(groupWithQuestions.questions),
+            media: groupWithQuestions.media,
+            questionsCount: groupWithQuestions._count.questions,
+          })
+        }
       }
 
       return createdGroups
@@ -274,36 +554,110 @@ export class QuestionGroupRepository {
 
   async addQuestionsToGroup(groupId: number, questionIds: number[]): Promise<any> {
     return await this.prisma.$transaction(async (tx) => {
-      // Connect questions to the group
-      await tx.question.updateMany({
-        where: { id: { in: questionIds } },
-        data: { questionGroupId: groupId },
+      // Get current max order
+      const currentQuestions = await tx.questionGroupQuestion.findMany({
+        where: { groupId },
+        orderBy: { order: 'desc' },
+        take: 1,
       })
 
-      // Return await updated group
-      return await tx.questionGroup.findUnique({
-        where: { id: groupId },
-        include: this.includeQuestions,
+      const startOrder = currentQuestions.length > 0 ? (currentQuestions[0].order || 0) + 1 : 1
+
+      // Create new relations (append to existing)
+      await tx.questionGroupQuestion.createMany({
+        data: questionIds.map((questionId, index) => ({
+          groupId,
+          questionId,
+          order: startOrder + index,
+        })),
+        skipDuplicates: true, // Skip if already exists
       })
+
+      // Return updated group
+      const group = await tx.questionGroup.findUnique({
+        where: { id: groupId },
+        include: {
+          questions: {
+            include: {
+              question: true,
+            },
+            orderBy: {
+              order: 'asc',
+            },
+          },
+          media: true,
+          _count: {
+            select: {
+              questions: true,
+            },
+          },
+        },
+      })
+
+      if (!group) return null
+
+      return {
+        id: group.id,
+        type: group.type,
+        title: group.title,
+        passage: group.passage,
+        mediaId: group.mediaId,
+        order: group.order,
+        metadata: group.metadata,
+        createdAt: group.createdAt,
+        questions: this.transformQuestions(group.questions),
+        media: group.media,
+        questionsCount: group._count.questions,
+      }
     })
   }
 
   async removeQuestionsFromGroup(groupId: number, questionIds: number[]): Promise<any> {
     return await this.prisma.$transaction(async (tx) => {
-      // Disconnect questions from the group
-      await tx.question.updateMany({
+      // Delete specific relations
+      await tx.questionGroupQuestion.deleteMany({
         where: {
-          id: { in: questionIds },
-          questionGroupId: groupId,
+          groupId,
+          questionId: { in: questionIds },
         },
-        data: { questionGroupId: null },
       })
 
-      // Return await updated group
-      return await tx.questionGroup.findUnique({
+      // Return updated group
+      const group = await tx.questionGroup.findUnique({
         where: { id: groupId },
-        include: this.includeQuestions,
+        include: {
+          questions: {
+            include: {
+              question: true,
+            },
+            orderBy: {
+              order: 'asc',
+            },
+          },
+          media: true,
+          _count: {
+            select: {
+              questions: true,
+            },
+          },
+        },
       })
+
+      if (!group) return null
+
+      return {
+        id: group.id,
+        type: group.type,
+        title: group.title,
+        passage: group.passage,
+        mediaId: group.mediaId,
+        order: group.order,
+        metadata: group.metadata,
+        createdAt: group.createdAt,
+        questions: this.transformQuestions(group.questions),
+        media: group.media,
+        questionsCount: group._count.questions,
+      }
     })
   }
 
@@ -336,10 +690,39 @@ export class QuestionGroupRepository {
     return { existing, missing }
   }
   async getGroupsByType(type: QuestionGroupTypeType): Promise<any[]> {
-    return await this.prisma.questionGroup.findMany({
+    const groups = await this.prisma.questionGroup.findMany({
       where: { type: type as any },
-      include: this.includeQuestions,
+      include: {
+        questions: {
+          include: {
+            question: true,
+          },
+          orderBy: {
+            order: 'asc',
+          },
+        },
+        media: true,
+        _count: {
+          select: {
+            questions: true,
+          },
+        },
+      },
     })
+
+    return groups.map((group) => ({
+      id: group.id,
+      type: group.type,
+      title: group.title,
+      passage: group.passage,
+      mediaId: group.mediaId,
+      order: group.order,
+      metadata: group.metadata,
+      createdAt: group.createdAt,
+      questions: this.transformQuestions(group.questions),
+      media: group.media,
+      questionsCount: group._count.questions,
+    }))
   }
 
   async createMedia(url: string, mimeType: string, sizeByte: number, caption?: string) {

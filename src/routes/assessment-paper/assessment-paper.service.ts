@@ -29,10 +29,6 @@ export class AssessmentPaperService {
       throw new ConflictException(`Assessment paper with title "${data.title}" already exists`)
     }
 
-    if (data.blueprintId) {
-      // TODO: Add blueprint existence check
-    }
-
     const isBlueprintMode = Boolean(data.blueprintId || data.seed || data.generatorVersion)
 
     const createData: CreateAssessmentPaperInput = {
