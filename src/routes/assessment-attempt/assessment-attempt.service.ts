@@ -114,7 +114,6 @@ export class AssessmentAttemptService {
   // ===== Grading and Scoring =====
 
   async gradeAttempt(attemptId: number): Promise<AssessmentAttemptWithStats> {
-    // Validate attempt exists and get assessment with scoreProfile
     const attempt = await this.assessmentAttemptRepo.findById(attemptId, {
       assessment: true,
       assessmentWithScoreProfile: true,
@@ -123,7 +122,6 @@ export class AssessmentAttemptService {
       throw new NotFoundException(ASSESSMENT_ATTEMPT_ERRORS.NOT_FOUND)
     }
 
-    // Check if submitted
     if (!(await this.assessmentAttemptRepo.isSubmitted(attemptId))) {
       throw new BadRequestException(ASSESSMENT_ATTEMPT_ERRORS.SUBMISSION_REQUIRED)
     }
@@ -131,7 +129,6 @@ export class AssessmentAttemptService {
     const assessmentType = attempt.assessment.type
     const scoreProfile = attempt.assessment.scoreProfile
 
-    // Ensure scoreProfile exists
     if (!scoreProfile) {
       throw new BadRequestException('Assessment must have a score profile configured')
     }
@@ -143,20 +140,18 @@ export class AssessmentAttemptService {
     let correctAnswers = 0
 
     if (assessmentType === 'TEST') {
-      // TEST scoring: simple sum using scorePerQuestion
       const testResult = await this.calculateTestScore(attemptId)
       finalScore = testResult.totalScore
       totalQuestions = testResult.totalQuestions
       correctAnswers = testResult.correctAnswers
 
-      // For TEST, create simple level evaluation
       const accuracy = totalQuestions > 0 ? (correctAnswers / totalQuestions) * 100 : 0
       levelEvaluation = {
         currentLevel: attempt.assessment.level,
         totalScore: finalScore,
         totalPassed: scoreProfile.minTotalPass ? finalScore >= scoreProfile.minTotalPass : true,
-        sectionsPassed: true, // TEST doesn't have section requirements
-        suggestedLevel: null, // No level suggestion for TEST
+        sectionsPassed: true,
+        suggestedLevel: null,
         recommendation: `Test completed with score: ${finalScore}/${scoreProfile.maxTotal || 100}`,
       }
     } else {
