@@ -234,4 +234,57 @@ export class QuizRepository {
     const count = await this.prisma.quiz.count({ where })
     return count > 0
   }
+
+  async hasAttempts(id: number): Promise<boolean> {
+    const count = await this.prisma.quizAttempt.count({
+      where: { quizId: id },
+    })
+    return count > 0
+  }
+
+  async clone(originalId: number, userId: number, newTitle: string): Promise<Quiz> {
+    // Get original quiz with all items
+    const original = await this.prisma.quiz.findUnique({
+      where: { id: originalId },
+      include: {
+        items: {
+          include: {
+            questions: true,
+            questionGroups: true,
+          },
+        },
+      },
+    })
+
+    if (!original) {
+      throw new Error('Original quiz not found')
+    }
+
+    // Clone the quiz with all items
+    return await this.prisma.quiz.create({
+      data: {
+        title: newTitle,
+        timeLimitSec: original.timeLimitSec,
+        createdBy: userId,
+        lessonId: original.lessonId,
+        items: {
+          create: original.items.map((item) => ({
+            order: item.order,
+            questions: {
+              create: item.questions.map((q) => ({
+                questionId: q.questionId,
+                order: q.order,
+              })),
+            },
+            questionGroups: {
+              create: item.questionGroups.map((qg) => ({
+                groupId: qg.groupId,
+                order: qg.order,
+              })),
+            },
+          })),
+        },
+      },
+    })
+  }
 }

@@ -8,6 +8,7 @@ import {
   SubmitQuizAttemptInput,
   QuizAttemptQuery,
   QUIZ_ATTEMPT_ERRORS,
+  QuizAttemptWithStatistics,
 } from './quiz-attempt.model'
 
 @Injectable()
@@ -142,7 +143,7 @@ export class QuizAttemptRepository {
     }
   }
 
-  async submitAttempt(attemptId: number, data: SubmitQuizAttemptInput): Promise<QuizAttempt> {
+  async submitAttempt(attemptId: number, data: SubmitQuizAttemptInput): Promise<QuizAttemptWithStatistics> {
     // Get attempt with quiz and questions
     const attempt = await this.prisma.quizAttempt.findUnique({
       where: { id: attemptId },
@@ -175,21 +176,20 @@ export class QuizAttemptRepository {
       throw new BadRequestException(QUIZ_ATTEMPT_ERRORS.ALREADY_SUBMITTED)
     }
 
+    // Collect all questions from quiz items
     const allQuestions = attempt.quiz.items.flatMap((item) => item.questions.map((q) => q.question))
     const questionIds = allQuestions.map((q) => q.id)
     const answerQuestionIds = data.answers.map((answer) => answer.questionId)
 
-    const missingQuestions = questionIds.filter((qId) => !answerQuestionIds.includes(qId))
-    if (missingQuestions.length > 0) {
-      throw new BadRequestException(`Missing answers for questions: ${missingQuestions.join(', ')}`)
-    }
-
+    // Create answers data - include both answered and unanswered questions
     const answersData: Array<{
       attemptId: number
       questionId: number
       selectedOptionId: number | null
       isCorrect: boolean
     }> = []
+
+    // Process answered questions
     for (const answer of data.answers) {
       const question = allQuestions.find((q) => q.id === answer.questionId)
       if (!question) continue
@@ -210,6 +210,25 @@ export class QuizAttemptRepository {
       })
     }
 
+    // Add unanswered questions as incorrect (no selected option)
+    const missingQuestionIds = questionIds.filter((qId) => !answerQuestionIds.includes(qId))
+    for (const questionId of missingQuestionIds) {
+      answersData.push({
+        attemptId,
+        questionId,
+        selectedOptionId: null, // No answer selected
+        isCorrect: false, // Unanswered = incorrect
+      })
+    }
+
+    // Calculate statistics
+    const totalQuestions = questionIds.length
+    const correctAnswers = answersData.filter((a) => a.isCorrect).length
+    const answeredQuestions = data.answers.length
+    const unansweredQuestions = missingQuestionIds.length
+    const incorrectAnswers = totalQuestions - correctAnswers
+    const accuracyPercentage = totalQuestions > 0 ? (correctAnswers / totalQuestions) * 100 : 0
+
     // Save answers and update attempt
     await this.prisma.$transaction(async (tx) => {
       // Create answers
@@ -217,17 +236,29 @@ export class QuizAttemptRepository {
         data: answersData,
       })
 
-      // Update attempt as submitted
+      // Update attempt as submitted with statistics
       await tx.quizAttempt.update({
         where: { id: attemptId },
         data: {
           submittedAt: new Date(),
+          score: accuracyPercentage, // Store accuracy percentage in score field
         },
       })
     })
 
-    // Return updated attempt
-    return (await this.findById(attemptId))!
+    // Return updated attempt with statistics
+    const updatedAttempt = await this.findById(attemptId)
+    return {
+      ...updatedAttempt!,
+      statistics: {
+        totalQuestions,
+        answeredQuestions,
+        unansweredQuestions,
+        correctAnswers,
+        incorrectAnswers,
+        accuracyPercentage: Math.round(accuracyPercentage * 100) / 100, // Round to 2 decimals
+      },
+    }
   }
 
   async delete(id: number): Promise<void> {
