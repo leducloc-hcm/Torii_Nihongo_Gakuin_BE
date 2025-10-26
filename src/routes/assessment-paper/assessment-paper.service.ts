@@ -44,6 +44,14 @@ export class AssessmentPaperService {
       throw new NotFoundException(`Assessment paper with ID ${id} not found`)
     }
 
+    // Check if anyone has attempted this assessment
+    const hasAttempts = await this.assessmentPaperRepo.hasAttempts(id)
+    if (hasAttempts) {
+      throw new BadRequestException(
+        'Cannot update assessment paper that has been attempted. Please clone it to create a new version.',
+      )
+    }
+
     if (data.title && data.title !== existingAssessmentPaper.title) {
       const titleExists = await this.assessmentPaperRepo.getTitleExists(data.title, id)
       if (titleExists) {
@@ -60,15 +68,31 @@ export class AssessmentPaperService {
       throw new NotFoundException(`Assessment paper with ID ${id} not found`)
     }
 
-    try {
-      await this.assessmentPaperRepo.delete(id)
-      return { message: 'Assessment paper deleted successfully' }
-    } catch (error: any) {
-      if (error.code === 'P2003') {
-        throw new BadRequestException('Cannot delete assessment paper because it has associated attempts')
-      }
-      throw error
+    const hasAttempts = await this.assessmentPaperRepo.hasAttempts(id)
+    if (hasAttempts) {
+      throw new BadRequestException('Cannot delete assessment paper that has been attempted.')
     }
+
+    await this.assessmentPaperRepo.delete(id)
+    return { message: 'Assessment paper deleted successfully' }
+  }
+
+  async cloneAssessmentPaper(id: number, newTitle?: string): Promise<AssessmentPaperBase> {
+    const original = await this.assessmentPaperRepo.findByIdWithRelations(id)
+    if (!original) {
+      throw new NotFoundException(`Assessment paper with ID ${id} not found`)
+    }
+
+    // Generate new title if not provided
+    const title = newTitle || `${original.title} (Copy v${original.version + 1})`
+
+    // Check title uniqueness
+    const titleExists = await this.assessmentPaperRepo.getTitleExists(title)
+    if (titleExists) {
+      throw new ConflictException(`Assessment paper with title "${title}" already exists`)
+    }
+
+    return this.assessmentPaperRepo.clone(id, title, original.version + 1)
   }
 
   async getAssessmentPapers(query: AssessmentPaperQuery): Promise<{

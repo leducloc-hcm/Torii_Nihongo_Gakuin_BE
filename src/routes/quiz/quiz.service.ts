@@ -57,6 +57,14 @@ export class QuizService {
       throw new ForbiddenException('Permission denied')
     }
 
+    // Check if anyone has attempted this quiz
+    const hasAttempts = await this.quizRepo.hasAttempts(id)
+    if (hasAttempts) {
+      throw new BadRequestException(
+        'Cannot update quiz that has been attempted. Please clone it to create a new version.',
+      )
+    }
+
     if (data.title && data.title !== quiz.title) {
       const titleExists = await this.quizRepo.getTitleExists(data.title, id)
       if (titleExists) {
@@ -74,9 +82,33 @@ export class QuizService {
       throw new ForbiddenException('Permission denied')
     }
 
+    // Check if anyone has attempted this quiz
+    const hasAttempts = await this.quizRepo.hasAttempts(id)
+    if (hasAttempts) {
+      throw new BadRequestException('Cannot delete quiz that has been attempted.')
+    }
+
     await this.quizRepo.delete(id)
 
     return { message: 'Quiz deleted successfully' }
+  }
+
+  async cloneQuiz(id: number, userId: number, newTitle?: string): Promise<QuizBase> {
+    const original = await this.quizRepo.findByIdWithRelations(id)
+    if (!original) {
+      throw new NotFoundException(`Quiz with ID ${id} not found`)
+    }
+
+    // Generate new title if not provided
+    const title = newTitle || `${original.title} (Copy)`
+
+    // Check title uniqueness
+    const titleExists = await this.quizRepo.getTitleExists(title)
+    if (titleExists) {
+      throw new ConflictException(`Quiz with title "${title}" already exists`)
+    }
+
+    return this.quizRepo.clone(id, userId, title)
   }
 
   async searchQuizzes(searchTerm: string, limit = 20) {

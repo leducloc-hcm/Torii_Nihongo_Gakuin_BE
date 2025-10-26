@@ -442,4 +442,78 @@ export class AssessmentPaperRepository {
 
     return false
   }
+
+  async hasAttempts(id: number): Promise<boolean> {
+    const count = await this.prisma.assessmentAttempt.count({
+      where: { assessmentId: id },
+    })
+    return count > 0
+  }
+
+  async clone(originalId: number, newTitle: string, newVersion: number): Promise<AssessmentPaper> {
+    const original = await this.prisma.assessmentPaper.findUnique({
+      where: { id: originalId },
+      include: {
+        sections: {
+          include: {
+            items: {
+              include: {
+                questions: true,
+                questionGroups: true,
+              },
+            },
+          },
+        },
+      },
+    })
+
+    if (!original) {
+      throw new Error('Original assessment not found')
+    }
+
+    return await this.prisma.assessmentPaper.create({
+      data: {
+        title: newTitle,
+        level: original.level,
+        type: original.type,
+        visibility: original.visibility,
+        createdBy: original.createdBy,
+        scoreProfileId: original.scoreProfileId,
+        blueprintId: original.blueprintId,
+        blueprintSnapshot: original.blueprintSnapshot as any,
+        seed: original.seed,
+        version: newVersion,
+        generatorVersion: original.generatorVersion,
+        generatorMeta: original.generatorMeta as any,
+        sections: {
+          create: original.sections.map((section) => ({
+            title: section.title,
+            timeLimitSec: section.timeLimitSec,
+            type: section.type,
+            items: {
+              create: section.items.map((item) => ({
+                name: item.name,
+                scorePerQuestion: item.scorePerQuestion,
+                order: item.order,
+                questions: {
+                  create: item.questions.map((q) => ({
+                    questionId: q.questionId,
+                    order: q.order,
+                    score: q.score,
+                  })),
+                },
+                questionGroups: {
+                  create: item.questionGroups.map((qg) => ({
+                    groupId: qg.groupId,
+                    order: qg.order,
+                    score: qg.score,
+                  })),
+                },
+              })),
+            },
+          })),
+        },
+      },
+    })
+  }
 }

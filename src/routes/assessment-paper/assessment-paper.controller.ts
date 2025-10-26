@@ -73,4 +73,12 @@ export class AssessmentPaperController {
   async remove(@Param('id', ParseIntPipe) id: number) {
     return this.assessmentPaperService.deleteAssessmentPaper(id)
   }
+
+  @Post(':id/clone')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
+  @HttpCode(HttpStatus.CREATED)
+  async clone(@Param('id', ParseIntPipe) id: number, @Body() body?: { title?: string }) {
+    return this.assessmentPaperService.cloneAssessmentPaper(id, body?.title)
+  }
 }
