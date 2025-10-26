@@ -7,9 +7,7 @@ export const CreateAssessmentItemSchema = z.object({
   name: z.string().optional(),
   order: z.number().int().min(0).default(0),
   scorePerQuestion: z.number().min(0).optional(),
-  // Many-to-many với Questions
   questionIds: z.array(z.number().int().positive()).optional(),
-  // Many-to-many với QuestionGroups
   questionGroupIds: z.array(z.number().int().positive()).optional(),
 })
 
