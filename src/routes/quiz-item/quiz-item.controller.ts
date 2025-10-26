@@ -22,22 +22,16 @@ export class QuizItemController {
   @Post()
   @Auth([AuthType.Bearer])
   @Roles(Role.LECTURER, Role.ADMIN)
-  @ApiOperation({ summary: 'Create a new quiz item' })
-  @ApiResponse({ status: 201, description: 'Quiz item created successfully' })
   async createQuizItem(@ActiveUser('userId') userId: number, @Body() dto: CreateQuizItemDto) {
     return await this.quizItemService.createQuizItem(userId, dto)
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get all quiz items' })
-  @ApiResponse({ status: 200, description: 'Quiz items retrieved successfully' })
   async getQuizItems(@Query() query: QuizItemQueryDto) {
     return await this.quizItemService.getQuizItems(query)
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Get quiz item by ID' })
-  @ApiResponse({ status: 200, description: 'Quiz item retrieved successfully' })
   async getQuizItemById(@Param('id', ParseIntPipe) id: number) {
     return await this.quizItemService.getQuizItemById(id)
   }
@@ -45,8 +39,6 @@ export class QuizItemController {
   @Put(':id')
   @Auth([AuthType.Bearer])
   @Roles(Role.LECTURER, Role.ADMIN)
-  @ApiOperation({ summary: 'Update quiz item' })
-  @ApiResponse({ status: 200, description: 'Quiz item updated successfully' })
   async updateQuizItem(
     @ActiveUser('userId') userId: number,
     @Param('id', ParseIntPipe) id: number,
@@ -58,11 +50,8 @@ export class QuizItemController {
   @Delete(':id')
   @Auth([AuthType.Bearer])
   @Roles(Role.LECTURER, Role.ADMIN)
-  @ApiOperation({ summary: 'Delete quiz item' })
-  @ApiResponse({ status: 200, description: 'Quiz item deleted successfully' })
   async deleteQuizItem(@ActiveUser('userId') userId: number, @Param('id', ParseIntPipe) id: number) {
-    await this.quizItemService.deleteQuizItem(userId, id)
-    return { message: 'Quiz item deleted successfully' }
+    return await this.quizItemService.deleteQuizItem(userId, id)
   }
 
   @Post('quiz/:quizId/bulk-add')

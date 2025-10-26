@@ -6,6 +6,15 @@ import { CreateQuizItemInput, UpdateQuizItemInput, QuizItemQuery, QUIZ_ITEM_ERRO
 export class QuizItemService {
   constructor(private readonly quizItemRepo: QuizItemRepository) {}
 
+  // Transform response to flatten junction table data
+  private transformResponse(item: any) {
+    return {
+      ...item,
+      questions: item.questions?.map((q: any) => q.question) || [],
+      questionGroups: item.questionGroups?.map((qg: any) => qg.group) || [],
+    }
+  }
+
   async createQuizItem(userId: number, data: CreateQuizItemInput) {
     // Check if user owns the quiz
     const quiz = await this.quizItemRepo['prisma'].quiz.findUnique({
@@ -18,11 +27,16 @@ export class QuizItemService {
       throw new ForbiddenException(QUIZ_ITEM_ERRORS.PERMISSION_DENIED)
     }
 
-    return await this.quizItemRepo.create(data)
+    const item = await this.quizItemRepo.create(data)
+    return this.transformResponse(item)
   }
 
   async getQuizItems(query: QuizItemQuery) {
-    return await this.quizItemRepo.findMany(query)
+    const result = await this.quizItemRepo.findMany(query)
+    return {
+      ...result,
+      data: result.data.map((item) => this.transformResponse(item)),
+    }
   }
 
   async getQuizItemById(id: number) {
@@ -71,6 +85,7 @@ export class QuizItemService {
     }
 
     await this.quizItemRepo.delete(id)
+    return { message: 'Quiz item deleted successfully' }
   }
 
   async bulkAddQuestions(userId: number, quizId: number, questionIds: number[]) {

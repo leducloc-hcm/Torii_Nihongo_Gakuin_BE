@@ -28,7 +28,7 @@ export class QuizService {
     return quiz
   }
 
-  async getQuizWithRelations(id: number): Promise<QuizWithRelations> {
+  async getQuizWithRelations(id: number) {
     const quiz = await this.quizRepo.findByIdWithRelations(id)
     if (!quiz) {
       throw new NotFoundException(`Quiz with ID ${id} not found`)
@@ -67,59 +67,16 @@ export class QuizService {
     return this.quizRepo.update(id, data)
   }
 
-  async deleteQuiz(id: number, userId?: number): Promise<void> {
+  async deleteQuiz(id: number, userId?: number) {
     const quiz = await this.getQuiz(id)
 
-    // Check permissions (only creator can delete)
     if (userId && quiz.createdBy !== userId) {
       throw new ForbiddenException('Permission denied')
     }
 
-    return this.quizRepo.delete(id)
-  }
+    await this.quizRepo.delete(id)
 
-  async bulkDeleteQuizzes(ids: number[], userId?: number): Promise<void> {
-    // Validate all quizzes exist and user has permission
-    if (userId) {
-      for (const id of ids) {
-        const quiz = await this.getQuiz(id)
-        if (quiz.createdBy !== userId) {
-          throw new ForbiddenException(`Permission denied for quiz ${id}`)
-        }
-      }
-    }
-
-    return this.quizRepo.bulkDelete(ids)
-  }
-
-  async cloneQuiz(id: number, data: { title?: string }, userId: number): Promise<QuizBase> {
-    const originalQuiz = await this.getQuizWithRelations(id)
-
-    const newTitle = data.title || `${originalQuiz.title} (Copy)`
-
-    // Check title uniqueness
-    const titleExists = await this.quizRepo.getTitleExists(newTitle)
-    if (titleExists) {
-      throw new ConflictException(`Quiz with title "${newTitle}" already exists`)
-    }
-
-    const newQuiz = await this.quizRepo.create(
-      {
-        title: newTitle,
-        lessonId: originalQuiz.lessonId || undefined,
-        timeLimitSec: originalQuiz.timeLimitSec,
-      },
-      userId,
-    )
-
-    return newQuiz
-  }
-
-  async getQuizStats(quizId: number) {
-    // Validate quiz exists
-    await this.getQuiz(quizId)
-
-    return this.quizRepo.getQuizStats(quizId)
+    return { message: 'Quiz deleted successfully' }
   }
 
   async searchQuizzes(searchTerm: string, limit = 20) {

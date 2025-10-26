@@ -105,7 +105,24 @@ export class CourseRepository {
   async findOne(where: CourseWhereUniqueInput, includeReviews = false): Promise<CourseWithRelations | null> {
     return this.prisma.course.findUnique({
       where: where as any,
-      include: includeReviews ? this.includeRelationsWithReviews : this.includeRelations,
+      include: {
+        modules: {
+          include: {
+            lessons: {
+              include: {
+                quiz: {
+                  select: {
+                    id: true,
+                    createdAt: true,
+                    timeLimitSec: true,
+                    title: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     }) as Promise<CourseWithRelations | null>
   }
 
