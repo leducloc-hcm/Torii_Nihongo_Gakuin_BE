@@ -22,6 +22,19 @@ export type QuizAttemptBasic = QuizAttempt & {
   }
 }
 
+export type QuizAttemptStatistics = {
+  totalQuestions: number
+  answeredQuestions: number
+  unansweredQuestions: number
+  correctAnswers: number
+  incorrectAnswers: number
+  accuracyPercentage: number
+}
+
+export type QuizAttemptWithStatistics = QuizAttempt & {
+  statistics: QuizAttemptStatistics
+}
+
 // ===== Zod Schemas =====
 export const StartQuizAttemptSchema = z.object({
   quizId: z.number().int().positive(),

@@ -367,7 +367,7 @@ model Question {
 
   assessmentAnswers AssessmentAnswer[]
   assessmentItems  AssessmentItemQuestion[]
-  quizItems         QuizItem[]
+  quizItems         QuizItemQuestion[]
   quizAnswers       QuizAnswer[]
 }
 
@@ -386,7 +386,7 @@ model QuestionGroup {
   questions   QuestionGroupQuestion[]
 
   aassessmentItems AssessmentItemGroup[]
-  quizItems       QuizItem[]
+  quizItems       QuizItemGroup[]
 }
 
 model QuestionGroupQuestion {
@@ -436,7 +436,7 @@ model AssessmentPaper {
   generatorVersion  String?
   generatorMeta     Json?
 
-  sections AssessmentSection[]
+  sections AssessmentSection[] 
   attempts AssessmentAttempt[]
 }
 
@@ -447,8 +447,8 @@ model AssessmentSection {
   timeLimitSec    Int?
   type           AssessmentSectionType
 
-  assessment AssessmentPaper @relation(fields: [assessmentId], references: [id])
-  items      AssessmentItem[]
+  assessment AssessmentPaper @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  items AssessmentItem[] 
 }
 
 model AssessmentItem {
@@ -458,9 +458,9 @@ model AssessmentItem {
   scorePerQuestion Float?
   order            Int     @default(0)
 
-  section        AssessmentSection        @relation(fields: [sectionId], references: [id])
-  questions      AssessmentItemQuestion[]
-  questionGroups AssessmentItemGroup[]
+  section        AssessmentSection        @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  questions      AssessmentItemQuestion[] 
+  questionGroups AssessmentItemGroup[]    
 }
 
 model AssessmentItemQuestion {
@@ -512,7 +512,7 @@ model AssessmentAnswer {
   timeSpentSec     Int?
   explanation      String?
 
-  attempt        AssessmentAttempt @relation(fields: [attemptId], references: [id])
+  attempt        AssessmentAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
   question       Question          @relation(fields: [questionId], references: [id])
   selectedOption Option?           @relation(fields: [selectedOptionId], references: [id])
 }
@@ -559,15 +559,38 @@ model Quiz {
 }
 
 model QuizItem {
-  id         Int @id @default(autoincrement())
-  quizId     Int
-  questionId Int
-  order      Int @default(0)
-  questionGroupId Int?
+  id    Int @id @default(autoincrement())
+  quizId Int
+  order Int @default(0)
 
-  questionGroup QuestionGroup?    @relation(fields: [questionGroupId], references: [id])
-  quiz     Quiz?     @relation(fields: [quizId], references: [id])
-  question Question @relation(fields: [questionId], references: [id])
+  quiz           Quiz              @relation(fields: [quizId], references: [id])
+  questions      QuizItemQuestion[]
+  questionGroups QuizItemGroup[]
+}
+
+model QuizItemQuestion {
+  itemId     Int
+  questionId Int
+  order      Int?
+  createdAt  DateTime @default(now())
+
+  item     QuizItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@id([itemId, questionId])
+}
+
+model QuizItemGroup {
+  itemId    Int
+  groupId   Int
+  order     Int?
+  
+  createdAt DateTime @default(now())
+
+  item  QuizItem      @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  group QuestionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@id([itemId, groupId])
 }
 
 model QuizAttempt {
@@ -577,6 +600,7 @@ model QuizAttempt {
 
   startedAt   DateTime  @default(now())
   submittedAt DateTime?
+  score       Float?    // Accuracy percentage (0-100)
   
   quiz    Quiz         @relation(fields: [quizId], references: [id])
   user    User         @relation(fields: [userId], references: [id])

@@ -26,29 +26,81 @@ export class QuizRepository {
     })
   }
 
-  async findById(id: number): Promise<Quiz | null> {
+  async findById(id: number) {
     return await this.prisma.quiz.findUnique({
-      where: { id },
-    })
-  }
-
-  async findByIdWithRelations(id: number): Promise<QuizWithRelations | null> {
-    return (await this.prisma.quiz.findUnique({
       where: { id },
       include: {
         author: {
-          select: { id: true, name: true, email: true },
+          select: { id: true, name: true },
         },
-        lesson: true,
-        attempts: {
+        items: {
           include: {
-            user: {
-              select: { id: true, name: true, email: true },
+            questions: {
+              include: {
+                question: true,
+              },
             },
           },
         },
       },
-    })) as QuizWithRelations | null
+    })
+  }
+
+  async findByIdWithRelations(id: number) {
+    return await this.prisma.quiz.findUnique({
+      where: { id },
+      include: {
+        author: {
+          select: { id: true, name: true },
+        },
+        items: {
+          include: {
+            questions: {
+              include: {
+                question: {
+                  include: {
+                    option: {
+                      select: {
+                        id: true,
+                        image: true,
+                        content: true,
+                        mediaId: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            questionGroups: {
+              include: {
+                group: {
+                  include: {
+                    media: true,
+                    questions: {
+                      include: {
+                        question: {
+                          include: {
+                            media: true,
+                            option: {
+                              select: {
+                                id: true,
+                                image: true,
+                                content: true,
+                                mediaId: true,
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    })
   }
 
   async findMany(query: QuizQuery): Promise<{
@@ -62,7 +114,12 @@ export class QuizRepository {
       hasPrev: boolean
     }
   }> {
-    const { page = 1, limit = 20, search, lessonId, createdBy, sortBy = 'createdAt', sortOrder = 'desc' } = query
+    // Parse query params to ensure they are numbers
+    const page = Number(query.page) || 1
+    const limit = Number(query.limit) || 20
+    const lessonId = query.lessonId ? Number(query.lessonId) : undefined
+    const createdBy = query.createdBy ? Number(query.createdBy) : undefined
+    const { search, sortBy = 'createdAt', sortOrder = 'desc' } = query
 
     const skip = (page - 1) * limit
 
@@ -178,56 +235,56 @@ export class QuizRepository {
     return count > 0
   }
 
-  async bulkDelete(ids: number[]): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
-      // Delete answers first
-      await tx.quizAnswer.deleteMany({
-        where: {
-          attempt: {
-            quizId: { in: ids },
-          },
-        },
-      })
-
-      // Delete attempts
-      await tx.quizAttempt.deleteMany({
-        where: { quizId: { in: ids } },
-      })
-
-      // Delete quiz items
-      await tx.quizItem.deleteMany({
-        where: { quizId: { in: ids } },
-      })
-
-      // Delete quizzes
-      await tx.quiz.deleteMany({
-        where: { id: { in: ids } },
-      })
+  async hasAttempts(id: number): Promise<boolean> {
+    const count = await this.prisma.quizAttempt.count({
+      where: { quizId: id },
     })
+    return count > 0
   }
 
-  // ===== Statistics =====
-
-  async getQuizStats(quizId: number): Promise<QuizStats> {
-    const attempts = await this.prisma.quizAttempt.findMany({
-      where: { quizId },
-      select: { submittedAt: true },
+  async clone(originalId: number, userId: number, newTitle: string): Promise<Quiz> {
+    // Get original quiz with all items
+    const original = await this.prisma.quiz.findUnique({
+      where: { id: originalId },
+      include: {
+        items: {
+          include: {
+            questions: true,
+            questionGroups: true,
+          },
+        },
+      },
     })
 
-    const totalAttempts = attempts.length
-    const completedAttempts = attempts.filter((a) => a.submittedAt).length
-
-    // Since we don't have score anymore, we return basic stats
-    const completionRate = totalAttempts > 0 ? completedAttempts / totalAttempts : 0
-
-    return {
-      totalAttempts,
-      completedAttempts,
-      averageScore: 0,
-      highestScore: 0,
-      lowestScore: 0,
-      passRate: 0,
-      completionRate: Math.round(completionRate * 100) / 100,
+    if (!original) {
+      throw new Error('Original quiz not found')
     }
+
+    // Clone the quiz with all items
+    return await this.prisma.quiz.create({
+      data: {
+        title: newTitle,
+        timeLimitSec: original.timeLimitSec,
+        createdBy: userId,
+        lessonId: original.lessonId,
+        items: {
+          create: original.items.map((item) => ({
+            order: item.order,
+            questions: {
+              create: item.questions.map((q) => ({
+                questionId: q.questionId,
+                order: q.order,
+              })),
+            },
+            questionGroups: {
+              create: item.questionGroups.map((qg) => ({
+                groupId: qg.groupId,
+                order: qg.order,
+              })),
+            },
+          })),
+        },
+      },
+    })
   }
 }

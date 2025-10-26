@@ -63,23 +63,9 @@ export class AssessmentAttemptController {
   }
 
   @Post(':id/grade')
-  @ApiOperation({
-    summary: 'Grade a submitted assessment',
-    description: 'Calculate score and JLPT level suggestion for a submitted assessment',
-  })
-  @ApiParam({ name: 'id', description: 'Assessment attempt ID' })
-  @ApiResponse({
-    status: 200,
-    description: 'Assessment graded successfully',
-    type: AssessmentAttemptStatsDto,
-  })
-  @ApiResponse({ status: 400, description: 'Assessment not submitted yet' })
-  @ApiResponse({ status: 404, description: 'Assessment attempt not found' })
   async gradeAssessment(@Param('id', ParseIntPipe) id: number) {
     return this.assessmentAttemptService.gradeAttempt(id)
   }
-
-  // ===== Query and Retrieval =====
 
   @Get()
   @ApiOperation({

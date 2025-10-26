@@ -6,30 +6,33 @@ export type QuizItemBase = QuizItem
 
 // Complex relation types
 export type QuizItemWithRelations = QuizItem & {
-  question: Question & {
-    option: Option[]
-  }
-  questionGroup?: QuestionGroup | null
+  questions: Array<{
+    question: Question
+  }>
+  questionGroups?: Array<{
+    group: QuestionGroup
+  }>
 }
 
 // ===== Zod Schemas =====
 export const CreateQuizItemSchema = z.object({
   quizId: z.number().int().positive(),
-  questionId: z.number().int().positive(),
-  questionGroupId: z.number().int().positive().optional(),
+  questionIds: z.array(z.number().int().positive()).optional(),
+  questionGroupIds: z.array(z.number().int().positive()).optional(),
   order: z.number().int().min(0).default(0),
 })
 
 export const UpdateQuizItemSchema = z.object({
   order: z.number().int().min(0).optional(),
-  questionGroupId: z.number().int().positive().optional().nullable(),
+  questionIds: z.array(z.number().int().positive()).optional(),
+  questionGroupIds: z.array(z.number().int().positive()).optional(),
 })
 
 export const QuizItemQuerySchema = z.object({
-  page: z.number().int().positive().default(1),
-  limit: z.number().int().positive().max(100).default(20),
-  quizId: z.number().int().positive().optional(),
-  questionId: z.number().int().positive().optional(),
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(20),
+  quizId: z.coerce.number().int().positive().optional(),
+  questionId: z.coerce.number().int().positive().optional(),
   sortBy: z.enum(['id', 'order']).default('order'),
   sortOrder: z.enum(['asc', 'desc']).default('asc'),
 })
