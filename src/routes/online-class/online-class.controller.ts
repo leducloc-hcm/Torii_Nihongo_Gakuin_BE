@@ -493,4 +493,33 @@ export class OnlineClassController {
       )
     }
   }
+
+  @Post('webhook/recording-complete')
+  @IsPublic()
+  @ApiOperation({ summary: 'Webhook endpoint for recording completion notification from Janus server' })
+  @ApiResponse({ status: 200, description: 'Recording URL updated successfully' })
+  async handleRecordingComplete(@Body() body: { janusRoomId: number; recordingUrl: string; filename?: string }) {
+    try {
+      const result = await this.onlineClassService.updateRecordingUrl(body.janusRoomId, body.recordingUrl)
+
+      return {
+        success: true,
+        message: 'Recording URL updated successfully',
+        data: {
+          sessionId: result.sessionId,
+          janusRoomId: result.janusRoomId,
+          recordingUrl: result.recordingUrl,
+          updatedAt: result.updatedAt,
+        },
+      }
+    } catch (error) {
+      throw new HttpException(
+        {
+          success: false,
+          message: error instanceof Error ? error.message : 'Failed to update recording URL',
+        },
+        HttpStatus.BAD_REQUEST,
+      )
+    }
+  }
 }
