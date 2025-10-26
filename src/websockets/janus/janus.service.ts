@@ -290,21 +290,33 @@ export class JanusService implements OnModuleDestroy {
     audio: boolean = true,
     video: boolean = true,
     data: boolean = false,
+    roomId?: number,
+    displayName?: string,
   ): Promise<{ success: boolean; jsep?: any }> {
     try {
+      const publishBody: any = {
+        request: 'publish',
+        audio,
+        video,
+        data,
+        audiocodec: 'opus',
+        videocodec: 'vp8',
+        bitrate: 256000,
+      }
+
+      // Add custom filename with room ID if provided
+      if (roomId && displayName) {
+        const timestamp = Date.now()
+        const sanitizedName = displayName.replace(/[^a-zA-Z0-9_-]/g, '_')
+        publishBody.filename = `room${roomId}-${sanitizedName}-${timestamp}`
+        this.logger.log(`Setting recording filename: ${publishBody.filename}`)
+      }
+
       const publishRequest: JanusPublishRequest = {
         janus: 'message',
         session_id: sessionId,
         handle_id: handleId,
-        body: {
-          request: 'publish',
-          audio,
-          video,
-          data,
-          audiocodec: 'opus',
-          videocodec: 'vp8',
-          bitrate: 256000,
-        },
+        body: publishBody,
         jsep: {
           type: 'offer',
           sdp: sdpOffer,

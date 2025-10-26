@@ -128,14 +128,14 @@ export class OnlineClassController {
     }
   }
 
-  @Post(':id/end')
+  @Post(':sessionId/end')
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Lecturer, RoleName.Staff)
   @ApiOperation({ summary: 'End online class session' })
   @ApiResponse({ status: 200, description: 'Online class session ended successfully' })
-  async endOnlineClassSession(@ActiveUser('userId') userId: number, @Param('id') classId: string) {
+  async endOnlineClassSession(@ActiveUser('userId') userId: number, @Param('sessionId') sessionId: string) {
     try {
-      const result = await this.onlineClassService.endOnlineClassSession(classId, userId)
+      const result = await this.onlineClassService.endOnlineClassSession(sessionId, userId)
 
       return {
         success: true,

@@ -289,7 +289,7 @@ export class OnlineClassService {
   }
 
   async endOnlineClassSession(
-    classId: string,
+    sessionId: string,
     lecturerId: number,
   ): Promise<{
     sessionId: string
@@ -299,12 +299,12 @@ export class OnlineClassService {
     participantCount: number
   }> {
     try {
-      const classIdInt = parseInt(classId)
+      const sessionIdInt = parseInt(sessionId)
 
       // Find active session
       const activeSession = await this.prisma.liveSession.findFirst({
         where: {
-          classId: classIdInt,
+          id: sessionIdInt,
           endedAt: null,
         },
         include: {
@@ -351,7 +351,7 @@ export class OnlineClassService {
         },
       })
 
-      this.logger.log(`Ended online class session ${activeSession.id} for class ${classId}`)
+      this.logger.log(`Ended online class session ${activeSession.id}`)
 
       return {
         sessionId: activeSession.id.toString(),
