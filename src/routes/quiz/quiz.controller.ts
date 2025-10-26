@@ -48,6 +48,17 @@ export class QuizController {
     return this.quizService.deleteQuiz(id, userId)
   }
 
+  @Post(':id/clone')
+  @Auth([AuthType.Bearer])
+  @Roles(Role.LECTURER, Role.STAFF, Role.ADMIN)
+  async cloneQuiz(
+    @Param('id', ParseIntPipe) id: number,
+    @ActiveUser('userId') userId: number,
+    @Body() body?: CloneQuizDto,
+  ) {
+    return this.quizService.cloneQuiz(id, userId, body?.title)
+  }
+
   @Get('search/:term')
   @ApiResponse({ status: HttpStatus.OK, description: 'Search results retrieved successfully' })
   async searchQuizzes(@Param('term') searchTerm: string) {
