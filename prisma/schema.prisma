@@ -363,10 +363,10 @@ model Question {
   media            MediaAsset?       @relation(fields: [mediaId], references: [id])
 
   groups           QuestionGroupQuestion[]
-
   option            Option[]
+
   assessmentAnswers AssessmentAnswer[]
-  assessmentItems   AssessmentItem[]
+  assessmentItems  AssessmentItemQuestion[]
   quizItems         QuizItem[]
   quizAnswers       QuizAnswer[]
 }
@@ -385,7 +385,7 @@ model QuestionGroup {
 
   questions   QuestionGroupQuestion[]
 
-  assessmentItems AssessmentItem[]
+  aassessmentItems AssessmentItemGroup[]
   quizItems       QuizItem[]
 }
 
@@ -451,19 +451,42 @@ model AssessmentSection {
   items      AssessmentItem[]
 }
 
-
 model AssessmentItem {
-  id              Int  @id @default(autoincrement())
-  sectionId       Int
-  name            String?
-  questionId      Int?
-  questionGroupId Int?
+  id               Int     @id @default(autoincrement())
+  sectionId        Int
+  name             String?
   scorePerQuestion Float?
-  order           Int  @default(0)
+  order            Int     @default(0)
 
-  section       AssessmentSection @relation(fields: [sectionId], references: [id])
-  question      Question?         @relation(fields: [questionId], references: [id])
-  questionGroup QuestionGroup?    @relation(fields: [questionGroupId], references: [id])
+  section        AssessmentSection        @relation(fields: [sectionId], references: [id])
+  questions      AssessmentItemQuestion[]
+  questionGroups AssessmentItemGroup[]
+}
+
+model AssessmentItemQuestion {
+  itemId     Int
+  questionId Int
+  order      Int?
+  score      Float?
+  createdAt  DateTime @default(now())
+
+  item       AssessmentItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  question   Question       @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@id([itemId, questionId])
+}
+
+model AssessmentItemGroup {
+  itemId    Int
+  groupId   Int
+  order     Int?
+  score     Float?
+  createdAt DateTime @default(now())
+
+  item      AssessmentItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  group     QuestionGroup  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@id([itemId, groupId])
 }
 
 model AssessmentAttempt {
