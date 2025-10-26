@@ -481,14 +481,16 @@ export class WebRTCGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const janusHost = new URL(janusServerUrl).hostname
 
     // SSH configuration
-    const janusUser = process.env.JANUS_SSH_USER || 'ubuntu'
+    const janusUser = process.env.JANUS_SSH_USER || 'ubuntu@janus.torii-nihongo-gakuin.io.vn'
     const janusKeyPath = process.env.JANUS_SSH_KEY || '~/.ssh/janus_key'
     const scriptPath = '/opt/janus/bin/auto_push_to_s3.sh'
+    const recordingsDir = '/opt/janus/share/janus/recordings'
 
     this.logger.log(`📹 Triggering recording combine for class ${classId} on ${janusHost}`)
 
     // SSH command to execute script on remote Janus server
-    const sshCommand = `ssh -i ${janusKeyPath} -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${janusUser}@${janusHost} "nohup ${scriptPath} ${classId} > /dev/null 2>&1 &"`
+    // Must cd to recordings dir and run with sudo (ubuntu user needs sudo privileges for this script)
+    const sshCommand = `ssh -i ${janusKeyPath} -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${janusUser}@${janusHost} "cd ${recordingsDir} && sudo ${scriptPath} ${classId}"`
 
     exec(sshCommand, (error, stdout, stderr) => {
       if (error) {

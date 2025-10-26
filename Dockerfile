@@ -62,8 +62,8 @@ RUN npm cache clean --force && rm -rf /root/.npm /tmp/*
 # ===================================
 FROM node:20-alpine AS runner
 
-# Install OpenSSL for Prisma
-RUN apk add --no-cache openssl libc6-compat
+# Install OpenSSL for Prisma and openssh-client for SSH to Janus server
+RUN apk add --no-cache openssl libc6-compat openssh-client
 
 WORKDIR /app
 
