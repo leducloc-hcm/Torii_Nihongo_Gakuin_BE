@@ -68,7 +68,6 @@ export class AssessmentPaperService {
       throw new NotFoundException(`Assessment paper with ID ${id} not found`)
     }
 
-    // Check if anyone has attempted this assessment
     const hasAttempts = await this.assessmentPaperRepo.hasAttempts(id)
     if (hasAttempts) {
       throw new BadRequestException('Cannot delete assessment paper that has been attempted.')
