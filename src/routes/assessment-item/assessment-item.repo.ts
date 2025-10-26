@@ -1,97 +1,40 @@
 import { Injectable } from '@nestjs/common'
-import { PrismaService } from '../../shared/services/prisma.service'
-import { AssessmentItem } from '@prisma/client'
-import { AssessmentItemWithDetails } from './assessment-item.model'
-
-export interface CreateAssessmentItemInput {
-  sectionId: number
-  questionId?: number
-  questionGroupId?: number
-  order?: number
-  name?: string
-  scorePerQuestion?: number
-}
-
-export interface UpdateAssessmentItemInput {
-  questionId?: number
-  questionGroupId?: number
-  order?: number
-  name?: string
-  scorePerQuestion?: number
-}
-
-export interface AssessmentItemQuery {
-  page?: number
-  limit?: number
-  sectionId?: number
-  questionId?: number
-  questionGroupId?: number
-  minOrder?: number
-  maxOrder?: number
-  includeQuestion?: boolean
-  includeSection?: boolean
-  includeQuestionGroup?: boolean
-  sortBy?: string
-  sortOrder?: string
-}
+import { CreateAssessmentItemDto, UpdateAssessmentItemDto } from './assessment-item.dto'
+import { PrismaService } from 'src/shared/services/prisma.service'
 
 @Injectable()
 export class AssessmentItemRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(data: CreateAssessmentItemInput): Promise<AssessmentItem> {
-    if (data.order === undefined) {
-      const maxOrder = await this.getMaxOrderInSection(data.sectionId)
-      data.order = maxOrder + 1
-    }
+  async create(data: CreateAssessmentItemDto) {
+    const { questionIds, questionGroupIds, ...itemData } = data
 
-    return this.prisma.assessmentItem.create({
+    return await this.prisma.assessmentItem.create({
       data: {
-        sectionId: data.sectionId,
-        questionId: data.questionId,
-        questionGroupId: data.questionGroupId,
-        order: data.order,
-        name: data.name,
-        scorePerQuestion: data.scorePerQuestion,
-      },
-      include: {
-        questionGroup: {
-          include: {
-            questions: {
-              include: {
-                question: {
-                  select: {
-                    id: true,
-                    stem: true,
-                    level: true,
-                    type: true,
-                    difficulty: true,
-                    media: {
-                      select: {
-                        id: true,
-                        url: true,
-                        kind: true,
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    })
-  }
-
-  async findById(
-    id: number,
-    includeRelations?: { question?: boolean; section?: boolean; questionGroup?: boolean },
-  ): Promise<AssessmentItemWithDetails | null> {
-    return this.prisma.assessmentItem.findUnique({
-      where: { id },
-      include: {
-        question: includeRelations?.question
+        ...itemData,
+        // Many-to-many với Questions
+        questions: questionIds?.length
           ? {
+              create: questionIds.map((questionId, index) => ({
+                questionId,
+                order: index,
+              })),
+            }
+          : undefined,
+        // Many-to-many với QuestionGroups
+        questionGroups: questionGroupIds?.length
+          ? {
+              create: questionGroupIds.map((groupId, index) => ({
+                groupId,
+                order: index,
+              })),
+            }
+          : undefined,
+      },
+      include: {
+        questions: {
+          include: {
+            question: {
               select: {
                 id: true,
                 stem: true,
@@ -99,70 +42,85 @@ export class AssessmentItemRepository {
                 difficulty: true,
                 level: true,
               },
-            }
-          : false,
-        questionGroup: includeRelations?.questionGroup
-          ? {
+            },
+          },
+          orderBy: { order: 'asc' },
+        },
+        questionGroups: {
+          include: {
+            group: {
               select: {
                 id: true,
                 title: true,
                 type: true,
               },
-            }
-          : false,
-        section: includeRelations?.section
-          ? {
-              select: {
-                id: true,
-                title: true,
-                assessmentId: true,
-                type: true,
-              },
-            }
-          : false,
+            },
+          },
+          orderBy: { order: 'asc' },
+        },
       },
-    }) as Promise<AssessmentItemWithDetails | null>
+    })
   }
 
-  async findMany(query: AssessmentItemQuery): Promise<{
-    items: AssessmentItemWithDetails[]
-    total: number
-  }> {
-    const {
-      sectionId,
-      questionId,
-      questionGroupId,
-      minOrder,
-      maxOrder,
-      includeQuestion = false,
-      includeSection = false,
-      includeQuestionGroup = false,
-      page = 1,
-      limit = 20,
-      sortBy = 'order',
-      sortOrder = 'asc',
-    } = query
+  async findById(id: number) {
+    return await this.prisma.assessmentItem.findUnique({
+      where: { id },
+      include: {
+        questions: {
+          include: {
+            question: {
+              select: {
+                id: true,
+                stem: true,
+                type: true,
+                difficulty: true,
+                level: true,
+              },
+            },
+          },
+          orderBy: { order: 'asc' },
+        },
+        questionGroups: {
+          include: {
+            group: {
+              select: {
+                id: true,
+                title: true,
+                type: true,
+              },
+            },
+          },
+          orderBy: { order: 'asc' },
+        },
+      },
+    })
+  }
 
-    const where: any = {}
+  async findMany({
+    page,
+    limit,
+    sectionId,
+    sortBy,
+    sortOrder,
+  }: {
+    page: number
+    limit: number
+    sectionId?: number
+    sortBy: 'id' | 'order' | 'name' | 'createdAt'
+    sortOrder: 'asc' | 'desc'
+  }) {
+    const where = sectionId ? { sectionId } : {}
 
-    if (sectionId !== undefined) where.sectionId = sectionId
-    if (questionId !== undefined) where.questionId = questionId
-    if (questionGroupId !== undefined) where.questionGroupId = questionGroupId
-    if (minOrder !== undefined || maxOrder !== undefined) {
-      where.order = {}
-      if (minOrder !== undefined) where.order.gte = minOrder
-      if (maxOrder !== undefined) where.order.lte = maxOrder
-    }
-
-    const orderBy: any = {}
-    orderBy[sortBy] = sortOrder
-
-    const [items, total] = await Promise.all([
+    const [data, total] = await Promise.all([
       this.prisma.assessmentItem.findMany({
         where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { [sortBy]: sortOrder },
         include: {
-          question: includeQuestion
-            ? {
+          questions: {
+            include: {
+              question: {
                 select: {
                   id: true,
                   stem: true,
@@ -170,96 +128,109 @@ export class AssessmentItemRepository {
                   difficulty: true,
                   level: true,
                 },
-              }
-            : false,
-          questionGroup: includeQuestionGroup
-            ? {
+              },
+            },
+            orderBy: { order: 'asc' },
+          },
+          questionGroups: {
+            include: {
+              group: {
                 select: {
                   id: true,
                   title: true,
                   type: true,
                 },
-              }
-            : false,
-          section: includeSection
-            ? {
-                select: {
-                  id: true,
-                  title: true,
-                  assessmentId: true,
-                  type: true,
-                },
-              }
-            : false,
+              },
+            },
+            orderBy: { order: 'asc' },
+          },
         },
-        orderBy,
-        skip: (page - 1) * limit,
-        take: limit,
       }),
       this.prisma.assessmentItem.count({ where }),
     ])
 
-    return { items: items as AssessmentItemWithDetails[], total }
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    }
   }
 
-  async update(id: number, data: UpdateAssessmentItemInput): Promise<AssessmentItem> {
-    return await this.prisma.assessmentItem.update({
+  async update(id: number, data: UpdateAssessmentItemDto) {
+    const { questionIds, questionGroupIds, ...itemData } = data
+
+    // Delete old relationships if new ones provided
+    if (questionIds !== undefined) {
+      await this.prisma.assessmentItemQuestion.deleteMany({
+        where: { itemId: id },
+      })
+    }
+
+    if (questionGroupIds !== undefined) {
+      await this.prisma.assessmentItemGroup.deleteMany({
+        where: { itemId: id },
+      })
+    }
+
+    return this.prisma.assessmentItem.update({
       where: { id },
-      data,
+      data: {
+        ...itemData,
+        // Recreate many-to-many với Questions
+        questions: questionIds?.length
+          ? {
+              create: questionIds.map((questionId, index) => ({
+                questionId,
+                order: index,
+              })),
+            }
+          : undefined,
+        // Recreate many-to-many với QuestionGroups
+        questionGroups: questionGroupIds?.length
+          ? {
+              create: questionGroupIds.map((groupId, index) => ({
+                groupId,
+                order: index,
+              })),
+            }
+          : undefined,
+      },
+      include: {
+        questions: {
+          include: {
+            question: {
+              select: {
+                id: true,
+                stem: true,
+                type: true,
+                difficulty: true,
+                level: true,
+              },
+            },
+          },
+          orderBy: { order: 'asc' },
+        },
+        questionGroups: {
+          include: {
+            group: {
+              select: {
+                id: true,
+                title: true,
+                type: true,
+              },
+            },
+          },
+          orderBy: { order: 'asc' },
+        },
+      },
     })
   }
 
-  async delete(id: number): Promise<AssessmentItem> {
+  async delete(id: number) {
     return await this.prisma.assessmentItem.delete({
       where: { id },
     })
-  }
-
-  async exists(id: number): Promise<boolean> {
-    const count = await this.prisma.assessmentItem.count({
-      where: { id },
-    })
-    return count > 0
-  }
-
-  async getBySectionId(sectionId: number): Promise<AssessmentItemWithDetails[]> {
-    return (await this.prisma.assessmentItem.findMany({
-      where: { sectionId },
-      include: {
-        question: {
-          select: {
-            id: true,
-            stem: true,
-            type: true,
-            difficulty: true,
-            level: true,
-          },
-        },
-        questionGroup: {
-          select: {
-            id: true,
-            title: true,
-            type: true,
-          },
-        },
-        section: {
-          select: {
-            id: true,
-            title: true,
-            assessmentId: true,
-            type: true,
-          },
-        },
-      },
-      orderBy: { order: 'asc' },
-    })) as AssessmentItemWithDetails[]
-  }
-
-  async getMaxOrderInSection(sectionId: number): Promise<number> {
-    const result = await this.prisma.assessmentItem.aggregate({
-      where: { sectionId },
-      _max: { order: true },
-    })
-    return result._max.order || -1
   }
 }

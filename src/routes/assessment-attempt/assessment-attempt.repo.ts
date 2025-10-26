@@ -79,13 +79,6 @@ export class AssessmentAttemptRepository {
                 question: {
                   select: {
                     type: true,
-                    assessmentItems: {
-                      include: {
-                        section: {
-                          select: { type: true },
-                        },
-                      },
-                    },
                   },
                 },
                 selectedOption: {
@@ -168,13 +161,6 @@ export class AssessmentAttemptRepository {
                   question: {
                     select: {
                       type: true,
-                      assessmentItems: {
-                        include: {
-                          section: {
-                            select: { type: true },
-                          },
-                        },
-                      },
                     },
                   },
                   selectedOption: {
@@ -294,20 +280,13 @@ export class AssessmentAttemptRepository {
 
     if (!attempt) return []
 
-    // Get answers with question details and section info through AssessmentItem
+    // Get answers with question details
     const answers = await this.prisma.assessmentAnswer.findMany({
       where: { attemptId },
       include: {
         question: {
-          include: {
-            assessmentItems: {
-              where: { section: { assessmentId: attempt.assessmentId } },
-              include: {
-                section: {
-                  select: { type: true },
-                },
-              },
-            },
+          select: {
+            type: true,
           },
         },
         selectedOption: {
@@ -325,7 +304,7 @@ export class AssessmentAttemptRepository {
       question: {
         type: answer.question.type,
         section: {
-          type: answer.question.assessmentItems[0]?.section.type || 'UNKNOWN',
+          type: 'UNKNOWN',
         },
       },
     }))
@@ -355,23 +334,13 @@ export class AssessmentAttemptRepository {
 
     if (!attempt) return []
 
-    // Get answers with question details, section info, and score per question
+    // Get answers with question details
     const answers = await this.prisma.assessmentAnswer.findMany({
       where: { attemptId },
       include: {
         question: {
-          include: {
-            assessmentItems: {
-              where: { section: { assessmentId: attempt.assessmentId } },
-              select: {
-                scorePerQuestion: true,
-                section: {
-                  select: {
-                    type: true,
-                  },
-                },
-              },
-            },
+          select: {
+            type: true,
           },
         },
         selectedOption: {
@@ -386,11 +355,11 @@ export class AssessmentAttemptRepository {
       selectedOptionId: answer.selectedOptionId,
       timeSpentSec: answer.timeSpentSec,
       isCorrect: answer.selectedOption?.isCorrect || false,
-      scorePerQuestion: answer.question.assessmentItems[0]?.scorePerQuestion || 1,
+      scorePerQuestion: 1, // Default score
       question: {
         type: answer.question.type,
         section: {
-          type: answer.question.assessmentItems[0]?.section.type || 'UNKNOWN',
+          type: 'UNKNOWN',
         },
       },
     }))

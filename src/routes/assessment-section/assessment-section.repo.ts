@@ -33,19 +33,27 @@ export class AssessmentSectionRepository {
       include: {
         items: {
           include: {
-            question: {
+            questions: {
               include: {
-                option: true,
+                question: {
+                  include: {
+                    option: true,
+                  },
+                },
               },
             },
-            questionGroup: {
+            questionGroups: {
               include: {
-                media: true,
-                questions: {
+                group: {
                   include: {
-                    question: {
+                    media: true,
+                    questions: {
                       include: {
-                        option: true,
+                        question: {
+                          include: {
+                            option: true,
+                          },
+                        },
                       },
                     },
                   },
@@ -181,19 +189,27 @@ export class AssessmentSectionRepository {
       include: {
         items: {
           include: {
-            question: {
+            questions: {
               include: {
-                option: true,
+                question: {
+                  include: {
+                    option: true,
+                  },
+                },
               },
             },
-            questionGroup: {
+            questionGroups: {
               include: {
-                media: true,
-                questions: {
+                group: {
                   include: {
-                    question: {
+                    media: true,
+                    questions: {
                       include: {
-                        option: true,
+                        question: {
+                          include: {
+                            option: true,
+                          },
+                        },
                       },
                     },
                   },
@@ -245,20 +261,7 @@ export class AssessmentSectionRepository {
     const section = await this.prisma.assessmentSection.findUnique({
       where: { id },
       include: {
-        items: {
-          include: {
-            question: {
-              select: {
-                type: true,
-              },
-            },
-            questionGroup: {
-              select: {
-                type: true,
-              },
-            },
-          },
-        },
+        items: true,
       },
     })
 
@@ -271,20 +274,6 @@ export class AssessmentSectionRepository {
 
     const totalItems = section.items.length
     const itemsByType: Record<string, number> = {}
-
-    section.items.forEach((item) => {
-      let type: string | undefined
-
-      if (item.question) {
-        type = item.question.type
-      } else if (item.questionGroup) {
-        type = item.questionGroup.type
-      }
-
-      if (type) {
-        itemsByType[type] = (itemsByType[type] || 0) + 1
-      }
-    })
 
     return {
       totalItems,
@@ -299,11 +288,6 @@ export class AssessmentSectionRepository {
       throw new Error('Section not found')
     }
 
-    // Get the next order for the target assessment
-    const lastSection = await this.prisma.assessmentSection.findFirst({
-      where: { assessmentId: targetAssessmentId },
-    })
-
     const newSection = await this.prisma.assessmentSection.create({
       data: {
         assessmentId: targetAssessmentId,
@@ -312,28 +296,12 @@ export class AssessmentSectionRepository {
       },
     })
 
-    // Copy all items
-    if (originalSection.items.length > 0) {
-      await this.prisma.assessmentItem.createMany({
-        data: originalSection.items.map((item, index) => ({
-          sectionId: newSection.id,
-          questionId: item.questionId,
-          questionGroupId: item.questionGroupId,
-        })),
-      })
-    }
-
     return newSection
   }
 
   // ===== Move Operations =====
   async moveSection(id: number, targetAssessmentId: number): Promise<AssessmentSection> {
-    // Get the next order for the target assessment
-    const lastSection = await this.prisma.assessmentSection.findFirst({
-      where: { assessmentId: targetAssessmentId },
-    })
-
-    return this.prisma.assessmentSection.update({
+    return await this.prisma.assessmentSection.update({
       where: { id },
       data: {
         assessmentId: targetAssessmentId,

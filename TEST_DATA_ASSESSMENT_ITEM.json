@@ -1,0 +1,354 @@
+{
+  "info": {
+    "title": "Assessment Item Test Data - Postman Collection",
+    "description": "Dữ liệu mẫu để test Assessment Item API với Questions và Question Groups"
+  },
+  
+  "examples": {
+    "1_create_item_with_questions": {
+      "name": "Tạo Item với nhiều Questions",
+      "method": "POST",
+      "url": "/assessment-items",
+      "body": {
+        "sectionId": 4,
+        "questionIds": [1, 2, 3],
+        "name": "問題4：つぎのぶんしょうを　よんで、しつもんに　こたえて　ください。こたえは、１・２・３・４から一番いいものを一つ選んでください。",
+        "scorePerQuestion": 1,
+        "order": 0
+      },
+      "note": "⚠️ QUAN TRỌNG: Phải dùng 'questionIds' (có s) không phải 'questionId'"
+    },
+
+    "2_create_item_with_question_groups": {
+      "name": "Tạo Item với Question Groups",
+      "method": "POST",
+      "url": "/assessment-items",
+      "body": {
+        "sectionId": 4,
+        "questionGroupIds": [201, 202],
+        "name": "Reading Comprehension Part",
+        "scorePerQuestion": 2,
+        "order": 1
+      }
+    },
+
+    "3_create_item_mixed": {
+      "name": "Tạo Item với CẢ Questions VÀ Question Groups",
+      "method": "POST",
+      "url": "/assessment-items",
+      "body": {
+        "sectionId": 4,
+        "questionIds": [1, 2],
+        "questionGroupIds": [201],
+        "name": "Mixed Assessment",
+        "order": 2
+      }
+    },
+
+    "4_create_item_vocabulary_only": {
+      "name": "Tạo Item chỉ có Vocabulary Questions",
+      "method": "POST",
+      "url": "/assessment-items",
+      "body": {
+        "sectionId": 1,
+        "questionIds": [101, 102, 103, 104, 105],
+        "name": "Basic Vocabulary Test",
+        "scorePerQuestion": 1.0,
+        "order": 0
+      }
+    },
+
+    "5_get_item_by_id": {
+      "name": "Lấy Item theo ID",
+      "method": "GET",
+      "url": "/assessment-items/1"
+    },
+
+    "6_get_all_items": {
+      "name": "Lấy tất cả Items với pagination",
+      "method": "GET",
+      "url": "/assessment-items?page=1&limit=20&sectionId=4&sortBy=order&sortOrder=asc"
+    },
+
+    "7_update_item_change_questions": {
+      "name": "Update Item - Thay đổi Questions",
+      "method": "PUT",
+      "url": "/assessment-items/1",
+      "body": {
+        "questionIds": [4, 5, 6],
+        "name": "Updated Question Set"
+      }
+    },
+
+    "8_update_item_change_groups": {
+      "name": "Update Item - Thay đổi Question Groups",
+      "method": "PUT",
+      "url": "/assessment-items/2",
+      "body": {
+        "questionGroupIds": [203, 204]
+      }
+    },
+
+    "9_delete_item": {
+      "name": "Xóa Item",
+      "method": "DELETE",
+      "url": "/assessment-items/1"
+    }
+  },
+
+  "complete_test_scenarios": {
+    "scenario_1_jlpt_n5_vocab_section": {
+      "description": "Tạo section Vocabulary với 5 câu hỏi đơn",
+      "steps": [
+        {
+          "step": 1,
+          "action": "Tạo Item với 5 questions",
+          "method": "POST",
+          "url": "/assessment-items",
+          "body": {
+            "sectionId": 1,
+            "questionIds": [101, 102, 103, 104, 105],
+            "name": "文字・語彙 Part 1",
+            "scorePerQuestion": 1.0,
+            "order": 0
+          }
+        }
+      ]
+    },
+
+    "scenario_2_reading_with_groups": {
+      "description": "Tạo section Reading với question groups",
+      "steps": [
+        {
+          "step": 1,
+          "action": "Tạo Item với reading passages",
+          "method": "POST",
+          "url": "/assessment-items",
+          "body": {
+            "sectionId": 3,
+            "questionGroupIds": [201, 202, 203],
+            "name": "読解 - Short Passages",
+            "scorePerQuestion": 2.0,
+            "order": 0
+          }
+        }
+      ]
+    },
+
+    "scenario_3_mixed_grammar_section": {
+      "description": "Section Grammar có cả questions và groups",
+      "steps": [
+        {
+          "step": 1,
+          "action": "Tạo Item với câu hỏi ngữ pháp đơn",
+          "method": "POST",
+          "url": "/assessment-items",
+          "body": {
+            "sectionId": 2,
+            "questionIds": [111, 112, 113],
+            "name": "文法 Part 1 - Basic Grammar",
+            "scorePerQuestion": 1.0,
+            "order": 0
+          }
+        },
+        {
+          "step": 2,
+          "action": "Tạo Item với grammar passage",
+          "method": "POST",
+          "url": "/assessment-items",
+          "body": {
+            "sectionId": 2,
+            "questionGroupIds": [301],
+            "name": "文法 Part 2 - Context Grammar",
+            "scorePerQuestion": 1.5,
+            "order": 1
+          }
+        }
+      ]
+    }
+  },
+
+  "sample_requests_for_postman": {
+    "create_vocab_item": {
+      "POST": "{{baseUrl}}/assessment-items",
+      "Headers": {
+        "Authorization": "Bearer {{token}}",
+        "Content-Type": "application/json"
+      },
+      "Body": {
+        "sectionId": 1,
+        "questionIds": [101, 102, 103, 104, 105],
+        "name": "Basic Vocabulary",
+        "scorePerQuestion": 1.0,
+        "order": 0
+      }
+    },
+
+    "create_reading_item": {
+      "POST": "{{baseUrl}}/assessment-items",
+      "Headers": {
+        "Authorization": "Bearer {{token}}",
+        "Content-Type": "application/json"
+      },
+      "Body": {
+        "sectionId": 3,
+        "questionGroupIds": [201, 202],
+        "name": "Reading Comprehension",
+        "scorePerQuestion": 2.0,
+        "order": 0
+      }
+    },
+
+    "create_mixed_item": {
+      "POST": "{{baseUrl}}/assessment-items",
+      "Headers": {
+        "Authorization": "Bearer {{token}}",
+        "Content-Type": "application/json"
+      },
+      "Body": {
+        "sectionId": 2,
+        "questionIds": [111, 112],
+        "questionGroupIds": [301],
+        "name": "Grammar Mixed",
+        "order": 0
+      }
+    },
+
+    "get_items_by_section": {
+      "GET": "{{baseUrl}}/assessment-items?sectionId=1&page=1&limit=20",
+      "Headers": {
+        "Authorization": "Bearer {{token}}"
+      }
+    },
+
+    "update_item_questions": {
+      "PUT": "{{baseUrl}}/assessment-items/1",
+      "Headers": {
+        "Authorization": "Bearer {{token}}",
+        "Content-Type": "application/json"
+      },
+      "Body": {
+        "questionIds": [106, 107, 108],
+        "name": "Updated Vocabulary Set"
+      }
+    }
+  },
+
+  "common_mistakes": {
+    "mistake_1": {
+      "wrong": {
+        "questionId": [1, 2, 3]
+      },
+      "correct": {
+        "questionIds": [1, 2, 3]
+      },
+      "error": "Unknown argument `questionId`. Did you mean `questions`?",
+      "solution": "Phải dùng 'questionIds' (có chữ s ở cuối)"
+    },
+    "mistake_2": {
+      "wrong": {
+        "questionGroupId": [201, 202]
+      },
+      "correct": {
+        "questionGroupIds": [201, 202]
+      },
+      "error": "Unknown argument `questionGroupId`",
+      "solution": "Phải dùng 'questionGroupIds' (có chữ s ở cuối)"
+    },
+    "mistake_3": {
+      "wrong": {
+        "sectionId": 1,
+        "questions": [1, 2, 3]
+      },
+      "correct": {
+        "sectionId": 1,
+        "questionIds": [1, 2, 3]
+      },
+      "error": "Unknown argument `questions`",
+      "solution": "Phải dùng 'questionIds' không phải 'questions'"
+    }
+  },
+
+  "validation_rules": {
+    "required_fields": [
+      "sectionId"
+    ],
+    "optional_fields": [
+      "name",
+      "order",
+      "scorePerQuestion",
+      "questionIds",
+      "questionGroupIds"
+    ],
+    "constraints": {
+      "sectionId": "Must be a valid section ID (integer)",
+      "questionIds": "Array of question IDs (integers)",
+      "questionGroupIds": "Array of question group IDs (integers)",
+      "order": "Integer >= 0, default = 0",
+      "scorePerQuestion": "Float >= 0, optional"
+    },
+    "notes": [
+      "Có thể tạo item chỉ với questionIds",
+      "Có thể tạo item chỉ với questionGroupIds",
+      "Có thể tạo item với cả questionIds VÀ questionGroupIds",
+      "Có thể tạo item không có questions/groups (rỗng)"
+    ]
+  },
+
+  "response_examples": {
+    "success_create": {
+      "id": 1,
+      "sectionId": 4,
+      "name": "問題4：つぎのぶんしょうを...",
+      "order": 0,
+      "scorePerQuestion": 1.0,
+      "questions": [
+        {
+          "id": 1,
+          "stem": "Question 1 text",
+          "type": "MULTIPLE_CHOICE",
+          "difficulty": "EASY",
+          "level": "N5"
+        },
+        {
+          "id": 2,
+          "stem": "Question 2 text",
+          "type": "MULTIPLE_CHOICE",
+          "difficulty": "EASY",
+          "level": "N5"
+        }
+      ],
+      "questionGroups": []
+    },
+    "success_with_groups": {
+      "id": 2,
+      "sectionId": 3,
+      "name": "Reading Comprehension",
+      "order": 1,
+      "scorePerQuestion": 2.0,
+      "questions": [],
+      "questionGroups": [
+        {
+          "id": 201,
+          "title": "Reading Passage 1",
+          "type": "READING"
+        },
+        {
+          "id": 202,
+          "title": "Reading Passage 2",
+          "type": "READING"
+        }
+      ]
+    },
+    "error_invalid_section": {
+      "statusCode": 404,
+      "message": "AssessmentSection with ID 999 not found",
+      "error": "Not Found"
+    },
+    "error_invalid_questions": {
+      "statusCode": 400,
+      "message": "Some questions not found",
+      "error": "Bad Request"
+    }
+  }
+}

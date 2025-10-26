@@ -71,26 +71,34 @@ export class AssessmentPaperRepository {
           include: {
             items: {
               include: {
-                question: {
+                questions: {
                   include: {
-                    option: true,
+                    question: {
+                      include: {
+                        option: true,
+                      },
+                    },
                   },
                 },
-                questionGroup: {
+                questionGroups: {
                   include: {
-                    media: true,
-                    questions: {
+                    group: {
                       include: {
-                        question: {
+                        media: true,
+                        questions: {
                           include: {
-                            option: {
-                              select: {
-                                id: true,
-                                content: true,
-                                mediaId: true,
+                            question: {
+                              include: {
+                                option: {
+                                  select: {
+                                    id: true,
+                                    content: true,
+                                    mediaId: true,
+                                  },
+                                },
+                                media: true,
                               },
                             },
-                            media: true,
                           },
                         },
                       },
@@ -135,32 +143,40 @@ export class AssessmentPaperRepository {
           include: {
             items: {
               include: {
-                question: {
+                questions: {
                   include: {
-                    option: {
-                      select: {
-                        id: true,
-                        content: true,
-                        mediaId: true,
-                        order: true,
-                        isCorrect: false, // Hide correct answers for security
+                    question: {
+                      include: {
+                        option: {
+                          select: {
+                            id: true,
+                            content: true,
+                            mediaId: true,
+                            order: true,
+                            isCorrect: false, // Hide correct answers for security
+                          },
+                        },
+                        media: true,
                       },
                     },
-                    media: true,
                   },
                 },
-                questionGroup: {
+                questionGroups: {
                   include: {
-                    media: true,
-                    questions: {
+                    group: {
                       include: {
-                        question: {
+                        media: true,
+                        questions: {
                           include: {
-                            option: {
-                              select: {
-                                id: true,
-                                content: true,
-                                mediaId: true,
+                            question: {
+                              include: {
+                                option: {
+                                  select: {
+                                    id: true,
+                                    content: true,
+                                    mediaId: true,
+                                  },
+                                },
                               },
                             },
                           },
