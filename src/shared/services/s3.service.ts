@@ -310,6 +310,47 @@ export class S3Service {
     }
   }
 
+  generateRecordingUploadUrl = async (
+    classId: string,
+    recordingId: string,
+    filename: string,
+    contentType: string = 'video/webm',
+    expiresIn: number = 3600, // 1 hour for upload
+  ) => {
+    try {
+      const key = `recordings/${classId}/${recordingId}/${filename}`
+
+      const command = new PutObjectCommand({
+        Bucket: this.BUCKET_NAME,
+        Key: key,
+        ContentType: contentType,
+        Metadata: {
+          classId,
+          recordingId,
+          originalFilename: filename,
+          uploadedAt: new Date().toISOString(),
+          type: 'class-recording',
+        },
+      })
+
+      const uploadUrl = await getSignedUrl(this.s3, command, { expiresIn })
+
+      const publicUrl = `https://${this.BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`
+
+      this.logger.log(`Generated presigned upload URL for recording: ${key}`)
+
+      return {
+        uploadUrl,
+        publicUrl,
+        key,
+        expiresIn,
+      }
+    } catch (error) {
+      this.logger.error(`Failed to generate recording upload URL:`, error)
+      throw error
+    }
+  }
+
   generateRecordingStreamUrl = async (
     classId: string,
     recordingId: string,

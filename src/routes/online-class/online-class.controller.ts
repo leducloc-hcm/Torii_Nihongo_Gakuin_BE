@@ -243,10 +243,10 @@ export class OnlineClassController {
   async startRecording(
     @Param('id') classId: string,
     @Body() startRecordingDto: StartRecordingDto,
-    @Request() req: any,
+    @ActiveUser('userId') userId: number,
   ) {
     try {
-      const lecturerId = req.user.id
+      const lecturerId = userId
       const recording = await this.onlineClassService.startRecording(classId, lecturerId, startRecordingDto)
 
       return {
@@ -275,9 +275,9 @@ export class OnlineClassController {
   @Roles(RoleName.Lecturer, RoleName.Staff)
   @ApiOperation({ summary: 'Stop recording online class' })
   @ApiResponse({ status: 200, description: 'Recording stopped successfully' })
-  async stopRecording(@Param('id') classId: string, @Request() req: any) {
+  async stopRecording(@Param('id') classId: string, @ActiveUser('userId') userId: number) {
     try {
-      const lecturerId = req.user.id
+      const lecturerId = userId
       const result = await this.onlineClassService.stopRecording(classId, lecturerId)
 
       return {
@@ -302,12 +302,81 @@ export class OnlineClassController {
     }
   }
 
+  @Post(':id/recording/upload-url')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Lecturer, RoleName.Staff)
+  @ApiOperation({ summary: 'Get presigned URL for uploading class recording to S3' })
+  @ApiResponse({ status: 200, description: 'Presigned URL generated successfully' })
+  async getRecordingUploadUrl(
+    @Param('id') classId: string,
+    @Body() body: { recordingId: string; filename: string },
+    @ActiveUser('userId') userId: number,
+  ) {
+    try {
+      const lecturerId = userId
+      const result = await this.onlineClassService.getRecordingUploadUrl(classId, lecturerId, body)
+
+      return {
+        success: true,
+        message: 'Presigned upload URL generated successfully',
+        data: {
+          uploadUrl: result.uploadUrl,
+          publicUrl: result.publicUrl,
+          key: result.key,
+          expiresIn: result.expiresIn,
+        },
+      }
+    } catch (error) {
+      throw new HttpException(
+        {
+          success: false,
+          message: error instanceof Error ? error.message : 'Failed to generate upload URL',
+        },
+        HttpStatus.BAD_REQUEST,
+      )
+    }
+  }
+
+  @Post(':id/recording/confirm')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Lecturer, RoleName.Staff)
+  @ApiOperation({ summary: 'Confirm recording upload completion' })
+  @ApiResponse({ status: 200, description: 'Recording confirmed successfully' })
+  async confirmRecordingUpload(
+    @Param('id') classId: string,
+    @Body() body: { recordingId: string; recordingUrl: string },
+    @ActiveUser('userId') userId: number,
+  ) {
+    try {
+      const lecturerId = userId
+      const result = await this.onlineClassService.confirmRecordingUpload(classId, lecturerId, body)
+
+      return {
+        success: true,
+        message: 'Recording confirmed successfully',
+        data: {
+          recordingUrl: result.recordingUrl,
+          recordingId: result.recordingId,
+          uploadedAt: result.uploadedAt,
+          sessionId: result.sessionId,
+        },
+      }
+    } catch (error) {
+      throw new HttpException(
+        {
+          success: false,
+          message: error instanceof Error ? error.message : 'Failed to confirm recording',
+        },
+        HttpStatus.BAD_REQUEST,
+      )
+    }
+  }
+
   @Get(':id/recordings')
   @ApiOperation({ summary: 'Get class recordings' })
   @ApiResponse({ status: 200, description: 'Recordings retrieved successfully' })
-  getClassRecordings(@Param('id') classId: string, @Request() req: any) {
+  getClassRecordings(@Param('id') classId: string, @ActiveUser('userId') userId: number) {
     try {
-      const userId = req.user.id
       const recordings = this.onlineClassService.getClassRecordings(classId, userId)
 
       return {
@@ -334,9 +403,13 @@ export class OnlineClassController {
   @Roles(RoleName.Lecturer, RoleName.Staff)
   @ApiOperation({ summary: 'Share document in online class' })
   @ApiResponse({ status: 200, description: 'Document shared successfully' })
-  async shareDocument(@Param('id') classId: string, @Body() shareDocumentDto: ShareDocumentDto, @Request() req: any) {
+  async shareDocument(
+    @Param('id') classId: string,
+    @Body() shareDocumentDto: ShareDocumentDto,
+    @ActiveUser('userId') userId: number,
+  ) {
     try {
-      const lecturerId = req.user.id
+      const lecturerId = userId
       const result = await this.onlineClassService.shareDocument(classId, lecturerId, shareDocumentDto)
 
       return {
@@ -362,9 +435,8 @@ export class OnlineClassController {
   @Get(':id/documents')
   @ApiOperation({ summary: 'Get shared documents in class' })
   @ApiResponse({ status: 200, description: 'Shared documents retrieved successfully' })
-  getSharedDocuments(@Param('id') classId: string, @Request() req: any) {
+  getSharedDocuments(@Param('id') classId: string, @ActiveUser('userId') userId: number) {
     try {
-      const userId = req.user.id
       const documents = this.onlineClassService.getSharedDocuments(classId, userId)
 
       return {
@@ -395,10 +467,10 @@ export class OnlineClassController {
     @Param('id') classId: string,
     @Param('participantId') participantId: string,
     @Body() actionDto: ParticipantActionDto,
-    @Request() req: any,
+    @ActiveUser('userId') userId: number,
   ) {
     try {
-      const lecturerId = req.user.id
+      const lecturerId = userId
       const result = await this.onlineClassService.performParticipantAction(
         classId,
         participantId,

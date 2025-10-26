@@ -661,18 +661,172 @@ export class OnlineClassService {
   }
 
   // Placeholder methods for additional functionality
-  startRecording(classId: string, lecturerId: number, options: StartRecordingDto): any {
-    // Implementation for starting recording
-    throw new BadRequestException('Recording functionality not implemented yet')
+  async startRecording(classId: string, lecturerId: number, options: StartRecordingDto): Promise<any> {
+    // Verify class exists and lecturer has permission
+    const onlineClass = await this.prisma.class.findUnique({
+      where: { id: Number.parseInt(classId) },
+      include: { lecturer: true },
+    })
+
+    if (!onlineClass) {
+      throw new BadRequestException('Class not found')
+    }
+
+    if (onlineClass.lecturerId !== lecturerId) {
+      throw new BadRequestException('Only the class lecturer can start recording')
+    }
+
+    // Get current session
+    const currentSession = await this.prisma.liveSession.findFirst({
+      where: {
+        classId: Number.parseInt(classId),
+        endedAt: null,
+      },
+      orderBy: { scheduledAt: 'desc' },
+    })
+
+    if (!currentSession) {
+      throw new BadRequestException('No active session found for this class')
+    }
+
+    // Generate recording ID and filename
+    const recordingId = `rec_${classId}_${currentSession.id}_${Date.now()}`
+    const filename = options.filename || `class_${classId}_${new Date().toISOString()}.webm`
+
+    // Store recording metadata in database
+    // Note: You may need to create a Recording table in your schema
+    // For now, we'll return the metadata
+    const recordingMetadata = {
+      recordingId,
+      filename,
+      startedAt: new Date().toISOString(),
+      options: {
+        includeVideo: options.includeVideo ?? true,
+        includeAudio: options.includeAudio ?? true,
+        quality: options.quality ?? 'medium',
+        maxDurationMinutes: options.maxDurationMinutes ?? 120,
+      },
+      classId,
+      sessionId: currentSession.id,
+      lecturerId,
+    }
+
+    this.logger.log(`Recording started for class ${classId}: ${recordingId}`)
+
+    return recordingMetadata
   }
 
-  stopRecording(classId: string, lecturerId: number): any {
-    // Implementation for stopping recording
-    throw new BadRequestException('Recording functionality not implemented yet')
+  async stopRecording(classId: string, lecturerId: number): Promise<any> {
+    // Verify class exists and lecturer has permission
+    const onlineClass = await this.prisma.class.findUnique({
+      where: { id: Number.parseInt(classId) },
+    })
+
+    if (!onlineClass) {
+      throw new BadRequestException('Class not found')
+    }
+
+    if (onlineClass.lecturerId !== lecturerId) {
+      throw new BadRequestException('Only the class lecturer can stop recording')
+    }
+
+    // Return stop metadata
+    // Frontend will upload the actual recording
+    const stoppedAt = new Date().toISOString()
+
+    this.logger.log(`Recording stopped for class ${classId}`)
+
+    return {
+      recordingId: `rec_${classId}_${Date.now()}`,
+      stoppedAt,
+      message: 'Recording stopped. Upload the recording data to complete the process.',
+    }
+  }
+
+  async getRecordingUploadUrl(
+    classId: string,
+    lecturerId: number,
+    data: { recordingId: string; filename: string },
+  ): Promise<any> {
+    // Verify class exists and lecturer has permission
+    const onlineClass = await this.prisma.class.findUnique({
+      where: { id: Number.parseInt(classId) },
+    })
+
+    if (!onlineClass) {
+      throw new BadRequestException('Class not found')
+    }
+
+    if (onlineClass.lecturerId !== lecturerId) {
+      throw new BadRequestException('Only the class lecturer can upload recordings')
+    }
+
+    // Generate presigned upload URL
+    const uploadUrlData = await this.s3Service.generateRecordingUploadUrl(
+      classId,
+      data.recordingId,
+      data.filename,
+      'video/webm',
+      3600, // 1 hour expiry
+    )
+
+    this.logger.log(`Generated presigned upload URL for class ${classId}`)
+
+    return {
+      uploadUrl: uploadUrlData.uploadUrl,
+      publicUrl: uploadUrlData.publicUrl,
+      key: uploadUrlData.key,
+      expiresIn: uploadUrlData.expiresIn,
+    }
+  }
+
+  async confirmRecordingUpload(
+    classId: string,
+    lecturerId: number,
+    data: { recordingId: string; recordingUrl: string },
+  ): Promise<any> {
+    // Verify class exists and lecturer has permission
+    const onlineClass = await this.prisma.class.findUnique({
+      where: { id: Number.parseInt(classId) },
+    })
+
+    if (!onlineClass) {
+      throw new BadRequestException('Class not found')
+    }
+
+    if (onlineClass.lecturerId !== lecturerId) {
+      throw new BadRequestException('Only the class lecturer can confirm recordings')
+    }
+
+    this.logger.log(`Recording confirmed for class ${classId}: ${data.recordingUrl}`)
+
+    // Update session with recording URL
+    const currentSession = await this.prisma.liveSession.findFirst({
+      where: {
+        classId: Number.parseInt(classId),
+        endedAt: null,
+      },
+      orderBy: { scheduledAt: 'desc' },
+    })
+
+    if (currentSession) {
+      await this.prisma.liveSession.update({
+        where: { id: currentSession.id },
+        data: { recordingUrl: data.recordingUrl },
+      })
+    }
+
+    return {
+      recordingUrl: data.recordingUrl,
+      recordingId: data.recordingId,
+      uploadedAt: new Date().toISOString(),
+      sessionId: currentSession?.id,
+    }
   }
 
   getClassRecordings(classId: string, userId: number): any[] {
-    // Implementation for getting recordings
+    // Implementation for getting recordings from database
+    // This would query a Recording table
     return []
   }
 
