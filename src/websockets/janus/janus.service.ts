@@ -156,12 +156,13 @@ export class JanusService implements OnModuleDestroy {
         body: {
           request: 'create',
           room: roomId,
-          publishers: options.publishers || 10,
-          bitrate: options.bitrate || 256000,
-          bitrate_cap: true,
-          fir_freq: options.fir_freq || 10,
+          publishers: options.publishers || 16,
+          bitrate: options.bitrate || 24000000, // Default to 24 Mbps for maximum quality
+          bitrate_cap: false, // Disable bitrate cap to allow full quality
+          fir_freq: options.fir_freq || 3, // More frequent keyframes for better quality
           audiocodec: options.audiocodec || 'opus',
-          videocodec: options.videocodec || 'vp8',
+          videocodec: options.videocodec || 'h264', // Default to H.264 for better quality
+          h264_profile: '64002a', // High profile, level 4.2 for 1080p60 support
           description: options.description || `Room ${roomId}`,
           is_private: options.is_private || false,
           record: options.record || false,
