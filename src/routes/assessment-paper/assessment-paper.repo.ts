@@ -84,7 +84,6 @@ export class AssessmentPaperRepository {
                   include: {
                     group: {
                       include: {
-                        media: true,
                         questions: {
                           include: {
                             question: {
@@ -101,6 +100,7 @@ export class AssessmentPaperRepository {
                             },
                           },
                         },
+                        media: true,
                       },
                     },
                   },
@@ -153,7 +153,7 @@ export class AssessmentPaperRepository {
                             content: true,
                             mediaId: true,
                             order: true,
-                            isCorrect: false, // Hide correct answers for security
+                            isCorrect: false,
                           },
                         },
                         media: true,
@@ -165,7 +165,6 @@ export class AssessmentPaperRepository {
                   include: {
                     group: {
                       include: {
-                        media: true,
                         questions: {
                           include: {
                             question: {
@@ -175,12 +174,14 @@ export class AssessmentPaperRepository {
                                     id: true,
                                     content: true,
                                     mediaId: true,
+                                    image: true,
                                   },
                                 },
                               },
                             },
                           },
                         },
+                        media: true,
                       },
                     },
                   },
