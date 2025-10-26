@@ -22,40 +22,14 @@ export class QuizItemRepository {
       throw new NotFoundException(QUIZ_ITEM_ERRORS.QUIZ_NOT_FOUND)
     }
 
-    // Check if question exists
-    const question = await this.prisma.question.findUnique({
-      where: { id: data.questionId },
-    })
-    if (!question) {
-      throw new NotFoundException(QUIZ_ITEM_ERRORS.QUESTION_NOT_FOUND)
-    }
-
-    // Check if question group exists (if provided)
-    if (data.questionGroupId) {
-      const questionGroup = await this.prisma.questionGroup.findUnique({
-        where: { id: data.questionGroupId },
-      })
-      if (!questionGroup) {
-        throw new NotFoundException(QUIZ_ITEM_ERRORS.QUESTION_GROUP_NOT_FOUND)
-      }
-    }
-
-    // Check for duplicate question in quiz
-    const existing = await this.prisma.quizItem.findFirst({
-      where: {
-        quizId: data.quizId,
-        questionId: data.questionId,
-      },
-    })
-    if (existing) {
-      throw new ConflictException(QUIZ_ITEM_ERRORS.DUPLICATE_QUESTION)
-    }
+    // Destructure to separate junction data from item data
+    const { questionIds, questionGroupIds, ...itemData } = data
 
     // Set order if not provided
-    let order = data.order ?? 0
+    let order = itemData.order ?? 0
     if (order === 0) {
       const lastItem = await this.prisma.quizItem.findFirst({
-        where: { quizId: data.quizId },
+        where: { quizId: itemData.quizId },
         orderBy: { order: 'desc' },
       })
       order = (lastItem?.order ?? -1) + 1
@@ -63,8 +37,48 @@ export class QuizItemRepository {
 
     return await this.prisma.quizItem.create({
       data: {
-        ...data,
+        ...itemData,
         order,
+        questions: questionIds?.length
+          ? {
+              create: questionIds.map((questionId, index) => ({
+                questionId,
+                order: index,
+              })),
+            }
+          : undefined,
+        questionGroups: questionGroupIds?.length
+          ? {
+              create: questionGroupIds.map((groupId, index) => ({
+                groupId,
+                order: index,
+              })),
+            }
+          : undefined,
+      },
+      include: {
+        questions: {
+          include: {
+            question: {
+              select: {
+                id: true,
+                stem: true,
+                type: true,
+              },
+            },
+          },
+        },
+        questionGroups: {
+          include: {
+            group: {
+              select: {
+                id: true,
+                title: true,
+                type: true,
+              },
+            },
+          },
+        },
       },
     })
   }
@@ -75,18 +89,46 @@ export class QuizItemRepository {
     })
   }
 
-  async findByIdWithRelations(id: number): Promise<QuizItemWithRelations | null> {
-    return (await this.prisma.quizItem.findUnique({
+  async findByIdWithRelations(id: number) {
+    return await this.prisma.quizItem.findUnique({
       where: { id },
       include: {
-        question: {
+        quiz: {
           include: {
-            option: true,
+            author: true,
+            items: {
+              include: {
+                questions: {
+                  include: {
+                    question: {
+                      include: {
+                        quizItems: {
+                          include: {
+                            question: {
+                              include: {
+                                option: {
+                                  select: {
+                                    id: true,
+                                    image: true,
+                                    content: true,
+                                    mediaId: true,
+                                  },
+                                },
+                                media: true,
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
           },
         },
-        questionGroup: true,
       },
-    })) as QuizItemWithRelations | null
+    })
   }
 
   async findMany(query: QuizItemQuery): Promise<{
@@ -100,7 +142,12 @@ export class QuizItemRepository {
       hasPrev: boolean
     }
   }> {
-    const { page = 1, limit = 20, quizId, questionId, sortBy = 'order', sortOrder = 'asc' } = query
+    // Parse query params to ensure they are numbers
+    const page = Number(query.page) || 1
+    const limit = Number(query.limit) || 20
+    const quizId = query.quizId ? Number(query.quizId) : undefined
+    const questionId = query.questionId ? Number(query.questionId) : undefined
+    const { sortBy = 'order', sortOrder = 'asc' } = query
 
     const skip = (page - 1) * limit
 
@@ -111,7 +158,11 @@ export class QuizItemRepository {
     }
 
     if (questionId !== undefined) {
-      where.questionId = questionId
+      where.questions = {
+        some: {
+          questionId,
+        },
+      }
     }
 
     const orderBy: Prisma.QuizItemOrderByWithRelationInput = {}
@@ -125,12 +176,16 @@ export class QuizItemRepository {
       this.prisma.quizItem.findMany({
         where,
         include: {
-          question: {
+          questions: {
             include: {
-              option: true,
+              question: true,
             },
           },
-          questionGroup: true,
+          questionGroups: {
+            include: {
+              group: true,
+            },
+          },
         },
         orderBy,
         skip,
@@ -160,19 +215,31 @@ export class QuizItemRepository {
       throw new NotFoundException(QUIZ_ITEM_ERRORS.NOT_FOUND)
     }
 
-    // Check if question group exists (if provided)
-    if (data.questionGroupId) {
-      const questionGroup = await this.prisma.questionGroup.findUnique({
-        where: { id: data.questionGroupId },
-      })
-      if (!questionGroup) {
-        throw new NotFoundException(QUIZ_ITEM_ERRORS.QUESTION_GROUP_NOT_FOUND)
-      }
-    }
+    const { questionIds, questionGroupIds, ...updateData } = data
 
     return await this.prisma.quizItem.update({
       where: { id },
-      data,
+      data: {
+        ...updateData,
+        ...(questionIds && {
+          questions: {
+            deleteMany: {},
+            create: questionIds.map((questionId, index) => ({
+              questionId,
+              order: index,
+            })),
+          },
+        }),
+        ...(questionGroupIds && {
+          questionGroups: {
+            deleteMany: {},
+            create: questionGroupIds.map((groupId, index) => ({
+              groupId,
+              order: index,
+            })),
+          },
+        }),
+      },
     })
   }
 
@@ -204,39 +271,32 @@ export class QuizItemRepository {
       throw new NotFoundException(QUIZ_ITEM_ERRORS.QUESTION_NOT_FOUND)
     }
 
-    // Get existing questions in quiz
-    const existingItems = await this.prisma.quizItem.findMany({
-      where: { quizId },
-      select: { questionId: true },
-    })
-    const existingQuestionIds = existingItems.map((item) => item.questionId)
-
-    // Filter out existing questions
-    const newQuestionIds = questionIds.filter((qId) => !existingQuestionIds.includes(qId))
-
-    if (newQuestionIds.length === 0) {
-      return { added: 0, skipped: questionIds.length }
-    }
-
     // Get next order number
     const lastItem = await this.prisma.quizItem.findFirst({
       where: { quizId },
       orderBy: { order: 'desc' },
     })
-    let nextOrder = (lastItem?.order ?? -1) + 1
+    const nextOrder = (lastItem?.order ?? -1) + 1
 
-    // Create quiz items
-    const itemsData = newQuestionIds.map((questionId) => ({
-      quizId,
-      questionId,
-      order: nextOrder++,
-    }))
+    // Create quiz items with questions
+    const created = await Promise.all(
+      questionIds.map((questionId, index) =>
+        this.prisma.quizItem.create({
+          data: {
+            quizId,
+            order: nextOrder + index,
+            questions: {
+              create: {
+                questionId,
+                order: 0,
+              },
+            },
+          },
+        }),
+      ),
+    )
 
-    await this.prisma.quizItem.createMany({
-      data: itemsData,
-    })
-
-    return { added: newQuestionIds.length, skipped: questionIds.length - newQuestionIds.length }
+    return { added: created.length, skipped: 0 }
   }
 
   async reorderQuizItems(quizId: number, items: Array<{ id: number; order: number }>): Promise<void> {

@@ -42,12 +42,12 @@ export const UpdateQuizSchema = z.object({
 })
 
 export const QuizQuerySchema = z.object({
-  page: z.number().int().positive().default(1),
-  limit: z.number().int().positive().max(100).default(20),
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(20),
   search: z.string().optional(),
-  lessonId: z.number().int().positive().optional(),
-  createdBy: z.number().int().positive().optional(),
-  includeAttempts: z.boolean().default(false),
+  lessonId: z.coerce.number().int().positive().optional(),
+  createdBy: z.coerce.number().int().positive().optional(),
+  includeAttempts: z.coerce.boolean().default(false),
   sortBy: z.enum(['id', 'title', 'createdAt', 'createdBy']).default('createdAt'),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
 })

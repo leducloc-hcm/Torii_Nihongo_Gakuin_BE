@@ -151,9 +151,13 @@ export class QuizAttemptRepository {
           include: {
             items: {
               include: {
-                question: {
+                questions: {
                   include: {
-                    option: true,
+                    question: {
+                      include: {
+                        option: true,
+                      },
+                    },
                   },
                 },
               },
@@ -171,8 +175,8 @@ export class QuizAttemptRepository {
       throw new BadRequestException(QUIZ_ATTEMPT_ERRORS.ALREADY_SUBMITTED)
     }
 
-    // Validate all questions are answered
-    const questionIds = attempt.quiz.items.map((item) => item.questionId)
+    const allQuestions = attempt.quiz.items.flatMap((item) => item.questions.map((q) => q.question))
+    const questionIds = allQuestions.map((q) => q.id)
     const answerQuestionIds = data.answers.map((answer) => answer.questionId)
 
     const missingQuestions = questionIds.filter((qId) => !answerQuestionIds.includes(qId))
@@ -180,7 +184,6 @@ export class QuizAttemptRepository {
       throw new BadRequestException(`Missing answers for questions: ${missingQuestions.join(', ')}`)
     }
 
-    // Create answers with correctness check
     const answersData: Array<{
       attemptId: number
       questionId: number
@@ -188,7 +191,7 @@ export class QuizAttemptRepository {
       isCorrect: boolean
     }> = []
     for (const answer of data.answers) {
-      const question = attempt.quiz.items.find((item) => item.questionId === answer.questionId)?.question
+      const question = allQuestions.find((q) => q.id === answer.questionId)
       if (!question) continue
 
       let isCorrect = false
