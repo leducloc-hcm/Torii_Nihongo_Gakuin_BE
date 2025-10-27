@@ -11,6 +11,7 @@ import { SharedUserRepository } from 'src/shared/repositories/shared-user.repo'
 import { EmailService } from 'src/shared/services/email.service'
 import { TwoFactorService } from 'src/shared/services/2fa.service'
 import { S3Service } from 'src/shared/services/s3.service'
+import { GoogleCalendarService } from 'src/shared/services/google-calendar.service'
 import { SharedWebsocketRepository } from 'src/shared/repositories/shared-websocket.repo'
 
 const sharedServices = [
@@ -18,10 +19,12 @@ const sharedServices = [
   HashingService,
   TokenService,
   EmailService,
+  GoogleCalendarService,
   SharedUserRepository,
   SharedWebsocketRepository,
   TwoFactorService,
   S3Service,
+  GoogleCalendarService,
 ]
 
 @Global()

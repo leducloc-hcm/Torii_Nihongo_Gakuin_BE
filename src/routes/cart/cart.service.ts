@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, BadRequestException, ConflictException }
 import { CartRepository } from './cart.repo'
 import { CourseRepository } from '../course/course.repo'
 import { Cart, CartSummary } from './cart.model'
-import { AddToCartDTO, UpdateCartItemDTO, CartResponseDTO } from './cart.dto'
+import { AddToCartDTO, CartResponseDTO } from './cart.dto'
 import { OnlineClassRepository } from '../online-class/online-class.repo'
 
 @Injectable()
