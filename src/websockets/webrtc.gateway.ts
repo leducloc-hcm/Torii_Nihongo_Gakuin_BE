@@ -482,7 +482,7 @@ export class WebRTCGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     // SSH configuration
     const janusUser = process.env.JANUS_SSH_USER || 'ubuntu'
-    const janusKeyPath = process.env.JANUS_SSH_KEY || '~/.ssh/janus_key'
+    const janusKeyPath = process.env.JANUS_SSH_KEY || '/home/ubuntu/.ssh/janus_key'
     const scriptPath = '/opt/janus/bin/auto_push_to_s3.sh'
     const recordingsDir = '/opt/janus/share/janus/recordings'
 
