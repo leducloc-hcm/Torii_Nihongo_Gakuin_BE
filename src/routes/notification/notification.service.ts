@@ -24,6 +24,10 @@ export class NotificationService {
     return this.notificationRepository.findAll(userId)
   }
 
+  async getUnreadCount(userId: number) {
+    return this.notificationRepository.getUnreadCount(userId)
+  }
+
   async findOne(id: number) {
     return this.notificationRepository.findOne(id)
   }
@@ -31,6 +35,11 @@ export class NotificationService {
   async update(id: number, data: UpdateNotificationDto) {
     return this.notificationRepository.update(id, data)
   }
+
+  async markAsRead(id: number, userId: number) {
+    return this.notificationRepository.markAsRead(id, userId)
+  }
+
   async markAllAsRead(userId: number) {
     return this.notificationRepository.markAllAsRead(userId)
   }
