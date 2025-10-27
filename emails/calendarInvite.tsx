@@ -10,6 +10,13 @@ interface EmailProps {
   firstSessionDate: Date
   lastSessionDate: Date
   classId: number
+  bulkGoogleCalendarUrl?: string | null
+  sessions?: Array<{
+    id: number
+    title: string
+    scheduledAt: Date
+    lecturerName: string
+  }>
 }
 
 const logoUrl = 'https://mconnectv1.s3.ap-southeast-1.amazonaws.com/Torii_Nihongo_Gakuin_Logo.png'
@@ -24,10 +31,12 @@ export const CalendarInviteEmail = ({
   firstSessionDate,
   lastSessionDate,
   classId,
+  bulkGoogleCalendarUrl = null,
+  sessions = [],
 }: EmailProps) => (
   <Html>
     <Head>
-      <title>📅 Lịch học trực tuyến - {classTitle}</title>
+      <title>{`📅 Lịch học trực tuyến - ${classTitle}`}</title>
     </Head>
     <Body style={main}>
       <Container style={container}>
@@ -82,6 +91,48 @@ export const CalendarInviteEmail = ({
               })}
             </Text>
           </Section>
+
+          {/* Google Calendar Quick Add */}
+          {bulkGoogleCalendarUrl && (
+            <Section style={quickAddBox}>
+              <Text style={quickAddTitle}>📅 Thêm nhanh vào Google Calendar</Text>
+              <Text style={quickAddDescription}>
+                Chỉ cần click vào nút bên dưới để tự động thêm toàn bộ lịch học vào Google Calendar của bạn:
+              </Text>
+
+              {/* Sessions Summary */}
+              <Section style={sessionsPreviewBox}>
+                <Text style={sessionsPreviewTitle}>📚 Tổng quan lịch học ({sessionsCount} buổi)</Text>
+                {sessions.slice(0, 3).map((session) => (
+                  <Text key={session.id} style={sessionPreviewInfo}>
+                    • <strong>{session.title}</strong> -{' '}
+                    {new Date(session.scheduledAt).toLocaleDateString('vi-VN', {
+                      weekday: 'short',
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </Text>
+                ))}
+                {sessions.length > 3 && (
+                  <Text style={sessionPreviewInfo}>... và {sessions.length - 3} buổi học khác</Text>
+                )}
+              </Section>
+
+              {/* Single Add All Button */}
+              <Section style={bulkButtonContainer}>
+                <Button style={bulkGoogleCalendarBtn} href={bulkGoogleCalendarUrl}>
+                  📅 Thêm toàn bộ lịch học vào Google Calendar
+                </Button>
+              </Section>
+
+              <Text style={quickAddNote}>
+                💡 <strong>Mẹo:</strong> Sau khi click, bạn sẽ được chuyển đến Google Calendar với thông tin tổng hợp về
+                toàn bộ khóa học. Chỉ cần nhấn "Save" để hoàn tất việc thêm sự kiện!
+              </Text>
+            </Section>
+          )}
 
           {/* Calendar Instructions */}
           <Section style={instructionsBox}>
@@ -166,6 +217,40 @@ CalendarInviteEmail.PreviewProps = {
   firstSessionDate: new Date('2025-11-01T19:00:00'),
   lastSessionDate: new Date('2025-12-20T20:30:00'),
   classId: 1,
+  bulkGoogleCalendarUrl:
+    'https://calendar.google.com/calendar/render?action=TEMPLATE&text=Lớp%20N5%20-%20Toàn%20bộ%20lịch%20học%20(12%20buổi)&dates=20251101T120000Z/20251220T140000Z&details=🎌%20LỊCH%20HỌC%20TOÀN%20BỘ%20KHÓA%20-%20Lớp%20N5',
+  sessions: [
+    {
+      id: 1,
+      title: 'Buổi 1 - Giới thiệu hiragana',
+      scheduledAt: new Date('2025-11-01T19:00:00'),
+      lecturerName: 'Sensei Tanaka',
+    },
+    {
+      id: 2,
+      title: 'Buổi 2 - Hiragana cơ bản',
+      scheduledAt: new Date('2025-11-03T19:00:00'),
+      lecturerName: 'Sensei Tanaka',
+    },
+    {
+      id: 3,
+      title: 'Buổi 3 - Katakana',
+      scheduledAt: new Date('2025-11-06T19:00:00'),
+      lecturerName: 'Sensei Tanaka',
+    },
+    {
+      id: 4,
+      title: 'Buổi 4 - Từ vựng cơ bản',
+      scheduledAt: new Date('2025-11-08T19:00:00'),
+      lecturerName: 'Sensei Tanaka',
+    },
+    {
+      id: 5,
+      title: 'Buổi 5 - Ngữ pháp N5',
+      scheduledAt: new Date('2025-11-10T19:00:00'),
+      lecturerName: 'Sensei Tanaka',
+    },
+  ],
 } as EmailProps
 
 export default CalendarInviteEmail
@@ -385,4 +470,111 @@ const footerSubtext = {
   color: '#94a3b8',
   fontSize: '12px',
   margin: '0',
+}
+
+// Google Calendar Quick Add Styles
+const quickAddBox = {
+  backgroundColor: '#f0f9ff',
+  border: '2px solid #0ea5e9',
+  borderRadius: '12px',
+  padding: '24px',
+  margin: '24px 0',
+}
+
+const quickAddTitle = {
+  color: '#0c4a6e',
+  fontSize: '18px',
+  fontWeight: '700',
+  margin: '0 0 12px 0',
+  textAlign: 'center' as const,
+}
+
+const quickAddDescription = {
+  color: '#075985',
+  fontSize: '16px',
+  lineHeight: '1.6',
+  margin: '0 0 20px 0',
+  textAlign: 'center' as const,
+}
+
+const sessionButtonContainer = {
+  backgroundColor: '#ffffff',
+  border: '1px solid #cbd5e1',
+  borderRadius: '8px',
+  padding: '16px',
+  margin: '12px 0',
+  textAlign: 'center' as const,
+}
+
+const sessionInfo = {
+  color: '#374151',
+  fontSize: '14px',
+  lineHeight: '1.5',
+  margin: '0 0 12px 0',
+  textAlign: 'center' as const,
+}
+
+const googleCalendarBtn = {
+  display: 'inline-block',
+  padding: '12px 24px',
+  fontSize: '14px',
+  fontWeight: '600',
+  textDecoration: 'none',
+  borderRadius: '8px',
+  backgroundColor: '#4285f4',
+  color: '#ffffff',
+  boxShadow: '0 2px 4px rgba(66, 133, 244, 0.3)',
+  border: 'none',
+}
+
+const quickAddNote = {
+  color: '#0369a1',
+  fontSize: '13px',
+  lineHeight: '1.5',
+  margin: '20px 0 0 0',
+  textAlign: 'center' as const,
+  fontStyle: 'italic',
+}
+
+// New styles for bulk calendar feature
+const sessionsPreviewBox = {
+  backgroundColor: '#f8fafc',
+  border: '1px solid #e2e8f0',
+  borderRadius: '8px',
+  padding: '16px',
+  margin: '16px 0',
+}
+
+const sessionsPreviewTitle = {
+  color: '#475569',
+  fontSize: '16px',
+  fontWeight: '600',
+  margin: '0 0 12px 0',
+  textAlign: 'left' as const,
+}
+
+const sessionPreviewInfo = {
+  color: '#64748b',
+  fontSize: '14px',
+  lineHeight: '1.4',
+  margin: '4px 0',
+  textAlign: 'left' as const,
+}
+
+const bulkButtonContainer = {
+  textAlign: 'center' as const,
+  margin: '20px 0',
+}
+
+const bulkGoogleCalendarBtn = {
+  display: 'inline-block',
+  padding: '16px 32px',
+  fontSize: '16px',
+  fontWeight: '700',
+  textDecoration: 'none',
+  borderRadius: '10px',
+  backgroundColor: '#4285f4',
+  color: '#ffffff',
+  boxShadow: '0 4px 8px rgba(66, 133, 244, 0.3)',
+  border: 'none',
 }

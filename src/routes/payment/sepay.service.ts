@@ -318,6 +318,14 @@ export class SepayService {
               })
 
               if (classDetails && calendarResult.events.length > 0) {
+                // Map events to session format for email template
+                const sessions = calendarResult.events.map((event) => ({
+                  id: event.id,
+                  title: event.title,
+                  scheduledAt: event.scheduledAt,
+                  lecturerName: event.lecturerName,
+                }))
+
                 await this.emailService.sendCalendarInvite({
                   email: order.user.email,
                   studentName: order.user.name,
@@ -329,6 +337,8 @@ export class SepayService {
                   lastSessionDate: calendarResult.events[calendarResult.events.length - 1].scheduledAt,
                   classId: classId,
                   calendarData: calendarResult.calendarData,
+                  bulkGoogleCalendarUrl: calendarResult.bulkGoogleCalendarUrl,
+                  sessions: sessions,
                 })
 
                 this.logger.log(`Calendar invite sent for class ${classId} to user ${order.userId}`)

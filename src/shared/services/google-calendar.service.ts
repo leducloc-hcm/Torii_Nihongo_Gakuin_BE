@@ -13,11 +13,21 @@ interface LiveSessionCalendarEvent {
   classTitle: string
 }
 
-interface CalendarGenerationResult {
+export interface CalendarGenerationResult {
   success: boolean
   calendarData?: string
   events?: LiveSessionCalendarEvent[]
   errorMessage?: string
+  bulkGoogleCalendarUrl?: string | null
+}
+
+interface GoogleCalendarEvent {
+  title: string
+  description: string
+  location: string
+  startDate: Date
+  endDate: Date
+  url?: string
 }
 
 @Injectable()
@@ -25,6 +35,84 @@ export class GoogleCalendarService {
   private readonly logger = new Logger(GoogleCalendarService.name)
 
   constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * Generate Google Calendar URL for a single event
+   */
+  private generateGoogleCalendarUrl(event: GoogleCalendarEvent): string {
+    const formatDate = (date: Date): string => {
+      return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z'
+    }
+
+    const params = new URLSearchParams({
+      action: 'TEMPLATE',
+      text: event.title,
+      dates: `${formatDate(event.startDate)}/${formatDate(event.endDate)}`,
+      details: event.description,
+      location: event.location,
+      ...(event.url && { url: event.url }),
+    })
+
+    return `https://calendar.google.com/calendar/render?${params.toString()}`
+  }
+
+  /**
+   * Generate a single Google Calendar URL that contains information about all sessions
+   * Since Google Calendar doesn't support bulk adding via URL, this creates a summary event
+   */
+  async generateBulkGoogleCalendarUrl(classId: number, userId: number): Promise<string | null> {
+    try {
+      const events = await this.getClassLiveSessions(classId)
+
+      if (events.length === 0) {
+        return null
+      }
+
+      const firstEvent = events[0]
+      const lastEvent = events[events.length - 1]
+
+      // Create a comprehensive description with all session details
+      const sessionsDescription = events
+        .map(
+          (event, index) =>
+            `📅 Buổi ${index + 1}: ${event.title}\n` +
+            `   ⏰ ${event.scheduledAt.toLocaleDateString('vi-VN', {
+              weekday: 'long',
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            })}\n   📍 ${event.location}\n`,
+        )
+        .join('\n')
+
+      return this.generateGoogleCalendarUrl({
+        title: `${firstEvent.classTitle} - Toàn bộ lịch học (${events.length} buổi)`,
+        description: [
+          `🎌 LỊCH HỌC TOÀN BỘ KHÓA - ${firstEvent.classTitle}`,
+          `👨‍🏫 Giảng viên: ${firstEvent.lecturerName}`,
+          `📊 Tổng số buổi: ${events.length} buổi học`,
+          ``,
+          `📅 CHI TIẾT CÁC BUỔI HỌC:`,
+          ``,
+          sessionsDescription,
+          ``,
+          `💡 LƯU Ý: Đây là sự kiện tổng hợp. Bạn cần thêm từng buổi học riêng lẻ vào lịch.`,
+          `📱 Truy cập link để xem chi tiết và tham gia: https://torii-nihongo-gakuin.io.vn/customer/online-class/${classId}/sessions`,
+          ``,
+          `🌸 Torii Nihongo Gakuin - Học tiếng Nhật hiệu quả`,
+        ].join('\n'),
+        location: `Online - ${firstEvent.classTitle}`,
+        startDate: firstEvent.scheduledAt,
+        endDate: new Date(lastEvent.scheduledAt.getTime() + lastEvent.durationMinutes * 60 * 1000),
+        url: `https://torii-nihongo-gakuin.io.vn/customer/online-class/${classId}/sessions`,
+      })
+    } catch (error) {
+      this.logger.error(`Error generating bulk Google Calendar URL: ${error.message}`, error.stack)
+      return null
+    }
+  }
 
   /**
    * Generate Google Calendar (.ics) file for all live sessions in a class
@@ -191,12 +279,16 @@ export class GoogleCalendarService {
         }
       }
 
+      // Generate bulk Google Calendar URL
+      const bulkGoogleCalendarUrl = await this.generateBulkGoogleCalendarUrl(classId, userId)
+
       this.logger.log(`Generated calendar for class ${classId} with ${events.length} sessions`)
 
       return {
         success: true,
         calendarData: value,
         events,
+        bulkGoogleCalendarUrl,
       }
     } catch (error) {
       this.logger.error(`Error generating class calendar: ${error.message}`, error.stack)

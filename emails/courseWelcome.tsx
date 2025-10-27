@@ -10,7 +10,7 @@ interface EmailProps {
 }
 
 const logoUrl = 'https://mconnectv1.s3.ap-southeast-1.amazonaws.com/Torii_Nihongo_Gakuin_Logo.png'
-const appUrl = 'https://app.toriinihongo.vn'
+const appUrl = 'https://torii-nihongo-gakuin.io.vn'
 
 export const CourseWelcomeEmail = ({ studentName, courseTitle, courseThumbnail, expiresAt, courseId }: EmailProps) => (
   <Html>
@@ -55,13 +55,13 @@ export const CourseWelcomeEmail = ({ studentName, courseTitle, courseThumbnail, 
 
           {/* CTA */}
           <Section style={ctaWrap}>
-            <Button style={ctaBtn} href={`${appUrl}/courses/${courseId}`}>
+            <Button style={ctaBtn} href={`${appUrl}/customer/my-course`}>
               Bắt đầu học ngay
             </Button>
             <Text style={ctaHelp}>
               Hoặc truy cập vào trang khóa học tại: <br />
-              <a href={`${appUrl}/courses/${courseId}`} style={link}>
-                {appUrl}/courses/{courseId}
+              <a href={`${appUrl}/customer/my-course`} style={link}>
+                {appUrl}/customer/my-course
               </a>
             </Text>
           </Section>

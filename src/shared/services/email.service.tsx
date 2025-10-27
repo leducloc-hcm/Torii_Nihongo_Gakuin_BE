@@ -67,6 +67,13 @@ export class EmailService {
     lastSessionDate: Date
     classId: number
     calendarData: string
+    bulkGoogleCalendarUrl?: string | null
+    sessions?: Array<{
+      id: number
+      title: string
+      scheduledAt: Date
+      lecturerName: string
+    }>
   }) {
     const subject = `📅 Lịch học trực tuyến - ${payload.classTitle}`
     return await this.resend.emails.send({
@@ -83,6 +90,8 @@ export class EmailService {
           firstSessionDate={payload.firstSessionDate}
           lastSessionDate={payload.lastSessionDate}
           classId={payload.classId}
+          bulkGoogleCalendarUrl={payload.bulkGoogleCalendarUrl}
+          sessions={payload.sessions}
         />
       ),
       attachments: [
