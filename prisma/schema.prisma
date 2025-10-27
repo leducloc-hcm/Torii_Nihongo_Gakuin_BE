@@ -543,7 +543,6 @@ model ScoreProfileSection {
   profile     ScoreProfile           @relation(fields: [profileId], references: [id])
 }
 
-
 model Quiz {
   id        Int      @id @default(autoincrement())
   lessonId  Int?     @unique

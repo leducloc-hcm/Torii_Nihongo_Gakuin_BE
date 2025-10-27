@@ -30,6 +30,7 @@ import { QuizModule } from './routes/quiz/quiz.module'
 import { QuizItemModule } from './routes/quiz-item/quiz-item.module'
 import { QuizAttemptModule } from './routes/quiz-attempt/quiz-attempt.module'
 import { QuizAnswerModule } from './routes/quiz-answer/quiz-answer.module'
+import { RedisModule } from './shared/redis/redis.module'
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { QuizAnswerModule } from './routes/quiz-answer/quiz-answer.module'
     TagModule,
     BlogModule,
     SharedModule,
+    RedisModule,
     ProfileModule,
     CourseModule,
     ModuleModule,
