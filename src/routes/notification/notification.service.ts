@@ -15,7 +15,7 @@ export class NotificationService {
     this.notificationGateway.sendNotification(notification.userId.toString(), {
       ...notification,
       userId: notification.userId.toString(),
-      type: 'general' as const,
+      type: 'enrollment:created' as const,
     })
     return notification
   }
