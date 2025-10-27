@@ -61,18 +61,14 @@ export class CartRepository {
     })
 
     if (existingItem) {
-      // Update quantity if item exists
-      await this.prisma.cartItem.update({
-        where: { id: existingItem.id },
-        data: { quantity: existingItem.quantity + quantity },
-      })
+      // Course already in cart - just return (no quantity update)
+      return (await this.findByUserId(userId)) as Cart
     } else {
       // Create new cart item
       await this.prisma.cartItem.create({
         data: {
           cartId: cart.id,
           courseId,
-          quantity,
         },
       })
     }
@@ -82,17 +78,7 @@ export class CartRepository {
   }
 
   async updateItemQuantity(userId: number, courseId: number, quantity: number): Promise<Cart | null> {
-    const cart = await this.findByUserId(userId)
-    if (!cart) return null
-
-    await this.prisma.cartItem.updateMany({
-      where: {
-        cartId: cart.id,
-        courseId,
-      },
-      data: { quantity },
-    })
-
+    // Deprecated - no quantity field anymore
     return await this.findByUserId(userId)
   }
 
@@ -123,10 +109,11 @@ export class CartRepository {
     const cart = await this.findByUserId(userId)
     if (!cart) return null
 
-    const totalItems = cart.items.reduce((sum, item) => sum + item.quantity, 0)
+    // No quantity field - each item counts as 1
+    const totalItems = cart.items.length
     const totalAmount = cart.items.reduce((sum, item) => {
       const coursePrice = item.course?.price || 0
-      return sum + coursePrice * item.quantity
+      return sum + coursePrice // No multiplication by quantity
     }, 0)
 
     return { totalItems, totalAmount }

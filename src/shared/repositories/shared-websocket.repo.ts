@@ -12,6 +12,7 @@ export class SharedWebsocketRepository {
       },
     })
   }
+
   create(data: { id: string; userId: number }) {
     return this.prismaService.websocket.create({
       data: {

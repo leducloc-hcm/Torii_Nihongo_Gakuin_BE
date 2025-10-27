@@ -543,7 +543,6 @@ model ScoreProfileSection {
   profile     ScoreProfile           @relation(fields: [profileId], references: [id])
 }
 
-
 model Quiz {
   id        Int      @id @default(autoincrement())
   lessonId  Int?     @unique
@@ -928,7 +927,6 @@ model CartItem {
   id       Int @id @default(autoincrement())
   cartId   Int
   courseId Int
-  quantity Int @default(1)
 
   cart   Cart   @relation(fields: [cartId], references: [id], onDelete: Cascade)
   course Course @relation(fields: [courseId], references: [id])
@@ -958,7 +956,6 @@ model OrderItem {
   courseId  Int?
   classId   Int?
   unitPrice Int
-  quantity  Int           @default(1)
   order  Order   @relation(fields: [orderId], references: [id])
   course Course? @relation(fields: [courseId], references: [id])
   class  Class?  @relation(fields: [classId], references: [id])

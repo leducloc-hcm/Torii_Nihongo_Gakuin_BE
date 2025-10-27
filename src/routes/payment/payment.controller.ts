@@ -1,66 +1,28 @@
 import {
+  Body,
   Controller,
   Get,
-  Post,
-  Body,
-  Param,
-  Query,
   HttpCode,
   HttpStatus,
-  UseGuards,
+  Param,
   ParseIntPipe,
-  Req,
-  Res,
+  Post,
+  Query,
+  UseGuards,
 } from '@nestjs/common'
-import type { Request, Response } from 'express'
-import { PaymentService } from './payment.service'
-import { CreatePaymentDTO, PaymentResponseDTO, PaymentCallbackResponseDTO, VNPayCallbackDTO } from './payment.dto'
-import { Auth, IsPublic } from 'src/shared/decorators/auth.decorator'
 import { AuthType } from 'src/shared/constants/auth.constant'
-import { Roles } from 'src/shared/decorators/roles.decorator'
-import { RolesGuard } from 'src/shared/guards/roles.guard'
 import { RoleName } from 'src/shared/constants/role.constant'
 import { ActiveUser } from 'src/shared/decorators/active-user.decorator'
+import { Auth, IsPublic } from 'src/shared/decorators/auth.decorator'
+import { Roles } from 'src/shared/decorators/roles.decorator'
+import { RolesGuard } from 'src/shared/guards/roles.guard'
+import { SepayPaymentResponseDTO, SepayWebhookDTO, BuyCourseDirectDTO } from './payment.dto'
+import { PaymentService } from './payment.service'
 
-@Controller('payment')
+@Controller('payments')
 @UseGuards(RolesGuard)
 export class PaymentController {
   constructor(private readonly paymentService: PaymentService) {}
-
-  @Post('create')
-  @Auth([AuthType.Bearer])
-  @Roles(RoleName.Customer, RoleName.Admin, RoleName.Staff)
-  @HttpCode(HttpStatus.CREATED)
-  async createPayment(@ActiveUser('userId') userId: number, @Req() req: Request): Promise<PaymentResponseDTO> {
-    const ipAddr =
-      (req.headers['x-forwarded-for'] as string) || (req.connection.remoteAddress as string) || req.ip || '127.0.0.1'
-
-    return this.paymentService.createPayment(userId, ipAddr)
-  }
-
-  @Get('vnpay/callback')
-  @IsPublic()
-  @HttpCode(HttpStatus.OK)
-  async vnpayCallback(@Query() callbackData: VNPayCallbackDTO, @Res() res: Response): Promise<void> {
-    const result = await this.paymentService.handleVNPayCallback(callbackData)
-
-    // Redirect to frontend with result
-    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000'
-
-    if (result.success) {
-      res.redirect(`${baseUrl}/payment/success?orderId=${result.orderId}&transactionId=${result.transactionId}`)
-    } else {
-      res.redirect(`${baseUrl}/payment/failed?message=${encodeURIComponent(result.message)}`)
-    }
-  }
-
-  @Post('vnpay/callback')
-  @IsPublic()
-  @HttpCode(HttpStatus.OK)
-  async vnpayCallbackPost(@Body() callbackData: VNPayCallbackDTO): Promise<PaymentCallbackResponseDTO> {
-    return this.paymentService.handleVNPayCallback(callbackData)
-  }
-
   @Get('orders/:orderId')
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Customer, RoleName.Admin, RoleName.Staff)
@@ -95,5 +57,62 @@ export class PaymentController {
     // This would be implemented in the payment service
     // return this.paymentService.getAllOrders({ skip, take, status, userId })
     return { message: 'Admin orders endpoint - to be implemented' }
+  }
+
+  @Post('sepay/create')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Customer, RoleName.Admin, RoleName.Staff)
+  @HttpCode(HttpStatus.CREATED)
+  async createSepayPayment(@ActiveUser('userId') userId: number): Promise<SepayPaymentResponseDTO> {
+    return this.paymentService.createSepayPayment(userId)
+  }
+
+  /**
+   * Buy course directly (skip cart)
+   * POST /payments/sepay/buy-direct
+   * Body: { courseId: 123, couponCode?: 'SALE20' }
+   */
+  @Post('sepay/buy-direct')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Customer, RoleName.Admin, RoleName.Staff)
+  @HttpCode(HttpStatus.CREATED)
+  async buyCourseDirectWithSepay(
+    @ActiveUser('userId') userId: number,
+    @Body() buyDto: BuyCourseDirectDTO,
+  ): Promise<SepayPaymentResponseDTO> {
+    return this.paymentService.buyCourseDirectWithSepay(userId, buyDto.courseId, buyDto.couponCode)
+  }
+
+  @Post('sepay/webhook')
+  @IsPublic()
+  @HttpCode(HttpStatus.OK)
+  async sepayWebhook(@Body() webhookData: SepayWebhookDTO) {
+    return this.paymentService.handleSepayWebhook(webhookData)
+  }
+
+  @Get('sepay/status/:paymentCode')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Customer, RoleName.Admin, RoleName.Staff)
+  @HttpCode(HttpStatus.OK)
+  async checkSepayStatus(@Param('paymentCode') paymentCode: string) {
+    return this.paymentService.checkSepayPaymentStatus(paymentCode)
+  }
+
+  @Get('sepay/order/:paymentCode')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Customer, RoleName.Admin, RoleName.Staff)
+  @HttpCode(HttpStatus.OK)
+  async getOrderByPaymentCode(@ActiveUser('userId') userId: number, @Param('paymentCode') paymentCode: string) {
+    const order = await this.paymentService.getOrderByPaymentCode(paymentCode)
+
+    if (!order) {
+      return { success: false, message: 'Order not found' }
+    }
+
+    if (order.userId !== userId) {
+      return { success: false, message: 'Unauthorized' }
+    }
+
+    return { success: true, order }
   }
 }

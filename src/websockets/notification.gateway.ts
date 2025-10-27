@@ -189,4 +189,85 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
   isUserOnline(userId: string): boolean {
     return this.userSockets.has(userId)
   }
+
+  notifyPaymentPending(
+    userId: number,
+    paymentData: {
+      orderId: number
+      amount: number
+      qrUrl?: string
+      message?: string
+    },
+  ) {
+    this.sendNotification(userId.toString(), {
+      type: 'general',
+      message: paymentData.message || 'Đang chờ thanh toán. Vui lòng quét mã QR để hoàn tất.',
+      data: {
+        paymentStatus: 'PENDING',
+        ...paymentData,
+      },
+    })
+    this.logger.log(`Sent payment pending notification to user ${userId}`)
+  }
+
+  notifyPaymentSuccess(
+    userId: number,
+    paymentData: {
+      orderId: number
+      transactionId?: string
+      amount: number
+      courseIds?: number[]
+      message?: string
+    },
+  ) {
+    this.sendNotification(userId.toString(), {
+      type: 'general',
+      message: paymentData.message || 'Thanh toán thành công! Bạn đã được ghi danh vào khóa học.',
+      data: {
+        paymentStatus: 'SUCCESS',
+        ...paymentData,
+      },
+    })
+    this.logger.log(`Sent payment success notification to user ${userId}, order ${paymentData.orderId}`)
+  }
+
+  notifyPaymentFailed(
+    userId: number,
+    paymentData: {
+      orderId: number
+      amount: number
+      errorMessage?: string
+      message?: string
+    },
+  ) {
+    this.sendNotification(userId.toString(), {
+      type: 'general',
+      message: paymentData.message || 'Thanh toán thất bại. Vui lòng thử lại.',
+      data: {
+        paymentStatus: 'FAILED',
+        ...paymentData,
+      },
+    })
+    this.logger.log(`Sent payment failed notification to user ${userId}, order ${paymentData.orderId}`)
+  }
+
+  notifyEnrollmentCreated(
+    userId: number,
+    enrollmentData: {
+      courseId: number
+      courseTitle: string
+      courseThumbnail?: string
+      expiresAt?: Date
+    },
+  ) {
+    this.sendNotification(userId.toString(), {
+      type: 'general',
+      message: `Bạn đã được ghi danh vào khóa học: ${enrollmentData.courseTitle}`,
+      data: {
+        notificationType: 'ENROLLMENT_CREATED',
+        ...enrollmentData,
+      },
+    })
+    this.logger.log(`Sent enrollment notification to user ${userId}, course ${enrollmentData.courseId}`)
+  }
 }
