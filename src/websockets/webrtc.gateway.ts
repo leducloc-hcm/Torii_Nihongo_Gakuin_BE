@@ -9,6 +9,7 @@ import {
 } from '@nestjs/websockets'
 import { Logger } from '@nestjs/common'
 import { Server, Socket } from 'socket.io'
+import { exec } from 'child_process'
 
 type Role = 'lecturer' | 'customer'
 
@@ -468,5 +469,72 @@ export class WebRTCGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     // Broadcast poll closed
     this.server.to(`class_${classId}`).emit('poll-closed', payload.pollId)
+  }
+
+  /**
+   * Trigger recording combine and S3 upload after room/class is destroyed
+   * Executes script on remote Janus server via SSH
+   */
+  private triggerRecordingCombine(classId: string): void {
+    // Extract hostname from JANUS_SERVER_URL (e.g., wss://janus.example.com/ws -> janus.example.com)
+    const janusServerUrl = process.env.JANUS_SERVER_URL || 'wss://janus.torii-nihongo-gakuin.io.vn/ws'
+    const janusHost = new URL(janusServerUrl).hostname
+
+    // SSH configuration
+    const janusUser = process.env.JANUS_SSH_USER || 'ubuntu'
+    const janusKeyPath = process.env.JANUS_SSH_KEY || '/home/ubuntu/.ssh/janus_key'
+    const scriptPath = '/opt/janus/bin/auto_push_to_s3.sh'
+    const recordingsDir = '/opt/janus/share/janus/recordings'
+
+    this.logger.log(`📹 Triggering recording combine for class ${classId} on ${janusHost}`)
+
+    // SSH command to execute script on remote Janus server
+    // Must cd to recordings dir and run with sudo (ubuntu user needs sudo privileges for this script)
+    const sshCommand = `ssh -i ${janusKeyPath} -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${janusUser}@${janusHost} "cd ${recordingsDir} && sudo ${scriptPath} ${classId}"`
+
+    exec(sshCommand, (error, stdout, stderr) => {
+      if (error) {
+        this.logger.error(
+          `❌ Recording combine error for class ${classId}: ${error.message}. ` +
+            `Ensure SSH key is configured and Janus server (${janusHost}) is accessible.`,
+        )
+        return
+      }
+      if (stderr) {
+        this.logger.warn(`⚠️ Recording stderr for class ${classId}:`, stderr)
+      }
+      this.logger.log(`✅ Recording combine triggered successfully for class ${classId} on ${janusHost}`)
+    })
+  }
+
+  /**
+   * Call this when class ends or room is destroyed
+   */
+  @SubscribeMessage('end-class')
+  handleEndClass(@ConnectedSocket() client: Socket, @MessageBody() payload: { classId: string }) {
+    const meta = this.socketMeta.get(client.id)
+    if (!meta) return
+
+    const { role, displayName } = meta
+
+    // Only lecturers can end the class
+    if (role !== 'lecturer') {
+      client.emit('error', { message: 'Only lecturers can end the class' })
+      return
+    }
+
+    const { classId } = payload
+
+    this.logger.log(`🛑 Class ${classId} ended by ${displayName}`)
+
+    // Notify all participants
+    this.server.to(`class_${classId}`).emit('class-ended', { classId })
+
+    // Trigger recording processing (5 second delay to ensure Janus finishes writing files)
+    setTimeout(() => {
+      this.triggerRecordingCombine(classId)
+    }, 5000)
+
+    return { success: true }
   }
 }

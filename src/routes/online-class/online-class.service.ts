@@ -14,7 +14,7 @@ import {
   OnlineClassResponseDto,
   ClassAnalyticsDto,
 } from './online-class.dto'
-import { Role, JLPTLevel, LiveMode } from '@prisma/client'
+import { Role, JLPTLevel, LiveMode, NotificationType } from '@prisma/client'
 import { sign, verify } from 'jsonwebtoken'
 
 @Injectable()
@@ -289,7 +289,7 @@ export class OnlineClassService {
   }
 
   async endOnlineClassSession(
-    classId: string,
+    sessionId: string,
     lecturerId: number,
   ): Promise<{
     sessionId: string
@@ -299,12 +299,12 @@ export class OnlineClassService {
     participantCount: number
   }> {
     try {
-      const classIdInt = parseInt(classId)
+      const sessionIdInt = parseInt(sessionId)
 
       // Find active session
       const activeSession = await this.prisma.liveSession.findFirst({
         where: {
-          classId: classIdInt,
+          id: sessionIdInt,
           endedAt: null,
         },
         include: {
@@ -351,7 +351,7 @@ export class OnlineClassService {
         },
       })
 
-      this.logger.log(`Ended online class session ${activeSession.id} for class ${classId}`)
+      this.logger.log(`Ended online class session ${activeSession.id}`)
 
       return {
         sessionId: activeSession.id.toString(),
@@ -821,6 +821,99 @@ export class OnlineClassService {
       recordingId: data.recordingId,
       uploadedAt: new Date().toISOString(),
       sessionId: currentSession?.id,
+    }
+  }
+
+  /**
+   * Update recording URL for a live session based on Janus room ID
+   * This is called by the webhook endpoint after the Janus server uploads the recording to S3
+   */
+  async updateRecordingUrl(janusRoomId: number, recordingUrl: string): Promise<any> {
+    this.logger.log(`📹 Updating recording URL for Janus room ${janusRoomId}: ${recordingUrl}`)
+
+    // Find the live session by janusRoomId
+    const liveSession = await this.prisma.liveSession.findFirst({
+      where: {
+        janusRoomId: janusRoomId,
+      },
+      orderBy: {
+        scheduledAt: 'desc', // Get the most recent session if there are multiple
+      },
+    })
+
+    if (!liveSession) {
+      this.logger.error(`❌ Live session not found for Janus room ${janusRoomId}`)
+      throw new NotFoundException(`Live session not found for Janus room ${janusRoomId}`)
+    }
+
+    // Update the recording URL
+    const updatedSession = await this.prisma.liveSession.update({
+      where: { id: liveSession.id },
+      data: { recordingUrl },
+    })
+
+    this.logger.log(
+      `✅ Recording URL updated successfully for session ${liveSession.id} (room ${janusRoomId}): ${recordingUrl}`,
+    )
+
+    // Optionally notify participants that recording is available
+    try {
+      await this.notifyRecordingAvailable(liveSession.classId, recordingUrl)
+    } catch (error) {
+      this.logger.warn(`⚠️ Failed to notify participants about recording availability: ${error.message}`)
+    }
+
+    return {
+      sessionId: updatedSession.id,
+      janusRoomId: updatedSession.janusRoomId,
+      recordingUrl: updatedSession.recordingUrl,
+      updatedAt: updatedSession.endedAt || new Date(),
+    }
+  }
+
+  /**
+   * Notify class participants that recording is available
+   */
+  private async notifyRecordingAvailable(classId: number, recordingUrl: string): Promise<void> {
+    try {
+      // Get class members
+      const classMembers = await this.prisma.classMember.findMany({
+        where: { classId },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+        },
+      })
+
+      const onlineClass = await this.prisma.class.findUnique({
+        where: { id: classId },
+        select: {
+          title: true,
+        },
+      })
+
+      // Send notification to each member
+      for (const member of classMembers) {
+        await this.notificationService.create({
+          userId: member.userId,
+          title: 'Class Recording Available',
+          message: `The recording for ${onlineClass?.title || 'your class'} is now available to watch.`,
+          type: NotificationType.SYSTEM,
+          actionUrl: `/classes/${classId}/recordings`,
+          entityId: classId,
+          entityType: 'CLASS',
+        })
+      }
+
+      this.logger.log(`📧 Sent recording notifications to ${classMembers.length} participants`)
+    } catch (error) {
+      this.logger.error(`Failed to send recording notifications: ${error.message}`)
+      // Don't throw error - notifications are optional
     }
   }
 
