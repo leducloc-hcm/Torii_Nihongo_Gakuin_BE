@@ -144,5 +144,22 @@ ENV JANUS_STUN_URL='stun:janus.torii-nihongo-gakuin.io.vn:3478'
 ENV JANUS_TURN_URL='turn:janus.torii-nihongo-gakuin.io.vn:3478'
 ENV JANUS_TURN_USERNAME='turnuser'
 ENV JANUS_TURN_PASSWORD='turnpassword'
-# Start the application
+
+ENV REDIS_HOST=redis-18098.c252.ap-southeast-1-1.ec2.redns.redis-cloud.com
+ENV REDIS_PORT=18098
+ENV REDIS_USERNAME=default
+ENV REDIS_PASSWORD=Lk1gyFJXcgIHBBCjb6e38WQFozS2fbqs
+ENV REDIS_DB=0
+ENV REDIS_TLS=false
+ENV REDIS_TTL=3600
+
+ENV SEPAY_ACCOUNT_NUMBER=00001053256
+ENV SEPAY_BANK_CODE=TPBank
+ENV SEPAY_ACCESS_KEY=YAG3ASSBDOVUDKRQ9RQC7KLZOBJ2LOIQCWU3AO87VXMU0QHNJ4T1GN65ZK0SRBPF
+ENV SEPAY_API_URL=https://my.sepay.vn/userapi/transactions/create
+ENV SEPAY_WEBHOOK_URL=https://develop.torii-nihongo-gakuin.io.vn/payment/sepay/webhook
+
+# Frontend URL for redirects
+ENV FRONTEND_URL=http://localhost:3000
+
 CMD ["node", "dist/src/main.js"]
