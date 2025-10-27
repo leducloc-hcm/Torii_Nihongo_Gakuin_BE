@@ -17,7 +17,6 @@ export const CartItemSchema = z.object({
   id: z.number().int().positive(),
   cartId: z.number().int().positive(),
   courseId: z.number().int().positive(),
-  quantity: z.number().int().min(1),
   course: CourseInfoSchema.optional(),
 })
 
@@ -33,19 +32,17 @@ export const CartSchema = z.object({
 // Add to Cart Schema
 export const AddToCartSchema = z.object({
   courseId: z.coerce.number().int().positive({ message: 'Course ID must be positive' }),
-  quantity: z.coerce.number().int().min(1, { message: 'Quantity must be at least 1' }).default(1),
 })
 
-// Update Cart Item Schema
+// Update Cart Item Schema (no longer needed, but keep for backward compatibility)
 export const UpdateCartItemSchema = z.object({
-  quantity: z.coerce.number().int().min(1, { message: 'Quantity must be at least 1' }),
+  // Empty - no fields to update since quantity is removed
 })
 
 // Cart Item Response Schema
 export const CartItemResponseSchema = z.object({
   id: z.number().int().positive(),
   courseId: z.number().int().positive(),
-  quantity: z.number().int().min(1),
   course: CourseInfoSchema,
 })
 
