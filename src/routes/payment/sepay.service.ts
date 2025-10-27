@@ -69,7 +69,7 @@ export class SepayService {
     }
 
     // Generate payment content code
-    const paymentCode = `TKPTPR${payload.orderId}T${Date.now()}`
+    const paymentCode = `TKPTPR DHMC${payload.orderId}T${Date.now()}`
 
     // Update order with provider reference
     await this.prisma.order.update({
