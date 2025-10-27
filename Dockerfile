@@ -157,7 +157,7 @@ ENV SEPAY_ACCOUNT_NUMBER=00001053256
 ENV SEPAY_BANK_CODE=TPBank
 ENV SEPAY_ACCESS_KEY=YAG3ASSBDOVUDKRQ9RQC7KLZOBJ2LOIQCWU3AO87VXMU0QHNJ4T1GN65ZK0SRBPF
 ENV SEPAY_API_URL=https://my.sepay.vn/userapi/transactions/create
-ENV SEPAY_WEBHOOK_URL=https://develop.torii-nihongo-gakuin.io.vn/payment/sepay/webhook
+ENV SEPAY_WEBHOOK_URL=https://develop.torii-nihongo-gakuin.io.vn/payments/sepay/webhook
 
 # Frontend URL for redirects
 ENV FRONTEND_URL=http://localhost:3000
