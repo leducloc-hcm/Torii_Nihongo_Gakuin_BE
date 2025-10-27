@@ -145,13 +145,7 @@ ENV JANUS_TURN_URL='turn:janus.torii-nihongo-gakuin.io.vn:3478'
 ENV JANUS_TURN_USERNAME='turnuser'
 ENV JANUS_TURN_PASSWORD='turnpassword'
 
-ENV REDIS_HOST=redis-18098.c252.ap-southeast-1-1.ec2.redns.redis-cloud.com
-ENV REDIS_PORT=18098
-ENV REDIS_USERNAME=default
-ENV REDIS_PASSWORD=Lk1gyFJXcgIHBBCjb6e38WQFozS2fbqs
-ENV REDIS_DB=0
-ENV REDIS_TLS=false
-ENV REDIS_TTL=3600
+ENV REDIS_URL='redis://default:Lk1gyFJXcgIHBBCjb6e38WQFozS2fbqs@redis-18098.c252.ap-southeast-1-1.ec2.redns.redis-cloud.com:18098'
 
 ENV SEPAY_ACCOUNT_NUMBER=00001053256
 ENV SEPAY_BANK_CODE=TPBank

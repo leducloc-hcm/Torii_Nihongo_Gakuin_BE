@@ -9,26 +9,29 @@ export const redisProvider: Provider = {
   provide: REDIS_CLIENT,
   inject: [redisConfig.KEY],
   useFactory: async (cfg: ConfigType<typeof redisConfig>) => {
-    const options: RedisOptions = cfg.url
-      ? {
-          lazyConnect: true,
-          maxRetriesPerRequest: null,
-          enableReadyCheck: true,
-          tls: cfg.url.startsWith('rediss://') || cfg.tls ? {} : undefined,
-        }
-      : {
+    // When using rediss:// URL, IORedis automatically handles TLS
+    // Do NOT add tls option - it causes conflicts
+    const options: RedisOptions = {
+      lazyConnect: true,
+      maxRetriesPerRequest: null,
+      enableReadyCheck: true,
+      connectTimeout: 10000,
+      retryStrategy: (times) => {
+        const delay = Math.min(times * 50, 2000)
+        return delay
+      },
+    }
+
+    const client = cfg.url
+      ? new IORedis(cfg.url, options) // rediss:// auto-enables TLS
+      : new IORedis({
+          ...options,
           host: cfg.host,
           port: Number(cfg.port),
           username: cfg.username,
           password: cfg.password,
           db: Number(cfg.db),
-          lazyConnect: true,
-          maxRetriesPerRequest: null,
-          enableReadyCheck: true,
-          tls: cfg.tls ? {} : undefined,
-        }
-
-    const client = cfg.url ? new IORedis(cfg.url, options) : new IORedis(options)
+        })
 
     client.on('connect', () => console.log('[Redis] 🔗 Connected'))
     client.on('ready', () => console.log('[Redis] ✅ Ready'))
