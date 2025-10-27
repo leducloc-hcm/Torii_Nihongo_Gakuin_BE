@@ -34,7 +34,6 @@ export class CartService {
       items: cart.items.map((item) => ({
         id: item.id,
         courseId: item.courseId,
-        quantity: item.quantity,
         course: {
           id: item.course!.id,
           slug: item.course!.slug,
@@ -54,7 +53,7 @@ export class CartService {
   }
 
   async addToCart(userId: number, addToCartDto: AddToCartDTO): Promise<CartResponseDTO> {
-    const { courseId, quantity } = addToCartDto
+    const { courseId } = addToCartDto
 
     // Check if course exists and is published
     const course = await this.courseRepository.findOne({ id: courseId })
@@ -71,22 +70,8 @@ export class CartService {
       throw new BadRequestException('Free courses cannot be added to cart')
     }
 
-    // Add item to cart
-    const updatedCart = await this.cartRepository.addItem(userId, courseId, quantity)
-
-    return (await this.getCart(userId)) as CartResponseDTO
-  }
-
-  async updateCartItem(userId: number, courseId: number, updateDto: UpdateCartItemDTO): Promise<CartResponseDTO> {
-    const { quantity } = updateDto
-
-    // Check if course exists in cart
-    const courseInCart = await this.cartRepository.checkCourseInCart(userId, courseId)
-    if (!courseInCart) {
-      throw new NotFoundException(`Course with ID ${courseId} not found in cart`)
-    }
-
-    await this.cartRepository.updateItemQuantity(userId, courseId, quantity)
+    // Add item to cart (no quantity)
+    const updatedCart = await this.cartRepository.addItem(userId, courseId, 1)
 
     return (await this.getCart(userId)) as CartResponseDTO
   }

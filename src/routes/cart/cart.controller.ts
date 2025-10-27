@@ -39,16 +39,6 @@ export class CartController {
     return this.cartService.addToCart(userId, addToCartDto)
   }
 
-  @Put('items/:courseId')
-  @HttpCode(HttpStatus.OK)
-  async updateCartItem(
-    @ActiveUser('userId') userId: number,
-    @Param('courseId', ParseIntPipe) courseId: number,
-    @Body() updateDto: UpdateCartItemDTO,
-  ): Promise<CartResponseDTO> {
-    return this.cartService.updateCartItem(userId, courseId, updateDto)
-  }
-
   @Delete('items/:courseId')
   @HttpCode(HttpStatus.OK)
   async removeFromCart(
