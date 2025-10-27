@@ -23,7 +23,10 @@ export interface ClassNotification {
     | 'screen-share-started'
     | 'screen-share-ended'
     | 'chat-message'
-    | 'general'
+    | 'payment:success'
+    | 'payment:failed'
+    | 'payment:pending'
+    | 'enrollment:created'
   classId?: string
   userId?: string
   displayName?: string
@@ -200,7 +203,7 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
     },
   ) {
     this.sendNotification(userId.toString(), {
-      type: 'general',
+      type: 'payment:pending',
       message: paymentData.message || 'Đang chờ thanh toán. Vui lòng quét mã QR để hoàn tất.',
       data: {
         paymentStatus: 'PENDING',
@@ -221,7 +224,7 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
     },
   ) {
     this.sendNotification(userId.toString(), {
-      type: 'general',
+      type: 'payment:success',
       message: paymentData.message || 'Thanh toán thành công! Bạn đã được ghi danh vào khóa học.',
       data: {
         paymentStatus: 'SUCCESS',
@@ -241,7 +244,7 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
     },
   ) {
     this.sendNotification(userId.toString(), {
-      type: 'general',
+      type: 'payment:failed',
       message: paymentData.message || 'Thanh toán thất bại. Vui lòng thử lại.',
       data: {
         paymentStatus: 'FAILED',
@@ -261,7 +264,7 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
     },
   ) {
     this.sendNotification(userId.toString(), {
-      type: 'general',
+      type: 'enrollment:created',
       message: `Bạn đã được ghi danh vào khóa học: ${enrollmentData.courseTitle}`,
       data: {
         notificationType: 'ENROLLMENT_CREATED',
