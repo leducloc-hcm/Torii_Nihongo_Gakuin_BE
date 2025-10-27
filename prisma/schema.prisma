@@ -635,6 +635,8 @@ model Class {
   sessions   LiveSession[]
   members    ClassMember[]
   orderItems OrderItem[]
+
+  CartItem CartItem[]
 }
 
 model ClassMember {
@@ -927,9 +929,11 @@ model CartItem {
   id       Int @id @default(autoincrement())
   cartId   Int
   courseId Int
+  classId   Int?
 
   cart   Cart   @relation(fields: [cartId], references: [id], onDelete: Cascade)
   course Course @relation(fields: [courseId], references: [id])
+    class  Class?  @relation(fields: [classId], references: [id])
 
   @@unique([cartId, courseId])
 }

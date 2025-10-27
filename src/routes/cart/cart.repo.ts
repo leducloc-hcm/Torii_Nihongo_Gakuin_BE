@@ -76,6 +76,35 @@ export class CartRepository {
     // Return updated cart
     return (await this.findByUserId(userId)) as Cart
   }
+  async addItemWithClassId(userId: number, courseId: number, quantity: number = 1, classId: number): Promise<Cart> {
+    const cart = await this.findOrCreate(userId)
+
+    // Check if course is already in cart
+    const existingItem = await this.prisma.cartItem.findUnique({
+      where: {
+        cartId_courseId: {
+          cartId: cart.id,
+          courseId,
+        },
+      },
+    })
+
+    if (existingItem) {
+      // Course already in cart - just return (no quantity update)
+      return (await this.findByUserId(userId)) as Cart
+    } else {
+      await this.prisma.cartItem.create({
+        data: {
+          cartId: cart.id,
+          courseId,
+          classId: classId,
+        },
+      })
+    }
+
+    // Return updated cart
+    return (await this.findByUserId(userId)) as Cart
+  }
 
   async updateItemQuantity(userId: number, courseId: number, quantity: number): Promise<Cart | null> {
     // Deprecated - no quantity field anymore

@@ -234,6 +234,25 @@ export class SepayService {
                 courseThumbnail: item.course?.thumbnailUrl || undefined,
                 expiresAt,
               })
+              if (item.classId) {
+                const existingMember = await tx.classMember.findUnique({
+                  where: {
+                    classId_userId: {
+                      userId: order.userId,
+                      classId: item.classId,
+                    },
+                  },
+                })
+                if (!existingMember) {
+                  await tx.classMember.create({
+                    data: {
+                      userId: order.userId,
+                      classId: item.classId,
+                      role: 'CUSTOMER', // Enrolled users are customers in the class
+                    },
+                  })
+                }
+              }
             }
           }
         }

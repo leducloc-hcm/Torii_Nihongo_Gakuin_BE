@@ -32,6 +32,7 @@ export const CartSchema = z.object({
 // Add to Cart Schema
 export const AddToCartSchema = z.object({
   courseId: z.coerce.number().int().positive({ message: 'Course ID must be positive' }),
+  classId: z.coerce.number().int().positive({ message: 'Class ID must be positive' }).optional(),
 })
 
 // Update Cart Item Schema (no longer needed, but keep for backward compatibility)
@@ -44,6 +45,7 @@ export const CartItemResponseSchema = z.object({
   id: z.number().int().positive(),
   courseId: z.number().int().positive(),
   course: CourseInfoSchema,
+  classId: z.number().int().positive().optional().nullable(),
 })
 
 // Cart Response Schema
