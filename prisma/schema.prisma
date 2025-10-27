@@ -412,7 +412,7 @@ model Option {
   assessmentAnswers AssessmentAnswer[]
   quizAnswers     QuizAnswer[]
   image     MediaAsset? @relation(fields: [mediaId], references: [id])
-  question  Question     @relation(fields: [questionId], references: [id])
+  question  Question     @relation(fields: [questionId], references: [id],onDelete: Cascade)
 }
 
 model AssessmentPaper {
