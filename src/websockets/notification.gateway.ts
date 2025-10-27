@@ -26,7 +26,7 @@ export interface ClassNotification {
     | 'payment:success'
     | 'payment:failed'
     | 'payment:pending'
-    | 'enrollment:created'
+    | 'notification:new' // ✅ Changed from 'enrollment:created' to match frontend
   classId?: string
   userId?: string
   displayName?: string
@@ -264,7 +264,7 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
     },
   ) {
     this.sendNotification(userId.toString(), {
-      type: 'enrollment:created',
+      type: 'notification:new', // ✅ Changed to match frontend listener
       message: `Bạn đã được ghi danh vào khóa học: ${enrollmentData.courseTitle}`,
       data: {
         notificationType: 'ENROLLMENT_CREATED',

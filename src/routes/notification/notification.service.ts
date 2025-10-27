@@ -15,7 +15,7 @@ export class NotificationService {
     this.notificationGateway.sendNotification(notification.userId.toString(), {
       ...notification,
       userId: notification.userId.toString(),
-      type: 'enrollment:created' as const,
+      type: 'notification:new' as const, // ✅ Changed to match frontend listener
     })
     return notification
   }
