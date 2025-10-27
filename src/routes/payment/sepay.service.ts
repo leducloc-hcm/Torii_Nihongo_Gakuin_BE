@@ -379,7 +379,7 @@ export class SepayService {
    * Format: TKPTPR{orderId}T{timestamp}
    */
   private extractPaymentCode(content: string): string | null {
-    const match = content.match(/TKPTPR\d+T\d+/)
+    const match = content.match(/TKPTPR DHMC\d+T\d+/)
     return match ? match[0] : null
   }
 }
