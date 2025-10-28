@@ -93,6 +93,42 @@ export class S3Service {
     }
   }
 
+  generatePresignedMaterialUploadUrl = async (
+    courseId: number,
+    moduleId: number,
+    lessonId: number,
+    filename: string,
+    contentType: string,
+    expiresIn: number = 3600, // 1 hour
+  ) => {
+    try {
+      const fileExt = filename.split('.').pop()
+      const key = `materials/courses/${courseId}/modules/${moduleId}/lessons/${lessonId}/${filename}.${fileExt}`
+
+      const command = new PutObjectCommand({
+        Bucket: this.BUCKET_NAME,
+        Key: key,
+        ContentType: contentType,
+        Metadata: {
+          courseId: courseId.toString(),
+          lessonId: lessonId.toString(),
+          originalFilename: filename,
+        },
+      })
+
+      const uploadUrl = await getSignedUrl(this.s3, command, { expiresIn })
+
+      return {
+        uploadUrl,
+        key,
+        expiresIn,
+      }
+    } catch (error) {
+      this.logger.error(`Failed to generate presigned material upload URL: ${error.message}`)
+      throw error
+    }
+  }
+
   // Generate presigned URL for video streaming
   generatePresignedStreamUrl = async (
     courseId: number,

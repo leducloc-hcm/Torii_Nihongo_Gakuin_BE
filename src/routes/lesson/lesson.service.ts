@@ -107,6 +107,23 @@ export class LessonService {
       data: result,
     }
   }
+
+  async generateMaterialUploadUrl(body: { lessonId: number; filename: string; contentType: string }, userId: number) {
+    const user = await this.sharedUserRepo.findUnique({ id: userId })
+    if (!user) {
+      throw new NotFoundException('User not found')
+    }
+    const lesson = await this.lessonRepository.findOne({ id: body.lessonId })
+    if (!lesson) {
+      throw new NotFoundException('Lesson not found')
+    }
+    const result = await this.lessonRepository.generateMaterialUploadUrl(body.lessonId, body.filename, body.contentType)
+    return {
+      message: 'Presigned material upload URL generated successfully',
+      data: result,
+    }
+  }
+
   async getPublicStreamUrl(lessonId: number) {
     const lesson = await this.lessonRepository.findOne({ id: lessonId })
     if (!lesson) {

@@ -179,6 +179,44 @@ export class LessonRepository {
     }
     return uploadInfo
   }
+
+  async generateMaterialUploadUrl(lessonId: number, filename: string, contentType: string) {
+    const lesson = await this.prisma.lesson.findFirst({
+      where: {
+        id: lessonId,
+      },
+      include: {
+        module: {
+          include: {
+            course: true,
+          },
+        },
+      },
+    })
+
+    if (!lesson) {
+      throw new Error('Lesson not found')
+    }
+    const uploadInfo = await this.s3Service.generatePresignedMaterialUploadUrl(
+      lesson.module.course.id,
+      lesson.module.id,
+      lessonId,
+      filename,
+      contentType,
+    )
+
+    await this.prisma.mediaAsset.create({
+      data: {
+        kind: MediaKind.OTHER,
+        url: uploadInfo.key,
+        lessonId: lesson.id,
+        mimeType: contentType,
+      },
+    })
+
+    return uploadInfo
+  }
+
   async generatePublicStreamUrl(lessonId: number) {
     const lesson = await this.prisma.lesson.findFirst({
       where: {

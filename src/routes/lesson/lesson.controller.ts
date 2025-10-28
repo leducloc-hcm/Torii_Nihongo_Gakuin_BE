@@ -76,6 +76,18 @@ export class LessonController {
   ) {
     return this.lessonService.generateUploadUrl(body, userId)
   }
+
+  @Post('/upload/material')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Admin, RoleName.Staff, RoleName.Lecturer)
+  @HttpCode(HttpStatus.OK)
+  async generateMaterialUploadUrl(
+    @Body() body: { lessonId: number; filename: string; contentType: string },
+    @ActiveUser('userId') userId: number,
+  ) {
+    return this.lessonService.generateMaterialUploadUrl(body, userId)
+  }
+
   @Get('public/:lessonId/stream')
   @HttpCode(HttpStatus.OK)
   @IsPublic()

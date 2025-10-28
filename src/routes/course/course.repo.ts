@@ -118,6 +118,14 @@ export class CourseRepository {
                     title: true,
                   },
                 },
+                media: {
+                  select: {
+                    id: true,
+                    url: true,
+                    kind: true,
+                    createdAt: true,
+                  },
+                },
               },
             },
           },
