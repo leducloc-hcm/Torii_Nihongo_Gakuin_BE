@@ -1150,9 +1150,6 @@ enum QuestionType {
 }
 
 enum QuestionGroupType {
-  VOCAB           
-  KANJI
-  GRAMMAR
   READING_SHORT
   READING_MEDIUM
   READING_LONG

@@ -154,6 +154,7 @@ export class AssessmentPaperRepository {
                             mediaId: true,
                             order: true,
                             isCorrect: false,
+                            image: true
                           },
                         },
                         media: true,
