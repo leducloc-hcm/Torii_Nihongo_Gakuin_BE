@@ -35,8 +35,6 @@ import { AssessmentAnswerService } from './assessment-answer.service'
 export class AssessmentAnswerController {
   constructor(private readonly assessmentAnswerService: AssessmentAnswerService) {}
 
-  // ===== Basic CRUD Operations =====
-
   @Post()
   @ApiOperation({
     summary: 'Create a new assessment answer',

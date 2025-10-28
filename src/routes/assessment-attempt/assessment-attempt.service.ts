@@ -63,6 +63,29 @@ export class AssessmentAttemptService {
     return attempt
   }
 
+  /**
+   * Get attempt with full details including questions, selected answers, and correct answers
+   */
+  async getAttemptWithDetails(id: number) {
+    const attempt = await this.assessmentAttemptRepo.findById(id, {
+      user: true,
+      assessment: true,
+      answers: false, // Will get answers separately with full details
+    })
+
+    if (!attempt) {
+      throw new NotFoundException(ASSESSMENT_ATTEMPT_ERRORS.NOT_FOUND)
+    }
+
+    // Get answers with full question and option details
+    const answersWithDetails = await this.assessmentAttemptRepo.getAttemptAnswersWithQuestions(id)
+
+    return {
+      ...attempt,
+      answers: answersWithDetails,
+    }
+  }
+
   async getAttempts(query: AssessmentAttemptQueryInput): Promise<PaginatedAssessmentAttempts> {
     const { page = 1, limit = 20 } = query
 

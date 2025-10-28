@@ -121,4 +121,24 @@ export class QuizService {
       sortOrder: 'asc',
     })
   }
+
+  async getAttemptedQuizzes(params: { userId: number; page: number; limit: number }) {
+    return await this.quizRepo.getAttemptedQuizzes(params)
+  }
+
+  async getRecentAttempts(quizId: number) {
+    return await this.quizRepo.getRecentAttempts(quizId)
+  }
+
+  async getQuizByAttempt(attemptId: number) {
+    return await this.quizRepo.getQuizByAttempt(attemptId)
+  }
+
+  async getQuizByUserAttempt(userId: number, attemptId: number) {
+    return await this.quizRepo.getQuizByUserAttempt(userId, attemptId)
+  }
+
+  async getQuizLeaderboard(quizId: number) {
+    return await this.quizRepo.getQuizLeaderboard(quizId)
+  }
 }

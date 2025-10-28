@@ -154,7 +154,7 @@ export class AssessmentPaperRepository {
                             mediaId: true,
                             order: true,
                             isCorrect: false,
-                            image: true
+                            image: true,
                           },
                         },
                         media: true,
@@ -203,7 +203,7 @@ export class AssessmentPaperRepository {
             },
           },
           orderBy: { startedAt: 'desc' },
-          take: 10, // Limit recent attempts
+          take: 10,
         },
       },
     })) as AssessmentPaperWithRelations | null
@@ -481,11 +481,9 @@ export class AssessmentPaperRepository {
         createdBy: original.createdBy,
         scoreProfileId: original.scoreProfileId,
         blueprintId: original.blueprintId,
-        blueprintSnapshot: original.blueprintSnapshot as any,
         seed: original.seed,
         version: newVersion,
         generatorVersion: original.generatorVersion,
-        generatorMeta: original.generatorMeta as any,
         sections: {
           create: original.sections.map((section) => ({
             title: section.title,
@@ -516,5 +514,355 @@ export class AssessmentPaperRepository {
         },
       },
     })
+  }
+
+  async getAssessmentPaperByAttempt(attemptId: number) {
+    const attempt = await this.prisma.assessmentAttempt.findUnique({
+      where: { id: attemptId },
+      select: {
+        id: true,
+        assessmentId: true,
+        userId: true,
+        score: true,
+        earnedScore: true,
+        startedAt: true,
+        submittedAt: true,
+        levelSuggestion: true,
+      },
+    })
+
+    if (!attempt) {
+      throw new Error('Attempt not found')
+    }
+
+    // Get assessment paper with full structure
+    const paper = await this.prisma.assessmentPaper.findUnique({
+      where: { id: attempt.assessmentId },
+      include: {
+        scoreProfile: {
+          select: {
+            id: true,
+            name: true,
+            level: true,
+            maxTotal: true,
+            minTotalPass: true,
+          },
+        },
+        sections: {
+          include: {
+            items: {
+              include: {
+                questions: {
+                  include: {
+                    question: {
+                      include: {
+                        option: {
+                          select: {
+                            id: true,
+                            content: true,
+                            isCorrect: true,
+                            order: true,
+                            mediaId: true,
+                          },
+                          orderBy: { order: 'asc' },
+                        },
+                        media: true,
+                      },
+                    },
+                  },
+                  orderBy: { order: 'asc' },
+                },
+                questionGroups: {
+                  include: {
+                    group: {
+                      include: {
+                        questions: {
+                          include: {
+                            question: {
+                              include: {
+                                option: {
+                                  select: {
+                                    id: true,
+                                    content: true,
+                                    isCorrect: true,
+                                    order: true,
+                                    mediaId: true,
+                                  },
+                                  orderBy: { order: 'asc' },
+                                },
+                                media: true,
+                              },
+                            },
+                          },
+                          orderBy: { order: 'asc' },
+                        },
+                        media: true,
+                      },
+                    },
+                  },
+                  orderBy: { order: 'asc' },
+                },
+              },
+              orderBy: { order: 'asc' },
+            },
+          },
+          orderBy: { id: 'asc' },
+        },
+      },
+    })
+
+    if (!paper) {
+      throw new Error('Assessment paper not found')
+    }
+
+    // Get all answers for this attempt
+    const answers = await this.prisma.assessmentAnswer.findMany({
+      where: { attemptId },
+      select: {
+        questionId: true,
+        selectedOptionId: true,
+        isCorrect: true,
+        timeSpentSec: true,
+      },
+    })
+
+    const answerMap = new Map(
+      answers.map((ans) => [
+        ans.questionId,
+        {
+          selectedOptionId: ans.selectedOptionId,
+          timeSpentSec: ans.timeSpentSec,
+        },
+      ]),
+    )
+
+    const enrichedPaper = {
+      ...paper,
+      attempt: {
+        id: attempt.id,
+        userId: attempt.userId,
+        score: attempt.score,
+        earnedScore: attempt.earnedScore,
+        startedAt: attempt.startedAt,
+        submittedAt: attempt.submittedAt,
+        levelSuggestion: attempt.levelSuggestion,
+      },
+      sections: paper.sections.map((section) => ({
+        ...section,
+        items: section.items.map((item) => ({
+          ...item,
+          questions: item.questions.map((q) => {
+            const userAnswer = answerMap.get(q.question.id)
+            return {
+              ...q,
+              question: {
+                ...q.question,
+                selectedOptionId: userAnswer?.selectedOptionId || null, // ✅ User's selected answer
+                timeSpentSec: userAnswer?.timeSpentSec || null,
+              },
+            }
+          }),
+          questionGroups: item.questionGroups.map((qg) => ({
+            ...qg,
+            group: {
+              ...qg.group,
+              questions: qg.group.questions.map((gq) => {
+                const userAnswer = answerMap.get(gq.question.id)
+                return {
+                  ...gq,
+                  question: {
+                    ...gq.question,
+                    selectedOptionId: userAnswer?.selectedOptionId || null, // ✅ User's selected answer
+                    timeSpentSec: userAnswer?.timeSpentSec || null,
+                  },
+                }
+              }),
+            },
+          })),
+        })),
+      })),
+    }
+
+    return enrichedPaper
+  }
+
+  async getAttemptedAssessments(params: {
+    userId: number
+    type?: 'TEST' | 'EXAM'
+    level?: 'N5' | 'N4' | 'N3' | 'N2' | 'N1'
+    page: number
+    limit: number
+  }) {
+    const { userId, type, level, page, limit } = params
+    const skip = (page - 1) * limit
+
+    const where: any = {
+      attempts: {
+        some: {
+          userId,
+          submittedAt: { not: null }, // ✅ Only include submitted attempts
+        },
+      },
+    }
+
+    if (type) where.type = type
+    if (level) where.level = level
+
+    const [data, total] = await Promise.all([
+      this.prisma.assessmentPaper.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          scoreProfile: {
+            select: {
+              id: true,
+              name: true,
+              maxTotal: true,
+            },
+          },
+          _count: {
+            select: {
+              attempts: {
+                where: {
+                  userId,
+                  submittedAt: { not: null },
+                },
+              },
+            },
+          },
+          attempts: {
+            where: {
+              userId,
+              submittedAt: { not: null },
+            },
+            orderBy: { submittedAt: 'desc' },
+            take: 1,
+            select: {
+              id: true,
+              score: true,
+              submittedAt: true,
+            },
+          },
+        },
+      }),
+      this.prisma.assessmentPaper.count({ where }),
+    ])
+
+    return {
+      data,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasNext: page * limit < total,
+        hasPrev: page > 1,
+      },
+    }
+  }
+
+  async getRecentAttempts(assessmentId: number) {
+    return await this.prisma.assessmentAttempt.findMany({
+      where: { assessmentId },
+      orderBy: { startedAt: 'desc' },
+      take: 3,
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    })
+  }
+
+  async getAssessmentPaperByUserAttempt(userId: number, attemptId: number) {
+    // Verify attempt belongs to user
+    const attempt = await this.prisma.assessmentAttempt.findFirst({
+      where: {
+        id: attemptId,
+        userId,
+      },
+    })
+
+    if (!attempt) {
+      throw new Error('Attempt not found or does not belong to this user')
+    }
+
+    // Use existing method
+    return await this.getAssessmentPaperByAttempt(attemptId)
+  }
+
+  /**
+   * Get leaderboard for an assessment (top 10 unique users by best score)
+   */
+  async getAssessmentLeaderboard(assessmentId: number) {
+    const topAttempts = await this.prisma.$queryRaw<
+      Array<{
+        userId: number
+        userName: string
+        userEmail: string
+        bestScore: number
+        attemptId: number
+        submittedAt: Date
+      }>
+    >`
+      WITH UserBestScores AS (
+        SELECT 
+          "userId",
+          MAX("score") as best_score
+        FROM "AssessmentAttempt"
+        WHERE "assessmentId" = ${assessmentId}
+          AND "score" IS NOT NULL
+          AND "submittedAt" IS NOT NULL
+        GROUP BY "userId"
+      ),
+      RankedAttempts AS (
+        SELECT 
+          aa."id" as attempt_id,
+          aa."userId" as user_id,
+          u."name" as user_name,
+          u."email" as user_email,
+          aa."score" as best_score,
+          aa."submittedAt" as submitted_at,
+          ROW_NUMBER() OVER (
+            PARTITION BY aa."userId" 
+            ORDER BY aa."score" DESC, aa."submittedAt" ASC
+          ) as rn
+        FROM "AssessmentAttempt" aa
+        JOIN "User" u ON u."id" = aa."userId"
+        JOIN UserBestScores ubs ON ubs."userId" = aa."userId" AND aa."score" = ubs.best_score
+        WHERE aa."assessmentId" = ${assessmentId}
+          AND aa."score" IS NOT NULL
+          AND aa."submittedAt" IS NOT NULL
+      )
+      SELECT 
+        user_id as "userId",
+        user_name as "userName",
+        user_email as "userEmail",
+        best_score as "bestScore",
+        attempt_id as "attemptId",
+        submitted_at as "submittedAt"
+      FROM RankedAttempts
+      WHERE rn = 1
+      ORDER BY best_score DESC, submitted_at ASC
+      LIMIT 10
+    `
+
+    return topAttempts.map((entry, index) => ({
+      rank: index + 1,
+      user: {
+        id: entry.userId,
+        name: entry.userName,
+        email: entry.userEmail,
+      },
+      bestScore: entry.bestScore,
+      attemptId: entry.attemptId,
+      submittedAt: entry.submittedAt,
+    }))
   }
 }
