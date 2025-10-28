@@ -46,6 +46,7 @@ export class CartService {
           price: item.course!.price,
           status: item.course!.status,
         },
+        classId: (item as any).classId || null,
       })),
       totalItems: summary?.totalItems || 0,
       totalAmount: summary?.totalAmount || 0,

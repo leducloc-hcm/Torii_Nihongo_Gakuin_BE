@@ -343,4 +343,26 @@ export class EnrollmentService {
       return false
     }
   }
+
+  async checkUserEnrollments(userId: number, courseIds: number[]): Promise<number[]> {
+    if (courseIds.length === 0) {
+      return []
+    }
+
+    try {
+      const enrollments = await this.enrollmentRepository.findUserEnrollmentsByCourseIds(userId, courseIds)
+
+      // Filter out expired enrollments and return only active course IDs
+      const activeEnrollments = enrollments.filter((enrollment) => {
+        if (enrollment.expiresAt && enrollment.expiresAt < new Date()) {
+          return false
+        }
+        return true
+      })
+
+      return activeEnrollments.map((enrollment) => enrollment.courseId)
+    } catch {
+      return []
+    }
+  }
 }

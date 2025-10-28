@@ -4,18 +4,14 @@ import { JanusService } from '../../websockets/janus/janus.service'
 import { S3Service } from '../../shared/services/s3.service'
 import { NotificationService } from '../notification/notification.service'
 import {
-  CreateOnlineClassDto,
-  UpdateOnlineClassDto,
-  ClassListQueryDto,
   JoinClassTokenDto,
   StartRecordingDto,
   ShareDocumentDto,
   ParticipantActionDto,
-  OnlineClassResponseDto,
   ClassAnalyticsDto,
 } from './online-class.dto'
-import { Role, JLPTLevel, LiveMode, NotificationType } from '@prisma/client'
-import { sign, verify } from 'jsonwebtoken'
+import { Role, LiveMode, NotificationType } from '@prisma/client'
+import { sign } from 'jsonwebtoken'
 
 @Injectable()
 export class OnlineClassService {
@@ -1034,6 +1030,17 @@ export class OnlineClassService {
                   name: true,
                   bio: true,
                   avatar: true,
+                },
+              },
+            },
+          },
+          members: {
+            select: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
                 },
               },
             },
