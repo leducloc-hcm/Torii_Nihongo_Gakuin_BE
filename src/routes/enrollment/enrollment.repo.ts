@@ -306,4 +306,22 @@ export class EnrollmentRepository {
       },
     })
   }
+
+  async findUserEnrollmentsByCourseIds(
+    userId: number,
+    courseIds: number[],
+  ): Promise<{ courseId: number; expiresAt: Date | null }[]> {
+    return await this.prisma.enrollment.findMany({
+      where: {
+        userId,
+        courseId: {
+          in: courseIds,
+        },
+      },
+      select: {
+        courseId: true,
+        expiresAt: true,
+      },
+    })
+  }
 }

@@ -11,8 +11,16 @@ export class OnlineClassRepository {
       where: { courseId },
       include: {
         lecturer: {
-          include: {
-            lecturerProfile: true,
+          select: {
+            email: true,
+            lecturerProfile: {
+              select: {
+                name: true,
+                username: true,
+                bio: true,
+                avatar: true,
+              },
+            },
           },
         },
         sessions: {
@@ -47,8 +55,16 @@ export class OnlineClassRepository {
       },
       include: {
         lecturer: {
-          include: {
-            lecturerProfile: true,
+          select: {
+            email: true,
+            lecturerProfile: {
+              select: {
+                name: true,
+                username: true,
+                bio: true,
+                avatar: true,
+              },
+            },
           },
         },
         sessions: {

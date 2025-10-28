@@ -181,7 +181,7 @@ export class CourseService {
     return course
   }
 
-  async getPublishedCourses(queryDto: Omit<QueryCourseDTO, 'status'>) {
+  async getPublishedCourses(queryDto: Omit<QueryCourseDTO, 'status'>, userId: number) {
     const { page, limit, search, level, courseType, sortBy, sortOrder } = queryDto
     const skip = (page - 1) * Number(limit)
 
@@ -224,10 +224,16 @@ export class CourseService {
     const lecturerArray = await this.lecturerRepository.findLectureProfileByUserIds(
       courses.map((course) => course.lecturerIds).flat(),
     )
+
+    // Check enrollment status for each course
+    const courseIds = courses.map((course) => course.id)
+    const userEnrollments = await this.enrollmentService.checkUserEnrollments(userId, courseIds)
+
     return {
       data: courses.map((course) => ({
         ...course,
         lecturers: lecturerArray.filter((lecturer) => course.lecturerIds.includes(lecturer.userId)),
+        isEnrolled: userEnrollments.includes(course.id),
       })),
       meta: {
         pagination: {
