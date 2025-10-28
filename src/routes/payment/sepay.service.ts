@@ -142,6 +142,7 @@ export class SepayService {
                   title: true,
                   slug: true,
                   thumbnailUrl: true,
+                  courseType: true,
                 },
               },
             },
@@ -219,20 +220,12 @@ export class SepayService {
                 data: {
                   userId: order.userId,
                   courseId: item.courseId,
-                  courseType: 'VIDEO_QUIZ',
+                  courseType: item.course!.courseType,
                   expiresAt,
                 },
               })
 
               enrollments.push({
-                courseId: item.courseId,
-                courseTitle: item.course?.title || 'Unknown Course',
-                courseThumbnail: item.course?.thumbnailUrl || undefined,
-                expiresAt,
-              })
-
-              // Send enrollment notification for each course
-              this.notificationGateway.notifyEnrollmentCreated(order.userId, {
                 courseId: item.courseId,
                 courseTitle: item.course?.title || 'Unknown Course',
                 courseThumbnail: item.course?.thumbnailUrl || undefined,
@@ -257,13 +250,68 @@ export class SepayService {
                     },
                   })
 
-                  // Add class ID to enrollments for calendar processing
-                  const existedEnrollment = enrollments.find((e) => e.courseId === item.courseId)
-                  if (existedEnrollment) {
-                    ;(existedEnrollment as any).classId = item.classId
+                  try {
+                    const calendarResult = await this.googleCalendarService.generateClassCalendar(
+                      item.classId,
+                      order.userId,
+                    )
+
+                    if (calendarResult.success && calendarResult.calendarData && calendarResult.events) {
+                      // Get class details for email
+                      const classDetails = await this.prisma.class.findUnique({
+                        where: { id: item.classId },
+                        include: {
+                          lecturer: {
+                            select: { name: true },
+                          },
+                          course: {
+                            select: { title: true },
+                          },
+                        },
+                      })
+
+                      if (classDetails && calendarResult.events.length > 0) {
+                        // Map events to session format for email template
+                        const sessions = calendarResult.events.map((event) => ({
+                          id: event.id,
+                          title: event.title,
+                          scheduledAt: event.scheduledAt,
+                          lecturerName: event.lecturerName,
+                        }))
+
+                        await this.emailService.sendCalendarInvite({
+                          email: order.user.email,
+                          studentName: order.user.name,
+                          classTitle: classDetails.title,
+                          courseTitle: classDetails.course?.title,
+                          lecturerName: classDetails.lecturer.name,
+                          sessionsCount: calendarResult.events.length,
+                          firstSessionDate: calendarResult.events[0].scheduledAt,
+                          lastSessionDate: calendarResult.events[calendarResult.events.length - 1].scheduledAt,
+                          classId: item.classId,
+                          calendarData: calendarResult.calendarData,
+                          bulkGoogleCalendarUrl: calendarResult.bulkGoogleCalendarUrl,
+                          sessions: sessions,
+                        })
+
+                        this.logger.log(`Calendar invite sent for class ${item.classId} to user ${order.userId}`)
+                      }
+                    }
+                  } catch (calendarError) {
+                    this.logger.error(
+                      `Failed to send calendar invite for class ${item.classId}: ${calendarError.message}`,
+                    )
+                    // Don't throw error as calendar failure shouldn't break the payment process
                   }
                 }
               }
+              // Send enrollment notification for each course
+              this.notificationGateway.notifyEnrollmentCreated(order.userId, {
+                courseId: item.courseId,
+                courseTitle: item.course?.title || 'Unknown Course',
+                courseThumbnail: item.course?.thumbnailUrl || undefined,
+                expiresAt,
+              })
               // Send welcome email for the course
               try {
                 await this.emailService.sendCourseWelcome({
@@ -297,59 +345,6 @@ export class SepayService {
       await this.cartService.clearCart(order.userId)
 
       // Send calendar invites for classes with live sessions
-      for (const enrollment of result) {
-        const classId = (enrollment as any).classId
-        if (classId) {
-          try {
-            const calendarResult = await this.googleCalendarService.generateClassCalendar(classId, order.userId)
-
-            if (calendarResult.success && calendarResult.calendarData && calendarResult.events) {
-              // Get class details for email
-              const classDetails = await this.prisma.class.findUnique({
-                where: { id: classId },
-                include: {
-                  lecturer: {
-                    select: { name: true },
-                  },
-                  course: {
-                    select: { title: true },
-                  },
-                },
-              })
-
-              if (classDetails && calendarResult.events.length > 0) {
-                // Map events to session format for email template
-                const sessions = calendarResult.events.map((event) => ({
-                  id: event.id,
-                  title: event.title,
-                  scheduledAt: event.scheduledAt,
-                  lecturerName: event.lecturerName,
-                }))
-
-                await this.emailService.sendCalendarInvite({
-                  email: order.user.email,
-                  studentName: order.user.name,
-                  classTitle: classDetails.title,
-                  courseTitle: classDetails.course?.title,
-                  lecturerName: classDetails.lecturer.name,
-                  sessionsCount: calendarResult.events.length,
-                  firstSessionDate: calendarResult.events[0].scheduledAt,
-                  lastSessionDate: calendarResult.events[calendarResult.events.length - 1].scheduledAt,
-                  classId: classId,
-                  calendarData: calendarResult.calendarData,
-                  bulkGoogleCalendarUrl: calendarResult.bulkGoogleCalendarUrl,
-                  sessions: sessions,
-                })
-
-                this.logger.log(`Calendar invite sent for class ${classId} to user ${order.userId}`)
-              }
-            }
-          } catch (calendarError) {
-            this.logger.error(`Failed to send calendar invite for class ${classId}: ${calendarError.message}`)
-            // Don't throw error as calendar failure shouldn't break the payment process
-          }
-        }
-      }
 
       this.notificationGateway.notifyPaymentSuccess(order.userId, {
         orderId: order.id,
