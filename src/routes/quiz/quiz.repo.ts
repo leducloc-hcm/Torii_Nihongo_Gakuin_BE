@@ -363,11 +363,14 @@ export class QuizRepository {
   }
 
   /**
-   * Get 3 most recent attempts for a quiz
+   * Get 3 most recent attempts for a quiz by user
    */
-  async getRecentAttempts(quizId: number) {
+  async getRecentAttempts(quizId: number, userId: number) {
     return await this.prisma.quizAttempt.findMany({
-      where: { quizId },
+      where: {
+        quizId,
+        userId, // ✅ Filter by user ID
+      },
       orderBy: { startedAt: 'desc' },
       take: 3,
       include: {

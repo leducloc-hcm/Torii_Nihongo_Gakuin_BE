@@ -126,8 +126,8 @@ export class QuizService {
     return await this.quizRepo.getAttemptedQuizzes(params)
   }
 
-  async getRecentAttempts(quizId: number) {
-    return await this.quizRepo.getRecentAttempts(quizId)
+  async getRecentAttempts(quizId: number, userId: number) {
+    return await this.quizRepo.getRecentAttempts(quizId, userId)
   }
 
   async getQuizByAttempt(attemptId: number) {

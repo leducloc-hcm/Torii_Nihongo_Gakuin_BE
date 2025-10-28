@@ -93,8 +93,8 @@ export class QuizController {
   @Get(':quizId/recent-attempts')
   @Auth([AuthType.Bearer])
   @Roles(Role.LECTURER, Role.STAFF, Role.CUSTOMER, Role.ADMIN)
-  async getRecentAttempts(@Param('quizId', ParseIntPipe) quizId: number) {
-    return this.quizService.getRecentAttempts(quizId)
+  async getRecentAttempts(@ActiveUser('userId') userId: number, @Param('quizId', ParseIntPipe) quizId: number) {
+    return this.quizService.getRecentAttempts(quizId, userId)
   }
 
   @Get(':quizId/leaderboard')

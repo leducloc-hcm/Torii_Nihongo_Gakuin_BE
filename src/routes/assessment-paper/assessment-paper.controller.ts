@@ -106,8 +106,8 @@ export class AssessmentPaperController {
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Customer, RoleName.Admin)
   @HttpCode(HttpStatus.OK)
-  getRecentAttempts(@Param('assessmentId', ParseIntPipe) assessmentId: number) {
-    return this.assessmentPaperService.getRecentAttempts(assessmentId)
+  getRecentAttempts(@ActiveUser('userId') userId: number, @Param('assessmentId', ParseIntPipe) assessmentId: number) {
+    return this.assessmentPaperService.getRecentAttempts(assessmentId, userId)
   }
 
   @Get('attempt/:attemptId/with-answers')

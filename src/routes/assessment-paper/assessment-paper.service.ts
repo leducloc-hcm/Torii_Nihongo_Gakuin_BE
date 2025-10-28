@@ -123,8 +123,8 @@ export class AssessmentPaperService {
     return await this.assessmentPaperRepo.getAttemptedAssessments(params)
   }
 
-  async getRecentAttempts(assessmentId: number) {
-    return await this.assessmentPaperRepo.getRecentAttempts(assessmentId)
+  async getRecentAttempts(assessmentId: number, userId: number) {
+    return await this.assessmentPaperRepo.getRecentAttempts(assessmentId, userId)
   }
 
   async getAssessmentPaperByUserAttempt(userId: number, attemptId: number) {

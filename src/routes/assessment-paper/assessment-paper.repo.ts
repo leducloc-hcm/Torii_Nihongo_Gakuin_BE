@@ -763,9 +763,12 @@ export class AssessmentPaperRepository {
     }
   }
 
-  async getRecentAttempts(assessmentId: number) {
+  async getRecentAttempts(assessmentId: number, userId: number) {
     return await this.prisma.assessmentAttempt.findMany({
-      where: { assessmentId },
+      where: {
+        assessmentId,
+        userId, // ✅ Filter by user ID
+      },
       orderBy: { startedAt: 'desc' },
       take: 3,
       include: {
