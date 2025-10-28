@@ -64,4 +64,43 @@ export class QuizController {
   async searchQuizzes(@Param('term') searchTerm: string) {
     return this.quizService.searchQuizzes(searchTerm)
   }
+
+  @Get('attempted/all')
+  @Auth([AuthType.Bearer])
+  @Roles(Role.LECTURER, Role.STAFF, Role.CUSTOMER, Role.ADMIN)
+  async getAttemptedQuizzes(
+    @ActiveUser('userId') userId: number,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.quizService.getAttemptedQuizzes({
+      userId,
+      page: page || 1,
+      limit: limit || 10,
+    })
+  }
+
+  @Get('attempt/:attemptId/with-answers')
+  @Auth([AuthType.Bearer])
+  @Roles(Role.LECTURER, Role.STAFF, Role.CUSTOMER, Role.ADMIN)
+  async getQuizByUserAttempt(
+    @ActiveUser('userId') userId: number,
+    @Param('attemptId', ParseIntPipe) attemptId: number,
+  ) {
+    return this.quizService.getQuizByUserAttempt(userId, attemptId)
+  }
+
+  @Get(':quizId/recent-attempts')
+  @Auth([AuthType.Bearer])
+  @Roles(Role.LECTURER, Role.STAFF, Role.CUSTOMER, Role.ADMIN)
+  async getRecentAttempts(@Param('quizId', ParseIntPipe) quizId: number) {
+    return this.quizService.getRecentAttempts(quizId)
+  }
+
+  @Get(':quizId/leaderboard')
+  @Auth([AuthType.Bearer])
+  @Roles(Role.LECTURER, Role.STAFF, Role.CUSTOMER, Role.ADMIN)
+  async getQuizLeaderboard(@Param('quizId', ParseIntPipe) quizId: number) {
+    return this.quizService.getQuizLeaderboard(quizId)
+  }
 }

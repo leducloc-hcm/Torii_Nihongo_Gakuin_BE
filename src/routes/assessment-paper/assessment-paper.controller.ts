@@ -82,14 +82,6 @@ export class AssessmentPaperController {
     return this.assessmentPaperService.cloneAssessmentPaper(id, body?.title)
   }
 
-  @Get('attempt/:attemptId/with-answers')
-  @Auth([AuthType.Bearer])
-  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Customer, RoleName.Admin)
-  @HttpCode(HttpStatus.OK)
-  async getAssessmentPaperByAttempt(@Param('attemptId', ParseIntPipe) attemptId: number) {
-    return this.assessmentPaperService.getAssessmentPaperByAttempt(attemptId)
-  }
-
   @Get('attempted/all')
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Customer, RoleName.Admin)
