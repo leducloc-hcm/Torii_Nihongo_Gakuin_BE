@@ -38,6 +38,32 @@ export class OnlineClassRepository {
       },
     })
   }
+  async findByCourseSlug(slug: string) {
+    return this.prisma.class.findMany({
+      where: {
+        course: {
+          slug: slug,
+        },
+      },
+      include: {
+        lecturer: {
+          include: {
+            lecturerProfile: true,
+          },
+        },
+        sessions: {
+          orderBy: { scheduledAt: 'asc' },
+        },
+        _count: {
+          select: {
+            members: true,
+            sessions: true,
+          },
+        },
+      },
+    })
+  }
+
   async findByCourseIdAndClassId(courseId: number, classId: number) {
     return this.prisma.class.findFirst({
       where: {

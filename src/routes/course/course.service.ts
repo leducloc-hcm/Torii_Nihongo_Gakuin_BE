@@ -120,11 +120,15 @@ export class CourseService {
     return course
   }
 
-  async findBySlug(slug: string, includeReviews = false): Promise<CourseWithRelations> {
+  async findBySlug(slug: string, includeReviews = false) {
     const course = await this.courseRepository.findBySlug(slug, includeReviews)
 
     if (!course) {
       throw new NotFoundException(`Course with slug '${slug}' not found`)
+    }
+    if (course.courseType === 'LIVE_ONLY') {
+      const classes = await this.onlineClassRepository.findByCourseSlug(course.slug)
+      course['classes'] = classes
     }
 
     return course
