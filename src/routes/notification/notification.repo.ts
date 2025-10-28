@@ -11,7 +11,16 @@ export class NotificationRepository {
   }
 
   async findAll(userId: number) {
-    return await this.prisma.notification.findMany({ where: { userId } })
+    return await this.prisma.notification.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    })
+  }
+
+  async getUnreadCount(userId: number) {
+    return await this.prisma.notification.count({
+      where: { userId, status: 'UNREAD' },
+    })
   }
 
   async findOne(id: number) {
@@ -25,10 +34,24 @@ export class NotificationRepository {
   async remove(id: number) {
     return await this.prisma.notification.delete({ where: { id } })
   }
+
+  async markAsRead(id: number, userId: number) {
+    return await this.prisma.notification.update({
+      where: { id, userId },
+      data: {
+        status: 'READ',
+        readAt: new Date(),
+      },
+    })
+  }
+
   async markAllAsRead(userId: number) {
     return await this.prisma.notification.updateMany({
       where: { userId, status: 'UNREAD' },
-      data: { status: 'READ' },
+      data: {
+        status: 'READ',
+        readAt: new Date(),
+      },
     })
   }
 }

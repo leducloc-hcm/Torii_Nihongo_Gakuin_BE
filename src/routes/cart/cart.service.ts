@@ -2,13 +2,15 @@ import { Injectable, NotFoundException, BadRequestException, ConflictException }
 import { CartRepository } from './cart.repo'
 import { CourseRepository } from '../course/course.repo'
 import { Cart, CartSummary } from './cart.model'
-import { AddToCartDTO, UpdateCartItemDTO, CartResponseDTO } from './cart.dto'
+import { AddToCartDTO, CartResponseDTO } from './cart.dto'
+import { OnlineClassRepository } from '../online-class/online-class.repo'
 
 @Injectable()
 export class CartService {
   constructor(
     private readonly cartRepository: CartRepository,
     private readonly courseRepository: CourseRepository,
+    private readonly classRepository: OnlineClassRepository,
   ) {}
 
   async initCart(userId: number): Promise<Cart> {
@@ -70,8 +72,18 @@ export class CartService {
       throw new BadRequestException('Free courses cannot be added to cart')
     }
 
-    // Add item to cart (no quantity)
-    const updatedCart = await this.cartRepository.addItem(userId, courseId, 1)
+    if (!addToCartDto.classId) {
+      // Add item to cart (no quantity)
+      const updatedCart = await this.cartRepository.addItem(userId, courseId, 1)
+    } else {
+      // Check if class exists for the course
+      const classForCourse = await this.classRepository.findByCourseIdAndClassId(courseId, addToCartDto.classId)
+      if (!classForCourse) {
+        throw new NotFoundException(`Class with ID ${addToCartDto.classId} not found for Course ID ${courseId}`)
+      }
+      // Add item to cart (no quantity)
+      const updatedCart = await this.cartRepository.addItemWithClassId(userId, courseId, 1, addToCartDto.classId)
+    }
 
     return (await this.getCart(userId)) as CartResponseDTO
   }

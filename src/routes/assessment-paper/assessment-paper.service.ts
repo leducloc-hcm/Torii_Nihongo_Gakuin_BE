@@ -108,4 +108,30 @@ export class AssessmentPaperService {
   }> {
     return this.assessmentPaperRepo.findMany(query)
   }
+
+  async getAssessmentPaperByAttempt(attemptId: number) {
+    return await this.assessmentPaperRepo.getAssessmentPaperByAttempt(attemptId)
+  }
+
+  async getAttemptedAssessments(params: {
+    userId: number
+    type?: 'TEST' | 'EXAM'
+    level?: 'N5' | 'N4' | 'N3' | 'N2' | 'N1'
+    page: number
+    limit: number
+  }) {
+    return await this.assessmentPaperRepo.getAttemptedAssessments(params)
+  }
+
+  async getRecentAttempts(assessmentId: number) {
+    return await this.assessmentPaperRepo.getRecentAttempts(assessmentId)
+  }
+
+  async getAssessmentPaperByUserAttempt(userId: number, attemptId: number) {
+    return await this.assessmentPaperRepo.getAssessmentPaperByUserAttempt(userId, attemptId)
+  }
+
+  async getAssessmentLeaderboard(assessmentId: number) {
+    return await this.assessmentPaperRepo.getAssessmentLeaderboard(assessmentId)
+  }
 }

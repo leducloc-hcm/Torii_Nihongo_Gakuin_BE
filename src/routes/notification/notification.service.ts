@@ -15,13 +15,17 @@ export class NotificationService {
     this.notificationGateway.sendNotification(notification.userId.toString(), {
       ...notification,
       userId: notification.userId.toString(),
-      type: 'general' as const,
+      type: 'notification:new' as const, // ✅ Changed to match frontend listener
     })
     return notification
   }
 
   async findAll(userId: number) {
     return this.notificationRepository.findAll(userId)
+  }
+
+  async getUnreadCount(userId: number) {
+    return this.notificationRepository.getUnreadCount(userId)
   }
 
   async findOne(id: number) {
@@ -31,6 +35,11 @@ export class NotificationService {
   async update(id: number, data: UpdateNotificationDto) {
     return this.notificationRepository.update(id, data)
   }
+
+  async markAsRead(id: number, userId: number) {
+    return this.notificationRepository.markAsRead(id, userId)
+  }
+
   async markAllAsRead(userId: number) {
     return this.notificationRepository.markAllAsRead(userId)
   }

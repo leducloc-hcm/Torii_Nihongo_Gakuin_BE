@@ -2,6 +2,8 @@ import { Injectable, Logger, BadRequestException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import axios from 'axios'
 import { PrismaService } from 'src/shared/services/prisma.service'
+import { EmailService } from 'src/shared/services/email.service'
+import { GoogleCalendarService } from 'src/shared/services/google-calendar.service'
 import { NotificationGateway } from 'src/websockets/notification.gateway'
 import { CartService } from '../cart/cart.service'
 
@@ -43,6 +45,8 @@ export class SepayService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
+    private readonly emailService: EmailService,
+    private readonly googleCalendarService: GoogleCalendarService,
     private readonly notificationGateway: NotificationGateway,
     private readonly cartService: CartService,
   ) {
@@ -234,6 +238,47 @@ export class SepayService {
                 courseThumbnail: item.course?.thumbnailUrl || undefined,
                 expiresAt,
               })
+
+              if (item.classId) {
+                const existingMember = await tx.classMember.findUnique({
+                  where: {
+                    classId_userId: {
+                      userId: order.userId,
+                      classId: item.classId,
+                    },
+                  },
+                })
+                if (!existingMember) {
+                  await tx.classMember.create({
+                    data: {
+                      userId: order.userId,
+                      classId: item.classId,
+                      role: 'CUSTOMER', // Enrolled users are customers in the class
+                    },
+                  })
+
+                  // Add class ID to enrollments for calendar processing
+                  const existedEnrollment = enrollments.find((e) => e.courseId === item.courseId)
+                  if (existedEnrollment) {
+                    ;(existedEnrollment as any).classId = item.classId
+                  }
+                }
+              }
+              // Send welcome email for the course
+              try {
+                await this.emailService.sendCourseWelcome({
+                  email: order.user.email,
+                  studentName: order.user.name,
+                  courseTitle: item.course?.title || 'Unknown Course',
+                  courseThumbnail: item.course?.thumbnailUrl || undefined,
+                  expiresAt,
+                  courseId: item.courseId,
+                })
+                this.logger.log(`Welcome email sent for course ${item.courseId} to user ${order.userId}`)
+              } catch (emailError) {
+                this.logger.error(`Failed to send welcome email for course ${item.courseId}: ${emailError.message}`)
+                // Don't throw error as email failure shouldn't break the payment process
+              }
             }
           }
         }
@@ -250,6 +295,61 @@ export class SepayService {
       })
 
       await this.cartService.clearCart(order.userId)
+
+      // Send calendar invites for classes with live sessions
+      for (const enrollment of result) {
+        const classId = (enrollment as any).classId
+        if (classId) {
+          try {
+            const calendarResult = await this.googleCalendarService.generateClassCalendar(classId, order.userId)
+
+            if (calendarResult.success && calendarResult.calendarData && calendarResult.events) {
+              // Get class details for email
+              const classDetails = await this.prisma.class.findUnique({
+                where: { id: classId },
+                include: {
+                  lecturer: {
+                    select: { name: true },
+                  },
+                  course: {
+                    select: { title: true },
+                  },
+                },
+              })
+
+              if (classDetails && calendarResult.events.length > 0) {
+                // Map events to session format for email template
+                const sessions = calendarResult.events.map((event) => ({
+                  id: event.id,
+                  title: event.title,
+                  scheduledAt: event.scheduledAt,
+                  lecturerName: event.lecturerName,
+                }))
+
+                await this.emailService.sendCalendarInvite({
+                  email: order.user.email,
+                  studentName: order.user.name,
+                  classTitle: classDetails.title,
+                  courseTitle: classDetails.course?.title,
+                  lecturerName: classDetails.lecturer.name,
+                  sessionsCount: calendarResult.events.length,
+                  firstSessionDate: calendarResult.events[0].scheduledAt,
+                  lastSessionDate: calendarResult.events[calendarResult.events.length - 1].scheduledAt,
+                  classId: classId,
+                  calendarData: calendarResult.calendarData,
+                  bulkGoogleCalendarUrl: calendarResult.bulkGoogleCalendarUrl,
+                  sessions: sessions,
+                })
+
+                this.logger.log(`Calendar invite sent for class ${classId} to user ${order.userId}`)
+              }
+            }
+          } catch (calendarError) {
+            this.logger.error(`Failed to send calendar invite for class ${classId}: ${calendarError.message}`)
+            // Don't throw error as calendar failure shouldn't break the payment process
+          }
+        }
+      }
 
       this.notificationGateway.notifyPaymentSuccess(order.userId, {
         orderId: order.id,
@@ -379,7 +479,7 @@ export class SepayService {
    * Format: TKPTPR{orderId}T{timestamp}
    */
   private extractPaymentCode(content: string): string | null {
-    const match = content.match(/TKPTPR\d+T\d+/)
+    const match = content.match(/TKPTPR DHMC\d+T\d+/)
     return match ? match[0] : null
   }
 }

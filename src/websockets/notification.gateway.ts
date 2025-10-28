@@ -14,22 +14,30 @@ export interface ClassNotification {
   type:
     | 'class-started'
     | 'class-ended'
-    | 'recording-started'
-    | 'recording-stopped'
-    | 'participant-joined'
-    | 'participant-left'
     | 'hand-raised'
-    | 'document-shared'
     | 'screen-share-started'
     | 'screen-share-ended'
     | 'chat-message'
-    | 'general'
+    | 'payment:success'
+    | 'payment:failed'
+    | 'payment:pending'
+    | 'notification:new' // ✅ Changed from 'enrollment:created' to match frontend
   classId?: string
   userId?: string
   displayName?: string
   message: string
   timestamp?: number
   data?: any
+}
+
+export interface PaymentNotificationData {
+  paymentStatus: 'PENDING' | 'SUCCESS' | 'FAILED'
+  orderId: number
+  amount: number
+  qrUrl?: string
+  transactionId?: string
+  courseIds?: number[]
+  errorMessage?: string
 }
 
 @WebSocketGateway({
@@ -79,21 +87,12 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
     this.logger.log(`Sent notification to user ${userId}: ${notification.type}`)
   }
 
-  // Send notification to multiple users
-  sendBulkNotifications(userIds: string[], notification: ClassNotification) {
-    userIds.forEach((userId) => {
-      this.sendNotification(userId, notification)
-    })
-  }
-
-  // Send notification to all users in a class
-  sendClassNotification(classId: string, notification: ClassNotification) {
-    this.server.to(`class_${classId}`).emit('notification', {
+  sendPaymentNotification(userId: string, notification: PaymentNotificationData) {
+    this.server.to(`user_${userId}`).emit('payment-notification', {
       ...notification,
-      classId,
       timestamp: Date.now(),
     })
-    this.logger.log(`Sent class notification to class ${classId}: ${notification.type}`)
+    this.logger.log(`Sent payment notification to user ${userId}: ${notification.paymentStatus}`)
   }
 
   // Send notification to all connected users
@@ -103,75 +102,6 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
       timestamp: Date.now(),
     })
     this.logger.log(`Sent global notification: ${notification.type}`)
-  }
-
-  // WebRTC-specific notification methods
-  notifyClassStarted(classId: string, teacherName: string, teacherId: string) {
-    this.sendClassNotification(classId, {
-      type: 'class-started',
-      message: `Class started by ${teacherName}`,
-      userId: teacherId,
-      displayName: teacherName,
-      data: { teacherId, teacherName },
-    })
-  }
-
-  notifyClassEnded(classId: string, teacherName: string, teacherId: string, duration: number) {
-    this.sendClassNotification(classId, {
-      type: 'class-ended',
-      message: `Class ended by ${teacherName}. Duration: ${Math.round(duration / 60000)} minutes`,
-      userId: teacherId,
-      displayName: teacherName,
-      data: { teacherId, teacherName, duration },
-    })
-  }
-
-  notifyRecordingStarted(classId: string, startedBy: string, recordingId: string) {
-    this.sendClassNotification(classId, {
-      type: 'recording-started',
-      message: `Recording started by ${startedBy}`,
-      displayName: startedBy,
-      data: { recordingId, startedBy },
-    })
-  }
-
-  notifyRecordingStopped(classId: string, stoppedBy: string, recordingId: string, s3Url?: string) {
-    this.sendClassNotification(classId, {
-      type: 'recording-stopped',
-      message: `Recording stopped by ${stoppedBy}`,
-      displayName: stoppedBy,
-      data: { recordingId, stoppedBy, s3Url },
-    })
-  }
-
-  notifyParticipantJoined(classId: string, userId: string, displayName: string, role: string) {
-    this.sendClassNotification(classId, {
-      type: 'participant-joined',
-      message: `${displayName} (${role}) joined the class`,
-      userId,
-      displayName,
-      data: { role },
-    })
-  }
-
-  notifyParticipantLeft(classId: string, userId: string, displayName: string, role: string) {
-    this.sendClassNotification(classId, {
-      type: 'participant-left',
-      message: `${displayName} (${role}) left the class`,
-      userId,
-      displayName,
-      data: { role },
-    })
-  }
-
-  notifyHandRaised(classId: string, userId: string, displayName: string, reason?: string) {
-    this.sendClassNotification(classId, {
-      type: 'hand-raised',
-      message: `${displayName} raised their hand${reason ? `: ${reason}` : ''}`,
-      userId,
-      displayName,
-      data: { reason },
-    })
   }
 
   // Get connected users count
@@ -200,7 +130,7 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
     },
   ) {
     this.sendNotification(userId.toString(), {
-      type: 'general',
+      type: 'payment:pending',
       message: paymentData.message || 'Đang chờ thanh toán. Vui lòng quét mã QR để hoàn tất.',
       data: {
         paymentStatus: 'PENDING',
@@ -220,15 +150,18 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
       message?: string
     },
   ) {
+    this.sendPaymentNotification(userId.toString(), {
+      paymentStatus: 'SUCCESS',
+      ...paymentData,
+    })
     this.sendNotification(userId.toString(), {
-      type: 'general',
-      message: paymentData.message || 'Thanh toán thành công! Bạn đã được ghi danh vào khóa học.',
+      type: 'payment:success',
+      message: paymentData.message || 'Thanh toán thành công. Cảm ơn bạn đã sử dụng dịch vụ của chúng tôi!',
       data: {
         paymentStatus: 'SUCCESS',
         ...paymentData,
       },
     })
-    this.logger.log(`Sent payment success notification to user ${userId}, order ${paymentData.orderId}`)
   }
 
   notifyPaymentFailed(
@@ -240,15 +173,18 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
       message?: string
     },
   ) {
+    this.sendPaymentNotification(userId.toString(), {
+      paymentStatus: 'FAILED',
+      ...paymentData,
+    })
     this.sendNotification(userId.toString(), {
-      type: 'general',
-      message: paymentData.message || 'Thanh toán thất bại. Vui lòng thử lại.',
+      type: 'payment:failed',
+      message: paymentData.message || 'Thanh toán không thành công. Vui lòng thử lại hoặc liên hệ hỗ trợ.',
       data: {
         paymentStatus: 'FAILED',
         ...paymentData,
       },
     })
-    this.logger.log(`Sent payment failed notification to user ${userId}, order ${paymentData.orderId}`)
   }
 
   notifyEnrollmentCreated(
@@ -261,7 +197,7 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
     },
   ) {
     this.sendNotification(userId.toString(), {
-      type: 'general',
+      type: 'notification:new', // ✅ Changed to match frontend listener
       message: `Bạn đã được ghi danh vào khóa học: ${enrollmentData.courseTitle}`,
       data: {
         notificationType: 'ENROLLMENT_CREATED',

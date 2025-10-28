@@ -50,7 +50,6 @@ export class CourseController {
   async findAll(@Query() queryDto: QueryCourseDTO) {
     return this.courseService.findAll(queryDto)
   }
-
   @Get('public/all')
   @IsPublic()
   @HttpCode(HttpStatus.OK)

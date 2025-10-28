@@ -29,7 +29,6 @@ services:
       - GOOGLE_REDIRECT_URI=
       - GOOGLE_CLIENT_REDIRECT_URI=
       - APP_NAME=
-      - PREFIX_STATIC_ENPOINT=
       - S3_REGION=ap-southeast-1
       - S3_ACCESS_KEY=AKIAVVZPCSCKZAVMUOVN
       - S3_SECRET_KEY=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

@@ -287,4 +287,352 @@ export class QuizRepository {
       },
     })
   }
+
+  async getAttemptedQuizzes(params: { userId: number; page: number; limit: number }) {
+    const { userId, page, limit } = params
+    const skip = (page - 1) * limit
+
+    const where: any = {
+      attempts: {
+        some: {
+          userId,
+          submittedAt: { not: null },
+        },
+      },
+    }
+
+    const [data, total] = await Promise.all([
+      this.prisma.quiz.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          author: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+          lesson: {
+            select: {
+              id: true,
+              title: true,
+            },
+          },
+          _count: {
+            select: {
+              attempts: {
+                where: {
+                  userId,
+                  submittedAt: { not: null },
+                },
+              },
+            },
+          },
+          attempts: {
+            where: {
+              userId,
+              submittedAt: { not: null },
+            },
+            orderBy: { submittedAt: 'desc' },
+            take: 1,
+            select: {
+              id: true,
+              score: true,
+              submittedAt: true,
+            },
+          },
+        },
+      }),
+      this.prisma.quiz.count({ where }),
+    ])
+
+    return {
+      data,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasNext: page * limit < total,
+        hasPrev: page > 1,
+      },
+    }
+  }
+
+  /**
+   * Get 3 most recent attempts for a quiz
+   */
+  async getRecentAttempts(quizId: number) {
+    return await this.prisma.quizAttempt.findMany({
+      where: { quizId },
+      orderBy: { startedAt: 'desc' },
+      take: 3,
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    })
+  }
+
+  /**
+   * Get quiz by attempt ID with all questions and user's answers
+   */
+  async getQuizByAttempt(attemptId: number) {
+    const attempt = await this.prisma.quizAttempt.findUnique({
+      where: { id: attemptId },
+      select: {
+        id: true,
+        quizId: true,
+        userId: true,
+        score: true,
+        startedAt: true,
+        submittedAt: true,
+      },
+    })
+
+    if (!attempt) {
+      throw new Error('Attempt not found')
+    }
+
+    // Get quiz with full structure
+    const quiz = await this.prisma.quiz.findUnique({
+      where: { id: attempt.quizId },
+      include: {
+        author: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        lesson: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
+        items: {
+          include: {
+            questions: {
+              include: {
+                question: {
+                  include: {
+                    option: {
+                      select: {
+                        id: true,
+                        content: true,
+                        isCorrect: true,
+                        order: true,
+                        mediaId: true,
+                      },
+                      orderBy: { order: 'asc' },
+                    },
+                    media: true,
+                  },
+                },
+              },
+              orderBy: { order: 'asc' },
+            },
+            questionGroups: {
+              include: {
+                group: {
+                  include: {
+                    questions: {
+                      include: {
+                        question: {
+                          include: {
+                            option: {
+                              select: {
+                                id: true,
+                                content: true,
+                                isCorrect: true,
+                                order: true,
+                                mediaId: true,
+                              },
+                              orderBy: { order: 'asc' },
+                            },
+                            media: true,
+                          },
+                        },
+                      },
+                      orderBy: { order: 'asc' },
+                    },
+                    media: true,
+                  },
+                },
+              },
+              orderBy: { order: 'asc' },
+            },
+          },
+          orderBy: { order: 'asc' },
+        },
+      },
+    })
+
+    if (!quiz) {
+      throw new Error('Quiz not found')
+    }
+
+    // Get all answers for this attempt
+    const answers = await this.prisma.quizAnswer.findMany({
+      where: { attemptId },
+      select: {
+        questionId: true,
+        selectedOptionId: true,
+        isCorrect: true,
+      },
+    })
+
+    const answerMap = new Map(
+      answers.map((ans) => [
+        ans.questionId,
+        {
+          selectedOptionId: ans.selectedOptionId,
+          isCorrect: ans.isCorrect,
+        },
+      ]),
+    )
+
+    // Enrich quiz with user's answers
+    const enrichedQuiz = {
+      ...quiz,
+      attempt: {
+        id: attempt.id,
+        userId: attempt.userId,
+        score: attempt.score,
+        startedAt: attempt.startedAt,
+        submittedAt: attempt.submittedAt,
+      },
+      items: quiz.items.map((item) => ({
+        ...item,
+        questions: item.questions.map((q) => {
+          const userAnswer = answerMap.get(q.question.id)
+          return {
+            ...q,
+            question: {
+              ...q.question,
+              selectedOptionId: userAnswer?.selectedOptionId || null,
+              isCorrect: userAnswer?.isCorrect || null,
+            },
+          }
+        }),
+        questionGroups: item.questionGroups.map((qg) => ({
+          ...qg,
+          group: {
+            ...qg.group,
+            questions: qg.group.questions.map((gq) => {
+              const userAnswer = answerMap.get(gq.question.id)
+              return {
+                ...gq,
+                question: {
+                  ...gq.question,
+                  selectedOptionId: userAnswer?.selectedOptionId || null,
+                  isCorrect: userAnswer?.isCorrect || null,
+                },
+              }
+            }),
+          },
+        })),
+      })),
+    }
+
+    return enrichedQuiz
+  }
+
+  /**
+   * Get quiz by user's attempt (with validation)
+   */
+  async getQuizByUserAttempt(userId: number, attemptId: number) {
+    // Verify attempt belongs to user
+    const attempt = await this.prisma.quizAttempt.findFirst({
+      where: {
+        id: attemptId,
+        userId,
+      },
+    })
+
+    if (!attempt) {
+      throw new Error('Attempt not found or does not belong to this user')
+    }
+
+    // Use existing method
+    return await this.getQuizByAttempt(attemptId)
+  }
+
+  /**
+   * Get leaderboard for a quiz (top 10 unique users by best score)
+   */
+  async getQuizLeaderboard(quizId: number) {
+    const topAttempts = await this.prisma.$queryRaw<
+      Array<{
+        userId: number
+        userName: string
+        userEmail: string
+        bestScore: number
+        attemptId: number
+        submittedAt: Date
+      }>
+    >`
+      WITH UserBestScores AS (
+        SELECT 
+          "userId",
+          MAX("score") as best_score
+        FROM "QuizAttempt"
+        WHERE "quizId" = ${quizId}
+          AND "score" IS NOT NULL
+          AND "submittedAt" IS NOT NULL
+        GROUP BY "userId"
+      ),
+      RankedAttempts AS (
+        SELECT 
+          qa."id" as attempt_id,
+          qa."userId" as user_id,
+          u."name" as user_name,
+          u."email" as user_email,
+          qa."score" as best_score,
+          qa."submittedAt" as submitted_at,
+          ROW_NUMBER() OVER (
+            PARTITION BY qa."userId" 
+            ORDER BY qa."score" DESC, qa."submittedAt" ASC
+          ) as rn
+        FROM "QuizAttempt" qa
+        JOIN "User" u ON u."id" = qa."userId"
+        JOIN UserBestScores ubs ON ubs."userId" = qa."userId" AND qa."score" = ubs.best_score
+        WHERE qa."quizId" = ${quizId}
+          AND qa."score" IS NOT NULL
+          AND qa."submittedAt" IS NOT NULL
+      )
+      SELECT 
+        user_id as "userId",
+        user_name as "userName",
+        user_email as "userEmail",
+        best_score as "bestScore",
+        attempt_id as "attemptId",
+        submitted_at as "submittedAt"
+      FROM RankedAttempts
+      WHERE rn = 1
+      ORDER BY best_score DESC, submitted_at ASC
+      LIMIT 10
+    `
+
+    return topAttempts.map((entry, index) => ({
+      rank: index + 1,
+      user: {
+        id: entry.userId,
+        name: entry.userName,
+        email: entry.userEmail,
+      },
+      bestScore: entry.bestScore,
+      attemptId: entry.attemptId,
+      submittedAt: entry.submittedAt,
+    }))
+  }
 }
