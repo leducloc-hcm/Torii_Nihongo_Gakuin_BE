@@ -249,7 +249,6 @@ export class SepayService {
                       role: 'CUSTOMER', // Enrolled users are customers in the class
                     },
                   })
-
                   try {
                     const calendarResult = await this.googleCalendarService.generateClassCalendar(
                       item.classId,

@@ -119,23 +119,6 @@ export class GoogleCalendarService {
    */
   async generateClassCalendar(classId: number, userId: number): Promise<CalendarGenerationResult> {
     try {
-      // First, verify user has access to this class
-      const classMember = await this.prisma.classMember.findUnique({
-        where: {
-          classId_userId: {
-            classId,
-            userId,
-          },
-        },
-      })
-
-      if (!classMember) {
-        return {
-          success: false,
-          errorMessage: 'User does not have access to this class',
-        }
-      }
-
       // Fetch class details and all live sessions
       const classDetails = await this.prisma.class.findUnique({
         where: { id: classId },

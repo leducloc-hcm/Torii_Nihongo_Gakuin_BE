@@ -18,6 +18,7 @@ export const CartItemSchema = z.object({
   cartId: z.number().int().positive(),
   courseId: z.number().int().positive(),
   course: CourseInfoSchema.optional(),
+  classId: z.number().int().positive().optional().nullable(),
 })
 
 // Cart Schema

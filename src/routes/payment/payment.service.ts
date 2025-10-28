@@ -115,6 +115,7 @@ export class PaymentService {
             type: 'COURSE',
             courseId: item.courseId,
             unitPrice: item.course?.price || 0,
+            classId: item.classId,
           })),
         },
       },
