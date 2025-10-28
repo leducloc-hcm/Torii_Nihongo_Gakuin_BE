@@ -365,6 +365,67 @@ export class AssessmentAttemptRepository {
     }))
   }
 
+  /**
+   * Get attempt answers with full question and options details (for showing results)
+   */
+  async getAttemptAnswersWithQuestions(attemptId: number): Promise<
+    Array<{
+      id: number
+      questionId: number
+      selectedOptionId: number | null
+      question: {
+        id: number
+        type: string
+        stem: string
+        passage: string | null
+        explanation: string | null
+        options: Array<{
+          id: number
+          content: string | null
+          isCorrect: boolean
+        }>
+      }
+    }>
+  > {
+    const answers = await this.prisma.assessmentAnswer.findMany({
+      where: { attemptId },
+      include: {
+        question: {
+          select: {
+            id: true,
+            type: true,
+            stem: true,
+            passage: true,
+            explanation: true,
+            option: {
+              select: {
+                id: true,
+                content: true,
+                isCorrect: true,
+              },
+              orderBy: { order: 'asc' },
+            },
+          },
+        },
+      },
+      orderBy: { questionId: 'asc' },
+    })
+
+    return answers.map((answer: any) => ({
+      id: answer.id,
+      questionId: answer.questionId,
+      selectedOptionId: answer.selectedOptionId,
+      question: {
+        id: answer.question.id,
+        type: answer.question.type,
+        stem: answer.question.stem,
+        passage: answer.question.passage,
+        explanation: answer.question.explanation,
+        options: answer.question.option,
+      },
+    }))
+  }
+
   async calculateSectionScores(attemptId: number): Promise<SectionScore[]> {
     const answers = await this.getAttemptAnswers(attemptId)
 

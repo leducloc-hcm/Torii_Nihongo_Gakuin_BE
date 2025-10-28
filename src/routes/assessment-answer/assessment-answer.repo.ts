@@ -293,7 +293,7 @@ export class AssessmentAnswerRepository {
   // ===== Query and Retrieval Methods =====
 
   async getAttemptAnswers(attemptId: number): Promise<AssessmentAnswer[]> {
-    return this.prisma.assessmentAnswer.findMany({
+    return await this.prisma.assessmentAnswer.findMany({
       where: { attemptId },
       orderBy: { questionId: 'asc' },
     })
@@ -375,7 +375,7 @@ export class AssessmentAnswerRepository {
       }
     }
 
-    return this.prisma.assessmentAnswer.findMany({
+    return await this.prisma.assessmentAnswer.findMany({
       where,
       select: {
         id: true,

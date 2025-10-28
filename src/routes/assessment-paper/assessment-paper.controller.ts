@@ -81,4 +81,59 @@ export class AssessmentPaperController {
   async clone(@Param('id', ParseIntPipe) id: number, @Body() body?: { title?: string }) {
     return this.assessmentPaperService.cloneAssessmentPaper(id, body?.title)
   }
+
+  @Get('attempt/:attemptId/with-answers')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Customer, RoleName.Admin)
+  @HttpCode(HttpStatus.OK)
+  async getAssessmentPaperByAttempt(@Param('attemptId', ParseIntPipe) attemptId: number) {
+    return this.assessmentPaperService.getAssessmentPaperByAttempt(attemptId)
+  }
+
+  @Get('attempted/all')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Customer, RoleName.Admin)
+  @HttpCode(HttpStatus.OK)
+  getAttemptedAssessments(
+    @ActiveUser('userId') userId: number,
+    @Query('type') type?: 'TEST' | 'EXAM',
+    @Query('level') level?: 'N5' | 'N4' | 'N3' | 'N2' | 'N1',
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.assessmentPaperService.getAttemptedAssessments({
+      userId,
+      type,
+      level,
+      page: page || 1,
+      limit: limit || 10,
+    })
+  }
+
+  @Get(':assessmentId/recent-attempts')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Customer, RoleName.Admin)
+  @HttpCode(HttpStatus.OK)
+  getRecentAttempts(@Param('assessmentId', ParseIntPipe) assessmentId: number) {
+    return this.assessmentPaperService.getRecentAttempts(assessmentId)
+  }
+
+  @Get('attempt/:attemptId/with-answers')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Customer, RoleName.Admin)
+  @HttpCode(HttpStatus.OK)
+  getAssessmentPaperByUserAttempt(
+    @ActiveUser('userId') userId: number,
+    @Param('attemptId', ParseIntPipe) attemptId: number,
+  ) {
+    return this.assessmentPaperService.getAssessmentPaperByUserAttempt(userId, attemptId)
+  }
+
+  @Get(':assessmentId/leaderboard')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Customer, RoleName.Admin)
+  @HttpCode(HttpStatus.OK)
+  getAssessmentLeaderboard(@Param('assessmentId', ParseIntPipe) assessmentId: number) {
+    return this.assessmentPaperService.getAssessmentLeaderboard(assessmentId)
+  }
 }
