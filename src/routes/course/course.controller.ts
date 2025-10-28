@@ -51,10 +51,11 @@ export class CourseController {
     return this.courseService.findAll(queryDto)
   }
   @Get('public/all')
-  @IsPublic()
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Customer)
   @HttpCode(HttpStatus.OK)
-  async findPublished(@Query() queryDto: Omit<QueryCourseDTO, 'status'>) {
-    return this.courseService.getPublishedCourses(queryDto)
+  async findPublished(@ActiveUser('userId') userId: number, @Query() queryDto: Omit<QueryCourseDTO, 'status'>) {
+    return this.courseService.getPublishedCourses(queryDto, userId)
   }
 
   @Get('my-enrolled-courses')

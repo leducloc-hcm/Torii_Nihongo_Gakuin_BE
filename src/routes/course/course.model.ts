@@ -113,6 +113,20 @@ export const CourseListItemSchema = z.object({
   }),
 })
 
+// Published Course List Item Schema (includes enrollment status)
+export const PublishedCourseListItemSchema = CourseListItemSchema.extend({
+  isEnrolled: z.boolean(),
+  lecturers: z.array(
+    z.object({
+      id: z.number(),
+      userId: z.number(),
+      name: z.string().nullable(),
+      username: z.string().nullable(),
+      avatar: z.string().nullable(),
+    }),
+  ),
+})
+
 // Repository input/output types
 export type CourseCreateInput = {
   slug: string
@@ -192,7 +206,7 @@ export type CourseWithRelations = {
   createdAt: Date
   updatedAt: Date
   lecturerIds: number[]
-  lecturers: Array<{
+  lecturers?: Array<{
     id: number
     name: string
     email: string
@@ -222,6 +236,32 @@ export type CourseWithRelations = {
     }
     createdAt: Date
   }>
+  isEnrolled?: boolean
+}
+
+export type PublishedCourseListItem = {
+  id: number
+  slug: string
+  title: string
+  subtitle: string | null
+  level: 'N5' | 'N4' | 'N3' | 'N2' | 'N1'
+  courseType: 'VIDEO_QUIZ' | 'VIDEO_QUIZ_LIVE' | 'LIVE_ONLY'
+  thumbnailUrl: string | null
+  price: number
+  status: 'DRAFT' | 'PENDING_REVIEW' | 'PUBLISHED' | 'ARCHIVED'
+  createdAt: Date
+  lecturers: Array<{
+    id: number
+    userId: number
+    name: string | null
+    username: string | null
+    avatar: string | null
+  }>
+  _count: {
+    modules: number
+    enrollments: number
+  }
+  isEnrolled: boolean
 }
 
 // Exported Zod types
@@ -231,3 +271,4 @@ export type UpdateCourseType = z.infer<typeof UpdateCourseSchema>
 export type QueryCourseType = z.infer<typeof QueryCourseSchema>
 export type CourseResponseType = z.infer<typeof CourseResponseSchema>
 export type CourseListItemType = z.infer<typeof CourseListItemSchema>
+export type PublishedCourseListItemType = z.infer<typeof PublishedCourseListItemSchema>
