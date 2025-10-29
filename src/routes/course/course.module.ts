@@ -6,9 +6,10 @@ import { OnlineClassRepository } from '../online-class/online-class.repo'
 import { SharedModule } from 'src/shared/shared.module'
 import { ProfileModule } from '../profile/profile.module'
 import { EnrollmentModule } from '../enrollment/enrollment.module'
+import { LessonProgressModule } from '../lesson-progress/lesson-progress.module'
 
 @Module({
-  imports: [SharedModule, ProfileModule, EnrollmentModule],
+  imports: [SharedModule, ProfileModule, EnrollmentModule, LessonProgressModule],
   controllers: [CourseController],
   providers: [CourseService, CourseRepository, OnlineClassRepository],
   exports: [CourseService, CourseRepository],

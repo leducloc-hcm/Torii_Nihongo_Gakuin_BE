@@ -10,6 +10,7 @@ import { CourseModule } from './routes/course/course.module'
 import { ModuleModule } from './routes/module/module.module'
 import { LessonModule } from './routes/lesson/lesson.module'
 import { EnrollmentModule } from './routes/enrollment/enrollment.module'
+import { LessonProgressModule } from './routes/lesson-progress/lesson-progress.module'
 import { FlashcardModule } from './routes/flashcard/flashcard.module'
 import { NotificationModule } from './routes/notification/notification.module'
 import { PlacementBlueprintModule } from './routes/placement/placement-blueprint.module'
@@ -44,6 +45,7 @@ import { RedisModule } from './shared/redis/redis.module'
     ModuleModule,
     LessonModule,
     EnrollmentModule,
+    LessonProgressModule,
     FlashcardModule,
     NotificationModule,
     QuestionGroupModule,

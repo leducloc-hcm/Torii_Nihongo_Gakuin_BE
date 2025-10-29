@@ -13,10 +13,14 @@ import {
   EnrollmentOrderByInput,
   MyEnrollmentType,
 } from './enrollment.model'
+import { PrismaService } from 'src/shared/services/prisma.service'
 
 @Injectable()
 export class EnrollmentService {
-  constructor(private readonly enrollmentRepository: EnrollmentRepository) {}
+  constructor(
+    private readonly enrollmentRepository: EnrollmentRepository,
+    private readonly prisma: PrismaService,
+  ) {}
 
   async create(createEnrollmentDto: CreateEnrollmentDTO, userId: number): Promise<EnrollmentWithRelations> {
     const { courseId, courseType, expiresAt } = createEnrollmentDto
@@ -155,14 +159,62 @@ export class EnrollmentService {
       orderBy,
     })
 
+    // Calculate progress for each enrollment
+    const enrollmentsWithProgress = await Promise.all(
+      enrollments.map(async (enrollment) => {
+        const progress = await this.calculateCourseProgress(userId, enrollment.courseId)
+        return {
+          ...enrollment,
+          progressPercentage: progress.progressPercentage,
+          totalLessons: progress.totalLessons,
+          completedLessons: progress.completedLessons,
+        }
+      }),
+    )
+
     return {
-      data: enrollments,
+      data: enrollmentsWithProgress,
       meta: {
         page,
         limit: Number(limit),
         total,
         totalPages: Math.ceil(total / Number(limit)),
       },
+    }
+  }
+
+  private async calculateCourseProgress(
+    userId: number,
+    courseId: number,
+  ): Promise<{ progressPercentage: number; totalLessons: number; completedLessons: number }> {
+    // Get total lessons count for the course
+    const totalLessons = await this.prisma.lesson.count({
+      where: {
+        module: {
+          courseId,
+        },
+      },
+    })
+
+    // Get completed lessons count for the user in this course
+    const completedLessons = await this.prisma.lessonProgress.count({
+      where: {
+        userId,
+        completed: true,
+        lesson: {
+          module: {
+            courseId,
+          },
+        },
+      },
+    })
+
+    const progressPercentage = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0
+
+    return {
+      progressPercentage,
+      totalLessons,
+      completedLessons,
     }
   }
 
@@ -301,10 +353,20 @@ export class EnrollmentService {
 
     const userExpiredCount = expiredEnrollments.filter((e) => e.userId === userId).length
 
+    // Calculate completion stats
+    const completedCoursesCount = await Promise.all(
+      activeEnrollments.map(async (enrollment) => {
+        const progress = await this.calculateCourseProgress(userId, enrollment.courseId)
+        return progress.progressPercentage === 100
+      }),
+    ).then((results) => results.filter(Boolean).length)
+
     return {
       total: totalCount,
       active: activeEnrollments.length,
       expired: userExpiredCount,
+      completed: completedCoursesCount,
+      inProgress: activeEnrollments.length - completedCoursesCount,
     }
   }
 

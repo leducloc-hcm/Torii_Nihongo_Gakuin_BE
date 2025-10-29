@@ -29,11 +29,16 @@ import { Roles } from 'src/shared/decorators/roles.decorator'
 import { RolesGuard } from 'src/shared/guards/roles.guard'
 import { RoleName } from 'src/shared/constants/role.constant'
 import { ActiveUser } from 'src/shared/decorators/active-user.decorator'
+import { LessonProgressService } from '../lesson-progress/lesson-progress.service'
+import { UpdateProgressDTO } from '../lesson-progress/lesson-progress.dto'
 
 @Controller('courses')
 @UseGuards(RolesGuard)
 export class CourseController {
-  constructor(private readonly courseService: CourseService) {}
+  constructor(
+    private readonly courseService: CourseService,
+    private readonly progressService: LessonProgressService,
+  ) {}
 
   @Post()
   @Auth([AuthType.Bearer])
@@ -188,5 +193,37 @@ export class CourseController {
     @Param('classId', ParseIntPipe) classId: number,
   ) {
     return await this.courseService.getClassSessions(courseId, classId)
+  }
+
+  // Learning Progress Routes
+  @Get(':courseId/progress')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Customer)
+  @HttpCode(HttpStatus.OK)
+  async getCourseProgress(@ActiveUser('userId') userId: number, @Param('courseId', ParseIntPipe) courseId: number) {
+    return await this.progressService.getCourseProgress(userId, courseId)
+  }
+
+  @Get(':courseId/progress-details')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Customer)
+  @HttpCode(HttpStatus.OK)
+  async getCourseProgressDetails(
+    @ActiveUser('userId') userId: number,
+    @Param('courseId', ParseIntPipe) courseId: number,
+  ) {
+    return await this.progressService.getCourseProgressDetails(userId, courseId)
+  }
+
+  @Put(':courseId/progress')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Customer)
+  @HttpCode(HttpStatus.OK)
+  async updateProgress(
+    @ActiveUser('userId') userId: number,
+    @Param('courseId', ParseIntPipe) courseId: number,
+    @Body() updateProgressDto: UpdateProgressDTO,
+  ) {
+    return await this.progressService.updateProgress(userId, updateProgressDto)
   }
 }
