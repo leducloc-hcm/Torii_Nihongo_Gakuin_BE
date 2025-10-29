@@ -485,12 +485,24 @@ export class WebRTCGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const janusKeyPath = process.env.JANUS_SSH_KEY || '/home/ubuntu/.ssh/janus_key'
     const scriptPath = '/opt/janus/bin/auto_push_to_s3.sh'
     const recordingsDir = '/opt/janus/share/janus/recordings'
+    const metadataFile = `/tmp/room${classId}_metadata.txt`
 
     this.logger.log(`📹 Triggering recording combine for class ${classId} on ${janusHost}`)
 
-    // SSH command to execute script on remote Janus server
-    // Must cd to recordings dir and run with sudo (ubuntu user needs sudo privileges for this script)
-    const sshCommand = `ssh -i ${janusKeyPath} -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${janusUser}@${janusHost} "cd ${recordingsDir} && sudo ${scriptPath} ${classId}"`
+    // Create metadata file with basic info
+    const timestamp = new Date().toISOString()
+    const metadata = [
+      `class_id=${classId}`,
+      `room_id=room${classId}`,
+      `ended_at=${timestamp}`,
+      `recordings_dir=${recordingsDir}`,
+    ].join('\n')
+
+    // SSH command to:
+    // 1. Create metadata file
+    // 2. Execute the combine script
+    // 3. Clean up metadata file after completion
+    const sshCommand = `ssh -i ${janusKeyPath} -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${janusUser}@${janusHost} "echo '${metadata}' > ${metadataFile} && cd ${recordingsDir} && sudo ${scriptPath} ${classId}; rm -f ${metadataFile}"`
 
     exec(sshCommand, (error, stdout, stderr) => {
       if (error) {
@@ -501,7 +513,20 @@ export class WebRTCGateway implements OnGatewayConnection, OnGatewayDisconnect {
         return
       }
       if (stderr) {
-        this.logger.warn(`⚠️ Recording stderr for class ${classId}:`, stderr)
+        // Filter out common SSH warnings that are not actual errors
+        const filteredStderr = stderr
+          .split('\n')
+          .filter((line) => {
+            return !line.includes('Permanently added') && !line.includes('xargs: warning') && line.trim() !== ''
+          })
+          .join('\n')
+
+        if (filteredStderr) {
+          this.logger.warn(`⚠️ Recording stderr for class ${classId}:\n${filteredStderr}`)
+        }
+      }
+      if (stdout) {
+        this.logger.log(`📹 Recording output for class ${classId}:\n${stdout}`)
       }
       this.logger.log(`✅ Recording combine triggered successfully for class ${classId} on ${janusHost}`)
     })
