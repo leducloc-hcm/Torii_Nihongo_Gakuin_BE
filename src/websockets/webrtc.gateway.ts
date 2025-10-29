@@ -10,6 +10,7 @@ import {
 import { Logger } from '@nestjs/common'
 import { Server, Socket } from 'socket.io'
 import { exec } from 'child_process'
+import { PrismaService } from '../shared/services/prisma.service'
 
 type Role = 'lecturer' | 'customer'
 
@@ -70,6 +71,8 @@ export class WebRTCGateway implements OnGatewayConnection, OnGatewayDisconnect {
   server: Server
 
   private readonly logger = new Logger(WebRTCGateway.name)
+
+  constructor(private readonly prisma: PrismaService) {}
 
   // In-memory participant tracking: classId -> (userId -> participant)
   private readonly classParticipants = new Map<string, Map<string, ParticipantInfo>>()
@@ -475,39 +478,43 @@ export class WebRTCGateway implements OnGatewayConnection, OnGatewayDisconnect {
    * Trigger recording combine and S3 upload after room/class is destroyed
    * Executes script on remote Janus server via SSH
    */
-  private triggerRecordingCombine(classId: string): void {
+  private triggerRecordingCombine(janusRoomId: number, classId: string): void {
     // Extract hostname from JANUS_SERVER_URL (e.g., wss://janus.example.com/ws -> janus.example.com)
     const janusServerUrl = process.env.JANUS_SERVER_URL || 'wss://janus.torii-nihongo-gakuin.io.vn/ws'
     const janusHost = new URL(janusServerUrl).hostname
 
     // SSH configuration
     const janusUser = process.env.JANUS_SSH_USER || 'ubuntu'
-    const janusKeyPath = process.env.JANUS_SSH_KEY || '/home/ubuntu/.ssh/janus_key'
+    const janusKeyPath = process.env.JANUS_SSH_KEY || '~/.ssh/janus_key'
     const scriptPath = '/opt/janus/bin/auto_push_to_s3.sh'
     const recordingsDir = '/opt/janus/share/janus/recordings'
-    const metadataFile = `/tmp/room${classId}_metadata.txt`
+    const metadataFile = `/tmp/room${janusRoomId}_metadata.txt`
 
-    this.logger.log(`📹 Triggering recording combine for class ${classId} on ${janusHost}`)
+    this.logger.log(`📹 Triggering recording combine for class ${classId} (Janus room ${janusRoomId}) on ${janusHost}`)
 
     // Create metadata file with basic info
     const timestamp = new Date().toISOString()
     const metadata = [
       `class_id=${classId}`,
-      `room_id=room${classId}`,
+      `room_id=${janusRoomId}`,
       `ended_at=${timestamp}`,
       `recordings_dir=${recordingsDir}`,
-    ].join('\n')
+    ].join('\\n')
 
     // SSH command to:
-    // 1. Create metadata file
-    // 2. Execute the combine script
-    // 3. Clean up metadata file after completion
-    const sshCommand = `ssh -i ${janusKeyPath} -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${janusUser}@${janusHost} "echo '${metadata}' > ${metadataFile} && cd ${recordingsDir} && sudo ${scriptPath} ${classId}; rm -f ${metadataFile}"`
+    // 1. Create metadata file using printf (handles newlines properly)
+    // 2. Verify metadata file was created
+    // 3. List recording files for this room
+    // 4. Execute the combine script
+    // 5. Clean up metadata file after completion
+    const sshCommand = `ssh -i ${janusKeyPath} -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${janusUser}@${janusHost} "printf '${metadata}\\n' > ${metadataFile} && echo '✓ Metadata file created' && ls -lh ${metadataFile} && echo '📁 Recording files for Janus room ${janusRoomId}:' && ls -lh ${recordingsDir}/*-${janusRoomId}-* 2>/dev/null || echo '⚠️ No recording files found for room ${janusRoomId}' && cd ${recordingsDir} && sudo ${scriptPath} ${janusRoomId}; rm -f ${metadataFile}"`
+
+    this.logger.log(`📹 Executing SSH command for Janus room ${janusRoomId}`)
 
     exec(sshCommand, (error, stdout, stderr) => {
       if (error) {
         this.logger.error(
-          `❌ Recording combine error for class ${classId}: ${error.message}. ` +
+          `❌ Recording combine error for class ${classId} (room ${janusRoomId}): ${error.message}. ` +
             `Ensure SSH key is configured and Janus server (${janusHost}) is accessible.`,
         )
         return
@@ -522,13 +529,15 @@ export class WebRTCGateway implements OnGatewayConnection, OnGatewayDisconnect {
           .join('\n')
 
         if (filteredStderr) {
-          this.logger.warn(`⚠️ Recording stderr for class ${classId}:\n${filteredStderr}`)
+          this.logger.warn(`⚠️ Recording stderr for class ${classId} (room ${janusRoomId}):\n${filteredStderr}`)
         }
       }
       if (stdout) {
-        this.logger.log(`📹 Recording output for class ${classId}:\n${stdout}`)
+        this.logger.log(`📹 Recording output for class ${classId} (room ${janusRoomId}):\n${stdout}`)
       }
-      this.logger.log(`✅ Recording combine triggered successfully for class ${classId} on ${janusHost}`)
+      this.logger.log(
+        `✅ Recording combine triggered successfully for class ${classId} (room ${janusRoomId}) on ${janusHost}`,
+      )
     })
   }
 
@@ -536,7 +545,7 @@ export class WebRTCGateway implements OnGatewayConnection, OnGatewayDisconnect {
    * Call this when class ends or room is destroyed
    */
   @SubscribeMessage('end-class')
-  handleEndClass(@ConnectedSocket() client: Socket, @MessageBody() payload: { classId: string }) {
+  async handleEndClass(@ConnectedSocket() client: Socket, @MessageBody() payload: { classId: string }) {
     const meta = this.socketMeta.get(client.id)
     if (!meta) return
 
@@ -555,10 +564,32 @@ export class WebRTCGateway implements OnGatewayConnection, OnGatewayDisconnect {
     // Notify all participants
     this.server.to(`class_${classId}`).emit('class-ended', { classId })
 
-    // Trigger recording processing (5 second delay to ensure Janus finishes writing files)
-    setTimeout(() => {
-      this.triggerRecordingCombine(classId)
-    }, 5000)
+    // Look up the Janus room ID from the database
+    try {
+      const activeSession = await this.prisma.liveSession.findFirst({
+        where: {
+          classId: parseInt(classId),
+          endedAt: null,
+        },
+        select: {
+          id: true,
+          janusRoomId: true,
+        },
+      })
+
+      if (activeSession?.janusRoomId) {
+        // Trigger recording processing (5 second delay to ensure Janus finishes writing files)
+        setTimeout(() => {
+          this.triggerRecordingCombine(activeSession.janusRoomId!, classId)
+        }, 5000)
+      } else {
+        this.logger.warn(
+          `⚠️ No active session or Janus room ID found for class ${classId}. Skipping recording combine.`,
+        )
+      }
+    } catch (error) {
+      this.logger.error(`❌ Error looking up Janus room ID for class ${classId}:`, error)
+    }
 
     return { success: true }
   }

@@ -208,7 +208,7 @@ export class LessonRepository {
     await this.prisma.mediaAsset.create({
       data: {
         kind: MediaKind.OTHER,
-        url: uploadInfo.key,
+        url: 'https://torii-nihongo-gakuin-s3.s3.ap-southeast-1.amazonaws.com/' + uploadInfo.key,
         lessonId: lesson.id,
         mimeType: contentType,
       },
