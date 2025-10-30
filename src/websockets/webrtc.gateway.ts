@@ -474,6 +474,29 @@ export class WebRTCGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.to(`class_${classId}`).emit('poll-closed', payload.pollId)
   }
 
+  @SubscribeMessage('mute-all-participants')
+  handleMuteAllParticipants(@ConnectedSocket() client: Socket) {
+    const meta = this.socketMeta.get(client.id)
+    if (!meta) return
+    const { classId, role, displayName } = meta
+
+    // Only lecturers can mute all participants
+    if (role !== 'lecturer') {
+      this.logger.warn('❌ mute-all-participants: Non-lecturer tried to mute all')
+      client.emit('error', { message: 'Only lecturers can mute all participants' })
+      return
+    }
+
+    this.logger.log(`🔇 Muting all participants in class ${classId} by ${displayName}`)
+
+    // Broadcast to all participants in the class
+    this.server.to(`class_${classId}`).emit('mute-requested', {
+      requestedBy: displayName,
+    })
+
+    this.logger.log(`🔇 ✅ Mute-all request broadcasted to class_${classId}`)
+  }
+
   /**
    * Trigger recording combine and S3 upload after room/class is destroyed
    * Executes script on remote Janus server via SSH
@@ -484,8 +507,8 @@ export class WebRTCGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const janusHost = new URL(janusServerUrl).hostname
 
     // SSH configuration
-    const janusUser = process.env.JANUS_SSH_USER || 'ubuntu'
-    const janusKeyPath = process.env.JANUS_SSH_KEY || '~/.ssh/janus_key'
+    const janusUser = process.env.JANUS_SSH_USER || 'root'
+    const janusKeyPath = process.env.JANUS_SSH_KEY || '~/home/ubuntu/.ssh/janus_key'
     const scriptPath = '/opt/janus/bin/auto_push_to_s3.sh'
     const recordingsDir = '/opt/janus/share/janus/recordings'
     const metadataFile = `/tmp/room${janusRoomId}_metadata.txt`
