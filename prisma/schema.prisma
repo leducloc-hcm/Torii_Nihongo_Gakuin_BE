@@ -64,6 +64,7 @@ model User {
 
   aiThreads  AIThread[]
   aiMessages AIChatMessage[]
+  aiQueries  AIQuery[]
 
   assessmentPaper AssessmentPaper[]
   quiz           Quiz[]
@@ -255,6 +256,7 @@ model Course {
   cartItems   CartItem[]
 
   Class Class[]
+  AICitation AICitation[]
 }
 
 model Module {
@@ -866,7 +868,6 @@ model Resource {
   reactions Reaction[]
   comments  Comment[]
 
-  AICitation AICitation[]
 }
 
 model Reaction {
@@ -1092,33 +1093,77 @@ model AIThread {
   userId    Int
   title     String?
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   user     User            @relation(fields: [userId], references: [id])
   messages AIChatMessage[]
+  queries  AIQuery[]
+
+  @@index([userId, createdAt])
+}
+
+model AIQuery {
+  id               String      @id @default(cuid())
+  threadId         Int
+  userId           Int
+  query            String      @db.Text
+  queryType        QueryType
+  initialResponse  String?     @db.Text
+  executedTools    Json?
+  requiresApproval Boolean     @default(false)
+  status           QueryStatus @default(PENDING)
+  cacheKey         String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  thread   AIThread        @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  user     User            @relation(fields: [userId], references: [id])
+  messages AIChatMessage[]
+
+  @@index([threadId, createdAt])
+  @@index([userId, status])
+  @@index([cacheKey])
 }
 
 model AIChatMessage {
   id        Int      @id @default(autoincrement())
   threadId  Int
   userId    Int
+  queryId   String?
   role      ChatRole
-  content   String
+  content   String   @db.Text
   audioUrl  String?
+  toolCalls Json?
   createdAt DateTime @default(now())
 
-  thread    AIThread     @relation(fields: [threadId], references: [id])
+  thread    AIThread     @relation(fields: [threadId], references: [id], onDelete: Cascade)
   user      User         @relation(fields: [userId], references: [id])
+  query     AIQuery?     @relation(fields: [queryId], references: [id], onDelete: SetNull)
   citations AICitation[]
+
+  @@index([threadId, createdAt])
+  @@index([queryId])
 }
 
 model AICitation {
-  id         Int     @id @default(autoincrement())
-  messageId  Int
-  sourceUrl  String?
-  resourceId Int?
+  id              Int                @id @default(autoincrement())
+  messageId       Int
+  sourceType      CitationSourceType
+  sourceUrl       String?
+  resourceId      Int?
+  courseId        Int?
+  lessonId        Int?
+  flashcardDeckId Int?
+  quizId          Int?
+  assessmentId    Int?
+  content         String?            @db.Text
+  createdAt       DateTime           @default(now())
 
-  message  AIChatMessage @relation(fields: [messageId], references: [id])
-  resource Resource?     @relation(fields: [resourceId], references: [id])
+  message AIChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  course  Course?       @relation(fields: [courseId], references: [id])
+
+  @@index([messageId])
+  @@index([sourceType])
 }
 
 // ===== Enums =====
@@ -1311,4 +1356,33 @@ enum MediaStatus {
   TRANSCODING
   READY
   FAILED
+}
+
+enum QueryType {
+  COURSE
+  LESSON
+  FLASHCARD
+  ASSESSMENT
+  QUIZ
+  LIVE_SESSION
+  RESOURCE
+  GENERAL
+}
+
+enum QueryStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum CitationSourceType {
+  COURSE
+  LESSON
+  FLASHCARD_DECK
+  QUIZ
+  ASSESSMENT
+  RESOURCE
+  WEB_URL
+  GENERAL
 }
