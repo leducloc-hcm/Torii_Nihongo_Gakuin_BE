@@ -1,0 +1,244 @@
+import { Injectable, Logger } from '@nestjs/common'
+import OpenAI from 'openai'
+import { ChatCompletionMessageParam, ChatCompletionTool } from 'openai/resources/chat/completions'
+import { McpBaseService } from 'src/mcp-client/mcp-client.service'
+import {
+  AgentResponse,
+  ExecuteToolsRequest,
+  ExecuteToolsResponse,
+  FastMCPResult,
+  MCPToolResult,
+  transformMCPToolToOpenAI,
+} from 'src/mcp-client/mcp.model'
+import { CourseMcpClient } from 'src/mcp-client/module/course/course-mcp.service'
+import { getEnabledMCPServers, MCP_SERVERS } from 'src/shared/config/mcp-servers.config'
+import { OPENAI_CONFIG, MCP_CONFIG } from 'src/shared/config/openai.config'
+
+@Injectable()
+export class AgentService {
+  private readonly logger = new Logger(AgentService.name)
+  private readonly openai: OpenAI
+  private allTools: ChatCompletionTool[] = []
+  private toolsLoaded = false
+
+  constructor(
+    private readonly mcpBase: McpBaseService,
+    private readonly courseMcp: CourseMcpClient,
+  ) {
+    this.openai = new OpenAI({
+      apiKey: OPENAI_CONFIG.apiKey,
+    })
+  }
+
+  /**
+   * Load all available tools from MCP servers
+   */
+  async loadTools(): Promise<void> {
+    if (this.toolsLoaded) return
+
+    this.logger.log('Loading tools from MCP servers...')
+    const tools: ChatCompletionTool[] = []
+
+    try {
+      const enabledServers = getEnabledMCPServers()
+
+      for (const server of enabledServers) {
+        try {
+          const mcpTools = await this.mcpBase.listTools(server.url)
+          const openAITools = mcpTools.map(transformMCPToolToOpenAI)
+          tools.push(...openAITools)
+          this.logger.log(`Loaded ${openAITools.length} tools from ${server.name}`)
+        } catch (error) {
+          this.logger.error(`Failed to load tools from ${server.name}:`, error.message)
+        }
+      }
+
+      this.allTools = tools
+      this.toolsLoaded = true
+      this.logger.log(`Total tools loaded: ${tools.length}`)
+    } catch (error) {
+      this.logger.error('Failed to load MCP tools:', error)
+    }
+  }
+
+  async getResponse(messages: ChatCompletionMessageParam[], useTools = true): Promise<AgentResponse> {
+    if (!this.toolsLoaded) {
+      await this.loadTools()
+    }
+
+    try {
+      const completionOptions: any = {
+        model: OPENAI_CONFIG.model,
+        messages,
+        tools: useTools && this.allTools.length > 0 ? this.allTools : undefined,
+        tool_choice: useTools && this.allTools.length > 0 ? 'auto' : undefined,
+        temperature: OPENAI_CONFIG.temperature,
+      }
+
+      // Only add max_completion_tokens if it's defined (not unlimited)
+      if (OPENAI_CONFIG.maxTokens !== undefined) {
+        completionOptions.max_completion_tokens = OPENAI_CONFIG.maxTokens
+      }
+
+      const response = await this.openai.chat.completions.create(completionOptions)
+
+      const choice = response.choices[0]
+      const toolCalls = choice.message.tool_calls
+
+      if (toolCalls && toolCalls.length > 0) {
+        return {
+          content: choice.message.content,
+          toolCalls: toolCalls.map((tc) => {
+            // Handle both regular and custom tool calls
+            if ('function' in tc) {
+              return {
+                id: tc.id,
+                name: tc.function.name,
+                arguments: tc.function.arguments,
+              }
+            }
+            // Fallback for custom tool calls
+            return {
+              id: tc.id,
+              name: (tc as any).name || 'unknown',
+              arguments: (tc as any).arguments || '{}',
+            }
+          }),
+          requiresApproval: MCP_CONFIG.toolApprovalRequired,
+          finishReason: choice.finish_reason as 'stop' | 'tool_calls' | 'length' | null,
+        }
+      }
+
+      return {
+        content: choice.message.content,
+        requiresApproval: false,
+        finishReason: choice.finish_reason as 'stop' | 'tool_calls' | 'length' | null,
+      }
+    } catch (error) {
+      this.logger.error('OpenAI API error:', error)
+      throw new Error(`AI service error: ${error.message}`)
+    }
+  }
+
+  /**
+   * Execute approved tools and get final response
+   */
+  async executeApprovedTools(request: ExecuteToolsRequest): Promise<ExecuteToolsResponse> {
+    const results: MCPToolResult[] = []
+
+    // Execute each tool call
+    for (const toolCall of request.toolCalls) {
+      try {
+        const result = await this.executeToolCall(toolCall.name, toolCall.arguments)
+        results.push({
+          toolCallId: toolCall.id,
+          toolName: toolCall.name,
+          result: result.result,
+          error: result.error,
+          executedAt: result.executedAt,
+        })
+      } catch (error) {
+        this.logger.error(`Failed to execute tool ${toolCall.name}:`, error.message)
+        results.push({
+          toolCallId: toolCall.id,
+          toolName: toolCall.name,
+          result: null,
+          error: error.message,
+          executedAt: new Date(),
+        })
+      }
+    }
+
+    // Build tool response messages
+    const toolMessages: ChatCompletionMessageParam[] = results.map((result) => ({
+      role: 'tool' as const,
+      tool_call_id: result.toolCallId,
+      content: result.error || JSON.stringify(result.result),
+    }))
+
+    // Rebuild conversation with tool results
+    // OpenAI requires: messages history + assistant message with tool_calls + tool responses
+    const messages: ChatCompletionMessageParam[] = [
+      ...(request.messages || []), // Previous conversation (should include assistant message with tool_calls)
+      ...toolMessages, // Tool results
+    ]
+
+    // Debug: Log the messages to verify structure
+    this.logger.debug('Messages being sent to OpenAI:')
+    messages.forEach((msg, idx) => {
+      if (msg.role === 'assistant' && 'tool_calls' in msg) {
+        this.logger.debug(`[${idx}] ${msg.role} - has ${msg.tool_calls?.length || 0} tool_calls`)
+      } else if (msg.role === 'tool') {
+        this.logger.debug(`[${idx}] ${msg.role} - tool_call_id: ${msg.tool_call_id}`)
+      } else {
+        this.logger.debug(`[${idx}] ${msg.role}`)
+      }
+    })
+
+    const finalCompletionOptions: any = {
+      model: OPENAI_CONFIG.model,
+      messages,
+      temperature: OPENAI_CONFIG.temperature,
+    }
+
+    // Only add max_completion_tokens if it's defined (not unlimited)
+    if (OPENAI_CONFIG.maxTokens !== undefined) {
+      finalCompletionOptions.max_completion_tokens = OPENAI_CONFIG.maxTokens
+    }
+
+    const finalResponse = await this.openai.chat.completions.create(finalCompletionOptions)
+
+    const finalChoice = finalResponse.choices[0]
+
+    return {
+      results,
+      finalResponse: finalChoice.message.content || undefined,
+      hasMoreTools: (finalChoice.message.tool_calls?.length ?? 0) > 0,
+    }
+  }
+
+  /**
+   * Execute a single tool call
+   */
+  private async executeToolCall(toolName: string, args: Record<string, any>): Promise<MCPToolResult> {
+    // Determine which MCP server to use based on tool name
+    const serverUrl = this.getServerUrlForTool(toolName)
+
+    if (!serverUrl) {
+      throw new Error(`No MCP server found for tool: ${toolName}`)
+    }
+
+    const result: FastMCPResult = await this.mcpBase.executeTool(serverUrl, toolName, args)
+
+    // Convert FastMCPResult to MCPToolResult
+    return {
+      toolCallId: '', // Will be set by the caller
+      toolName: toolName,
+      result: result.success ? result.data : null,
+      error: result.error || undefined,
+      executedAt: new Date(),
+    }
+  }
+
+  /**
+   * Map tool name to MCP server URL
+   */
+  private getServerUrlForTool(toolName: string): string | null {
+    const lowerToolName = toolName.toLowerCase()
+
+    if (lowerToolName.includes('course')) {
+      return MCP_SERVERS.course.url
+    }
+
+    // Default to first enabled server
+    const enabledServers = getEnabledMCPServers()
+    return enabledServers.length > 0 ? enabledServers[0].url : null
+  }
+
+  /**
+   * Get all available tools
+   */
+  getAvailableTools(): ChatCompletionTool[] {
+    return this.allTools
+  }
+}

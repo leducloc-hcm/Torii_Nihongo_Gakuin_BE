@@ -9,8 +9,6 @@ export const redisProvider: Provider = {
   provide: REDIS_CLIENT,
   inject: [redisConfig.KEY],
   useFactory: async (cfg: ConfigType<typeof redisConfig>) => {
-    // When using rediss:// URL, IORedis automatically handles TLS
-    // Do NOT add tls option - it causes conflicts
     const options: RedisOptions = {
       lazyConnect: true,
       maxRetriesPerRequest: null,
@@ -23,7 +21,7 @@ export const redisProvider: Provider = {
     }
 
     const client = cfg.url
-      ? new IORedis(cfg.url, options) // rediss:// auto-enables TLS
+      ? new IORedis(cfg.url, options)
       : new IORedis({
           ...options,
           host: cfg.host,

@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from 'src/shared/services/prisma.service'
 import { JLPTLevelType } from 'src/shared/constants/enum.constant'
-import { PlacementBlueprintType } from 'src/shared/types/placement.types'
 import {
   PlacementBlueprintCreateData,
   PlacementBlueprintOrderByInput,
@@ -9,6 +8,7 @@ import {
   PlacementBlueprintWhereInput,
   PlacementBlueprintWhereUniqueInput,
 } from 'src/routes/placement/placement-blueprint.model'
+import { PlacementBlueprintType } from 'src/shared/types/placement.types'
 
 @Injectable()
 export class PlacementBlueprintRepository {
