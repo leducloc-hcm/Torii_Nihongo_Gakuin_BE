@@ -260,6 +260,7 @@ export class QuestionGroupRepository {
                       id: true,
                       content: true,
                       mediaId: true,
+                      isCorrect: true,
                       image: {
                         select: {
                           id: true,
