@@ -6,6 +6,7 @@ import { EmailService } from 'src/shared/services/email.service'
 import { GoogleCalendarService } from 'src/shared/services/google-calendar.service'
 import { NotificationGateway } from 'src/websockets/notification.gateway'
 import { CartService } from '../cart/cart.service'
+import { ClassFolderService } from '../online-class/class-folder.service'
 
 interface SepayConfig {
   accountNumber: string
@@ -49,6 +50,7 @@ export class SepayService {
     private readonly googleCalendarService: GoogleCalendarService,
     private readonly notificationGateway: NotificationGateway,
     private readonly cartService: CartService,
+    private readonly classFolderService: ClassFolderService,
   ) {
     this.config = {
       accountNumber: this.configService.get<string>('SEPAY_ACCOUNT_NUMBER') || '',
@@ -249,6 +251,18 @@ export class SepayService {
                       role: 'CUSTOMER', // Enrolled users are customers in the class
                     },
                   })
+
+                  // Grant folder access to the new member
+                  try {
+                    await this.classFolderService.grantFolderAccessToMember(item.classId, order.userId, 'CUSTOMER')
+                  } catch (folderError) {
+                    this.logger.warn(
+                      `Failed to grant folder access for user ${order.userId} to class ${item.classId}:`,
+                      folderError,
+                    )
+                    // Don't throw, continue with other operations
+                  }
+
                   try {
                     const calendarResult = await this.googleCalendarService.generateClassCalendar(
                       item.classId,
