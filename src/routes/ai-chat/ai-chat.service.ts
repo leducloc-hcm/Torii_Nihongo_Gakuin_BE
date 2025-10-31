@@ -5,8 +5,8 @@ import { ChatRole, QueryStatus } from '@prisma/client'
 import { SendQueryDto } from './ai-chat.dto'
 import { AgentService } from 'src/mcp-client/agent.service'
 import { PromptService } from 'src/mcp-client/module/course/course-mcp.prompt'
-import { detectQueryType } from 'src/mcp-client/module/course/course-mcp.query'
 import { RedisContextService } from 'src/shared/redis/redis-context.service'
+import { detectQueryType } from 'src/mcp-client/shared/query-detection.utils'
 
 @Injectable()
 export class AIChatService {
