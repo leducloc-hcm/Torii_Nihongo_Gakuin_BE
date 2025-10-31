@@ -92,6 +92,64 @@ export class PaymentService {
     }
   }
 
+  async getAllOrders(params: { page?: number; limit?: number; status?: string; userId?: number } = {}) {
+    const { page = 1, limit = 10, status, userId } = params
+    const skip = (page - 1) * limit
+
+    const where: any = {}
+    if (status) {
+      where.status = status
+    }
+    if (userId) {
+      where.userId = userId
+    }
+
+    const [orders, total] = await Promise.all([
+      this.prisma.order.findMany({
+        where,
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+          items: {
+            include: {
+              course: {
+                select: {
+                  id: true,
+                  title: true,
+                  slug: true,
+                  thumbnailUrl: true,
+                },
+              },
+            },
+          },
+          coupon: {
+            select: {
+              code: true,
+              title: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.order.count({ where }),
+    ])
+
+    return {
+      orders,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    }
+  }
+
   async createSepayPayment(userId: number): Promise<{
     success: boolean
     message: string

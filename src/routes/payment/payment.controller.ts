@@ -53,8 +53,7 @@ export class PaymentController {
     @Query('status') status?: string,
     @Query('userId', new ParseIntPipe({ optional: true })) userId?: number,
   ) {
-    // return this.paymentService.getAllOrders({ page: page || 1, limit: limit || 10, status, userId })
-    return { message: 'Admin orders endpoint - to be implemented' }
+    return this.paymentService.getAllOrders({ page: page || 1, limit: limit || 10, status, userId })
   }
 
   @Post('sepay/create')
