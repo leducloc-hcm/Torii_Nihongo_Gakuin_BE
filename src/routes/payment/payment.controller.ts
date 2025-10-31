@@ -31,31 +31,29 @@ export class PaymentController {
     return this.paymentService.getOrderStatus(orderId, userId)
   }
 
-  @Get('orders')
+  @Get()
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Customer, RoleName.Admin, RoleName.Staff)
   @HttpCode(HttpStatus.OK)
   async getUserOrders(
     @ActiveUser('userId') userId: number,
-    @Query('skip', ParseIntPipe) skip?: number,
-    @Query('take', ParseIntPipe) take?: number,
+    @Query('page', new ParseIntPipe({ optional: true })) page?: number,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
   ) {
-    return this.paymentService.getUserOrders(userId, { skip, take })
+    return this.paymentService.getUserOrders(userId, { page: page || 1, limit: limit || 10 })
   }
 
-  // Admin endpoints for order management
-  @Get('admin/orders')
+  @Get('admin')
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Admin, RoleName.Staff)
   @HttpCode(HttpStatus.OK)
   getAllOrders(
-    @Query('skip', ParseIntPipe) skip?: number,
-    @Query('take', ParseIntPipe) take?: number,
+    @Query('page', new ParseIntPipe({ optional: true })) page?: number,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
     @Query('status') status?: string,
-    @Query('userId', ParseIntPipe) userId?: number,
+    @Query('userId', new ParseIntPipe({ optional: true })) userId?: number,
   ) {
-    // This would be implemented in the payment service
-    // return this.paymentService.getAllOrders({ skip, take, status, userId })
+    // return this.paymentService.getAllOrders({ page: page || 1, limit: limit || 10, status, userId })
     return { message: 'Admin orders endpoint - to be implemented' }
   }
 

@@ -49,8 +49,9 @@ export class PaymentService {
     return order
   }
 
-  async getUserOrders(userId: number, params: { skip?: number; take?: number } = {}) {
-    const { skip = 0, take = 10 } = params
+  async getUserOrders(userId: number, params: { page?: number; limit?: number } = {}) {
+    const { page = 1, limit = 10 } = params
+    const skip = (page - 1) * limit
 
     const [orders, total] = await Promise.all([
       this.prisma.order.findMany({
@@ -77,12 +78,18 @@ export class PaymentService {
         },
         orderBy: { createdAt: 'desc' },
         skip,
-        take,
+        take: limit,
       }),
       this.prisma.order.count({ where: { userId } }),
     ])
 
-    return { orders, total }
+    return {
+      orders,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    }
   }
 
   async createSepayPayment(userId: number): Promise<{
