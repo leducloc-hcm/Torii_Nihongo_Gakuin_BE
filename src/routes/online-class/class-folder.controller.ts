@@ -177,7 +177,7 @@ export class ClassFolderController {
 
   @Delete('online-classes/:classId/folder/resources/:resourceId')
   @Auth([AuthType.Bearer])
-  @Roles(RoleName.Lecturer, RoleName.Admin, RoleName.Staff)
+  @Roles(RoleName.Lecturer, RoleName.Admin, RoleName.Staff, RoleName.Customer)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete a resource from class folder' })
   @ApiResponse({ status: 200, description: 'Resource deleted successfully' })
