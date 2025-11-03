@@ -86,6 +86,9 @@ model User {
   purchasedCoupons   Coupon[] @relation("CouponPurchaser")
   couponRedemptions  CouponRedemption[] @relation("UserCouponRedemptions")
   couponAuditLogs    CouponAuditLog[] @relation("CouponAuditor")
+  assessmentProgress AssessmentProgress[]
+  assignedAssessments AssessmentAssignment[] @relation("AssignedByUser")
+  receivedAssessments AssessmentAssignment[] @relation("AssignedToUser")
 }
 
 model CustomerProfile {
@@ -384,28 +387,38 @@ model PlacementBlueprint {
 
 model Question {
   id               Int              @id @default(autoincrement())
+  uuid             String?          @unique @default(uuid())
+  version          Int              @default(1)
   type             QuestionType
   level            JLPTLevel
-  difficulty       Difficulty        @default(MEDIUM)
-  stem             String           
-  passage          String?           
+  difficulty       Difficulty       @default(MEDIUM)
+  stem             String
+  passage          String?
   mediaId          Int?
-  explanation      String?           
-  createdAt        DateTime          @default(now())
+  explanation      String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
   readingLength    ReadingLength?
-  media            MediaAsset?       @relation(fields: [mediaId], references: [id])
+  media            MediaAsset?      @relation(fields: [mediaId], references: [id])
 
-  groups           QuestionGroupQuestion[]
-  option            Option[]
-
-  assessmentAnswers AssessmentAnswer[]
-  assessmentItems  AssessmentItemQuestion[]
-  quizItems         QuizItemQuestion[]
-  quizAnswers       QuizAnswer[]
+  groups                   QuestionGroupQuestion[]
+  options                  Option[]
+  assessmentAnswers        AssessmentAnswer[]
+  assessmentItems          AssessmentItemQuestion[]
+  quizItems                QuizItemQuestion[]
+  quizAnswers              QuizAnswer[]
+  assessmentAnswerProgress AssessmentAnswerProgress[]
+  
+  @@index([uuid])
+  @@index([version])
+  @@index([type])
+  @@index([level])
 }
 
 model QuestionGroup {
   id          Int       @id @default(autoincrement())
+  uuid        String?    @unique @default(uuid()) 
+  version     Int       @default(1)
   type        QuestionGroupType
   title       String?
   passage     String?          
@@ -418,8 +431,11 @@ model QuestionGroup {
 
   questions   QuestionGroupQuestion[]
 
-  aassessmentItems AssessmentItemGroup[]
+  assessmentItems AssessmentItemGroup[]
   quizItems       QuizItemGroup[]
+  
+  @@index([uuid])
+  @@index([version])
 }
 
 model QuestionGroupQuestion {
@@ -444,8 +460,77 @@ model Option {
   order      Int     @default(0)
   assessmentAnswers AssessmentAnswer[]
   quizAnswers     QuizAnswer[]
+  assessmentAnswerProgress AssessmentAnswerProgress[]
   image     MediaAsset? @relation(fields: [mediaId], references: [id])
   question  Question     @relation(fields: [questionId], references: [id],onDelete: Cascade)
+}
+
+model AssessmentAssignment {
+  id             Int        @id @default(autoincrement())
+  assessmentId   Int
+  assignedById   Int
+  assignedToId   Int?
+  classId        Int?
+  note           String?
+  startAt        DateTime?
+  dueAt          DateTime?
+  lockAfterDue   Boolean @default(false)
+  maxAttempts    Int?               // giới hạn số lần làm bài
+  status         AssignmentStatus   @default(PENDING)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  assessment AssessmentPaper @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  assignedBy User            @relation("AssignedByUser", fields: [assignedById], references: [id], onDelete: Cascade)
+  assignedTo User?           @relation("AssignedToUser", fields: [assignedToId], references: [id], onDelete: SetNull)
+  class      Class?          @relation(fields: [classId], references: [id], onDelete: SetNull)
+  progresses AssessmentProgress[]
+
+  @@index([assessmentId])
+  @@index([assignedById])
+  @@index([assignedToId])
+}
+
+model AssessmentProgress {
+  id              Int      @id @default(autoincrement())
+  assessmentId    Int
+  userId          Int
+  assignmentId    Int?
+  startedAt       DateTime @default(now())
+  lastSavedAt     DateTime @updatedAt
+  currentSection  Int?
+  currentQuestion Int?
+  timeSpentSec    Int      @default(0)
+  isSubmitted     Boolean  @default(false)
+  completedAt     DateTime?
+  remainingSec    Int?
+
+  assessment AssessmentPaper @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignment AssessmentAssignment? @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+  answers    AssessmentAnswerProgress[]
+
+  @@unique([assessmentId, userId])
+  @@index([assessmentId])
+  @@index([userId])
+}
+
+model AssessmentAnswerProgress {
+  id               Int      @id @default(autoincrement())
+  progressId       Int
+  questionId       Int
+  selectedOptionId Int?
+  lastUpdatedAt    DateTime @default(now())
+  timeSpentSec     Int      @default(0)
+  isFlagged        Boolean  @default(false)
+
+  progress  AssessmentProgress @relation(fields: [progressId], references: [id], onDelete: Cascade)
+  question  Question           @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  selectedOption Option?       @relation(fields: [selectedOptionId], references: [id], onDelete: SetNull)
+
+  @@unique([progressId, questionId])
+  @@index([progressId])
+  @@index([questionId])
 }
 
 model AssessmentPaper {
@@ -468,9 +553,10 @@ model AssessmentPaper {
   version           Int           @default(1)
   generatorVersion  String?
   generatorMeta     Json?
-
+  assessmentProgress AssessmentProgress[]
   sections AssessmentSection[] 
   attempts AssessmentAttempt[]
+  assessmentAssignment AssessmentAssignment[]
 }
 
 model AssessmentSection {
@@ -671,6 +757,7 @@ model Class {
   orderItems OrderItem[]
   folder     Folder?       @relation("ClassFolder")
   CartItem   CartItem[]
+  assessmentAssignment AssessmentAssignment[]
 }
 
 model ClassMember {
@@ -1467,7 +1554,6 @@ enum NotificationType {
   COMMENT
   RATING
   SYSTEM
-  PROMOTION
   REMINDER
 }
 
@@ -1563,4 +1649,11 @@ enum CouponAuditAction {
   ACTIVATED
   DEACTIVATED
   REDEEMED
+}
+
+enum AssignmentStatus {
+  PENDING
+  IN_PROGRESS
+  SUBMITTED
+  GRADED
 }

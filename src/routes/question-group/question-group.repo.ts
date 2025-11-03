@@ -732,16 +732,214 @@ export class QuestionGroupRepository {
     }))
   }
 
-  async createMedia(url: string, mimeType: string, sizeByte: number, caption?: string) {
+  async createMedia(url: string, mimeType: string, sizeByte: number, caption?: string, kind?: string, meta?: any) {
     return await this.prisma.mediaAsset.create({
       data: {
         url,
         mimeType,
         sizeByte,
         caption,
-        kind: 'OTHER',
+        kind: (kind as any) || 'OTHER',
+        meta: meta,
         status: 'READY',
       },
     })
+  }
+
+  async isQuestionGroupUsed(groupId: number): Promise<boolean> {
+    const [assessmentItemsCount, quizItemsCount] = await Promise.all([
+      this.prisma.assessmentItemGroup.count({
+        where: { groupId },
+      }),
+      this.prisma.quizItemGroup.count({
+        where: { groupId },
+      }),
+    ])
+
+    return assessmentItemsCount > 0 || quizItemsCount > 0
+  }
+
+  async findVersionsByUuid(uuid: string): Promise<any[]> {
+    const groups = await this.prisma.questionGroup.findMany({
+      where: { uuid },
+      orderBy: { version: 'desc' },
+      include: {
+        questions: {
+          include: {
+            question: true,
+          },
+          orderBy: {
+            order: 'asc',
+          },
+        },
+        media: true,
+        _count: {
+          select: {
+            questions: true,
+          },
+        },
+      },
+    })
+
+    return groups.map((group) => ({
+      id: group.id,
+      uuid: group.uuid,
+      version: group.version,
+      type: group.type,
+      title: group.title,
+      passage: group.passage,
+      mediaId: group.mediaId,
+      order: group.order,
+      metadata: group.metadata,
+      createdAt: group.createdAt,
+      questions: this.transformQuestions(group.questions),
+      media: group.media,
+      questionsCount: group._count.questions,
+    }))
+  }
+
+  async getLatestVersion(uuid: string): Promise<number> {
+    const latest = await this.prisma.questionGroup.findFirst({
+      where: { uuid },
+      orderBy: { version: 'desc' },
+      select: { version: true },
+    })
+
+    return latest?.version || 0
+  }
+
+  async cloneQuestionGroup(groupId: number, modifications?: Partial<any>): Promise<any> {
+    return await this.prisma.$transaction(async (tx) => {
+      // Get original group with questions
+      const original = await tx.questionGroup.findUnique({
+        where: { id: groupId },
+        include: {
+          questions: {
+            include: {
+              question: true,
+            },
+            orderBy: {
+              order: 'asc',
+            },
+          },
+          media: true,
+        },
+      })
+
+      if (!original) {
+        throw new Error('Question group not found')
+      }
+
+      const groupUuid = original.uuid || undefined
+
+      const latestVersion = await this.getLatestVersion(groupUuid || '')
+      const newVersion = latestVersion + 1
+
+      const newGroup = await tx.questionGroup.create({
+        data: {
+          uuid: groupUuid,
+          version: newVersion,
+          type: modifications?.type || original.type,
+          title: modifications?.title !== undefined ? modifications.title : original.title,
+          passage: modifications?.passage !== undefined ? modifications.passage : original.passage,
+          mediaId: modifications?.mediaId !== undefined ? modifications.mediaId : original.mediaId,
+          order: modifications?.order !== undefined ? modifications.order : original.order,
+          metadata: modifications?.metadata !== undefined ? modifications.metadata : original.metadata,
+        },
+      })
+
+      // Clone question relationships
+      const questionIdsToClone = modifications?.questionIds || original.questions.map((q) => q.questionId)
+      if (questionIdsToClone && questionIdsToClone.length > 0) {
+        await tx.questionGroupQuestion.createMany({
+          data: questionIdsToClone.map((questionId: number, index: number) => ({
+            groupId: newGroup.id,
+            questionId,
+            order: index + 1,
+          })),
+        })
+      }
+
+      const groupWithQuestions = await tx.questionGroup.findUnique({
+        where: { id: newGroup.id },
+        include: {
+          questions: {
+            include: {
+              question: true,
+            },
+            orderBy: {
+              order: 'asc',
+            },
+          },
+          media: true,
+          _count: {
+            select: {
+              questions: true,
+            },
+          },
+        },
+      })
+
+      if (!groupWithQuestions) return null
+
+      return {
+        id: groupWithQuestions.id,
+        uuid: groupWithQuestions.uuid,
+        version: groupWithQuestions.version,
+        type: groupWithQuestions.type,
+        title: groupWithQuestions.title,
+        passage: groupWithQuestions.passage,
+        mediaId: groupWithQuestions.mediaId,
+        order: groupWithQuestions.order,
+        metadata: groupWithQuestions.metadata,
+        createdAt: groupWithQuestions.createdAt,
+        questions: this.transformQuestions(groupWithQuestions.questions),
+        media: groupWithQuestions.media,
+        questionsCount: groupWithQuestions._count.questions,
+      }
+    })
+  }
+
+  async findByUuidAndVersion(uuid: string, version: number): Promise<any | null> {
+    const group = await this.prisma.questionGroup.findFirst({
+      where: {
+        uuid,
+        version,
+      },
+      include: {
+        questions: {
+          include: {
+            question: true,
+          },
+          orderBy: {
+            order: 'asc',
+          },
+        },
+        media: true,
+        _count: {
+          select: {
+            questions: true,
+          },
+        },
+      },
+    })
+
+    if (!group) return null
+
+    return {
+      id: group.id,
+      uuid: group.uuid,
+      version: group.version,
+      type: group.type,
+      title: group.title,
+      passage: group.passage,
+      mediaId: group.mediaId,
+      order: group.order,
+      metadata: group.metadata,
+      createdAt: group.createdAt,
+      questions: this.transformQuestions(group.questions),
+      media: group.media,
+      questionsCount: group._count.questions,
+    }
   }
 }

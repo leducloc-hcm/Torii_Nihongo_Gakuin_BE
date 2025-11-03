@@ -22,6 +22,7 @@ import {
   BulkCreateQuestionGroupsDTO,
   AddQuestionsToGroupDTO,
   RemoveQuestionsFromGroupDTO,
+  CloneQuestionGroupDTO,
 } from './question-group.dto'
 import { Auth } from 'src/shared/decorators/auth.decorator'
 import { AuthType } from 'src/shared/constants/auth.constant'
@@ -153,5 +154,37 @@ export class QuestionGroupController {
   async remove(@Param('id', ParseIntPipe) id: number) {
     await this.questionGroupService.remove(id)
     return { message: 'Question group deleted successfully' }
+  }
+
+  @Post(':id/clone')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Staff, RoleName.Admin, RoleName.Lecturer)
+  @HttpCode(HttpStatus.CREATED)
+  async cloneQuestionGroup(@Param('id', ParseIntPipe) id: number, @Body() cloneDto: CloneQuestionGroupDTO) {
+    return this.questionGroupService.cloneQuestionGroup(id, cloneDto)
+  }
+
+  @Get('uuid/:uuid/versions')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Staff, RoleName.Admin, RoleName.Lecturer)
+  @HttpCode(HttpStatus.OK)
+  async getVersions(@Param('uuid') uuid: string) {
+    return this.questionGroupService.getQuestionGroupVersions(uuid)
+  }
+
+  @Get('uuid/:uuid/version/:version')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Staff, RoleName.Admin, RoleName.Lecturer)
+  @HttpCode(HttpStatus.OK)
+  async getVersion(@Param('uuid') uuid: string, @Param('version', ParseIntPipe) version: number) {
+    return this.questionGroupService.getQuestionGroupByVersion(uuid, version)
+  }
+
+  @Get(':id/usage')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Staff, RoleName.Admin, RoleName.Lecturer)
+  @HttpCode(HttpStatus.OK)
+  async checkUsage(@Param('id', ParseIntPipe) id: number) {
+    return this.questionGroupService.checkQuestionGroupUsage(id)
   }
 }
