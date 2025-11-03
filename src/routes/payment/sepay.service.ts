@@ -344,12 +344,21 @@ export class SepayService {
           }
         }
 
-        // Update coupon usage
+        // Update coupon redemption status to COMPLETED
         if (order.couponId) {
-          await tx.promotion.update({
-            where: { id: order.couponId },
-            data: { used: { increment: 1 } },
+          await tx.couponRedemption.updateMany({
+            where: {
+              orderId: order.id,
+              couponId: order.couponId,
+              status: 'PENDING',
+            },
+            data: {
+              status: 'COMPLETED',
+              completedAt: new Date(),
+            },
           })
+
+          this.logger.log(`Coupon redemption completed for order ${order.id}, coupon ${order.couponId}`)
         }
 
         return enrollments
@@ -394,6 +403,20 @@ export class SepayService {
                 where: { id: order.id },
                 data: { status: 'FAILED' },
               })
+
+              // Update coupon redemption to FAILED
+              if (order.couponId) {
+                await this.prisma.couponRedemption.updateMany({
+                  where: {
+                    orderId: order.id,
+                    couponId: order.couponId,
+                    status: 'PENDING',
+                  },
+                  data: {
+                    status: 'FAILED',
+                  },
+                })
+              }
 
               this.notificationGateway.notifyPaymentFailed(order.userId, {
                 orderId: order.id,

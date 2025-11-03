@@ -240,7 +240,7 @@ export class PaymentService {
       },
     })
 
-    // Create coupon redemption if coupon was applied
+    // Create coupon redemption in PENDING status (will be updated to COMPLETED by webhook)
     if (coupon && coupon.type !== 'GIFT') {
       await this.prisma.couponRedemption.create({
         data: {
@@ -248,7 +248,7 @@ export class PaymentService {
           userId,
           orderId: order.id,
           discountApplied: checkoutCalculation.discountAmount,
-          status: 'COMPLETED',
+          status: 'PENDING', // Changed to PENDING - will be COMPLETED when payment succeeds
         },
       })
     }
@@ -414,7 +414,7 @@ export class PaymentService {
       },
     })
 
-    // Create coupon redemption if coupon was applied
+    // Create coupon redemption in PENDING status (will be updated to COMPLETED by webhook)
     if (appliedCoupon && appliedCoupon.type !== 'GIFT') {
       await this.prisma.couponRedemption.create({
         data: {
@@ -422,7 +422,7 @@ export class PaymentService {
           userId,
           orderId: order.id,
           discountApplied: discountAmount,
-          status: 'COMPLETED',
+          status: 'PENDING', // Changed to PENDING - will be COMPLETED when payment succeeds
         },
       })
     }
