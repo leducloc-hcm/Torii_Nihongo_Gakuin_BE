@@ -46,6 +46,7 @@ model User {
   spinPicks    SpinWheelEvent[]  @relation("SpinPickUser")
 
   folders   Folder[]
+  folderPermissions FolderPermission[]
   resources Resource[] @relation("ResourceAuthor")
   reactions Reaction[]
   comments  Comment[]
@@ -652,14 +653,15 @@ model Class {
   capacity    Int      @default(20)
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
+  folderId    Int?     @unique
 
   course     Course?       @relation(fields: [courseId], references: [id])
   lecturer   User          @relation(fields: [lecturerId], references: [id])
   sessions   LiveSession[]
   members    ClassMember[]
   orderItems OrderItem[]
-
-  CartItem CartItem[]
+  folder     Folder?       @relation("ClassFolder")
+  CartItem   CartItem[]
 }
 
 model ClassMember {
@@ -840,15 +842,21 @@ model WrongTerm {
 
 // ===== Community Library & Folders =====
 model Folder {
-  id       Int    @id @default(autoincrement())
-  ownerId  Int
-  name     String
-  parentId Int?
+  id           Int      @id @default(autoincrement())
+  ownerId      Int
+  name         String
+  parentId     Int?
+  classId      Int?     @unique
+  totalSizeByte BigInt  @default(0)
 
-  owner     User       @relation(fields: [ownerId], references: [id])
-  parent    Folder?    @relation("FolderToFolder", fields: [parentId], references: [id])
-  children  Folder[]   @relation("FolderToFolder")
-  resources Resource[]
+  owner        User              @relation(fields: [ownerId], references: [id])
+  parent       Folder?           @relation("FolderToFolder", fields: [parentId], references: [id])
+  children     Folder[]          @relation("FolderToFolder")
+  resources    Resource[]
+  class        Class?            @relation("ClassFolder", fields: [classId], references: [id])
+  permissions  FolderPermission[]
+
+  @@index([classId])
 }
 
 model Resource {
@@ -858,6 +866,8 @@ model Resource {
   title      String
   body       String?
   mediaUrl   String?
+  sizeByte   BigInt?
+  s3Key      String?
   visibility Visibility @default(PRIVATE)
   tags       String[]
   createdAt  DateTime   @default(now())
@@ -892,6 +902,22 @@ model Comment {
 
   resource Resource @relation(fields: [resourceId], references: [id])
   user     User     @relation(fields: [userId], references: [id])
+}
+
+model FolderPermission {
+  id         Int                @id @default(autoincrement())
+  folderId   Int
+  userId     Int
+  permission FolderPermissionType @default(VIEW_ONLY)
+  grantedAt  DateTime           @default(now())
+  grantedBy  Int?
+
+  folder Folder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([folderId, userId])
+  @@index([userId])
+  @@index([folderId])
 }
 
 // ===== Gamification (Points, Streaks, Rewards) =====
@@ -1385,4 +1411,9 @@ enum CitationSourceType {
   RESOURCE
   WEB_URL
   GENERAL
+}
+
+enum FolderPermissionType {
+  VIEW_ONLY
+  EDIT
 }

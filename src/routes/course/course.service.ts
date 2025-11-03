@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common'
 import { CourseRepository } from './course.repo'
 import { OnlineClassRepository } from '../online-class/online-class.repo'
+import { ClassFolderService } from '../online-class/class-folder.service'
 import {
   CreateCourseDTO,
   UpdateCourseDTO,
@@ -20,6 +21,7 @@ export class CourseService {
     private readonly onlineClassRepository: OnlineClassRepository,
     private readonly lecturerRepository: LectureProfileRepository,
     private readonly enrollmentService: EnrollmentService,
+    private readonly classFolderService: ClassFolderService,
   ) {}
 
   async create(createCourseDto: CreateCourseDTO, userId: number): Promise<CourseWithRelations> {
@@ -327,13 +329,18 @@ export class CourseService {
       throw new BadRequestException(`Lecturer with ID ${createClassDto.lecturerId} does not exist or is not authorized`)
     }
 
-    return this.onlineClassRepository.create({
+    const newClass = await this.onlineClassRepository.create({
       title: createClassDto.title,
       description: createClassDto.description,
       capacity: createClassDto.capacity,
       course: { connect: { id: courseId } },
       lecturer: { connect: { id: createClassDto.lecturerId } },
     })
+
+    // Auto-create folder for the class
+    await this.classFolderService.createClassFolder(newClass.id, createClassDto.lecturerId)
+
+    return newClass
   }
 
   async updateCourseClass(courseId: number, classId: number, updateClassDto: UpdateClassDTO) {

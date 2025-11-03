@@ -1,4 +1,4 @@
-import { GetObjectCommand, PutObjectCommand, S3 } from '@aws-sdk/client-s3'
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3 } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { Injectable, Logger } from '@nestjs/common'
 import { v4 as uuidv4 } from 'uuid'
@@ -469,6 +469,68 @@ export class S3Service {
     } catch (error) {
       this.logger.error(`Failed to generate document presigned URL:`, error)
       throw error
+    }
+  }
+
+  // Generate presigned URL for class folder material upload
+  generateClassFolderMaterialUploadUrl = async (
+    classId: number,
+    filename: string,
+    contentType: string,
+    fileSizeByte: number,
+    expiresIn: number = 3600, // 1 hour
+  ) => {
+    try {
+      const fileExt = filename.split('.').pop()
+      const timestamp = Date.now()
+      const uuid = uuidv4()
+      const key = `class-materials/${classId}/${timestamp}-${uuid}.${fileExt}`
+
+      const command = new PutObjectCommand({
+        Bucket: this.BUCKET_NAME,
+        Key: key,
+        ContentType: contentType,
+        ContentLength: fileSizeByte, // Enforce size limit at S3 level
+        Metadata: {
+          classId: classId.toString(),
+          originalFilename: filename,
+          uploadedAt: new Date().toISOString(),
+          type: 'class-folder-material',
+          sizeByte: fileSizeByte.toString(),
+        },
+      })
+
+      const uploadUrl = await getSignedUrl(this.s3, command, { expiresIn })
+
+      const publicUrl = `https://${this.BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`
+
+      this.logger.log(`Generated presigned upload URL for class folder material: ${key}`)
+
+      return {
+        uploadUrl,
+        publicUrl,
+        key,
+        expiresIn,
+      }
+    } catch (error) {
+      this.logger.error(`Failed to generate class folder material upload URL: ${error.message}`)
+      throw error
+    }
+  }
+
+  // Delete object from S3
+  deleteObject = async (key: string): Promise<void> => {
+    try {
+      const command = new DeleteObjectCommand({
+        Bucket: this.BUCKET_NAME,
+        Key: key,
+      })
+
+      await this.s3.send(command)
+      this.logger.log(`Deleted object from S3: ${key}`)
+    } catch (error) {
+      this.logger.error(`Failed to delete object from S3 (${key}): ${error.message}`)
+      // Don't throw error - file might not exist, continue with resource deletion
     }
   }
 }
