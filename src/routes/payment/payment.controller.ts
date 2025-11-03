@@ -61,7 +61,7 @@ export class PaymentController {
   @Roles(RoleName.Customer, RoleName.Admin, RoleName.Staff)
   @HttpCode(HttpStatus.CREATED)
   async createSepayPayment(@ActiveUser('userId') userId: number): Promise<SepayPaymentResponseDTO> {
-    return this.paymentService.createSepayPayment(userId)
+    return this.paymentService.createSepayPaymentWithCoupon(userId)
   }
 
   /**
@@ -77,7 +77,7 @@ export class PaymentController {
     @ActiveUser('userId') userId: number,
     @Body() buyDto: BuyCourseDirectDTO,
   ): Promise<SepayPaymentResponseDTO> {
-    return this.paymentService.buyCourseDirectWithSepay(userId, buyDto.courseId, buyDto.couponCode)
+    return await this.paymentService.buyCourseDirectWithCoupon(userId, buyDto.courseId, buyDto.couponCode)
   }
 
   @Post('sepay/webhook')

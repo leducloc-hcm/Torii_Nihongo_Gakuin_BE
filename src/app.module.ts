@@ -32,6 +32,7 @@ import { QuizItemModule } from './routes/quiz-item/quiz-item.module'
 import { QuizAttemptModule } from './routes/quiz-attempt/quiz-attempt.module'
 import { QuizAnswerModule } from './routes/quiz-answer/quiz-answer.module'
 import { RedisModule } from './shared/redis/redis.module'
+import { CouponModule } from './routes/coupon/coupon.module'
 
 @Module({
   imports: [
@@ -66,6 +67,7 @@ import { RedisModule } from './shared/redis/redis.module'
     QuizItemModule,
     QuizAttemptModule,
     QuizAnswerModule,
+    CouponModule,
   ],
   controllers: [AppController],
   providers: [AppService],
