@@ -369,7 +369,8 @@ export class QuizRepository {
     return await this.prisma.quizAttempt.findMany({
       where: {
         quizId,
-        userId, // ✅ Filter by user ID
+        userId,
+        submittedAt: { not: null },
       },
       orderBy: { startedAt: 'desc' },
       take: 3,
@@ -385,9 +386,6 @@ export class QuizRepository {
     })
   }
 
-  /**
-   * Get quiz by attempt ID with all questions and user's answers
-   */
   async getQuizByAttempt(attemptId: number) {
     const attempt = await this.prisma.quizAttempt.findUnique({
       where: { id: attemptId },
@@ -405,7 +403,6 @@ export class QuizRepository {
       throw new Error('Attempt not found')
     }
 
-    // Get quiz with full structure
     const quiz = await this.prisma.quiz.findUnique({
       where: { id: attempt.quizId },
       include: {
@@ -504,7 +501,6 @@ export class QuizRepository {
       ]),
     )
 
-    // Enrich quiz with user's answers
     const enrichedQuiz = {
       ...quiz,
       attempt: {
@@ -550,11 +546,7 @@ export class QuizRepository {
     return enrichedQuiz
   }
 
-  /**
-   * Get quiz by user's attempt (with validation)
-   */
   async getQuizByUserAttempt(userId: number, attemptId: number) {
-    // Verify attempt belongs to user
     const attempt = await this.prisma.quizAttempt.findFirst({
       where: {
         id: attemptId,
@@ -566,13 +558,9 @@ export class QuizRepository {
       throw new Error('Attempt not found or does not belong to this user')
     }
 
-    // Use existing method
     return await this.getQuizByAttempt(attemptId)
   }
 
-  /**
-   * Get leaderboard for a quiz (top 10 unique users by best score)
-   */
   async getQuizLeaderboard(quizId: number) {
     const topAttempts = await this.prisma.$queryRaw<
       Array<{

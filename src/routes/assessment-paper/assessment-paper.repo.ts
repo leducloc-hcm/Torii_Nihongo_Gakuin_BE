@@ -767,7 +767,8 @@ export class AssessmentPaperRepository {
     return await this.prisma.assessmentAttempt.findMany({
       where: {
         assessmentId,
-        userId, // ✅ Filter by user ID
+        userId,
+        submittedAt: { not: null },
       },
       orderBy: { startedAt: 'desc' },
       take: 3,
@@ -784,7 +785,6 @@ export class AssessmentPaperRepository {
   }
 
   async getAssessmentPaperByUserAttempt(userId: number, attemptId: number) {
-    // Verify attempt belongs to user
     const attempt = await this.prisma.assessmentAttempt.findFirst({
       where: {
         id: attemptId,
@@ -796,13 +796,9 @@ export class AssessmentPaperRepository {
       throw new Error('Attempt not found or does not belong to this user')
     }
 
-    // Use existing method
     return await this.getAssessmentPaperByAttempt(attemptId)
   }
 
-  /**
-   * Get leaderboard for an assessment (top 10 unique users by best score)
-   */
   async getAssessmentLeaderboard(assessmentId: number) {
     const topAttempts = await this.prisma.$queryRaw<
       Array<{
