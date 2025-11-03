@@ -15,7 +15,13 @@ import {
   UploadedFiles,
 } from '@nestjs/common'
 import { QuestionService } from './question.service'
-import { CreateQuestionDTO, UpdateQuestionDTO, QueryQuestionDTO, BulkCreateQuestionsDTO } from './question.dto'
+import {
+  CreateQuestionDTO,
+  UpdateQuestionDTO,
+  QueryQuestionDTO,
+  BulkCreateQuestionsDTO,
+  CloneQuestionDTO,
+} from './question.dto'
 import { Auth } from 'src/shared/decorators/auth.decorator'
 import { AuthType } from 'src/shared/constants/auth.constant'
 import { Roles } from 'src/shared/decorators/roles.decorator'
@@ -137,5 +143,37 @@ export class QuestionController {
   async remove(@Param('id', ParseIntPipe) id: number) {
     await this.questionService.remove(id)
     return { message: 'Question deleted successfully' }
+  }
+
+  @Post(':id/clone')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Staff, RoleName.Admin, RoleName.Lecturer)
+  @HttpCode(HttpStatus.CREATED)
+  async cloneQuestion(@Param('id', ParseIntPipe) id: number, @Body() cloneDto: CloneQuestionDTO) {
+    return this.questionService.cloneQuestion(id, cloneDto)
+  }
+
+  @Get('uuid/:uuid/versions')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Staff, RoleName.Admin, RoleName.Lecturer)
+  @HttpCode(HttpStatus.OK)
+  async getVersions(@Param('uuid') uuid: string) {
+    return this.questionService.getQuestionVersions(uuid)
+  }
+
+  @Get('uuid/:uuid/version/:version')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Staff, RoleName.Admin, RoleName.Lecturer)
+  @HttpCode(HttpStatus.OK)
+  async getVersion(@Param('uuid') uuid: string, @Param('version', ParseIntPipe) version: number) {
+    return this.questionService.getQuestionByVersion(uuid, version)
+  }
+
+  @Get(':id/usage')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Staff, RoleName.Admin, RoleName.Lecturer)
+  @HttpCode(HttpStatus.OK)
+  async checkUsage(@Param('id', ParseIntPipe) id: number) {
+    return this.questionService.checkQuestionUsage(id)
   }
 }

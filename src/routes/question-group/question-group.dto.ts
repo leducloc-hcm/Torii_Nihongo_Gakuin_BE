@@ -20,3 +20,7 @@ export class BulkCreateQuestionGroupsDTO extends createZodDto(BulkCreateQuestion
 export class AddQuestionsToGroupDTO extends createZodDto(AddQuestionsToGroupSchema) {}
 export class RemoveQuestionsFromGroupDTO extends createZodDto(RemoveQuestionsFromGroupSchema) {}
 export class QuestionGroupStatsDTO extends createZodDto(QuestionGroupStatsSchema) {}
+
+// Versioning DTOs
+import { CloneQuestionGroupSchema } from './question-group.model'
+export class CloneQuestionGroupDTO extends createZodDto(CloneQuestionGroupSchema) {}

@@ -14,28 +14,29 @@ datasource db {
 }
 
 model User {
-  id                 Int                 @id @default(autoincrement())
-  email              String              @unique
-  password           String
-  name               String
-  role               Role                @default(CUSTOMER)
-  status             VerifyStatus        @default(UNVERIFIED)
-  bio                String?
-  totpSecret         String?             @db.VarChar(1000)
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
-  deletedAt          DateTime?
-  lecturerProfile    LecturerProfile?
-  staffProfile       StaffProfile?
-  customerProfile    CustomerProfile?
-  enrollments        Enrollment[]
-  notes              LessonNote[]
-  devices            Device[]
-  refreshTokens      RefreshToken[]
+  id         Int          @id @default(autoincrement())
+  email      String       @unique
+  password   String
+  name       String
+  role       Role         @default(CUSTOMER)
+  status     VerifyStatus @default(UNVERIFIED)
+  bio        String?
+  totpSecret String?      @db.VarChar(1000)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  deletedAt  DateTime?
+  lecturerProfile LecturerProfile?
+  staffProfile    StaffProfile?
+  customerProfile CustomerProfile?
+  enrollments     Enrollment[]
+  notes           LessonNote[]
+  lessonProgress  LessonProgress[]
+  devices         Device[]
+  refreshTokens   RefreshToken[]
   assessmentAttempts AssessmentAttempt[]
-  cardProgress       CardProgress[]
-  flashcardDecks     FlashcardDeck[]
-  wrongTerms         WrongTerm[]
+  cardProgress    CardProgress[]
+  flashcardDecks  FlashcardDeck[]
+  wrongTerms      WrongTerm[]
 
   classMembers ClassMember[]
   liveChats    LiveChatMessage[]
@@ -45,6 +46,7 @@ model User {
   spinPicks    SpinWheelEvent[]  @relation("SpinPickUser")
 
   folders   Folder[]
+  folderPermissions FolderPermission[]
   resources Resource[] @relation("ResourceAuthor")
   reactions Reaction[]
   comments  Comment[]
@@ -63,20 +65,19 @@ model User {
 
   aiThreads  AIThread[]
   aiMessages AIChatMessage[]
+  aiQueries  AIQuery[]
 
   assessmentPaper AssessmentPaper[]
-  quiz            Quiz[]
-  quizAttempts    QuizAttempt[]
-  Class           Class[]
+  quiz           Quiz[]
+  quizAttempts   QuizAttempt[]
+  Class Class[]
+
 
   Notification Notification[]
 
   Websocket Websocket[]
 
-  AdminProfile        AdminProfile[]
-  assignedAssessments AssessmentAssignment[] @relation("AssignedToUser")
-  createdAssignments  AssessmentAssignment[] @relation("AssignedByUser")
-  assessmentProgress  AssessmentProgress[]
+  AdminProfile AdminProfile[]
   
   // Coupon system relations
   createdCoupons     Coupon[] @relation("CouponCreator")
@@ -85,6 +86,9 @@ model User {
   purchasedCoupons   Coupon[] @relation("CouponPurchaser")
   couponRedemptions  CouponRedemption[] @relation("UserCouponRedemptions")
   couponAuditLogs    CouponAuditLog[] @relation("CouponAuditor")
+  assessmentProgress AssessmentProgress[]
+  assignedAssessments AssessmentAssignment[] @relation("AssignedByUser")
+  receivedAssessments AssessmentAssignment[] @relation("AssignedToUser")
 }
 
 model CustomerProfile {
@@ -169,6 +173,7 @@ model Specialty {
   lecturerSpecialties LecturerSpecialty[]
 }
 
+
 model Notification {
   id            Int                  @id @default(autoincrement())
   type          NotificationType
@@ -241,7 +246,6 @@ model AdminProfile {
   website     String?
   user        User      @relation(fields: [userId], references: [id])
 }
-
 model Course {
   id           Int          @id @default(autoincrement())
   slug         String       @unique
@@ -255,13 +259,13 @@ model Course {
   status       CourseStatus @default(DRAFT)
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
-  createdBy    Int
-  lecturerIds  Int[]
-  modules      Module[]
-  enrollments  Enrollment[]
-  reviews      Review[]
-  orderItems   OrderItem[]
-  cartItems    CartItem[]
+  createdBy   Int
+  lecturerIds   Int[]
+  modules     Module[]
+  enrollments Enrollment[]
+  reviews     Review[]
+  orderItems  OrderItem[]
+  cartItems   CartItem[]
 
   Class Class[]
   AICitation AICitation[]
@@ -291,29 +295,30 @@ model Lesson {
   updatedAt   DateTime     @updatedAt
   status      LessonStatus @default(PRIVATE)
   module      Module       @relation(fields: [moduleId], references: [id])
-  media       MediaAsset[]
+  media   MediaAsset[]
   liveSession LiveSession?
   quiz        Quiz?
   notes       LessonNote[]
+  progress    LessonProgress[]
 }
 
 model MediaAsset {
-  id        Int         @id @default(autoincrement())
+  id        Int       @id @default(autoincrement())
   lessonId  Int?
   url       String
-  kind      MediaKind   @default(OTHER)
+  kind      MediaKind @default(OTHER)
   status    MediaStatus @default(UPLOADING)
   mimeType  String?
   sizeByte  Int?
   caption   String?
   meta      Json?
-  createdAt DateTime    @default(now())
+  createdAt DateTime  @default(now())
 
-  lesson         Lesson?            @relation(fields: [lessonId], references: [id])
-  questions      Question[]
+  lesson    Lesson?    @relation(fields: [lessonId], references: [id])
+  questions Question[]
   questionGroups QuestionGroup[]
-  options        Option[]
-  liveSessions   LiveSessionMedia[]
+  options   Option[]
+  liveSessions LiveSessionMedia[]
 }
 
 model Enrollment {
@@ -346,137 +351,168 @@ model LessonNote {
   @@index([lessonId, userId])
 }
 
+model LessonProgress {
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  lessonId        Int
+  watchedSec      Int      @default(0)
+  lastPositionSec Int      @default(0)
+  completed       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id])
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, lessonId])
+  @@index([lessonId])
+  @@index([userId])
+  @@map("lesson_progress")
+}
+
 // ===== Placement Test & Question Bank =====
 model PlacementBlueprint {
-  id              Int               @id @default(autoincrement())
-  level           JLPTLevel
-  totalQuestions  Int               @default(25)
-  vocabKanji      Int               @default(10)
-  grammar         Int               @default(5)
-  synonym         Int               @default(3)
-  orderSentence   Int               @default(2)
-  readingShort    Int               @default(2)
-  readingMedium   Int               @default(3)
-  active          Boolean           @default(true)
+  id             Int       @id @default(autoincrement())
+  level          JLPTLevel
+  totalQuestions Int       @default(25)
+  vocabKanji     Int       @default(10)
+  grammar        Int       @default(5)
+  synonym        Int       @default(3)
+  orderSentence  Int       @default(2)
+  readingShort   Int       @default(2)
+  readingMedium  Int       @default(3)
+  active         Boolean   @default(true)
   assessmentPaper AssessmentPaper[]
 }
 
 model Question {
-  id            Int            @id @default(autoincrement())
-  type          QuestionType
-  level         JLPTLevel
-  difficulty    Difficulty     @default(MEDIUM)
-  stem          String
-  passage       String?
-  mediaId       Int?
-  explanation   String?
-  createdAt     DateTime       @default(now())
-  readingLength ReadingLength?
-  media         MediaAsset?    @relation(fields: [mediaId], references: [id])
+  id               Int              @id @default(autoincrement())
+  uuid             String?          @unique @default(uuid())
+  version          Int              @default(1)
+  type             QuestionType
+  level            JLPTLevel
+  difficulty       Difficulty       @default(MEDIUM)
+  stem             String
+  passage          String?
+  mediaId          Int?
+  explanation      String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  readingLength    ReadingLength?
+  media            MediaAsset?      @relation(fields: [mediaId], references: [id])
 
-  groups QuestionGroupQuestion[]
-  option Option[]
-
+  groups                   QuestionGroupQuestion[]
+  options                  Option[]
   assessmentAnswers        AssessmentAnswer[]
   assessmentItems          AssessmentItemQuestion[]
   quizItems                QuizItemQuestion[]
   quizAnswers              QuizAnswer[]
   assessmentAnswerProgress AssessmentAnswerProgress[]
+  
+  @@index([uuid])
+  @@index([version])
+  @@index([type])
+  @@index([level])
 }
 
 model QuestionGroup {
-  id        Int               @id @default(autoincrement())
-  type      QuestionGroupType
-  title     String?
-  passage   String?
-  mediaId   Int?
-  order     Int?
-  metadata  Json?
-  createdAt DateTime          @default(now())
+  id          Int       @id @default(autoincrement())
+  uuid        String?    @unique @default(uuid()) 
+  version     Int       @default(1)
+  type        QuestionGroupType
+  title       String?
+  passage     String?          
+  mediaId     Int?
+  order       Int?
+  metadata    Json?
+  createdAt   DateTime  @default(now())
 
-  media MediaAsset? @relation(fields: [mediaId], references: [id])
+  media       MediaAsset? @relation(fields: [mediaId], references: [id])
 
-  questions       QuestionGroupQuestion[]
+  questions   QuestionGroupQuestion[]
+
   assessmentItems AssessmentItemGroup[]
   quizItems       QuizItemGroup[]
+  
+  @@index([uuid])
+  @@index([version])
 }
 
 model QuestionGroupQuestion {
   questionId Int
   groupId    Int
-  order      Int?
-  score      Float?
-  createdAt  DateTime @default(now())
+  order      Int?         
+  score      Float?       
+  createdAt  DateTime     @default(now())
 
-  question Question      @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  group    QuestionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  question   Question      @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  group      QuestionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
-  @@id([questionId, groupId])
+  @@id([questionId, groupId]) 
 }
 
 model Option {
-  id                       Int                        @id @default(autoincrement())
-  questionId               Int
-  content                  String?
-  mediaId                  Int?
-  isCorrect                Boolean                    @default(false)
-  order                    Int                        @default(0)
-  assessmentAnswers        AssessmentAnswer[]
-  quizAnswers              QuizAnswer[]
+  id         Int     @id @default(autoincrement())
+  questionId Int
+  content    String?
+  mediaId    Int?
+  isCorrect  Boolean @default(false)
+  order      Int     @default(0)
+  assessmentAnswers AssessmentAnswer[]
+  quizAnswers     QuizAnswer[]
   assessmentAnswerProgress AssessmentAnswerProgress[]
-  image                    MediaAsset?                @relation(fields: [mediaId], references: [id])
-  question                 Question                   @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  image     MediaAsset? @relation(fields: [mediaId], references: [id])
+  question  Question     @relation(fields: [questionId], references: [id],onDelete: Cascade)
 }
 
 model AssessmentAssignment {
-  id           Int              @id @default(autoincrement())
-  assessmentId Int
-  assignedById Int
-  assignedToId Int?
-  classId      Int?
-  note         String?
-  startAt      DateTime?
-  dueAt        DateTime?
-  maxAttempts  Int? // giới hạn số lần làm bài
-  status       AssignmentStatus @default(PENDING)
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
+  id             Int        @id @default(autoincrement())
+  assessmentId   Int
+  assignedById   Int
+  assignedToId   Int?
+  classId        Int?
+  note           String?
+  startAt        DateTime?
+  dueAt          DateTime?
+  lockAfterDue   Boolean @default(false)
+  maxAttempts    Int?               // giới hạn số lần làm bài
+  status         AssignmentStatus   @default(PENDING)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  assessment AssessmentPaper      @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
-  assignedBy User                 @relation("AssignedByUser", fields: [assignedById], references: [id], onDelete: Cascade)
-  assignedTo User?                @relation("AssignedToUser", fields: [assignedToId], references: [id], onDelete: SetNull)
-  class      Class?               @relation(fields: [classId], references: [id], onDelete: SetNull)
-  progress   AssessmentProgress[]
+  assessment AssessmentPaper @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  assignedBy User            @relation("AssignedByUser", fields: [assignedById], references: [id], onDelete: Cascade)
+  assignedTo User?           @relation("AssignedToUser", fields: [assignedToId], references: [id], onDelete: SetNull)
+  class      Class?          @relation(fields: [classId], references: [id], onDelete: SetNull)
+  progresses AssessmentProgress[]
 
   @@index([assessmentId])
   @@index([assignedById])
   @@index([assignedToId])
-  @@index([classId])
 }
 
 model AssessmentProgress {
-  id              Int       @id @default(autoincrement())
+  id              Int      @id @default(autoincrement())
   assessmentId    Int
   userId          Int
   assignmentId    Int?
-  startedAt       DateTime  @default(now())
-  lastSavedAt     DateTime  @updatedAt
+  startedAt       DateTime @default(now())
+  lastSavedAt     DateTime @updatedAt
   currentSection  Int?
   currentQuestion Int?
-  timeSpentSec    Int       @default(0)
-  isSubmitted     Boolean   @default(false)
+  timeSpentSec    Int      @default(0)
+  isSubmitted     Boolean  @default(false)
   completedAt     DateTime?
   remainingSec    Int?
 
-  assessment AssessmentPaper            @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
-  user       User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  assignment AssessmentAssignment?      @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+  assessment AssessmentPaper @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignment AssessmentAssignment? @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
   answers    AssessmentAnswerProgress[]
 
-  @@unique([assessmentId, userId, assignmentId])
+  @@unique([assessmentId, userId])
   @@index([assessmentId])
   @@index([userId])
-  @@index([assignmentId])
 }
 
 model AssessmentAnswerProgress {
@@ -488,9 +524,9 @@ model AssessmentAnswerProgress {
   timeSpentSec     Int      @default(0)
   isFlagged        Boolean  @default(false)
 
-  progress       AssessmentProgress @relation(fields: [progressId], references: [id], onDelete: Cascade)
-  question       Question           @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  selectedOption Option?            @relation(fields: [selectedOptionId], references: [id], onDelete: SetNull)
+  progress  AssessmentProgress @relation(fields: [progressId], references: [id], onDelete: Cascade)
+  question  Question           @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  selectedOption Option?       @relation(fields: [selectedOptionId], references: [id], onDelete: SetNull)
 
   @@unique([progressId, questionId])
   @@index([progressId])
@@ -498,41 +534,40 @@ model AssessmentAnswerProgress {
 }
 
 model AssessmentPaper {
-  id         Int            @id @default(autoincrement())
+  id         Int           @id @default(autoincrement())
   title      String
   level      JLPTLevel
-  type       AssessmentType
-  visibility Visibility     @default(PRIVATE)
+  type       AssessmentType           
+  visibility Visibility    @default(PRIVATE)
 
-  createdBy Int
-  author    User     @relation(fields: [createdBy], references: [id])
-  createdAt DateTime @default(now())
+  createdBy  Int
+  author     User          @relation(fields: [createdBy], references: [id])
+  createdAt  DateTime      @default(now())
 
-  scoreProfileId    Int?
-  scoreProfile      ScoreProfile?       @relation(fields: [scoreProfileId], references: [id])
-  blueprintId       Int? // thay cho TestPaper.blueprintId
+  scoreProfileId   Int?
+  scoreProfile     ScoreProfile? @relation(fields: [scoreProfileId], references: [id])
+  blueprintId       Int?                        // thay cho TestPaper.blueprintId
   blueprint         PlacementBlueprint? @relation(fields: [blueprintId], references: [id])
   blueprintSnapshot Json?
   seed              BigInt?
-  version           Int                 @default(1)
+  version           Int           @default(1)
   generatorVersion  String?
   generatorMeta     Json?
-
-  sections    AssessmentSection[]
-  attempts    AssessmentAttempt[]
-  assignments AssessmentAssignment[]
-  progress    AssessmentProgress[]
+  assessmentProgress AssessmentProgress[]
+  sections AssessmentSection[] 
+  attempts AssessmentAttempt[]
+  assessmentAssignment AssessmentAssignment[]
 }
 
 model AssessmentSection {
-  id           Int                   @id @default(autoincrement())
-  assessmentId Int
-  title        String
-  timeLimitSec Int?
-  type         AssessmentSectionType
+  id             Int           @id @default(autoincrement())
+  assessmentId   Int
+  title          String
+  timeLimitSec    Int?
+  type           AssessmentSectionType
 
-  assessment AssessmentPaper  @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
-  items      AssessmentItem[]
+  assessment AssessmentPaper @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  items AssessmentItem[] 
 }
 
 model AssessmentItem {
@@ -543,8 +578,8 @@ model AssessmentItem {
   order            Int     @default(0)
 
   section        AssessmentSection        @relation(fields: [sectionId], references: [id], onDelete: Cascade)
-  questions      AssessmentItemQuestion[]
-  questionGroups AssessmentItemGroup[]
+  questions      AssessmentItemQuestion[] 
+  questionGroups AssessmentItemGroup[]    
 }
 
 model AssessmentItemQuestion {
@@ -554,8 +589,8 @@ model AssessmentItemQuestion {
   score      Float?
   createdAt  DateTime @default(now())
 
-  item     AssessmentItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  question Question       @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  item       AssessmentItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  question   Question       @relation(fields: [questionId], references: [id], onDelete: Cascade)
 
   @@id([itemId, questionId])
 }
@@ -567,8 +602,8 @@ model AssessmentItemGroup {
   score     Float?
   createdAt DateTime @default(now())
 
-  item  AssessmentItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  group QuestionGroup  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  item      AssessmentItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  group     QuestionGroup  @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
   @@id([itemId, groupId])
 }
@@ -583,11 +618,10 @@ model AssessmentAttempt {
   levelSuggestion JLPTLevel?
   earnedScore     Float?
 
-  assessment AssessmentPaper    @relation(fields: [assessmentId], references: [id])
-  user       User               @relation(fields: [userId], references: [id])
+  assessment AssessmentPaper  @relation(fields: [assessmentId], references: [id])
+  user       User        @relation(fields: [userId], references: [id])
   answers    AssessmentAnswer[]
 }
-
 model AssessmentAnswer {
   id               Int      @id @default(autoincrement())
   attemptId        Int
@@ -603,51 +637,51 @@ model AssessmentAnswer {
 }
 
 model ScoreProfile {
-  id           Int        @id @default(autoincrement())
-  name         String
-  level        JLPTLevel?
-  maxTotal     Int?
-  minTotalPass Int?
+  id              Int            @id @default(autoincrement())
+  name            String        
+  level           JLPTLevel?    
+  maxTotal        Int?          
+  minTotalPass    Int?           
 
-  papers    AssessmentPaper[]
-  sections  ScoreProfileSection[]
-  createdAt DateTime              @default(now())
-  updatedAt DateTime              @updatedAt
+  papers          AssessmentPaper[]
+  sections        ScoreProfileSection[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 }
 
 model ScoreProfileSection {
-  id             Int                   @id @default(autoincrement())
-  type           AssessmentSectionType
-  title          String
-  maxScore       Int
-  weight         Float?
-  minPass        Int?
-  defaultTimeSec Int?
+  id          Int                    @id @default(autoincrement())
+  type        AssessmentSectionType  
+  title       String                 
+  maxScore    Int                    
+  weight      Float?                
+  minPass     Int?       
+  defaultTimeSec Int?            
 
-  profileId Int
-  profile   ScoreProfile @relation(fields: [profileId], references: [id])
+  profileId   Int
+  profile     ScoreProfile           @relation(fields: [profileId], references: [id])
 }
 
 model Quiz {
-  id           Int      @id @default(autoincrement())
-  lessonId     Int?     @unique
-  title        String
-  createdAt    DateTime @default(now())
-  createdBy    Int
-  timeLimitSec Int
+  id        Int      @id @default(autoincrement())
+  lessonId  Int?     @unique
+  title     String
+  createdAt DateTime @default(now())
+  createdBy  Int
+  timeLimitSec    Int
 
-  author   User          @relation(fields: [createdBy], references: [id])
+  author    User    @relation(fields: [createdBy], references: [id])
   lesson   Lesson?       @relation(fields: [lessonId], references: [id])
   items    QuizItem[]
   attempts QuizAttempt[]
 }
 
 model QuizItem {
-  id     Int @id @default(autoincrement())
+  id    Int @id @default(autoincrement())
   quizId Int
-  order  Int @default(0)
+  order Int @default(0)
 
-  quiz           Quiz               @relation(fields: [quizId], references: [id])
+  quiz           Quiz              @relation(fields: [quizId], references: [id])
   questions      QuizItemQuestion[]
   questionGroups QuizItemGroup[]
 }
@@ -665,10 +699,10 @@ model QuizItemQuestion {
 }
 
 model QuizItemGroup {
-  itemId  Int
-  groupId Int
-  order   Int?
-
+  itemId    Int
+  groupId   Int
+  order     Int?
+  
   createdAt DateTime @default(now())
 
   item  QuizItem      @relation(fields: [itemId], references: [id], onDelete: Cascade)
@@ -678,14 +712,14 @@ model QuizItemGroup {
 }
 
 model QuizAttempt {
-  id     Int @id @default(autoincrement())
-  quizId Int
-  userId Int
+  id          Int       @id @default(autoincrement())
+  quizId      Int
+  userId      Int
 
   startedAt   DateTime  @default(now())
   submittedAt DateTime?
-  score       Float? // Accuracy percentage (0-100)
-
+  score       Float?    // Accuracy percentage (0-100)
+  
   quiz    Quiz         @relation(fields: [quizId], references: [id])
   user    User         @relation(fields: [userId], references: [id])
   answers QuizAnswer[]
@@ -714,14 +748,16 @@ model Class {
   capacity    Int      @default(20)
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
+  folderId    Int?     @unique
 
-  course               Course?                @relation(fields: [courseId], references: [id])
-  lecturer             User                   @relation(fields: [lecturerId], references: [id])
-  sessions             LiveSession[]
-  members              ClassMember[]
-  orderItems           OrderItem[]
-  AssessmentAssignment AssessmentAssignment[]
-  CartItem             CartItem[]
+  course     Course?       @relation(fields: [courseId], references: [id])
+  lecturer   User          @relation(fields: [lecturerId], references: [id])
+  sessions   LiveSession[]
+  members    ClassMember[]
+  orderItems OrderItem[]
+  folder     Folder?       @relation("ClassFolder")
+  CartItem   CartItem[]
+  assessmentAssignment AssessmentAssignment[]
 }
 
 model ClassMember {
@@ -898,17 +934,25 @@ model WrongTerm {
   @@unique([userId, term])
 }
 
+
+
 // ===== Community Library & Folders =====
 model Folder {
-  id       Int    @id @default(autoincrement())
-  ownerId  Int
-  name     String
-  parentId Int?
+  id           Int      @id @default(autoincrement())
+  ownerId      Int
+  name         String
+  parentId     Int?
+  classId      Int?     @unique
+  totalSizeByte BigInt  @default(0)
 
-  owner     User       @relation(fields: [ownerId], references: [id])
-  parent    Folder?    @relation("FolderToFolder", fields: [parentId], references: [id])
-  children  Folder[]   @relation("FolderToFolder")
-  resources Resource[]
+  owner        User              @relation(fields: [ownerId], references: [id])
+  parent       Folder?           @relation("FolderToFolder", fields: [parentId], references: [id])
+  children     Folder[]          @relation("FolderToFolder")
+  resources    Resource[]
+  class        Class?            @relation("ClassFolder", fields: [classId], references: [id])
+  permissions  FolderPermission[]
+
+  @@index([classId])
 }
 
 model Resource {
@@ -918,6 +962,8 @@ model Resource {
   title      String
   body       String?
   mediaUrl   String?
+  sizeByte   BigInt?
+  s3Key      String?
   visibility Visibility @default(PRIVATE)
   tags       String[]
   createdAt  DateTime   @default(now())
@@ -927,6 +973,7 @@ model Resource {
   folder    Folder?    @relation(fields: [folderId], references: [id])
   reactions Reaction[]
   comments  Comment[]
+
 }
 
 model Reaction {
@@ -953,6 +1000,22 @@ model Comment {
   user     User     @relation(fields: [userId], references: [id])
 }
 
+model FolderPermission {
+  id         Int                @id @default(autoincrement())
+  folderId   Int
+  userId     Int
+  permission FolderPermissionType @default(VIEW_ONLY)
+  grantedAt  DateTime           @default(now())
+  grantedBy  Int?
+
+  folder Folder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([folderId, userId])
+  @@index([userId])
+  @@index([folderId])
+}
+
 // ===== Gamification (Points, Streaks, Rewards) =====
 model PointsLedger {
   id        Int      @id @default(autoincrement())
@@ -977,11 +1040,11 @@ model Streak {
 }
 
 model Reward {
-  id          Int                @id @default(autoincrement())
-  type        RewardType
-  name        String
-  points      Int                @default(0)
-  stock       Int?
+  id     Int        @id @default(autoincrement())
+  type   RewardType
+  name   String
+  points Int        @default(0)
+  stock  Int?
   redemptions RewardRedemption[]
 }
 
@@ -1007,14 +1070,14 @@ model Cart {
 }
 
 model CartItem {
-  id       Int  @id @default(autoincrement())
+  id       Int @id @default(autoincrement())
   cartId   Int
   courseId Int
-  classId  Int?
+  classId   Int?
 
   cart   Cart   @relation(fields: [cartId], references: [id], onDelete: Cascade)
   course Course @relation(fields: [courseId], references: [id])
-  class  Class? @relation(fields: [classId], references: [id])
+    class  Class?  @relation(fields: [classId], references: [id])
 
   @@unique([cartId, courseId])
 }
@@ -1044,9 +1107,9 @@ model OrderItem {
   courseId  Int?
   classId   Int?
   unitPrice Int
-  order     Order         @relation(fields: [orderId], references: [id])
-  course    Course?       @relation(fields: [courseId], references: [id])
-  class     Class?        @relation(fields: [classId], references: [id])
+  order  Order   @relation(fields: [orderId], references: [id])
+  course Course? @relation(fields: [courseId], references: [id])
+  class  Class?  @relation(fields: [classId], references: [id])
 }
 
 model Promotion {
@@ -1269,33 +1332,77 @@ model AIThread {
   userId    Int
   title     String?
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   user     User            @relation(fields: [userId], references: [id])
   messages AIChatMessage[]
+  queries  AIQuery[]
+
+  @@index([userId, createdAt])
+}
+
+model AIQuery {
+  id               String      @id @default(cuid())
+  threadId         Int
+  userId           Int
+  query            String      @db.Text
+  queryType        QueryType
+  initialResponse  String?     @db.Text
+  executedTools    Json?
+  requiresApproval Boolean     @default(false)
+  status           QueryStatus @default(PENDING)
+  cacheKey         String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  thread   AIThread        @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  user     User            @relation(fields: [userId], references: [id])
+  messages AIChatMessage[]
+
+  @@index([threadId, createdAt])
+  @@index([userId, status])
+  @@index([cacheKey])
 }
 
 model AIChatMessage {
   id        Int      @id @default(autoincrement())
   threadId  Int
   userId    Int
+  queryId   String?
   role      ChatRole
-  content   String
+  content   String   @db.Text
   audioUrl  String?
+  toolCalls Json?
   createdAt DateTime @default(now())
 
-  thread    AIThread     @relation(fields: [threadId], references: [id])
+  thread    AIThread     @relation(fields: [threadId], references: [id], onDelete: Cascade)
   user      User         @relation(fields: [userId], references: [id])
+  query     AIQuery?     @relation(fields: [queryId], references: [id], onDelete: SetNull)
   citations AICitation[]
+
+  @@index([threadId, createdAt])
+  @@index([queryId])
 }
 
 model AICitation {
-  id         Int     @id @default(autoincrement())
-  messageId  Int
-  sourceUrl  String?
-  resourceId Int?
+  id              Int                @id @default(autoincrement())
+  messageId       Int
+  sourceType      CitationSourceType
+  sourceUrl       String?
+  resourceId      Int?
+  courseId        Int?
+  lessonId        Int?
+  flashcardDeckId Int?
+  quizId          Int?
+  assessmentId    Int?
+  content         String?            @db.Text
+  createdAt       DateTime           @default(now())
 
-  message  AIChatMessage @relation(fields: [messageId], references: [id])
-  course   Course?       @relation(fields: [resourceId], references: [id])
+  message AIChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  course  Course?       @relation(fields: [courseId], references: [id])
+
+  @@index([messageId])
+  @@index([sourceType])
 }
 
 // ===== Enums =====
@@ -1353,6 +1460,7 @@ enum QuestionGroupType {
   READING_LONG
   LISTENING
 }
+
 
 enum Difficulty {
   EASY
@@ -1489,11 +1597,38 @@ enum MediaStatus {
   FAILED
 }
 
-enum AssignmentStatus {
+enum QueryType {
+  COURSE
+  LESSON
+  FLASHCARD
+  ASSESSMENT
+  QUIZ
+  LIVE_SESSION
+  RESOURCE
+  GENERAL
+}
+
+enum QueryStatus {
   PENDING
-  IN_PROGRESS
-  SUBMITTED
-  GRADED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum CitationSourceType {
+  COURSE
+  LESSON
+  FLASHCARD_DECK
+  QUIZ
+  ASSESSMENT
+  RESOURCE
+  WEB_URL
+  GENERAL
+}
+
+enum FolderPermissionType {
+  VIEW_ONLY
+  EDIT
 }
 
 // ===== Enhanced Coupon System Enums =====
@@ -1534,4 +1669,11 @@ enum CouponAuditAction {
   ACTIVATED
   DEACTIVATED
   REDEEMED
+}
+
+enum AssignmentStatus {
+  PENDING
+  IN_PROGRESS
+  SUBMITTED
+  GRADED
 }

@@ -98,6 +98,16 @@ export const QuestionGroupStatsSchema = z.object({
   averageQuestionsPerGroup: z.number(),
 })
 
+export const CloneQuestionGroupSchema = z.object({
+  type: QuestionGroupTypeEnum.optional(),
+  title: z.string().min(1).max(500).optional().nullable(),
+  passage: z.string().max(5000).optional().nullable(),
+  mediaId: z.number().int().positive().optional().nullable(),
+  order: z.number().int().min(0).optional().nullable(),
+  metadata: z.record(z.any()).optional().nullable(),
+  questionIds: z.array(z.number().int().positive()).optional(),
+})
+
 export type QuestionGroup = z.infer<typeof QuestionGroupSchema>
 export type QuestionGroupWithQuestions = QuestionGroup & {
   questions: Array<{

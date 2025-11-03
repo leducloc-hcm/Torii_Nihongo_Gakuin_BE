@@ -114,6 +114,43 @@ export const QuestionStatsSchema = z.object({
   withoutMedia: z.number().int(),
 })
 
+export const CloneQuestionSchema = z
+  .object({
+    type: QuestionTypeEnum.optional(),
+    level: JLPTLevelEnum.optional(),
+    difficulty: DifficultyEnum.optional(),
+    stem: z.string().min(1).max(2000).optional(),
+    passage: z.string().max(5000).optional().nullable(),
+    explanation: z.string().max(2000).optional().nullable(),
+    readingLength: ReadingLengthEnum.optional().nullable(),
+    mediaId: z.number().int().positive().optional().nullable(),
+    options: z
+      .array(
+        z.object({
+          content: z.string().min(1).max(1000),
+          isCorrect: z.boolean().default(false),
+          order: z.number().int().min(0).default(0),
+          mediaId: z.number().int().positive().optional().nullable(),
+        }),
+      )
+      .min(2, 'At least 2 options required')
+      .max(6, 'Maximum 6 options allowed')
+      .optional(),
+  })
+  .refine(
+    (data) => {
+      if (data.options) {
+        const correctOptions = data.options.filter((opt) => opt.isCorrect).length
+        return correctOptions >= 1
+      }
+      return true
+    },
+    {
+      message: 'At least one option must be correct when options are provided',
+      path: ['options'],
+    },
+  )
+
 export type Question = z.infer<typeof QuestionSchema>
 export type QuestionWithOptions = Question & {
   options: Array<{

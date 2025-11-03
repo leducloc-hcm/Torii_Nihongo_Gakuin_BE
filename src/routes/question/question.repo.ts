@@ -399,7 +399,8 @@ export class QuestionRepository {
     caption?: string | null
     mimeType?: string
     sizeByte?: number
-  }): Promise<{ id: number; url: string; kind: string; caption?: string | null }> {
+    meta?: any
+  }): Promise<{ id: number; url: string; kind: string; caption?: string | null; meta?: any }> {
     return await this.prisma.mediaAsset.create({
       data: {
         url: data.url,
@@ -407,6 +408,7 @@ export class QuestionRepository {
         caption: data.caption,
         mimeType: data.mimeType,
         sizeByte: data.sizeByte,
+        meta: data.meta,
         status: 'READY',
       },
       select: {
@@ -414,7 +416,117 @@ export class QuestionRepository {
         url: true,
         kind: true,
         caption: true,
+        meta: true,
       },
+    })
+  }
+
+  async isQuestionUsed(questionId: number): Promise<boolean> {
+    const [assessmentItemsCount, quizItemsCount, assessmentAnswersCount, quizAnswersCount] = await Promise.all([
+      this.prisma.assessmentItemQuestion.count({
+        where: { questionId },
+      }),
+      this.prisma.quizItemQuestion.count({
+        where: { questionId },
+      }),
+      this.prisma.assessmentAnswer.count({
+        where: { questionId },
+      }),
+      this.prisma.quizAnswer.count({
+        where: { questionId },
+      }),
+    ])
+
+    return assessmentItemsCount > 0 || quizItemsCount > 0 || assessmentAnswersCount > 0 || quizAnswersCount > 0
+  }
+
+  async findVersionsByUuid(uuid: string): Promise<any[]> {
+    return await this.prisma.question.findMany({
+      where: { uuid },
+      orderBy: { version: 'desc' },
+      include: this.includeWithOptions,
+    })
+  }
+
+  async getLatestVersion(uuid: string): Promise<number> {
+    const latest = await this.prisma.question.findFirst({
+      where: { uuid },
+      orderBy: { version: 'desc' },
+      select: { version: true },
+    })
+
+    return latest?.version || 0
+  }
+
+  async cloneQuestion(questionId: number, modifications?: Partial<any>): Promise<any> {
+    return await this.prisma.$transaction(async (tx) => {
+      // Get original question with options
+      const original = await tx.question.findUnique({
+        where: { id: questionId },
+        include: {
+          option: {
+            orderBy: { order: 'asc' },
+          },
+          media: true,
+        },
+      })
+
+      if (!original) {
+        throw new Error('Question not found')
+      }
+
+      const questionUuid = original.uuid || undefined
+
+      const latestVersion = await this.getLatestVersion(questionUuid || '')
+      const newVersion = latestVersion + 1
+
+      const newQuestion = await tx.question.create({
+        data: {
+          uuid: questionUuid,
+          version: newVersion,
+          type: modifications?.type || original.type,
+          level: modifications?.level || original.level,
+          difficulty: modifications?.difficulty || original.difficulty,
+          stem: modifications?.stem || original.stem,
+          passage: modifications?.passage !== undefined ? modifications.passage : original.passage,
+          explanation: modifications?.explanation !== undefined ? modifications.explanation : original.explanation,
+          readingLength:
+            modifications?.readingLength !== undefined ? modifications.readingLength : original.readingLength,
+          mediaId: modifications?.mediaId !== undefined ? modifications.mediaId : original.mediaId,
+        },
+        include: {
+          media: true,
+        },
+      })
+
+      const optionsToClone = modifications?.options || original.option
+      if (optionsToClone && optionsToClone.length > 0) {
+        await tx.option.createMany({
+          data: optionsToClone.map((opt: any) => ({
+            questionId: newQuestion.id,
+            content: opt.content,
+            mediaId: opt.mediaId,
+            isCorrect: opt.isCorrect,
+            order: opt.order,
+          })),
+        })
+      }
+
+      // Return the complete new question
+      return await tx.question.findUnique({
+        where: { id: newQuestion.id },
+        include: this.includeWithOptions,
+      })
+    })
+  }
+
+  async findByUuidAndVersion(uuid: string, version: number): Promise<any | null> {
+    return await this.prisma.question.findFirst({
+      where: {
+        uuid,
+        version,
+      },
+      include: this.includeWithOptions,
     })
   }
 }

@@ -20,3 +20,7 @@ export class QuestionResponseDTO extends createZodDto(QuestionResponseSchema) {}
 export class QuestionListItemDTO extends createZodDto(QuestionListItemSchema) {}
 export class BulkCreateQuestionsDTO extends createZodDto(BulkCreateQuestionsSchema) {}
 export class QuestionStatsDTO extends createZodDto(QuestionStatsSchema) {}
+
+// Versioning DTOs
+import { CloneQuestionSchema } from './question.model'
+export class CloneQuestionDTO extends createZodDto(CloneQuestionSchema) {}
