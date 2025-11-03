@@ -210,4 +210,23 @@ export class CourseRepository {
 
     return this.findAll({ skip, take, where: whereWithStatus, orderBy })
   }
+
+  async findByIds(ids: number[]): Promise<Course[]> {
+    return this.prisma.course.findMany({
+      where: {
+        id: {
+          in: ids,
+        },
+      },
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        price: true,
+        courseType: true,
+        level: true,
+        status: true,
+      },
+    }) as Promise<Course[]>
+  }
 }

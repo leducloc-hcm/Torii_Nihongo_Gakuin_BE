@@ -33,6 +33,7 @@ import { QuizAttemptModule } from './routes/quiz-attempt/quiz-attempt.module'
 import { QuizAnswerModule } from './routes/quiz-answer/quiz-answer.module'
 import { RedisModule } from './shared/redis/redis.module'
 import { AIChatModule } from 'src/routes/ai-chat/ai-chat.module'
+import { CouponModule } from './routes/coupon/coupon.module'
 
 @Module({
   imports: [
@@ -68,6 +69,7 @@ import { AIChatModule } from 'src/routes/ai-chat/ai-chat.module'
     QuizAttemptModule,
     QuizAnswerModule,
     AIChatModule,
+    CouponModule,
   ],
   controllers: [AppController],
   providers: [AppService],

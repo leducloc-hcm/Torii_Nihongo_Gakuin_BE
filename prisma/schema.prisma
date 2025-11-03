@@ -77,6 +77,14 @@ model User {
   assignedAssessments AssessmentAssignment[] @relation("AssignedToUser")
   createdAssignments  AssessmentAssignment[] @relation("AssignedByUser")
   assessmentProgress  AssessmentProgress[]
+  
+  // Coupon system relations
+  createdCoupons     Coupon[] @relation("CouponCreator")
+  approvedCoupons    Coupon[] @relation("CouponApprover")
+  rejectedCoupons    Coupon[] @relation("CouponRejector")
+  purchasedCoupons   Coupon[] @relation("CouponPurchaser")
+  couponRedemptions  CouponRedemption[] @relation("UserCouponRedemptions")
+  couponAuditLogs    CouponAuditLog[] @relation("CouponAuditor")
 }
 
 model CustomerProfile {
@@ -256,6 +264,8 @@ model Course {
   cartItems    CartItem[]
 
   Class Class[]
+  AICitation AICitation[]
+  coupons CouponCourse[] @relation("CouponCourses")
 }
 
 model Module {
@@ -917,8 +927,6 @@ model Resource {
   folder    Folder?    @relation(fields: [folderId], references: [id])
   reactions Reaction[]
   comments  Comment[]
-
-  AICitation AICitation[]
 }
 
 model Reaction {
@@ -1018,12 +1026,15 @@ model Order {
   status        PaymentStatus @default(PENDING)
   providerRef   String?
   createdAt     DateTime      @default(now())
-  couponId      Int?
   affiliateCode String?
+  
+  // Coupon support
+  couponId Int?
 
   user   User        @relation(fields: [userId], references: [id])
   items  OrderItem[]
-  coupon Promotion?  @relation(fields: [couponId], references: [id])
+  coupon Coupon? @relation("OrderCoupon", fields: [couponId], references: [id])
+  redemption CouponRedemption? @relation("OrderRedemption")
 }
 
 model OrderItem {
@@ -1051,8 +1062,122 @@ model Promotion {
   active      Boolean   @default(true)
   startsAt    DateTime?
   endsAt      DateTime?
+}
 
-  orders Order[]
+// ===== Enhanced Coupon System =====
+model Coupon {
+  id                 Int           @id @default(autoincrement())
+  code               String        @unique
+  title              String
+  description        String?
+  type               CouponType
+  discountType       DiscountType?
+  discountValue      Int?          // percentage (1-100) or fixed amount in cents
+  
+  // Eligibility & Constraints  
+  minOrderAmount     Int?          // minimum order amount in cents
+  maxDiscountAmount  Int?          // maximum discount cap in cents
+  maxRedemptions     Int?          // global usage limit
+  perUserLimit       Int?          // per-user usage limit
+  newUsersOnly       Boolean       @default(false)
+  requireFullCombo   Boolean       @default(false) // for DISCOUNT_MULTI
+  
+  // Time window
+  startsAt           DateTime?
+  endsAt             DateTime?
+  
+  // Status & Workflow
+  status             CouponStatus  @default(DRAFT)
+  
+  // Audit
+  createdBy          Int
+  approvedBy         Int?
+  rejectedBy         Int?
+  approvalNote       String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  
+  // Gift coupon specific
+  giftMessage        String?
+  extendDays         Int?          @default(30) // days to extend existing video courses
+  
+  // Gift Purchase Support
+  purchasedBy        Int?          // userId who purchased this gift coupon
+  purchaseOrderId    Int?          // order that created this gift coupon
+  recipientEmail     String?       // email of intended recipient
+  recipientName      String?       // name of intended recipient
+  purchasedAt        DateTime?     // when the gift was purchased
+  isGiftPurchase     Boolean       @default(false) // flag to differentiate purchased gifts
+  
+  creator            User          @relation("CouponCreator", fields: [createdBy], references: [id])
+  approver           User?         @relation("CouponApprover", fields: [approvedBy], references: [id])
+  rejector           User?         @relation("CouponRejector", fields: [rejectedBy], references: [id])
+  purchaser          User?         @relation("CouponPurchaser", fields: [purchasedBy], references: [id])
+  
+  courses            CouponCourse[]
+  redemptions        CouponRedemption[]
+  auditLogs          CouponAuditLog[]
+  orders             Order[]       @relation("OrderCoupon")
+
+  @@index([code])
+  @@index([status])
+  @@index([type])
+  @@index([startsAt, endsAt])
+  @@index([purchasedBy])
+  @@index([isGiftPurchase])
+}
+
+model CouponCourse {
+  id        Int    @id @default(autoincrement())
+  couponId  Int
+  courseId  Int
+  required  Boolean @default(true) // for combo logic
+  
+  coupon    Coupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  course    Course @relation("CouponCourses", fields: [courseId], references: [id])
+  
+  @@unique([couponId, courseId])
+}
+
+model CouponRedemption {
+  id           Int                @id @default(autoincrement())
+  couponId     Int
+  userId       Int
+  orderId      Int?               @unique // for discount coupons
+  discountApplied Int?            // amount discounted in cents
+  
+  // Gift redemption specific
+  giftedCourses Json?             // array of {courseId, action: 'enrolled'|'extended'}
+  pendingClassSelections Int[]    // courseIds waiting for class selection
+  
+  status       RedemptionStatus   @default(COMPLETED)
+  redeemedAt   DateTime           @default(now())
+  completedAt  DateTime?          // when all actions are done (including class selections)
+  
+  coupon       Coupon             @relation(fields: [couponId], references: [id])
+  user         User               @relation("UserCouponRedemptions", fields: [userId], references: [id])
+  order        Order?             @relation("OrderRedemption", fields: [orderId], references: [id])
+  
+  @@unique([couponId, userId]) // one redemption per user per coupon
+  @@index([userId])
+  @@index([couponId])
+}
+
+model CouponAuditLog {
+  id        Int                @id @default(autoincrement())
+  couponId  Int
+  userId    Int                // who made the change
+  action    CouponAuditAction
+  oldValues Json?
+  newValues Json?
+  note      String?
+  createdAt DateTime           @default(now())
+  
+  coupon    Coupon             @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  user      User               @relation("CouponAuditor", fields: [userId], references: [id])
+  
+  @@index([couponId])
+  @@index([userId])
 }
 
 model AffiliateCode {
@@ -1170,7 +1295,7 @@ model AICitation {
   resourceId Int?
 
   message  AIChatMessage @relation(fields: [messageId], references: [id])
-  resource Resource?     @relation(fields: [resourceId], references: [id])
+  course   Course?       @relation(fields: [resourceId], references: [id])
 }
 
 // ===== Enums =====
@@ -1369,4 +1494,44 @@ enum AssignmentStatus {
   IN_PROGRESS
   SUBMITTED
   GRADED
+}
+
+// ===== Enhanced Coupon System Enums =====
+enum CouponType {
+  DISCOUNT_SINGLE
+  DISCOUNT_MULTI
+  GIFT
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+}
+
+enum CouponStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  ACTIVE
+  INACTIVE
+  EXPIRED
+  REJECTED
+}
+
+enum RedemptionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  PARTIALLY_COMPLETED // for gift coupons with pending class selections
+}
+
+enum CouponAuditAction {
+  CREATED
+  UPDATED
+  SUBMITTED_FOR_APPROVAL
+  APPROVED
+  REJECTED
+  ACTIVATED
+  DEACTIVATED
+  REDEEMED
 }

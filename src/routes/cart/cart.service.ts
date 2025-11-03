@@ -1,9 +1,26 @@
+// Enhanced Cart Service with Coupon Integration
+
 import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common'
 import { CartRepository } from './cart.repo'
 import { CourseRepository } from '../course/course.repo'
+import { CouponService } from '../coupon/coupon.service'
 import { Cart, CartSummary } from './cart.model'
 import { AddToCartDTO, CartResponseDTO } from './cart.dto'
 import { OnlineClassRepository } from '../online-class/online-class.repo'
+import { DiscountType } from '../coupon/coupon.model'
+
+export interface EnhancedCartSummary extends CartSummary {
+  appliedCoupon?: {
+    code: string
+    title: string
+    discountAmount: number
+    finalAmount: number
+  }
+}
+
+export interface CartWithCouponDTO {
+  couponCode?: string
+}
 
 @Injectable()
 export class CartService {
@@ -11,6 +28,7 @@ export class CartService {
     private readonly cartRepository: CartRepository,
     private readonly courseRepository: CourseRepository,
     private readonly classRepository: OnlineClassRepository,
+    private readonly couponService: CouponService,
   ) {}
 
   async initCart(userId: number): Promise<Cart> {
@@ -53,6 +71,57 @@ export class CartService {
       createdAt: cart.createdAt,
       updatedAt: cart.updatedAt,
     }
+  }
+
+  async getCartWithCoupon(userId: number, couponCode?: string): Promise<EnhancedCartSummary | null> {
+    const cart = await this.cartRepository.findByUserId(userId)
+    if (!cart) return null
+
+    const baseSummary = await this.cartRepository.getCartSummary(userId)
+    if (!baseSummary) return null
+
+    const enhancedSummary: EnhancedCartSummary = {
+      totalItems: baseSummary.totalItems,
+      totalAmount: baseSummary.totalAmount,
+      items: cart.items,
+    }
+
+    if (!couponCode) {
+      return enhancedSummary
+    }
+
+    // Validate and apply coupon
+    try {
+      const courseIds = cart.items.map((item) => item.courseId)
+      const validation = await this.couponService.validateCoupon(
+        {
+          code: couponCode,
+          courseIds,
+          totalAmount: baseSummary.totalAmount,
+        },
+        userId,
+      )
+
+      if (validation.isValid && validation.discount) {
+        const discountAmount = validation.discount.appliedAmount
+        const finalAmount = Math.max(0, baseSummary.totalAmount - discountAmount)
+
+        return {
+          ...enhancedSummary,
+          appliedCoupon: {
+            code: couponCode,
+            title: `${validation.discount.type === DiscountType.PERCENTAGE ? validation.discount.value + '%' : '$' + (validation.discount.value / 100).toFixed(2)} off`,
+            discountAmount,
+            finalAmount,
+          },
+        }
+      }
+    } catch (error) {
+      // If coupon validation fails, return cart without coupon
+      console.log('Coupon validation failed:', error.message)
+    }
+
+    return enhancedSummary
   }
 
   async addToCart(userId: number, addToCartDto: AddToCartDTO): Promise<CartResponseDTO> {
@@ -118,7 +187,14 @@ export class CartService {
     }
   }
 
-  async validateCartForCheckout(userId: number): Promise<{ isValid: boolean; errors: string[] }> {
+  async validateCartForCheckout(
+    userId: number,
+    couponCode?: string,
+  ): Promise<{
+    isValid: boolean
+    errors: string[]
+    couponValidation?: any
+  }> {
     const cart = await this.cartRepository.findByUserId(userId)
     const errors: string[] = []
 
@@ -145,9 +221,84 @@ export class CartService {
       }
     }
 
+    let couponValidation
+    if (couponCode && errors.length === 0) {
+      try {
+        const courseIds = cart.items.map((item) => item.courseId)
+        const summary = await this.getCartSummary(userId)
+
+        couponValidation = await this.couponService.validateCoupon(
+          {
+            code: couponCode,
+            courseIds,
+            totalAmount: summary?.totalAmount || 0,
+          },
+          userId,
+        )
+
+        if (!couponValidation.isValid) {
+          errors.push(...couponValidation.errors)
+        }
+      } catch (error) {
+        errors.push(`Coupon validation failed: ${error.message}`)
+      }
+    }
+
     return {
       isValid: errors.length === 0,
       errors,
+      couponValidation,
+    }
+  }
+
+  // New method to calculate final checkout amount with coupon
+  async calculateCheckoutAmount(
+    userId: number,
+    couponCode?: string,
+  ): Promise<{
+    subtotal: number
+    discountAmount: number
+    finalAmount: number
+    couponDetails?: any
+  }> {
+    const summary = await this.getCartSummary(userId)
+    if (!summary) {
+      throw new BadRequestException('Cart is empty')
+    }
+
+    const subtotal = summary.totalAmount
+    let discountAmount = 0
+    let couponDetails
+
+    if (couponCode) {
+      const courseIds = summary.items.map((item) => item.courseId)
+
+      try {
+        const validation = await this.couponService.validateCoupon(
+          {
+            code: couponCode,
+            courseIds,
+            totalAmount: subtotal,
+          },
+          userId,
+        )
+
+        if (validation.isValid && validation.discount) {
+          discountAmount = validation.discount.appliedAmount
+          couponDetails = validation.discount
+        }
+      } catch (error) {
+        throw new BadRequestException(`Invalid coupon: ${error.message}`)
+      }
+    }
+
+    const finalAmount = Math.max(0, subtotal - discountAmount)
+
+    return {
+      subtotal,
+      discountAmount,
+      finalAmount,
+      couponDetails,
     }
   }
 }
