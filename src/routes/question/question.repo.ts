@@ -1,14 +1,10 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from 'src/shared/services/prisma.service'
-import { JLPTLevelType, QuestionTypeType, DifficultyType } from 'src/shared/constants/enum.constant'
-import { QuestionType } from 'src/shared/types/question.types'
 import {
   QuestionCreateInput,
-  QuestionUpdateInput,
-  QuestionWhereUniqueInput,
-  QuestionWhereInput,
   QuestionOrderByInput,
-  QuestionWithOptions,
+  QuestionWhereInput,
+  QuestionWhereUniqueInput,
 } from './question.model'
 
 @Injectable()
@@ -16,7 +12,7 @@ export class QuestionRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   private readonly includeWithOptions = {
-    option: {
+    options: {
       orderBy: {
         order: 'asc' as const,
       },
@@ -36,7 +32,7 @@ export class QuestionRepository {
       return await this.prisma.question.create({
         data: data as any,
         include: {
-          option: {
+          options: {
             orderBy: {
               order: 'asc',
             },
@@ -67,7 +63,7 @@ export class QuestionRepository {
     return await this.prisma.question.create({
       data: {
         ...questionData,
-        option: {
+        options: {
           create: options,
         },
       },
@@ -123,10 +119,10 @@ export class QuestionRepository {
         include: {
           _count: {
             select: {
-              option: true,
+              options: true,
             },
           },
-          option: {
+          options: {
             include: {
               question: true,
             },
@@ -171,7 +167,7 @@ export class QuestionRepository {
         where: where as any,
         data,
         include: {
-          option: {
+          options: {
             orderBy: {
               order: 'asc',
             },
@@ -323,7 +319,7 @@ export class QuestionRepository {
         const question = await tx.question.create({
           data: {
             ...questionData,
-            option: {
+            options: {
               create: options,
             },
           },
@@ -464,7 +460,7 @@ export class QuestionRepository {
       const original = await tx.question.findUnique({
         where: { id: questionId },
         include: {
-          option: {
+          options: {
             orderBy: { order: 'asc' },
           },
           media: true,
@@ -499,7 +495,7 @@ export class QuestionRepository {
         },
       })
 
-      const optionsToClone = modifications?.options || original.option
+      const optionsToClone = modifications?.options || original.options
       if (optionsToClone && optionsToClone.length > 0) {
         await tx.option.createMany({
           data: optionsToClone.map((opt: any) => ({

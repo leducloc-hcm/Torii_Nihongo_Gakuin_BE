@@ -29,7 +29,7 @@ export class QuizAnswerRepository {
     // Check if question exists
     const question = await this.prisma.question.findUnique({
       where: { id: data.questionId },
-      include: { option: true },
+      include: { options: true },
     })
     if (!question) {
       throw new NotFoundException(QUIZ_ANSWER_ERRORS.QUESTION_NOT_FOUND)
@@ -58,8 +58,8 @@ export class QuizAnswerRepository {
 
     // Calculate correctness
     let isCorrect = false
-    if (data.selectedOptionId && question.option) {
-      const selectedOption = question.option.find((opt) => opt.id === data.selectedOptionId)
+    if (data.selectedOptionId && question.options) {
+      const selectedOption = question.options.find((opt) => opt.id === data.selectedOptionId)
       isCorrect = selectedOption?.isCorrect || false
     }
 
@@ -197,10 +197,10 @@ export class QuizAnswerRepository {
       } else {
         const question = await this.prisma.question.findUnique({
           where: { id: answer.questionId },
-          include: { option: true },
+          include: { options: true },
         })
-        if (question?.option) {
-          const selectedOption = question.option.find((opt) => opt.id === data.selectedOptionId)
+        if (question?.options) {
+          const selectedOption = question.options.find((opt) => opt.id === data.selectedOptionId)
           isCorrect = selectedOption?.isCorrect || false
         }
       }

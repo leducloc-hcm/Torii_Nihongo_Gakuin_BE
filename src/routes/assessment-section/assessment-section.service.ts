@@ -15,7 +15,6 @@ import { AssessmentSection } from '@prisma/client'
 export class AssessmentSectionService {
   constructor(private readonly assessmentSectionRepo: AssessmentSectionRepository) {}
 
-  // ===== Basic CRUD Operations =====
   async createAssessmentSection(data: CreateAssessmentSectionInput): Promise<AssessmentSection> {
     const checkAssessmentId = await this.assessmentSectionRepo.checkIdAssessmentPaper(data.assessmentId)
     if (!checkAssessmentId) {

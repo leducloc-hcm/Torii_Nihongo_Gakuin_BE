@@ -156,7 +156,7 @@ export class QuizAttemptRepository {
                   include: {
                     question: {
                       include: {
-                        option: true,
+                        options: true,
                       },
                     },
                   },
@@ -197,8 +197,8 @@ export class QuizAttemptRepository {
       let isCorrect = false
 
       // Check if selected option is correct
-      if (answer.selectedOptionId && question.option) {
-        const selectedOption = question.option.find((opt: any) => opt.id === answer.selectedOptionId)
+      if (answer.selectedOptionId && question.options) {
+        const selectedOption = question.options.find((opt: any) => opt.id === answer.selectedOptionId)
         isCorrect = selectedOption?.isCorrect || false
       }
 

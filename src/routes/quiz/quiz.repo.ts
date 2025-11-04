@@ -59,7 +59,7 @@ export class QuizRepository {
               include: {
                 question: {
                   include: {
-                    option: {
+                    options: {
                       select: {
                         id: true,
                         image: true,
@@ -81,7 +81,7 @@ export class QuizRepository {
                         question: {
                           include: {
                             media: true,
-                            option: {
+                            options: {
                               select: {
                                 id: true,
                                 image: true,
@@ -362,9 +362,6 @@ export class QuizRepository {
     }
   }
 
-  /**
-   * Get 3 most recent attempts for a quiz by user
-   */
   async getRecentAttempts(quizId: number, userId: number) {
     return await this.prisma.quizAttempt.findMany({
       where: {
@@ -403,7 +400,47 @@ export class QuizRepository {
       throw new Error('Attempt not found')
     }
 
-    const quiz = await this.prisma.quiz.findUnique({
+    type QuizWithItems = Prisma.QuizGetPayload<{
+      include: {
+        author: { select: { id: true; name: true; email: true } }
+        lesson: { select: { id: true; title: true } }
+        items: {
+          include: {
+            questions: {
+              include: {
+                question: {
+                  include: {
+                    options: true
+                    media: true
+                  }
+                }
+              }
+            }
+            questionGroups: {
+              include: {
+                group: {
+                  include: {
+                    questions: {
+                      include: {
+                        question: {
+                          include: {
+                            options: true
+                            media: true
+                          }
+                        }
+                      }
+                    }
+                    media: true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }>
+
+    const quiz: QuizWithItems | null = await this.prisma.quiz.findUnique({
       where: { id: attempt.quizId },
       include: {
         author: {
@@ -425,7 +462,7 @@ export class QuizRepository {
               include: {
                 question: {
                   include: {
-                    option: {
+                    options: {
                       select: {
                         id: true,
                         content: true,
@@ -449,7 +486,7 @@ export class QuizRepository {
                       include: {
                         question: {
                           include: {
-                            option: {
+                            options: {
                               select: {
                                 id: true,
                                 content: true,
