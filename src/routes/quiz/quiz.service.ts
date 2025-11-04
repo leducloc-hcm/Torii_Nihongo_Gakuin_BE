@@ -12,11 +12,6 @@ import { QuizBase, QuizBasic, QuizWithRelations, CreateQuizInput, UpdateQuizInpu
 export class QuizService {
   constructor(private readonly quizRepo: QuizRepository) {}
   async createQuiz(data: CreateQuizInput, userId: number): Promise<QuizBase> {
-    const titleExists = await this.quizRepo.getTitleExists(data.title)
-    if (titleExists) {
-      throw new ConflictException(`Quiz with title "${data.title}" already exists`)
-    }
-
     return this.quizRepo.create(data, userId)
   }
 
@@ -64,14 +59,6 @@ export class QuizService {
         'Cannot update quiz that has been attempted. Please clone it to create a new version.',
       )
     }
-
-    if (data.title && data.title !== quiz.title) {
-      const titleExists = await this.quizRepo.getTitleExists(data.title, id)
-      if (titleExists) {
-        throw new ConflictException(`Quiz with title "${data.title}" already exists`)
-      }
-    }
-
     return this.quizRepo.update(id, data)
   }
 
@@ -98,16 +85,7 @@ export class QuizService {
     if (!original) {
       throw new NotFoundException(`Quiz with ID ${id} not found`)
     }
-
-    // Generate new title if not provided
     const title = newTitle || `${original.title} (Copy)`
-
-    // Check title uniqueness
-    const titleExists = await this.quizRepo.getTitleExists(title)
-    if (titleExists) {
-      throw new ConflictException(`Quiz with title "${title}" already exists`)
-    }
-
     return this.quizRepo.clone(id, userId, title)
   }
 
