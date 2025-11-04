@@ -120,34 +120,51 @@ export class AgentService {
     }
   }
 
-  /**
-   * Execute approved tools and get final response
-   */
   async executeApprovedTools(request: ExecuteToolsRequest): Promise<ExecuteToolsResponse> {
     const results: MCPToolResult[] = []
 
-    // Execute each tool call
-    for (const toolCall of request.toolCalls) {
+    if (request.toolCalls.length > 1) {
+      this.logger.log(
+        `Executing ${request.toolCalls.length} tools in parallel: ${request.toolCalls.map((tc) => tc.name).join(', ')}`,
+      )
+    }
+
+    const toolPromises = request.toolCalls.map(async (toolCall) => {
       try {
+        this.logger.log(`\n=== Executing tool: ${toolCall.name} ===`)
+        this.logger.log(`Arguments: ${JSON.stringify(toolCall.arguments, null, 2)}`)
+
         const result = await this.executeToolCall(toolCall.name, toolCall.arguments)
-        results.push({
+
+        this.logger.log(`Tool ${toolCall.name} result:`)
+        this.logger.log(`  Success: ${result.result !== null}`)
+        this.logger.log(`  Error: ${result.error || 'none'}`)
+        if (result.result) {
+          this.logger.log(`  Result preview: ${JSON.stringify(result.result).substring(0, 200)}...`)
+        }
+        this.logger.log(`=== Tool ${toolCall.name} completed ===\n`)
+
+        return {
           toolCallId: toolCall.id,
           toolName: toolCall.name,
           result: result.result,
           error: result.error,
           executedAt: result.executedAt,
-        })
+        }
       } catch (error) {
         this.logger.error(`Failed to execute tool ${toolCall.name}:`, error.message)
-        results.push({
+        return {
           toolCallId: toolCall.id,
           toolName: toolCall.name,
           result: null,
           error: error.message,
           executedAt: new Date(),
-        })
+        }
       }
-    }
+    })
+
+    // Wait for all tools to complete
+    results.push(...(await Promise.all(toolPromises)))
 
     // Build tool response messages
     const toolMessages: ChatCompletionMessageParam[] = results.map((result) => ({
@@ -208,7 +225,15 @@ export class AgentService {
       throw new Error(`No MCP server found for tool: ${toolName}`)
     }
 
+    this.logger.debug(`Calling MCP server: ${serverUrl}`)
+    this.logger.debug(`Tool: ${toolName}, Args: ${JSON.stringify(args)}`)
+
     const result: FastMCPResult = await this.mcpBase.executeTool(serverUrl, toolName, args)
+
+    this.logger.debug(`MCP Response:`)
+    this.logger.debug(`  Success: ${result.success}`)
+    this.logger.debug(`  Error: ${result.error || 'none'}`)
+    this.logger.debug(`  Data: ${result.data ? JSON.stringify(result.data).substring(0, 300) : 'null'}`)
 
     // Convert FastMCPResult to MCPToolResult
     return {

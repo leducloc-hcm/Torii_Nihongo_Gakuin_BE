@@ -10,13 +10,7 @@ export const MCP_SERVERS: Record<string, MCPServerConfig> = {
     name: 'course-mcp',
     url: process.env.MCP_COURSE_SERVER_URL || 'http://localhost:8000/course/mcp',
     enabled: process.env.MCP_COURSE_ENABLED !== 'false',
-    description: 'Course management and search operations',
-  },
-  lesson: {
-    name: 'lesson-mcp',
-    url: process.env.MCP_LESSON_SERVER_URL || 'http://localhost:8000/lesson/mcp',
-    enabled: process.env.MCP_LESSON_ENABLED !== 'false',
-    description: 'Lesson details, course reviews, and lesson structure operations',
+    description: 'Course management, lesson details, and live course operations',
   },
 }
 

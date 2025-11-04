@@ -20,11 +20,10 @@ export class AIChatController {
   @Get('threads')
   @ApiOperation({ summary: 'Get user chat threads' })
   async getUserThreads(@ActiveUser('userId') userId: number, @Query() dto: GetThreadsDto) {
-    // Đảm bảo limit và offset là number
     const limit = dto.limit ? Number(dto.limit) : 20
-    const offset = dto.offset ? Number(dto.offset) : 0
+    const page = dto.page ? Number(dto.page) : 1
 
-    return this.aiChatService.getUserThreads(userId, limit, offset)
+    return this.aiChatService.getUserThreads(userId, limit, page)
   }
 
   @Get('threads/:threadId/messages')
@@ -34,11 +33,10 @@ export class AIChatController {
     @Param('threadId', ParseIntPipe) threadId: number,
     @Query() dto: GetThreadMessagesDto,
   ) {
-    // Đảm bảo limit và offset là number
-    const limit = dto.limit ? Number(dto.limit) : 50
-    const offset = dto.offset ? Number(dto.offset) : 0
+    const limit = dto.limit ? Number(dto.limit) : 20
+    const page = dto.page ? Number(dto.page) : 1
 
-    return this.aiChatService.getThreadMessages(userId, threadId, limit, offset)
+    return this.aiChatService.getThreadMessages(userId, threadId, limit, page)
   }
 
   @Delete('threads/:threadId')
@@ -52,5 +50,11 @@ export class AIChatController {
   @ApiResponse({ status: 200, description: 'Query processed' })
   async sendQuery(@ActiveUser('userId') userId: number, @Body() dto: SendQueryDto) {
     return this.aiChatService.handleQuery(userId, dto)
+  }
+
+  @Post('cache/clear')
+  @ApiOperation({ summary: 'Clear user cache (development only)' })
+  async clearUserCache(@ActiveUser('userId') userId: number) {
+    return this.aiChatService.clearUserCache(userId)
   }
 }

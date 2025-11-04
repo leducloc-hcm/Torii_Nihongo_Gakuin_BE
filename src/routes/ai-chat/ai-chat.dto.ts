@@ -56,29 +56,29 @@ export class ExecuteToolsDto {
 }
 
 export class GetThreadMessagesDto {
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsInt()
-  @Type(() => Number)
-  limit?: number = 50
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsInt()
-  @Type(() => Number)
-  offset?: number = 0
-}
-
-export class GetThreadsDto {
-  @ApiPropertyOptional({ default: 20 })
+  @ApiPropertyOptional({ default: 20, description: 'Number of messages per page' })
   @IsOptional()
   @IsInt()
   @Type(() => Number)
   limit?: number = 20
 
-  @ApiPropertyOptional({ default: 0 })
+  @ApiPropertyOptional({ default: 1, description: 'Page number (starts from 1)' })
   @IsOptional()
   @IsInt()
   @Type(() => Number)
-  offset?: number = 0
+  page?: number = 1
+}
+
+export class GetThreadsDto {
+  @ApiPropertyOptional({ default: 20, description: 'Number of threads per page' })
+  @IsOptional()
+  @IsInt()
+  @Type(() => Number)
+  limit?: number = 20
+
+  @ApiPropertyOptional({ default: 1, description: 'Page number (starts from 1)' })
+  @IsOptional()
+  @IsInt()
+  @Type(() => Number)
+  page?: number = 1
 }
