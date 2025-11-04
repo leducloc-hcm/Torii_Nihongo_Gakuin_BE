@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common'
+import { Module, forwardRef } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
 import { PaymentController } from './payment.controller'
 import { PaymentService } from './payment.service'
@@ -10,7 +10,14 @@ import { SharedModule } from 'src/shared/shared.module'
 import { WebsocketsModule } from 'src/websockets/websockets.module'
 
 @Module({
-  imports: [SharedModule, CartModule, CouponModule, ConfigModule, WebsocketsModule, OnlineClassModule],
+  imports: [
+    SharedModule,
+    forwardRef(() => CartModule),
+    forwardRef(() => CouponModule),
+    ConfigModule,
+    WebsocketsModule,
+    OnlineClassModule,
+  ],
   controllers: [PaymentController],
   providers: [PaymentService, SepayService],
   exports: [PaymentService, SepayService],

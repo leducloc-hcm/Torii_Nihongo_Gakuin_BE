@@ -12,9 +12,12 @@ import {
   UseGuards,
   HttpStatus,
   ParseIntPipe,
+  Inject,
+  forwardRef,
 } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger'
 import { CouponService } from './coupon.service'
+import { PaymentService } from '../payment/payment.service'
 import {
   CreateCouponDTO,
   UpdateCouponDTO,
@@ -23,6 +26,7 @@ import {
   SelectClassForGiftDTO,
   ApprovalActionDTO,
   ListCouponsQueryDTO,
+  PurchaseGiftCouponDTO,
 } from './coupon.dto'
 import { AccessTokenGuard } from 'src/shared/guards/access-token.guard'
 import { RolesGuard } from 'src/shared/guards/roles.guard'
@@ -35,7 +39,11 @@ import { Role } from '@prisma/client'
 @UseGuards(AccessTokenGuard)
 @ApiBearerAuth()
 export class CouponController {
-  constructor(private readonly couponService: CouponService) {}
+  constructor(
+    private readonly couponService: CouponService,
+    @Inject(forwardRef(() => PaymentService))
+    private readonly paymentService: PaymentService,
+  ) {}
 
   // ===== Staff/Admin Operations =====
 
@@ -160,5 +168,48 @@ export class CouponController {
     @Query('limit', ParseIntPipe) limit: number = 10,
   ) {
     return this.couponService.getUserRedemptions(userId, { page, limit })
+  }
+
+  // ===== Gift Purchase Operations =====
+
+  @Post('purchase-gift')
+  @ApiOperation({ summary: 'Purchase a gift coupon' })
+  @ApiResponse({ status: HttpStatus.CREATED, description: 'Gift coupon purchase created, payment required' })
+  async purchaseGiftCoupon(@Body() purchaseDto: PurchaseGiftCouponDTO, @ActiveUser('userId') userId: number) {
+    // Create the gift coupon in DRAFT status
+    const giftCouponResponse = await this.couponService.createPurchasedGiftCoupon(userId, purchaseDto)
+
+    // If payment is required, create the payment order
+    if (giftCouponResponse.paymentRequired && giftCouponResponse.paymentDetails) {
+      const paymentResponse = await this.paymentService.createGiftCouponPayment(
+        userId,
+        giftCouponResponse.paymentDetails.couponId,
+        giftCouponResponse.paymentDetails.totalAmount,
+        giftCouponResponse.paymentDetails.courses,
+      )
+
+      return {
+        ...giftCouponResponse,
+        paymentInfo: {
+          qrUrl: paymentResponse.qrUrl,
+          orderId: paymentResponse.orderId,
+          amount: paymentResponse.amount,
+          message: 'Gift coupon created successfully. Please complete payment to activate.',
+        },
+      }
+    }
+
+    return giftCouponResponse
+  }
+
+  @Get('my/purchased-gifts')
+  @ApiOperation({ summary: 'Get user purchased gift coupons' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Purchased gift coupons retrieved successfully' })
+  async getUserPurchasedGifts(
+    @ActiveUser('userId') userId: number,
+    @Query('page', ParseIntPipe) page: number = 1,
+    @Query('limit', ParseIntPipe) limit: number = 10,
+  ) {
+    return this.couponService.getUserPurchasedGifts(userId, { page, limit })
   }
 }

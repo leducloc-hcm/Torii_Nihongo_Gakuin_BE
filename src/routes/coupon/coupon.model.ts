@@ -535,6 +535,21 @@ export const GiftPurchaseResponseSchema = z.object({
   recipientEmail: z.string().email().optional(),
   recipientName: z.string().optional(),
   giftMessage: z.string().optional(),
+  paymentRequired: z.boolean().optional(),
+  paymentDetails: z
+    .object({
+      userId: z.number().int().positive(),
+      couponId: z.number().int().positive(),
+      totalAmount: z.number().int().min(0),
+      courses: z.array(
+        z.object({
+          id: z.number().int().positive(),
+          title: z.string(),
+          price: z.number().int().min(0),
+        }),
+      ),
+    })
+    .optional(),
 })
 
 export type PurchaseGiftCouponType = z.infer<typeof PurchaseGiftCouponSchema>

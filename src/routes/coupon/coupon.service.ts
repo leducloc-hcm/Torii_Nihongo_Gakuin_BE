@@ -652,7 +652,8 @@ export class CouponService {
 
     this.logger.log(`Gift coupon ${coupon.code} created by user ${userId}`)
 
-    // TODO: Create payment order via PaymentService
+    // Return the gift coupon details
+    // Payment creation will be handled by the controller to avoid circular dependencies
     return {
       couponId: updatedCoupon.id,
       code: updatedCoupon.code,
@@ -667,6 +668,18 @@ export class CouponService {
       recipientEmail: dto.recipientEmail,
       recipientName: dto.recipientName,
       giftMessage: dto.giftMessage,
+      // Add payment information that can be used by the controller
+      paymentRequired: true,
+      paymentDetails: {
+        userId,
+        couponId: updatedCoupon.id,
+        totalAmount,
+        courses: courses.map((c) => ({
+          id: c.id,
+          title: c.title,
+          price: c.price,
+        })),
+      },
     }
   }
 

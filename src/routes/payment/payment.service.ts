@@ -1,6 +1,6 @@
 // Enhanced Payment Service with Coupon Integration
 
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Injectable, Logger, NotFoundException, Inject, forwardRef } from '@nestjs/common'
 import { PrismaService } from 'src/shared/services/prisma.service'
 import { CartService } from '../cart/cart.service'
 import { CouponService } from '../coupon/coupon.service'
@@ -12,7 +12,9 @@ export class PaymentService {
 
   constructor(
     private readonly prisma: PrismaService,
+    @Inject(forwardRef(() => CartService))
     private readonly cartService: CartService,
+    @Inject(forwardRef(() => CouponService))
     private readonly couponService: CouponService,
     private readonly sepayService: SepayService,
   ) {}
@@ -455,5 +457,72 @@ export class PaymentService {
     }
 
     return response
+  }
+
+  // ===== Gift Coupon Payment =====
+
+  async createGiftCouponPayment(
+    userId: number,
+    couponId: number,
+    totalAmount: number,
+    courses: Array<{ id: number; title: string; price: number }>,
+  ): Promise<{
+    success: boolean
+    message: string
+    qrUrl: string
+    orderId: number
+    amount: number
+    content: string
+  }> {
+    // Create order for gift coupon purchase
+    const orderData = {
+      userId,
+      totalAmount,
+      status: 'PENDING' as const,
+      couponId, // Link to the gift coupon being purchased
+      items: {
+        create: courses.map((course) => ({
+          type: 'COURSE' as const,
+          courseId: course.id,
+          unitPrice: course.price,
+        })),
+      },
+    }
+
+    const order = await this.prisma.order.create({
+      data: orderData,
+      include: {
+        items: {
+          include: {
+            course: {
+              select: {
+                id: true,
+                title: true,
+                slug: true,
+              },
+            },
+          },
+        },
+      },
+    })
+
+    // Generate payment QR code
+    const courseNames = courses.map((c) => c.title).join(', ')
+    const orderInfo = `Gift Coupon - ${courseNames} - Order ${order.id}`
+
+    const paymentData = await this.sepayService.createPaymentUrl({
+      orderId: order.id,
+      amount: totalAmount,
+      orderInfo,
+      userId,
+    })
+
+    this.logger.log(`Created gift coupon payment for order ${order.id}, amount: ${totalAmount}`)
+
+    return {
+      success: true,
+      message: 'Gift coupon payment created successfully',
+      ...paymentData,
+    }
   }
 }

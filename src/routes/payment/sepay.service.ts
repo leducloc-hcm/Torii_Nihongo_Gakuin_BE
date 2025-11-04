@@ -361,6 +361,31 @@ export class SepayService {
           this.logger.log(`Coupon redemption completed for order ${order.id}, coupon ${order.couponId}`)
         }
 
+        // Activate gift coupon if this is a gift coupon purchase
+        if (order.coupon && order.couponId && order.coupon.type === 'GIFT' && order.coupon.status === 'DRAFT') {
+          await tx.coupon.update({
+            where: { id: order.couponId },
+            data: {
+              status: 'ACTIVE',
+              purchasedAt: new Date(),
+            },
+          })
+
+          // Create audit log for gift coupon activation
+          await tx.couponAuditLog.create({
+            data: {
+              couponId: order.couponId,
+              userId: order.userId,
+              action: 'ACTIVATED',
+              oldValues: JSON.stringify({ status: 'DRAFT' }),
+              newValues: JSON.stringify({ status: 'ACTIVE', purchasedAt: new Date() }),
+              note: 'Gift coupon activated after payment completion',
+            },
+          })
+
+          this.logger.log(`Gift coupon ${order.coupon.code} activated after payment for order ${order.id}`)
+        }
+
         return enrollments
       })
 

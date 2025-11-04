@@ -1,6 +1,13 @@
 // Enhanced Cart Service with Coupon Integration
 
-import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common'
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+  Inject,
+  forwardRef,
+} from '@nestjs/common'
 import { CartRepository } from './cart.repo'
 import { CourseRepository } from '../course/course.repo'
 import { CouponService } from '../coupon/coupon.service'
@@ -28,6 +35,7 @@ export class CartService {
     private readonly cartRepository: CartRepository,
     private readonly courseRepository: CourseRepository,
     private readonly classRepository: OnlineClassRepository,
+    @Inject(forwardRef(() => CouponService))
     private readonly couponService: CouponService,
   ) {}
 
