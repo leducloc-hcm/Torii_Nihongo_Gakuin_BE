@@ -22,6 +22,13 @@ export class CreateQuizDto extends createZodDto(CreateQuizSchema) {
     example: 1800,
   })
   timeLimitSec!: number
+
+  @ApiPropertyOptional({
+    description: 'Quiz version',
+    example: 1,
+    default: 1,
+  })
+  version!: number
 }
 
 export class UpdateQuizDto extends createZodDto(UpdateQuizSchema) {
@@ -43,6 +50,12 @@ export class UpdateQuizDto extends createZodDto(UpdateQuizSchema) {
     example: 1800,
   })
   timeLimitSec?: number
+
+  @ApiPropertyOptional({
+    description: 'Quiz version',
+    example: 2,
+  })
+  version?: number
 }
 
 export class QuizQueryDto extends createZodDto(QuizQuerySchema) {

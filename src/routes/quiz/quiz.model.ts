@@ -33,12 +33,14 @@ export const CreateQuizSchema = z.object({
   title: z.string().min(1).max(255),
   lessonId: z.number().int().positive().optional(),
   timeLimitSec: z.number().int().positive(),
+  version: z.number().int().positive().optional().default(1),
 })
 
 export const UpdateQuizSchema = z.object({
   title: z.string().min(1).max(255).optional(),
   lessonId: z.number().int().positive().optional().nullable(),
   timeLimitSec: z.number().int().positive().optional(),
+  version: z.number().int().positive().optional(),
 })
 
 export const QuizQuerySchema = z.object({

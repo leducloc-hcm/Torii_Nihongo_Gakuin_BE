@@ -666,6 +666,7 @@ model Quiz {
   id        Int      @id @default(autoincrement())
   lessonId  Int?     @unique
   title     String
+  version   Int      @default(1)
   createdAt DateTime @default(now())
   createdBy  Int
   timeLimitSec    Int

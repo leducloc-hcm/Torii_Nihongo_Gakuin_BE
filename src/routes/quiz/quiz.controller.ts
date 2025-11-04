@@ -1,13 +1,12 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, ParseIntPipe, HttpStatus } from '@nestjs/common'
-import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger'
-import { QuizService } from './quiz.service'
-import { CreateQuizDto, UpdateQuizDto, QuizQueryDto, BulkDeleteQuizDto, CloneQuizDto, QuizStatsDto } from './quiz.dto'
+import { Body, Controller, Delete, Get, HttpStatus, Param, ParseIntPipe, Post, Put, Query } from '@nestjs/common'
+import { ApiResponse, ApiTags } from '@nestjs/swagger'
+import { Role } from '@prisma/client'
+import { AuthType } from '../../shared/constants/auth.constant'
+import { ActiveUser } from '../../shared/decorators/active-user.decorator'
 import { Auth } from '../../shared/decorators/auth.decorator'
 import { Roles } from '../../shared/decorators/roles.decorator'
-import { ActiveUser } from '../../shared/decorators/active-user.decorator'
-import { AccessTokenPayload } from '../../shared/types/jwt.type'
-import { AuthType } from '../../shared/constants/auth.constant'
-import { Role } from '@prisma/client'
+import { CloneQuizDto, CreateQuizDto, QuizQueryDto, UpdateQuizDto } from './quiz.dto'
+import { QuizService } from './quiz.service'
 
 @ApiTags('Quiz')
 @Controller('quiz')
