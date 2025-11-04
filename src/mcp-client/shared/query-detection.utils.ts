@@ -174,3 +174,127 @@ export function isRecommendationQuery(query: string): boolean {
 
   return recommendKeywords.some((keyword) => query.toLowerCase().includes(keyword))
 }
+
+/**
+ * Detect if query requires multiple tool types
+ * Returns which tool categories are needed
+ */
+export interface MultiToolRequirement {
+  requiresCourse: boolean
+  requiresLesson: boolean
+  requiresFlashcard: boolean
+  requiresAssessment: boolean
+  toolCategories: QueryType[]
+}
+
+export function detectMultiToolRequirement(query: string): MultiToolRequirement {
+  const lowerQuery = query.toLowerCase()
+
+  // Course keywords
+  const courseKeywords = ['khóa học', 'course', 'khoá', 'コース', '講座', 'curriculum', 'program']
+
+  // Lesson keywords
+  const lessonKeywords = [
+    'bài học',
+    'lesson',
+    'chi tiết bài',
+    'nội dung bài',
+    'レッスン',
+    '課',
+    'module',
+    'unit',
+    'chapter',
+  ]
+
+  // Flashcard keywords
+  const flashcardKeywords = ['flashcard', 'thẻ', 'từ vựng', 'vocabulary', 'フラッシュカード', '単語']
+
+  // Assessment keywords
+  const assessmentKeywords = ['test', 'quiz', 'exam', 'bài kiểm tra', 'bài thi', 'テスト', '試験']
+
+  const requiresCourse = courseKeywords.some((keyword) => lowerQuery.includes(keyword))
+  const requiresLesson = lessonKeywords.some((keyword) => lowerQuery.includes(keyword))
+  const requiresFlashcard = flashcardKeywords.some((keyword) => lowerQuery.includes(keyword))
+  const requiresAssessment = assessmentKeywords.some((keyword) => lowerQuery.includes(keyword))
+
+  const toolCategories: QueryType[] = []
+  if (requiresCourse) toolCategories.push(QueryType.COURSE)
+  if (requiresLesson) toolCategories.push(QueryType.LESSON)
+  if (requiresFlashcard) toolCategories.push(QueryType.FLASHCARD)
+  if (requiresAssessment) toolCategories.push(QueryType.ASSESSMENT)
+
+  return {
+    requiresCourse,
+    requiresLesson,
+    requiresFlashcard,
+    requiresAssessment,
+    toolCategories,
+  }
+}
+
+/**
+ * Check if query explicitly asks for multiple tool types
+ */
+export function requiresMultipleTools(query: string): boolean {
+  const multiToolRequirement = detectMultiToolRequirement(query)
+  return multiToolRequirement.toolCategories.length > 1
+}
+
+/**
+ * Suggest which specific tools should be called together
+ */
+export function suggestToolCombination(query: string): string[] {
+  const lowerQuery = query.toLowerCase()
+  const tools: string[] = []
+  const requirement = detectMultiToolRequirement(query)
+
+  // Check for LIVE course keywords
+  const isLiveCourse =
+    lowerQuery.includes('live') ||
+    lowerQuery.includes('trực tuyến') ||
+    lowerQuery.includes('lịch học') ||
+    lowerQuery.includes('schedule') ||
+    lowerQuery.includes('class time')
+
+  // Determine course tools
+  if (requirement.requiresCourse) {
+    if (isLiveCourse) {
+      // For LIVE courses, use search_live_courses (includes schedules)
+      tools.push('search_live_courses')
+    } else if (
+      lowerQuery.includes('chi tiết') ||
+      lowerQuery.includes('detail') ||
+      lowerQuery.includes('詳細') ||
+      requirement.requiresLesson
+    ) {
+      // For detailed info or when lessons are needed, use get_course_details
+      // Note: get_course_details now includes modules + lessons automatically
+      tools.push('get_course_details')
+    } else if (isSearchQuery(query) || lowerQuery.includes('tìm') || lowerQuery.includes('find')) {
+      tools.push('search_courses')
+    }
+
+    if (isRecommendationQuery(query)) {
+      tools.push('get_recommended_courses')
+    }
+  }
+
+  return [...new Set(tools)] // Remove duplicates
+}
+
+/**
+ * Generate hint for AI about multi-tool usage based on query
+ */
+export function generateMultiToolHint(query: string): string {
+  const requirement = detectMultiToolRequirement(query)
+  const suggestedTools = suggestToolCombination(query)
+
+  if (!requiresMultipleTools(query)) {
+    return ''
+  }
+
+  const categories = requirement.toolCategories.join(' and ')
+  const toolsList = suggestedTools.join(', ')
+
+  return `HINT: This query requires information about ${categories}. Consider calling multiple tools: [${toolsList}] to provide a complete answer.`
+}

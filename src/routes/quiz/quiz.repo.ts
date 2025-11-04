@@ -21,6 +21,7 @@ export class QuizRepository {
         title: data.title,
         lessonId: data.lessonId || null,
         timeLimitSec: data.timeLimitSec,
+        version: data.version || 1,
         createdBy,
       },
     })
@@ -64,6 +65,7 @@ export class QuizRepository {
                         id: true,
                         image: true,
                         content: true,
+                        isCorrect: true,
                         mediaId: true,
                       },
                     },
@@ -196,6 +198,7 @@ export class QuizRepository {
         title: data.title,
         lessonId: data.lessonId,
         timeLimitSec: data.timeLimitSec,
+        version: data.version,
       },
     })
   }
@@ -260,11 +263,11 @@ export class QuizRepository {
       throw new Error('Original quiz not found')
     }
 
-    // Clone the quiz with all items
     return await this.prisma.quiz.create({
       data: {
         title: newTitle,
         timeLimitSec: original.timeLimitSec,
+        version: original.version + 1,
         createdBy: userId,
         lessonId: original.lessonId,
         items: {

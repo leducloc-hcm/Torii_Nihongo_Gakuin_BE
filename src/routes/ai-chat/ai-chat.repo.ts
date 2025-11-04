@@ -34,19 +34,36 @@ export class AIThreadRepository {
     })
   }
 
-  async findByUserId(userId: number, limit = 20, offset = 0) {
-    return this.prisma.aIThread.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      take: limit,
-      skip: offset,
-      include: {
-        messages: {
-          orderBy: { createdAt: 'asc' },
-          take: 5,
+  async findByUserId(userId: number, limit = 20, page = 1) {
+    const skip = (page - 1) * limit
+
+    const [data, total] = await Promise.all([
+      this.prisma.aIThread.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip,
+        include: {
+          messages: {
+            orderBy: { createdAt: 'asc' },
+            take: 5,
+          },
         },
+      }),
+      this.prisma.aIThread.count({ where: { userId } }),
+    ])
+
+    return {
+      data,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasNext: page * limit < total,
+        hasPrev: page > 1,
       },
-    })
+    }
   }
 
   async update(id: number, data: { title?: string }) {
@@ -103,16 +120,33 @@ export class AIMessageRepository {
     })
   }
 
-  async findByThreadId(threadId: number, limit = 50, offset = 0) {
-    return this.prisma.aIChatMessage.findMany({
-      where: { threadId },
-      orderBy: { createdAt: 'asc' },
-      take: limit,
-      skip: offset,
-      include: {
-        citations: true,
+  async findByThreadId(threadId: number, limit = 20, page = 1) {
+    const skip = (page - 1) * limit
+
+    const [data, total] = await Promise.all([
+      this.prisma.aIChatMessage.findMany({
+        where: { threadId },
+        orderBy: { createdAt: 'asc' },
+        take: limit,
+        skip,
+        include: {
+          citations: true,
+        },
+      }),
+      this.prisma.aIChatMessage.count({ where: { threadId } }),
+    ])
+
+    return {
+      data,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasNext: page * limit < total,
+        hasPrev: page > 1,
       },
-    })
+    }
   }
 
   async findByQueryId(queryId: string) {

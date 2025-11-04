@@ -6,13 +6,18 @@ import { SendQueryDto } from './ai-chat.dto'
 import { AgentService } from 'src/mcp-client/agent.service'
 import { PromptService } from 'src/mcp-client/module/course/course-mcp.prompt'
 import { RedisContextService } from 'src/shared/redis/redis-context.service'
-import { detectQueryType } from 'src/mcp-client/shared/query-detection.utils'
+import {
+  detectQueryType,
+  requiresMultipleTools,
+  generateMultiToolHint,
+  suggestToolCombination,
+} from 'src/mcp-client/shared/query-detection.utils'
 
 @Injectable()
 export class AIChatService {
   private readonly logger = new Logger(AIChatService.name)
-  private readonly THREAD_CACHE_TTL = 259200 // 3 days in seconds (3 * 24 * 60 * 60)
-  private readonly MESSAGES_CACHE_TTL = 259200 // 3 days in seconds
+  private readonly THREAD_CACHE_TTL = 10 // 10 seconds in seconds
+  private readonly MESSAGES_CACHE_TTL = 10 // 10 minutes in seconds
 
   constructor(
     private readonly agentService: AgentService,
@@ -22,36 +27,26 @@ export class AIChatService {
     private readonly messageRepo: AIMessageRepository,
     private readonly redis: RedisContextService,
   ) {
-    // Load MCP tools on startup
     this.agentService.loadTools().catch((err) => {
       this.logger.error('Failed to load MCP tools on startup:', err)
     })
   }
 
-  /**
-   * Get cache key for thread
-   */
   private getThreadCacheKey(threadId: number): string {
     return `ai_thread:${threadId}`
   }
 
-  /**
-   * Get cache key for thread messages
-   */
-  private getMessagesCacheKey(threadId: number): string {
+  private getMessagesCacheKey(threadId: number, limit?: number, page?: number): string {
+    if (limit !== undefined && page !== undefined) {
+      return `ai_thread_messages:${threadId}:${limit}:${page}`
+    }
     return `ai_thread_messages:${threadId}`
   }
 
-  /**
-   * Get cache key for user threads list
-   */
   private getUserThreadsCacheKey(userId: number): string {
     return `ai_user_threads:${userId}`
   }
 
-  /**
-   * Invalidate all cache for a thread
-   */
   private async invalidateThreadCache(threadId: number, userId: number): Promise<void> {
     await Promise.all([
       this.redis.del(this.getThreadCacheKey(threadId)),
@@ -60,38 +55,43 @@ export class AIChatService {
     ])
   }
 
-  /**
-   * Handle new user query
-   */
   async handleQuery(userId: number, dto: SendQueryDto) {
     const { threadId, query } = dto
 
-    // Try to get thread from cache first
     const cacheKey = this.getThreadCacheKey(threadId)
     let thread = await this.redis.get(cacheKey)
 
     if (!thread) {
-      // Cache miss - fetch from database
       thread = await this.threadRepo.findById(threadId)
       if (!thread || thread.userId !== userId) {
         throw new NotFoundException('Thread not found')
       }
-      // Cache for 3 days
       await this.redis.set(cacheKey, JSON.stringify(thread), this.THREAD_CACHE_TTL)
     } else {
-      // Parse cached thread
       thread = typeof thread === 'string' ? JSON.parse(thread) : thread
       if (thread.userId !== userId) {
         throw new NotFoundException('Thread not found')
       }
     }
 
-    // Detect query type
     const queryType = detectQueryType(query)
-    this.logger.log(`Query type detected: ${queryType}`)
+    const needsMultipleTools = requiresMultipleTools(query)
+    const suggestedTools = needsMultipleTools ? suggestToolCombination(query) : []
 
-    // Build chat messages with language detection
-    const systemPrompt = this.promptService.getSystemPrompt(queryType, undefined, query)
+    this.logger.log(`Query type detected: ${queryType}`)
+    if (needsMultipleTools) {
+      this.logger.log(`Multi-tool query detected. Suggested tools: [${suggestedTools.join(', ')}]`)
+    }
+
+    // Build chat messages with language detection and multi-tool hint
+    let systemPrompt = this.promptService.getSystemPrompt(queryType, undefined, query)
+
+    // Add multi-tool hint if needed
+    if (needsMultipleTools) {
+      const multiToolHint = generateMultiToolHint(query)
+      systemPrompt = `${systemPrompt}\n\n${multiToolHint}`
+    }
+
     const messages: ChatCompletionMessageParam[] = [{ role: 'system', content: systemPrompt }]
 
     // Add recent thread messages for context (last 10)
@@ -178,7 +178,8 @@ export class AIChatService {
     }
 
     // AUTO-EXECUTE TOOLS immediately without waiting for approval
-    this.logger.log(`Auto-executing ${agentResponse.toolCalls.length} tools...`)
+    const toolNames = agentResponse.toolCalls.map((tc) => tc.name).join(', ')
+    this.logger.log(`Auto-executing ${agentResponse.toolCalls.length} tool(s): [${toolNames}]`)
 
     await this.queryRepo.update(queryRecord.id, {
       status: QueryStatus.PROCESSING,
@@ -241,36 +242,36 @@ export class AIChatService {
   }
 
   /**
-   * Get user's threads
+   * Get user's threads with pagination
    */
-  async getUserThreads(userId: number, limit = 20, offset = 0) {
-    // Only cache first page (offset = 0)
-    if (offset === 0) {
+  async getUserThreads(userId: number, limit = 20, page = 1) {
+    // Only cache first page (page = 1)
+    if (page === 1) {
       const cacheKey = this.getUserThreadsCacheKey(userId)
       const cached = await this.redis.get(cacheKey)
 
       if (cached) {
-        const threads = typeof cached === 'string' ? JSON.parse(cached) : cached
+        const result = typeof cached === 'string' ? JSON.parse(cached) : cached
         this.logger.debug(`Cache hit for user threads: ${userId}`)
-        return threads.slice(0, limit) // Return only requested limit
+        return result
       }
     }
 
     // Cache miss or not first page - fetch from database
-    const threads = await this.threadRepo.findByUserId(userId, limit, offset)
+    const result = await this.threadRepo.findByUserId(userId, limit, page)
 
     // Cache first page only
-    if (offset === 0) {
-      await this.redis.set(this.getUserThreadsCacheKey(userId), JSON.stringify(threads), this.THREAD_CACHE_TTL)
+    if (page === 1) {
+      await this.redis.set(this.getUserThreadsCacheKey(userId), JSON.stringify(result), this.THREAD_CACHE_TTL)
     }
 
-    return threads
+    return result
   }
 
   /**
-   * Get thread messages
+   * Get thread messages with pagination
    */
-  async getThreadMessages(userId: number, threadId: number, limit = 50, offset = 0) {
+  async getThreadMessages(userId: number, threadId: number, limit = 20, page = 1) {
     // Verify thread ownership
     const threadCacheKey = this.getThreadCacheKey(threadId)
     let thread = await this.redis.get(threadCacheKey)
@@ -288,27 +289,31 @@ export class AIChatService {
       }
     }
 
-    // Only cache first page of messages (offset = 0)
-    if (offset === 0) {
-      const messagesCacheKey = this.getMessagesCacheKey(threadId)
+    // Only cache first page of messages (page = 1)
+    if (page === 1) {
+      const messagesCacheKey = this.getMessagesCacheKey(threadId, limit, page)
       const cached = await this.redis.get(messagesCacheKey)
 
       if (cached) {
-        const messages = typeof cached === 'string' ? JSON.parse(cached) : cached
-        this.logger.debug(`Cache hit for thread messages: ${threadId}`)
-        return messages.slice(0, limit)
+        const result = typeof cached === 'string' ? JSON.parse(cached) : cached
+        this.logger.debug(`Cache hit for thread messages: ${threadId} (limit=${limit}, page=${page})`)
+        return result
       }
     }
 
     // Cache miss or not first page - fetch from database
-    const messages = await this.messageRepo.findByThreadId(threadId, limit, offset)
+    const result = await this.messageRepo.findByThreadId(threadId, limit, page)
 
     // Cache first page only
-    if (offset === 0) {
-      await this.redis.set(this.getMessagesCacheKey(threadId), JSON.stringify(messages), this.MESSAGES_CACHE_TTL)
+    if (page === 1) {
+      await this.redis.set(
+        this.getMessagesCacheKey(threadId, limit, page),
+        JSON.stringify(result),
+        this.MESSAGES_CACHE_TTL,
+      )
     }
 
-    return messages
+    return result
   }
 
   /**
@@ -327,5 +332,15 @@ export class AIChatService {
     await this.invalidateThreadCache(threadId, userId)
 
     return result
+  }
+
+  /**
+   * Clear all cache for a user (development/debugging)
+   */
+  async clearUserCache(userId: number) {
+    const cacheKey = this.getUserThreadsCacheKey(userId)
+    await this.redis.del(cacheKey)
+    this.logger.log(`Cleared cache for user ${userId}`)
+    return { message: 'Cache cleared successfully', userId }
   }
 }
