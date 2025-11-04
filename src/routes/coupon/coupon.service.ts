@@ -45,6 +45,11 @@ export class CouponService {
   // ===== CRUD Operations =====
 
   async createCoupon(createDto: CreateCouponDTO, createdBy: number) {
+    // Validate user ID
+    if (!createdBy || typeof createdBy !== 'number') {
+      throw new BadRequestException('Invalid user ID. User must be authenticated.')
+    }
+
     // Validate coupon code uniqueness
     const existingCoupon = await this.couponRepository.checkCouponExists(createDto.code)
     if (existingCoupon) {
@@ -82,17 +87,17 @@ export class CouponService {
       title: createDto.title,
       description: createDto.description,
       type: createDto.type,
-      discountType: createDto.discountType,
-      discountValue: createDto.discountValue,
-      minOrderAmount: createDto.minOrderAmount,
-      maxDiscountAmount: createDto.maxDiscountAmount,
-      maxRedemptions: createDto.maxRedemptions,
-      perUserLimit: createDto.perUserLimit,
+      discountType: createDto.discountType || null,
+      discountValue: createDto.discountValue ? Math.floor(createDto.discountValue) : null,
+      minOrderAmount: createDto.minOrderAmount ? Math.floor(createDto.minOrderAmount) : null,
+      maxDiscountAmount: createDto.maxDiscountAmount ? Math.floor(createDto.maxDiscountAmount) : null,
+      maxRedemptions: createDto.maxRedemptions || null,
+      perUserLimit: createDto.perUserLimit || null,
       newUsersOnly: createDto.newUsersOnly || false,
       requireFullCombo: createDto.requireFullCombo || false,
-      startsAt: createDto.startsAt ? new Date(createDto.startsAt) : undefined,
-      endsAt: createDto.endsAt ? new Date(createDto.endsAt) : undefined,
-      giftMessage: createDto.giftMessage,
+      startsAt: createDto.startsAt ? new Date(createDto.startsAt) : null,
+      endsAt: createDto.endsAt ? new Date(createDto.endsAt) : null,
+      giftMessage: createDto.giftMessage || null,
       extendDays: createDto.extendDays || 30,
       status: CouponStatus.DRAFT,
       creator: { connect: { id: createdBy } },
@@ -392,6 +397,12 @@ export class CouponService {
       isValid: true,
       errors: [],
       discount,
+      coupon: {
+        id: coupon.id,
+        code: coupon.code,
+        title: coupon.title,
+        type: coupon.type,
+      },
     }
   }
 

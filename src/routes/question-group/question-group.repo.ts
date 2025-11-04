@@ -255,7 +255,7 @@ export class QuestionGroupRepository {
             include: {
               question: {
                 include: {
-                  option: {
+                  options: {
                     select: {
                       id: true,
                       content: true,

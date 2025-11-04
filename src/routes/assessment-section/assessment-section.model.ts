@@ -1,6 +1,5 @@
+import { AssessmentItem, AssessmentPaper, AssessmentSection, Question } from '@prisma/client'
 import { z } from 'zod'
-import { AssessmentSection, AssessmentItem, Question, AssessmentPaper } from '@prisma/client'
-import { time } from 'console'
 
 export type AssessmentSectionBase = AssessmentSection
 

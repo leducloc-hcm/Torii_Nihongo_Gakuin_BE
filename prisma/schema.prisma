@@ -1112,20 +1112,6 @@ model OrderItem {
   class  Class?  @relation(fields: [classId], references: [id])
 }
 
-model Promotion {
-  id          Int       @id @default(autoincrement())
-  code        String    @unique
-  kind        PromoKind @default(COUPON)
-  title       String
-  description String?
-  discountPct Int?
-  discountAmt Int?
-  maxUsage    Int?
-  used        Int       @default(0)
-  active      Boolean   @default(true)
-  startsAt    DateTime?
-  endsAt      DateTime?
-}
 
 // ===== Enhanced Coupon System =====
 model Coupon {
@@ -1520,11 +1506,6 @@ enum OrderItemType {
   PACKAGE
 }
 
-enum PromoKind {
-  COUPON
-  VOUCHER
-}
-
 enum RewardType {
   POINTS
   ITEM
@@ -1573,7 +1554,6 @@ enum NotificationType {
   COMMENT
   RATING
   SYSTEM
-  PROMOTION
   REMINDER
 }
 

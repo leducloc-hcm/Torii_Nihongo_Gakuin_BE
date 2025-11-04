@@ -106,7 +106,7 @@ export class QuizItemRepository {
                           include: {
                             question: {
                               include: {
-                                option: {
+                                options: {
                                   select: {
                                     id: true,
                                     image: true,

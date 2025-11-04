@@ -47,27 +47,27 @@ export const CouponSchema = z.object({
   id: z.number().int().positive(),
   code: z.string().min(1, 'Coupon code is required').max(50, 'Coupon code must be less than 50 characters'),
   title: z.string().min(1, 'Coupon title is required'),
-  description: z.string().optional(),
+  description: z.string().optional().nullable(),
   type: z.nativeEnum(CouponType),
-  discountType: z.nativeEnum(DiscountType).optional(),
-  discountValue: z.number().min(1).optional(),
-  minOrderAmount: z.number().min(0).optional(),
-  maxDiscountAmount: z.number().min(0).optional(),
-  maxRedemptions: z.number().min(1).optional(),
-  perUserLimit: z.number().min(1).optional(),
+  discountType: z.nativeEnum(DiscountType).optional().nullable(),
+  discountValue: z.number().int().min(0).optional().nullable(),
+  minOrderAmount: z.number().int().min(0).optional().nullable(),
+  maxDiscountAmount: z.number().int().min(0).optional().nullable(),
+  maxRedemptions: z.number().int().min(1).optional().nullable(),
+  perUserLimit: z.number().int().min(1).optional().nullable(),
   newUsersOnly: z.boolean().default(false),
   requireFullCombo: z.boolean().default(false),
-  startsAt: z.coerce.date().optional(),
-  endsAt: z.coerce.date().optional(),
+  startsAt: z.coerce.date().optional().nullable(),
+  endsAt: z.coerce.date().optional().nullable(),
   status: z.nativeEnum(CouponStatus),
   createdBy: z.number().int().positive(),
-  approvedBy: z.number().int().positive().optional(),
-  rejectedBy: z.number().int().positive().optional(),
-  approvalNote: z.string().optional(),
+  approvedBy: z.number().int().positive().optional().nullable(),
+  rejectedBy: z.number().int().positive().optional().nullable(),
+  approvalNote: z.string().optional().nullable(),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
-  giftMessage: z.string().optional(),
-  extendDays: z.number().min(1).optional(),
+  giftMessage: z.string().optional().nullable(),
+  extendDays: z.number().int().min(1).optional().nullable(),
 })
 
 // Create Coupon Schema
@@ -81,10 +81,18 @@ export const CreateCouponSchema = CouponSchema.omit({
   createdAt: true,
   updatedAt: true,
 }).extend({
-  startsAt: z.string().datetime().optional(),
-  endsAt: z.string().datetime().optional(),
+  startsAt: z.string().datetime().optional().nullable(),
+  endsAt: z.string().datetime().optional().nullable(),
   courseIds: z.array(z.number().int().positive()).min(1, 'At least one course is required'),
   courseRequiredFlags: z.array(z.boolean()).optional(),
+  discountType: z.nativeEnum(DiscountType).optional().nullable(),
+  discountValue: z.number().int().min(0).optional().nullable(),
+  minOrderAmount: z.number().int().min(0).optional().nullable(),
+  maxDiscountAmount: z.number().int().min(0).optional().nullable(),
+  maxRedemptions: z.number().int().min(1).optional().nullable(),
+  perUserLimit: z.number().int().min(1).optional().nullable(),
+  giftMessage: z.string().optional().nullable(),
+  extendDays: z.number().int().min(1).optional().nullable(),
 })
 
 // Update Coupon Schema
@@ -455,6 +463,12 @@ export type CouponValidationResult = {
     value: number
     appliedAmount: number
     maxDiscountReached?: boolean
+  }
+  coupon?: {
+    id: number
+    code: string
+    title: string
+    type: CouponType
   }
   requiresCombo?: boolean
   missingCourses?: number[]

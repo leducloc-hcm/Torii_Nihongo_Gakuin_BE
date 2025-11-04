@@ -305,7 +305,7 @@ export class AssessmentAnswerRepository {
       include: {
         question: {
           include: {
-            option: {
+            options: {
               select: {
                 id: true,
                 content: true,
@@ -324,7 +324,7 @@ export class AssessmentAnswerRepository {
       ...answer,
       question: {
         ...answer.question,
-        options: answer.question.option,
+        options: answer.question.options,
       },
     })) as unknown as AssessmentAnswerWithQuestion[]
   }
@@ -375,16 +375,9 @@ export class AssessmentAnswerRepository {
       }
     }
 
-    return await this.prisma.assessmentAnswer.findMany({
+    return (await this.prisma.assessmentAnswer.findMany({
       where,
-      select: {
-        id: true,
-        attemptId: true,
-        questionId: true,
-        selectedOptionId: true,
-        isCorrect: true,
-        timeSpentSec: true,
-        explanation: true,
+      include: {
         question: {
           select: {
             id: true,
@@ -403,7 +396,7 @@ export class AssessmentAnswerRepository {
           },
         },
       },
-    })
+    })) as any
   }
 
   async getQuestionStatistics(questionId: number): Promise<{
@@ -446,7 +439,7 @@ export class AssessmentAnswerRepository {
       include: {
         question: {
           include: {
-            option: {
+            options: {
               select: {
                 id: true,
                 content: true,
@@ -466,7 +459,7 @@ export class AssessmentAnswerRepository {
       ...answer,
       question: {
         ...answer.question,
-        options: answer.question.option,
+        options: answer.question.options,
       },
     })) as unknown as AssessmentAnswerWithQuestion[]
   }

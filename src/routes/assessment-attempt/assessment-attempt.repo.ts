@@ -397,7 +397,7 @@ export class AssessmentAttemptRepository {
             stem: true,
             passage: true,
             explanation: true,
-            option: {
+            options: {
               select: {
                 id: true,
                 content: true,

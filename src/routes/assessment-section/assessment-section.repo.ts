@@ -37,7 +37,7 @@ export class AssessmentSectionRepository {
               include: {
                 question: {
                   include: {
-                    option: true,
+                    options: true,
                   },
                 },
               },
@@ -51,7 +51,7 @@ export class AssessmentSectionRepository {
                       include: {
                         question: {
                           include: {
-                            option: true,
+                            options: true,
                           },
                         },
                       },
@@ -193,7 +193,7 @@ export class AssessmentSectionRepository {
               include: {
                 question: {
                   include: {
-                    option: true,
+                    options: true,
                   },
                 },
               },
@@ -207,7 +207,7 @@ export class AssessmentSectionRepository {
                       include: {
                         question: {
                           include: {
-                            option: true,
+                            options: true,
                           },
                         },
                       },

@@ -75,7 +75,7 @@ export class AssessmentPaperRepository {
                   include: {
                     question: {
                       include: {
-                        option: true,
+                        options: true,
                       },
                     },
                   },
@@ -88,7 +88,7 @@ export class AssessmentPaperRepository {
                           include: {
                             question: {
                               include: {
-                                option: {
+                                options: {
                                   select: {
                                     id: true,
                                     content: true,
@@ -147,7 +147,7 @@ export class AssessmentPaperRepository {
                   include: {
                     question: {
                       include: {
-                        option: {
+                        options: {
                           select: {
                             id: true,
                             content: true,
@@ -170,7 +170,7 @@ export class AssessmentPaperRepository {
                           include: {
                             question: {
                               include: {
-                                option: {
+                                options: {
                                   select: {
                                     id: true,
                                     content: true,
@@ -535,7 +535,6 @@ export class AssessmentPaperRepository {
       throw new Error('Attempt not found')
     }
 
-    // Get assessment paper with full structure
     const paper = await this.prisma.assessmentPaper.findUnique({
       where: { id: attempt.assessmentId },
       include: {
@@ -556,7 +555,7 @@ export class AssessmentPaperRepository {
                   include: {
                     question: {
                       include: {
-                        option: {
+                        options: {
                           select: {
                             id: true,
                             content: true,
@@ -580,7 +579,7 @@ export class AssessmentPaperRepository {
                           include: {
                             question: {
                               include: {
-                                option: {
+                                options: {
                                   select: {
                                     id: true,
                                     content: true,
@@ -637,7 +636,7 @@ export class AssessmentPaperRepository {
     )
 
     const enrichedPaper = {
-      ...paper,
+      ...(paper as any),
       attempt: {
         id: attempt.id,
         userId: attempt.userId,
@@ -647,7 +646,7 @@ export class AssessmentPaperRepository {
         submittedAt: attempt.submittedAt,
         levelSuggestion: attempt.levelSuggestion,
       },
-      sections: paper.sections.map((section) => ({
+      sections: (paper as any).sections.map((section: any) => ({
         ...section,
         items: section.items.map((item) => ({
           ...item,

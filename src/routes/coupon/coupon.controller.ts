@@ -10,7 +10,6 @@ import {
   Param,
   Query,
   UseGuards,
-  Request,
   HttpStatus,
   ParseIntPipe,
 } from '@nestjs/common'
@@ -28,6 +27,7 @@ import {
 import { AccessTokenGuard } from 'src/shared/guards/access-token.guard'
 import { RolesGuard } from 'src/shared/guards/roles.guard'
 import { Roles } from 'src/shared/decorators/roles.decorator'
+import { ActiveUser } from 'src/shared/decorators/active-user.decorator'
 import { Role } from '@prisma/client'
 
 @ApiTags('Coupons')
@@ -44,8 +44,8 @@ export class CouponController {
   @Roles(Role.STAFF, Role.ADMIN)
   @ApiOperation({ summary: 'Create a new coupon' })
   @ApiResponse({ status: HttpStatus.CREATED, description: 'Coupon created successfully' })
-  async createCoupon(@Body() createDto: CreateCouponDTO, @Request() req: any) {
-    return this.couponService.createCoupon(createDto, req.user.id)
+  async createCoupon(@Body() createDto: CreateCouponDTO, @ActiveUser('userId') userId: number) {
+    return this.couponService.createCoupon(createDto, userId)
   }
 
   @Get()
@@ -57,7 +57,7 @@ export class CouponController {
     return this.couponService.listCoupons(query)
   }
 
-  @Get('pending-approvals')
+  @Get('pending-approval')
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN)
   @ApiOperation({ summary: 'Get coupons pending approval' })
@@ -80,8 +80,12 @@ export class CouponController {
   @Roles(Role.STAFF, Role.ADMIN)
   @ApiOperation({ summary: 'Update a coupon' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Coupon updated successfully' })
-  async updateCoupon(@Param('id', ParseIntPipe) id: number, @Body() updateDto: UpdateCouponDTO, @Request() req: any) {
-    return this.couponService.updateCoupon(id, updateDto, req.user.id)
+  async updateCoupon(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateDto: UpdateCouponDTO,
+    @ActiveUser('userId') userId: number,
+  ) {
+    return this.couponService.updateCoupon(id, updateDto, userId)
   }
 
   @Delete(':id')
@@ -89,8 +93,8 @@ export class CouponController {
   @Roles(Role.STAFF, Role.ADMIN)
   @ApiOperation({ summary: 'Delete a coupon' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Coupon deleted successfully' })
-  async deleteCoupon(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
-    return this.couponService.deleteCoupon(id, req.user.id)
+  async deleteCoupon(@Param('id', ParseIntPipe) id: number, @ActiveUser('userId') userId: number) {
+    return this.couponService.deleteCoupon(id, userId)
   }
 
   @Post(':id/submit-approval')
@@ -98,8 +102,8 @@ export class CouponController {
   @Roles(Role.STAFF, Role.ADMIN)
   @ApiOperation({ summary: 'Submit coupon for approval' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Coupon submitted for approval' })
-  async submitForApproval(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
-    return this.couponService.submitForApproval(id, req.user.id)
+  async submitForApproval(@Param('id', ParseIntPipe) id: number, @ActiveUser('userId') userId: number) {
+    return this.couponService.submitForApproval(id, userId)
   }
 
   @Post(':id/approval-action')
@@ -110,9 +114,9 @@ export class CouponController {
   async approveOrRejectCoupon(
     @Param('id', ParseIntPipe) id: number,
     @Body() approvalDto: ApprovalActionDTO,
-    @Request() req: any,
+    @ActiveUser('userId') userId: number,
   ) {
-    return this.couponService.approveOrRejectCoupon(id, approvalDto, req.user.id)
+    return this.couponService.approveOrRejectCoupon(id, approvalDto, userId)
   }
 
   @Post(':id/toggle-status')
@@ -120,8 +124,8 @@ export class CouponController {
   @Roles(Role.ADMIN)
   @ApiOperation({ summary: 'Toggle coupon active/inactive status' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Coupon status toggled' })
-  async toggleCouponStatus(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
-    return this.couponService.toggleCouponStatus(id, req.user.id)
+  async toggleCouponStatus(@Param('id', ParseIntPipe) id: number, @ActiveUser('userId') userId: number) {
+    return this.couponService.toggleCouponStatus(id, userId)
   }
 
   // ===== Customer Operations =====
@@ -129,32 +133,32 @@ export class CouponController {
   @Post('validate')
   @ApiOperation({ summary: 'Validate a coupon for checkout' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Coupon validation result' })
-  async validateCoupon(@Body() validationDto: ValidateCouponDTO, @Request() req: any) {
-    return this.couponService.validateCoupon(validationDto, req.user.id)
+  async validateCoupon(@Body() validationDto: ValidateCouponDTO, @ActiveUser('userId') userId: number) {
+    return this.couponService.validateCoupon(validationDto, userId)
   }
 
   @Post('redeem-gift')
   @ApiOperation({ summary: 'Redeem a gift coupon' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Gift coupon redeemed successfully' })
-  async redeemGiftCoupon(@Body() redeemDto: RedeemGiftCouponDTO, @Request() req: any) {
-    return this.couponService.redeemGiftCoupon(redeemDto, req.user.id)
+  async redeemGiftCoupon(@Body() redeemDto: RedeemGiftCouponDTO, @ActiveUser('userId') userId: number) {
+    return this.couponService.redeemGiftCoupon(redeemDto, userId)
   }
 
   @Post('select-class')
   @ApiOperation({ summary: 'Select class for gift coupon live course' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Class selection completed' })
-  async selectClassForGift(@Body() selectDto: SelectClassForGiftDTO, @Request() req: any) {
-    return this.couponService.selectClassForGift(selectDto, req.user.id)
+  async selectClassForGift(@Body() selectDto: SelectClassForGiftDTO, @ActiveUser('userId') userId: number) {
+    return this.couponService.selectClassForGift(selectDto, userId)
   }
 
   @Get('my/redemptions')
   @ApiOperation({ summary: 'Get user redemption history' })
   @ApiResponse({ status: HttpStatus.OK, description: 'User redemptions retrieved successfully' })
   async getUserRedemptions(
-    @Request() req: any,
+    @ActiveUser('userId') userId: number,
     @Query('page', ParseIntPipe) page: number = 1,
     @Query('limit', ParseIntPipe) limit: number = 10,
   ) {
-    return this.couponService.getUserRedemptions(req.user.id, { page, limit })
+    return this.couponService.getUserRedemptions(userId, { page, limit })
   }
 }

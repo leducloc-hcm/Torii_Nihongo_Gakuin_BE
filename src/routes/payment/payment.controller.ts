@@ -16,7 +16,7 @@ import { ActiveUser } from 'src/shared/decorators/active-user.decorator'
 import { Auth, IsPublic } from 'src/shared/decorators/auth.decorator'
 import { Roles } from 'src/shared/decorators/roles.decorator'
 import { RolesGuard } from 'src/shared/guards/roles.guard'
-import { SepayPaymentResponseDTO, SepayWebhookDTO, BuyCourseDirectDTO } from './payment.dto'
+import { SepayPaymentResponseDTO, SepayWebhookDTO, BuyCourseDirectDTO, CreatePaymentDTO } from './payment.dto'
 import { PaymentService } from './payment.service'
 
 @Controller('payments')
@@ -60,8 +60,11 @@ export class PaymentController {
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Customer, RoleName.Admin, RoleName.Staff)
   @HttpCode(HttpStatus.CREATED)
-  async createSepayPayment(@ActiveUser('userId') userId: number): Promise<SepayPaymentResponseDTO> {
-    return this.paymentService.createSepayPaymentWithCoupon(userId)
+  async createSepayPayment(
+    @ActiveUser('userId') userId: number,
+    @Body() createPaymentDto: CreatePaymentDTO,
+  ): Promise<SepayPaymentResponseDTO> {
+    return this.paymentService.createSepayPaymentWithCoupon(userId, createPaymentDto.couponCode)
   }
 
   /**
