@@ -36,37 +36,11 @@ export class AssessmentAnswerController {
   constructor(private readonly assessmentAnswerService: AssessmentAnswerService) {}
 
   @Post()
-  @ApiOperation({
-    summary: 'Create a new assessment answer',
-    description: 'Create a single answer for an assessment question within an attempt',
-  })
-  @ApiResponse({
-    status: 201,
-    description: 'Assessment answer created successfully',
-    type: AssessmentAnswerResponseDto,
-  })
-  @ApiResponse({ status: 400, description: 'Invalid input data' })
-  @ApiResponse({ status: 404, description: 'Assessment attempt or question not found' })
-  @ApiResponse({ status: 409, description: 'Question already answered' })
   async createAnswer(@Body() createDto: CreateAssessmentAnswerDto) {
     return this.assessmentAnswerService.createAnswer(createDto)
   }
 
   @Get(':id')
-  @ApiOperation({
-    summary: 'Get assessment answer by ID',
-    description: 'Retrieve a specific assessment answer with optional details',
-  })
-  @ApiParam({ name: 'id', description: 'Assessment answer ID' })
-  @ApiQuery({ name: 'includeQuestion', required: false, type: Boolean })
-  @ApiQuery({ name: 'includeAttempt', required: false, type: Boolean })
-  @ApiQuery({ name: 'includeSelectedOption', required: false, type: Boolean })
-  @ApiResponse({
-    status: 200,
-    description: 'Assessment answer retrieved successfully',
-    type: AssessmentAnswerResponseDto,
-  })
-  @ApiResponse({ status: 404, description: 'Assessment answer not found' })
   async getAnswer(
     @Param('id', ParseIntPipe) id: number,
     @Query('includeQuestion') includeQuestion?: boolean,
@@ -81,15 +55,6 @@ export class AssessmentAnswerController {
   }
 
   @Get()
-  @ApiOperation({
-    summary: 'Get assessment answers with filtering',
-    description: 'Retrieve assessment answers with optional filtering and pagination',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Assessment answers retrieved successfully',
-    type: AssessmentAnswerListResponseDto,
-  })
   async getAnswers(@Query() query: AssessmentAnswerQueryDto) {
     return this.assessmentAnswerService.getAnswers(query as any)
   }
@@ -118,26 +83,11 @@ export class AssessmentAnswerController {
     description: 'Delete an assessment answer',
   })
   @ApiParam({ name: 'id', description: 'Assessment answer ID' })
-  @ApiResponse({ status: 204, description: 'Assessment answer deleted successfully' })
-  @ApiResponse({ status: 404, description: 'Assessment answer not found' })
-  @ApiResponse({ status: 400, description: 'Cannot delete answers for submitted attempt' })
   async deleteAnswer(@Param('id', ParseIntPipe) id: number) {
     await this.assessmentAnswerService.deleteAnswer(id)
   }
 
-  // ===== Bulk Operations =====
-
   @Post('bulk')
-  @ApiOperation({
-    summary: 'Create multiple assessment answers',
-    description: 'Create multiple answers for an assessment attempt',
-  })
-  @ApiResponse({
-    status: 201,
-    description: 'Assessment answers created successfully',
-    type: [AssessmentAnswerResponseDto],
-  })
-  @ApiResponse({ status: 400, description: 'Invalid input data or attempt already submitted' })
   async createBulkAnswers(@Body() bulkCreateDto: BulkCreateAssessmentAnswersDto) {
     return this.assessmentAnswerService.createBulkAnswers(bulkCreateDto)
   }
@@ -157,32 +107,10 @@ export class AssessmentAnswerController {
     return await this.assessmentAnswerService.updateBulkAnswers(attemptId, answers)
   }
 
-  // ===== Grading Operations =====
-
   @Post('grade')
-  @ApiOperation({
-    summary: 'Grade assessment answers',
-    description: 'Grade all answers for a submitted assessment attempt',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Assessment answers graded successfully',
-    schema: {
-      type: 'object',
-      properties: {
-        gradedCount: { type: 'number', example: 45 },
-        totalCount: { type: 'number', example: 50 },
-        accuracy: { type: 'number', example: 85.5 },
-      },
-    },
-  })
-  @ApiResponse({ status: 404, description: 'Assessment attempt not found' })
-  @ApiResponse({ status: 400, description: 'Assessment attempt not submitted yet' })
   async gradeAnswers(@Body() gradeDto: GradeAssessmentAnswersDto) {
     return this.assessmentAnswerService.gradeAnswers(gradeDto)
   }
-
-  // ===== Attempt-Specific Operations =====
 
   @Get('attempt/:attemptId')
   @ApiOperation({
@@ -201,10 +129,6 @@ export class AssessmentAnswerController {
   }
 
   @Get('attempt/:attemptId/summary')
-  @ApiOperation({
-    summary: 'Get assessment attempt summary',
-    description: 'Get summary statistics for an assessment attempt',
-  })
   @ApiParam({ name: 'attemptId', description: 'Assessment attempt ID' })
   @ApiResponse({
     status: 200,
@@ -217,10 +141,6 @@ export class AssessmentAnswerController {
   }
 
   @Get('attempt/:attemptId/performance')
-  @ApiOperation({
-    summary: 'Get question performance for an attempt',
-    description: 'Get detailed performance analysis for each question in an attempt',
-  })
   @ApiParam({ name: 'attemptId', description: 'Assessment attempt ID' })
   @ApiResponse({
     status: 200,
@@ -233,24 +153,7 @@ export class AssessmentAnswerController {
   }
 
   @Get('attempt/:attemptId/progress')
-  @ApiOperation({
-    summary: 'Get assessment attempt progress',
-    description: 'Get completion progress for an assessment attempt',
-  })
   @ApiParam({ name: 'attemptId', description: 'Assessment attempt ID' })
-  @ApiResponse({
-    status: 200,
-    description: 'Assessment progress retrieved successfully',
-    schema: {
-      type: 'object',
-      properties: {
-        totalQuestions: { type: 'number', example: 50 },
-        answeredQuestions: { type: 'number', example: 35 },
-        completionPercentage: { type: 'number', example: 70.0 },
-      },
-    },
-  })
-  @ApiResponse({ status: 404, description: 'Assessment attempt not found' })
   async getAttemptProgress(@Param('attemptId', ParseIntPipe) attemptId: number) {
     return this.assessmentAnswerService.getAttemptProgress(attemptId)
   }
@@ -262,29 +165,12 @@ export class AssessmentAnswerController {
     description: 'Delete all answers for a specific assessment attempt',
   })
   @ApiParam({ name: 'attemptId', description: 'Assessment attempt ID' })
-  @ApiResponse({
-    status: 200,
-    description: 'Assessment answers deleted successfully',
-    schema: {
-      type: 'object',
-      properties: {
-        deletedCount: { type: 'number', example: 45 },
-      },
-    },
-  })
-  @ApiResponse({ status: 404, description: 'Assessment attempt not found' })
   async deleteAttemptAnswers(@Param('attemptId', ParseIntPipe) attemptId: number) {
     const deletedCount = await this.assessmentAnswerService.deleteAttemptAnswers(attemptId)
     return { deletedCount }
   }
 
-  // ===== Analytics and Statistics =====
-
   @Get('analytics')
-  @ApiOperation({
-    summary: 'Get answer analytics',
-    description: 'Get comprehensive analytics for assessment answers',
-  })
   @ApiResponse({
     status: 200,
     description: 'Answer analytics retrieved successfully',
@@ -318,8 +204,6 @@ export class AssessmentAnswerController {
   async getQuestionStatistics(@Param('questionId', ParseIntPipe) questionId: number) {
     return this.assessmentAnswerService.getQuestionStatistics(questionId)
   }
-
-  // ===== User-Specific Operations =====
 
   @Get('user/:userId/history')
   @ApiOperation({
