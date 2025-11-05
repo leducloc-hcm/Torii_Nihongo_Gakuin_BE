@@ -3,6 +3,8 @@ export enum QueryType {
   LESSON = 'LESSON',
   FLASHCARD = 'FLASHCARD',
   ASSESSMENT = 'ASSESSMENT',
+  ENROLLMENT = 'ENROLLMENT',
+  PROGRESS = 'PROGRESS',
   GENERAL = 'GENERAL',
 }
 
@@ -122,12 +124,46 @@ export function detectQueryType(query: string): QueryType {
     '結果',
   ]
 
+  // Enrollment/Progress-specific keywords
+  const enrollmentKeywords = [
+    // English
+    'enroll',
+    'enrollment',
+    'enrolled',
+    'my courses',
+    'progress',
+    'learning',
+    'study',
+    'complete',
+    'completion',
+    'streak',
+    'stats',
+    'statistics',
+    // Vietnamese
+    'đăng ký',
+    'ghi danh',
+    'khóa của tôi',
+    'tiến độ',
+    'học tập',
+    'hoàn thành',
+    'chuỗi',
+    'thống kê',
+    // Japanese
+    '登録',
+    '進捗',
+    '学習',
+    '完了',
+    '統計',
+  ]
+
   const hasCourseKeyword = courseKeywords.some((keyword) => lowerQuery.includes(keyword))
   const hasLessonKeyword = lessonKeywords.some((keyword) => lowerQuery.includes(keyword))
   const hasFlashcardKeyword = flashcardKeywords.some((keyword) => lowerQuery.includes(keyword))
   const hasAssessmentKeyword = assessmentKeywords.some((keyword) => lowerQuery.includes(keyword))
+  const hasEnrollmentKeyword = enrollmentKeywords.some((keyword) => lowerQuery.includes(keyword))
 
-  // Priority: Course > Flashcard > Assessment > Lesson > General
+  // Priority: Enrollment > Course > Flashcard > Assessment > Lesson > General
+  if (hasEnrollmentKeyword) return QueryType.ENROLLMENT
   if (hasCourseKeyword) return QueryType.COURSE
   if (hasFlashcardKeyword) return QueryType.FLASHCARD
   if (hasAssessmentKeyword) return QueryType.ASSESSMENT

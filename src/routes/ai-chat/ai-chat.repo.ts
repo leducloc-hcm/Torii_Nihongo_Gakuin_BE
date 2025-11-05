@@ -170,6 +170,14 @@ export class AIMessageRepository {
       where: { threadId },
     })
   }
+
+  async getAllByThreadId(threadId: number) {
+    return this.prisma.aIChatMessage.findMany({
+      where: { threadId },
+      select: { id: true, createdAt: true, role: true, queryId: true },
+      orderBy: { id: 'asc' },
+    })
+  }
 }
 
 /**

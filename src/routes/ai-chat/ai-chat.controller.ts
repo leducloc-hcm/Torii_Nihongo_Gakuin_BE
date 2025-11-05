@@ -57,4 +57,10 @@ export class AIChatController {
   async clearUserCache(@ActiveUser('userId') userId: number) {
     return this.aiChatService.clearUserCache(userId)
   }
+
+  @Get('debug/threads/:threadId/messages/count')
+  @ApiOperation({ summary: 'Debug: Get actual message count from database' })
+  async debugMessageCount(@Param('threadId', ParseIntPipe) threadId: number) {
+    return this.aiChatService.debugMessageCount(threadId)
+  }
 }
