@@ -16,8 +16,8 @@ import {
 @Injectable()
 export class AIChatService {
   private readonly logger = new Logger(AIChatService.name)
-  private readonly THREAD_CACHE_TTL = 10 // 10 minutes in seconds
-  private readonly MESSAGES_CACHE_TTL = 10 // 10 minutes in seconds
+  private readonly THREAD_CACHE_TTL = 120 // 10 minutes in seconds
+  private readonly MESSAGES_CACHE_TTL = 600 // 10 minutes in seconds
 
   constructor(
     private readonly agentService: AgentService,
@@ -234,11 +234,9 @@ export class AIChatService {
       )
 
       if (hasData) {
-        // AI got data but didn't format response - ask it to try again
         finalResponse =
           'Xin lỗi, tôi đã tìm thấy thông tin nhưng gặp lỗi khi định dạng câu trả lời. Bạn có thể hỏi lại câu hỏi này không?'
       } else {
-        // Tools returned empty/null data
         const toolName = executeResult.results[0]?.toolName || 'tool'
         if (toolName.includes('enrollment') || toolName.includes('progress')) {
           finalResponse =
@@ -253,7 +251,6 @@ export class AIChatService {
       }
     }
 
-    // Save assistant response with tool results
     this.logger.debug(`Saving assistant message to database...`)
     await this.messageRepo.create({
       threadId,
@@ -264,8 +261,6 @@ export class AIChatService {
       toolCalls: executeResult.results,
     })
 
-    // Invalidate cache AFTER a small delay to ensure DB write is fully committed
-    // This prevents race condition where frontend queries before write completes
     setTimeout(() => {
       void this.invalidateThreadCache(threadId, userId)
         .then(() => this.logger.debug(`Cache invalidated for thread ${threadId}`))
@@ -280,24 +275,16 @@ export class AIChatService {
     }
   }
 
-  /**
-   * Create new thread
-   */
   async createThread(userId: number, title?: string) {
     const thread = await this.threadRepo.create(userId, title)
 
-    // Invalidate user threads cache
     await this.redis.del(this.getUserThreadsCacheKey(userId))
 
-    // Cache the new thread
     await this.redis.set(this.getThreadCacheKey(thread.id), JSON.stringify(thread), this.THREAD_CACHE_TTL)
 
     return thread
   }
 
-  /**
-   * Get user's threads with pagination
-   */
   async getUserThreads(userId: number, limit = 20, page = 1) {
     // Only cache first page (page = 1)
     if (page === 1) {
@@ -311,10 +298,8 @@ export class AIChatService {
       }
     }
 
-    // Cache miss or not first page - fetch from database
     const result = await this.threadRepo.findByUserId(userId, limit, page)
 
-    // Cache first page only
     if (page === 1) {
       await this.redis.set(this.getUserThreadsCacheKey(userId), JSON.stringify(result), this.THREAD_CACHE_TTL)
     }
@@ -322,83 +307,52 @@ export class AIChatService {
     return result
   }
 
-  /**
-   * Get thread messages with pagination
-   */
   async getThreadMessages(userId: number, threadId: number, limit = 20, page = 1) {
-    // Verify thread ownership
     const thread = await this.threadRepo.findById(threadId)
     if (!thread || thread.userId !== userId) {
       throw new NotFoundException('Thread not found')
     }
 
-    // Cache enabled with proper invalidation pattern
     const messagesCacheKey = this.getMessagesCacheKey(threadId, limit, page)
-    this.logger.debug(`[Cache] Checking key: ${messagesCacheKey}`)
 
-    // Check cache for first page only
     if (page === 1) {
       const cached = await this.redis.get(messagesCacheKey)
       if (cached) {
-        // Handle both string and object from Redis
         const result = typeof cached === 'string' ? JSON.parse(cached) : cached
         const messageIds = result.data?.map((m: any) => m.id).join(',') || 'none'
-        this.logger.warn(
-          `[Cache HIT] Thread ${threadId}: ${result.data?.length || 0} messages (IDs: ${messageIds}) | Total in cache: ${result.pagination?.total || 0}`,
-        )
         return result
       }
-      this.logger.debug(`[Cache MISS] Thread ${threadId}`)
     }
 
-    // Fetch from database
-    this.logger.log(`[DB Query] Fetching messages for thread ${threadId} (page ${page}, limit ${limit})`)
     const result = await this.messageRepo.findByThreadId(threadId, limit, page)
     const messageIds = result.data.map((m) => m.id).join(',')
-    this.logger.warn(
-      `[DB Query] Fetched ${result.data.length} messages (IDs: ${messageIds}) | Total in DB: ${result.pagination.total}`,
-    )
-
-    // Cache first page only
     if (page === 1) {
       await this.redis.set(messagesCacheKey, JSON.stringify(result), this.MESSAGES_CACHE_TTL)
-      this.logger.debug(`[Cache SET] Thread ${threadId}: ${result.data.length} messages cached`)
     }
 
     return result
   }
 
-  /**
-   * Delete thread
-   */
   async deleteThread(userId: number, threadId: number) {
     const thread = await this.threadRepo.findById(threadId)
     if (!thread || thread.userId !== userId) {
       throw new NotFoundException('Thread not found')
     }
 
-    // Delete from database
     const result = await this.threadRepo.delete(threadId)
 
-    // Invalidate all related cache
     await this.invalidateThreadCache(threadId, userId)
 
     return result
   }
 
-  /**
-   * Clear all cache for a user (development/debugging)
-   */
   async clearUserCache(userId: number) {
-    // Get all threads for this user
     const threads = await this.threadRepo.findByUserId(userId, 1000, 1)
 
-    // Clear cache for each thread
     const redisClient = this.redis.getClient()
     let totalKeysCleared = 0
 
     for (const thread of threads.data) {
-      // Clear all message cache keys for this thread
       const messagePattern = `ai_thread_messages:${thread.id}:*`
       const messageKeys = await redisClient.keys(messagePattern)
 
@@ -407,16 +361,13 @@ export class AIChatService {
         totalKeysCleared++
       }
 
-      // Clear thread cache
       await this.redis.del(this.getThreadCacheKey(thread.id))
       totalKeysCleared++
     }
 
-    // Clear user threads cache
     await this.redis.del(this.getUserThreadsCacheKey(userId))
     totalKeysCleared++
 
-    this.logger.log(`Cleared ${totalKeysCleared} cache keys for user ${userId}`)
     return {
       message: 'Cache cleared successfully',
       userId,
@@ -425,9 +376,6 @@ export class AIChatService {
     }
   }
 
-  /**
-   * Debug: Get actual message count from database (bypass cache)
-   */
   async debugMessageCount(threadId: number) {
     const allMessages = await this.messageRepo.getAllByThreadId(threadId)
 
