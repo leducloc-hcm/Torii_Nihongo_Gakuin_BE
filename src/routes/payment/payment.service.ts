@@ -242,15 +242,30 @@ export class PaymentService {
       },
     })
 
-    // Create coupon redemption in PENDING status (will be updated to COMPLETED by webhook)
+    // Create or update coupon redemption in PENDING status (will be updated to COMPLETED by webhook)
     if (coupon && coupon.type !== 'GIFT') {
-      await this.prisma.couponRedemption.create({
-        data: {
+      // Use upsert since there's a unique constraint on couponId+userId
+      // This handles the case where user previously used the same coupon
+      await this.prisma.couponRedemption.upsert({
+        where: {
+          couponId_userId: {
+            couponId: coupon.id,
+            userId,
+          },
+        },
+        create: {
           couponId: coupon.id,
           userId,
           orderId: order.id,
           discountApplied: checkoutCalculation.discountAmount,
-          status: 'PENDING', // Changed to PENDING - will be COMPLETED when payment succeeds
+          status: 'PENDING',
+        },
+        update: {
+          orderId: order.id,
+          discountApplied: checkoutCalculation.discountAmount,
+          status: 'PENDING',
+          redeemedAt: new Date(),
+          completedAt: null,
         },
       })
     }
@@ -416,15 +431,30 @@ export class PaymentService {
       },
     })
 
-    // Create coupon redemption in PENDING status (will be updated to COMPLETED by webhook)
+    // Create or update coupon redemption in PENDING status (will be updated to COMPLETED by webhook)
     if (appliedCoupon && appliedCoupon.type !== 'GIFT') {
-      await this.prisma.couponRedemption.create({
-        data: {
+      // Use upsert since there's a unique constraint on couponId+userId
+      // This handles the case where user previously used the same coupon
+      await this.prisma.couponRedemption.upsert({
+        where: {
+          couponId_userId: {
+            couponId: appliedCoupon.id,
+            userId,
+          },
+        },
+        create: {
           couponId: appliedCoupon.id,
           userId,
           orderId: order.id,
           discountApplied: discountAmount,
-          status: 'PENDING', // Changed to PENDING - will be COMPLETED when payment succeeds
+          status: 'PENDING',
+        },
+        update: {
+          orderId: order.id,
+          discountApplied: discountAmount,
+          status: 'PENDING',
+          redeemedAt: new Date(),
+          completedAt: null,
         },
       })
     }

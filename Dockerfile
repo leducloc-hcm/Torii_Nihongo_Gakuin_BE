@@ -122,7 +122,7 @@ ENV RESEND_FROM_ADDRESS='noreply@torii-nihongo-gakuin.io.vn'
 ENV GOOGLE_CLIENT_ID='521002288353-ojkodbhule2bu47eocs445f9r1t87tft.apps.googleusercontent.com'
 ENV GOOGLE_CLIENT_SECRET='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'
 ENV GOOGLE_REDIRECT_URI='https://develop.torii-nihongo-gakuin.io.vn/auth/google/callback'
-ENV GOOGLE_CLIENT_REDIRECT_URI='http://localhost:3000/auth/google'
+ENV GOOGLE_CLIENT_REDIRECT_URI='http://localhost:3000/auth/google/callback'
 ENV APP_NAME='Torii Nihongo Gakuin'
 
 
