@@ -170,6 +170,9 @@ ENV MCP_COURSE_ENABLED=true
 # Enrollment MCP Server
 ENV MCP_ENROLLMENT_SERVER_URL=https://agent.torii-nihongo-gakuin.io.vn/enrollment/mcp
 ENV MCP_ENROLLMENT_ENABLED=true
+
+ENV MCP_FLASHCARD_SERVER_URL=https://develop.torii-nihongo-gakuin.io.vn/flashcard/mcp
+ENV MCP_FLASHCARD_ENABLED=true
 # Frontend URL for redirects
 ENV FRONTEND_URL=http://localhost:3000
 
