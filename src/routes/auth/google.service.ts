@@ -9,6 +9,8 @@ import { HashingService } from 'src/shared/services/hashing.service'
 import { v4 as uuidv4 } from 'uuid'
 import { RoleName } from 'src/shared/constants/role.constant'
 import { VerifyStatus } from 'src/shared/constants/auth.constant'
+import { ProfileService } from '../profile/profile.service'
+import { CartService } from '../cart/cart.service'
 
 @Injectable()
 export class GoogleService {
@@ -17,6 +19,8 @@ export class GoogleService {
     private readonly authRepository: AuthRepository,
     private readonly hashingService: HashingService,
     private readonly authService: AuthService,
+    private readonly profileService: ProfileService,
+    private readonly cartService: CartService,
   ) {
     this.oauth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
@@ -82,6 +86,16 @@ export class GoogleService {
           password: hashedPassword,
           status: VerifyStatus.VERIFIED,
         })
+
+        // Create profile and initialize cart for the new user
+        await Promise.all([
+          this.profileService.createProfile({
+            email: data.email,
+            name: data.name ?? '',
+            role: RoleName.Customer,
+          }),
+          this.cartService.initCart(user.id),
+        ])
       }
       const device = await this.authRepository.createDevice({
         userId: user.id,
