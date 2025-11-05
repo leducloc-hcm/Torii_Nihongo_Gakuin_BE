@@ -4,12 +4,14 @@ import { getLanguageDetectionPrompt } from 'src/mcp-client/prompts/language-dete
 import { META_CONTEXT_PROMPT } from 'src/mcp-client/prompts/meta-context.prompt'
 import { detectLanguage, Language } from 'src/mcp-client/shared/language.utils'
 import { QueryType } from 'src/mcp-client/shared/query-detection.utils'
+import { getCoursePrompt } from './course-specific.prompt'
+import { getEnrollmentPrompt } from '../enrollment/enrollment-mcp.prompt'
 
 @Injectable()
 export class PromptService {
   private readonly logger = new Logger(PromptService.name)
 
-  getSystemPrompt(queryType: QueryType, userName?: string, userQuery?: string): string {
+  getSystemPrompt(queryType: QueryType, userName?: string, userQuery?: string, userId?: number): string {
     const greeting = userName ? `Hello ${userName}!` : 'Hello!'
 
     // Detect language from user query if provided
@@ -17,6 +19,10 @@ export class PromptService {
     if (userQuery) {
       detectedLang = detectLanguage(userQuery)
       this.logger.debug(`Detected language: ${detectedLang} for query: ${userQuery.substring(0, 50)}...`)
+    }
+
+    if (userId) {
+      this.logger.debug(`System prompt generated with userId: ${userId}`)
     }
 
     // Compose system prompt from reusable templates
@@ -29,49 +35,26 @@ export class PromptService {
       CORE_BEHAVIOR_PROMPT +
       '\n\n'
 
-    const typeSpecificPrompt = this.getTypeSpecificPrompt(queryType)
+    const typeSpecificPrompt = this.getTypeSpecificPrompt(queryType, userId)
 
     return basePrompt + typeSpecificPrompt
   }
 
-  private getTypeSpecificPrompt(queryType: QueryType): string {
-    switch (queryType) {
-      case QueryType.COURSE:
-        return `Focus: Course Information
-- Use search_courses to find relevant courses
-- Use get_course_details for detailed course information
-- Use recommend_courses to suggest courses based on user's level
-- Explain course structure, modules, and expected outcomes
-- Highlight prerequisites and target JLPT levels
+  private getTypeSpecificPrompt(queryType: QueryType, userId?: number): string {
+    // Try to get prompt from specific modules first
+    const coursePrompt = getCoursePrompt(queryType)
+    if (coursePrompt) return coursePrompt
 
-IMPORTANT - Course Links & Thumbnails:
-- When mentioning a course, ALWAYS include a clickable link using this format:
-  [Course Name](http://localhost:3000/customer/explore-course/{slug})
-- The slug field is available in course data
-- Example Vietnamese: [Khóa học N5](http://localhost:3000/customer/explore-course/n5-course)
-- Example English: [N5 Course](http://localhost:3000/customer/explore-course/n5-course)
-- Example Japanese: [N5コース](http://localhost:3000/customer/explore-course/n5-course)
-- Make it easy for users to navigate to course details by clicking the link
-- Remember: Course name in link should match the language of your response
+    const enrollmentPrompt = getEnrollmentPrompt(queryType, userId)
+    if (enrollmentPrompt) return enrollmentPrompt
 
-IMPORTANT - Course Thumbnails (NEW):
-- Course data includes a "thumbnailUrl" field with the course image URL
-- You can display course thumbnails in your response using markdown image syntax
-- Format: ![Course Title](thumbnailUrl)
-- Example: ![Khóa học N5](https://cdn.example.com/n5-course.jpg)
-- Place the image BEFORE the course description for visual appeal
-- If thumbnailUrl is null or empty, skip the image (don't show broken image)
-- Images will be automatically lazy-loaded and responsive in the chat UI`
-
-      case QueryType.GENERAL:
-      default:
-        return `Focus: General Assistance
+    // Default to general assistance
+    return `Focus: General Assistance
 - Answer general questions about Japanese language learning
 - Provide study tips and learning strategies
 - Explain JLPT structure and requirements
 - Guide students through platform features
 - Use appropriate tools based on the question context`
-    }
   }
 
   getUserMessagePrompt(query: string, queryType: QueryType): string {
@@ -109,18 +92,48 @@ Instructions:
 3. Synthesize the information from all tool results
 4. Format the response clearly with markdown (headings, lists, tables as appropriate)
 5. Include specific details like course names, levels, dates, etc.
-6. **IMPORTANT: For each course mentioned, include thumbnail and clickable link:**
-   - If course has thumbnailUrl, display it: ![Course Title](thumbnailUrl)
-   - Then add clickable link: [Course Name](http://localhost:3000/customer/explore-course/{slug})
-   - Use the "slug" and "thumbnailUrl" fields from the course data
-   - Course name in the link text should match your response language
-   - Example Vietnamese:
-     ![Khóa học N5](https://cdn.example.com/n5.jpg)
-     [Khóa học N5 cho người mới bắt đầu](http://localhost:3000/customer/explore-course/n5-beginner)
-   - Example English:
-     ![N5 Course](https://cdn.example.com/n5.jpg)
-     [N5 Beginner Course](http://localhost:3000/customer/explore-course/n5-beginner)
-   - If thumbnailUrl is null/empty, skip the image and just show the link
+6. **CRITICAL - MANDATORY Course Display Format:**
+   
+   FOR EVERY SINGLE COURSE you mention, you MUST include these elements in this order:
+   
+   a) Thumbnail image (if thumbnailUrl field has a valid value):
+      - Check if thumbnailUrl exists AND is not empty string
+      - Use markdown image syntax: exclamation mark open bracket title close bracket open paren thumbnailUrl close paren
+      - Put on its own line FIRST
+      - Skip this line if thumbnailUrl is null, empty string, or missing
+   
+   b) Clickable course link (MANDATORY - NEVER SKIP THIS):
+      - Use markdown link syntax pointing to: http://localhost:3000/customer/explore-course/SLUG
+      - Replace SLUG with the actual slug value from course data
+      - Use the course title as link text
+      - This link is REQUIRED for every course, even if you skip the image
+   
+   c) Course information (as bullet points):
+      - Cấp độ (Level): N5, N4, N3, N2, or N1
+      - Loại (Type): Video + Quiz, Live Only, or other courseType value
+      - Giá (Price): Show price in VNĐ format if available
+      - For LIVE_ONLY courses: List all scheduled sessions with dates and times from OnlineClass data
+   
+   MANDATORY FORMAT CHECKLIST for each course:
+   ✓ Image line (if thumbnail exists)
+   ✓ Clickable link line with correct slug
+   ✓ Level bullet point
+   ✓ Type bullet point  
+   ✓ Price bullet point (if available)
+   ✓ Sessions list (for LIVE courses only)
+   
+   EXAMPLE Vietnamese response for VIDEO_QUIZ course:
+   First line: Image markdown with thumbnailUrl
+   Second line: Link markdown with slug
+   Third line: Dash Cấp độ colon space level
+   Fourth line: Dash Loại colon space Video + Quiz
+   Fifth line: Dash Giá colon space price VNĐ
+   
+   EXAMPLE Vietnamese response for LIVE_ONLY course:
+   Include "Các buổi học đã lên lịch:" followed by bullet list of sessions with dates/times
+   
+   YOU MUST SHOW ALL COURSES from the tool result data - do not summarize or skip courses!
+   If tool returns 8 courses, show all 8 courses with full details and links!
 7. If any tool returned an error, acknowledge it gracefully in the appropriate language
 8. When mentioning missing courses/data, use proper perspective:
    - ✅ "Hiện tại chưa có khóa học N1 trong hệ thống"

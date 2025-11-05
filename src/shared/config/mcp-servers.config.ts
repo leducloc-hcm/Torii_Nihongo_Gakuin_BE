@@ -12,6 +12,12 @@ export const MCP_SERVERS: Record<string, MCPServerConfig> = {
     enabled: process.env.MCP_COURSE_ENABLED !== 'false',
     description: 'Course management, lesson details, and live course operations',
   },
+  enrollment: {
+    name: 'enrollment-mcp',
+    url: process.env.MCP_ENROLLMENT_SERVER_URL || 'http://localhost:8000/enrollment/mcp',
+    enabled: process.env.MCP_ENROLLMENT_ENABLED !== 'false',
+    description: 'Enrollment management and user progress tracking',
+  },
 }
 
 export function getEnabledMCPServers(): MCPServerConfig[] {

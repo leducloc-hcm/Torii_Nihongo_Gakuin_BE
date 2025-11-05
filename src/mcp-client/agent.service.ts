@@ -11,6 +11,7 @@ import {
   transformMCPToolToOpenAI,
 } from 'src/mcp-client/mcp.model'
 import { CourseMcpClient } from 'src/mcp-client/module/course/course-mcp.service'
+import { EnrollmentMcpClient } from 'src/mcp-client/module/enrollment/enrollment-mcp.service'
 import { getEnabledMCPServers, MCP_SERVERS } from 'src/shared/config/mcp-servers.config'
 import { OPENAI_CONFIG, MCP_CONFIG } from 'src/shared/config/openai.config'
 
@@ -24,6 +25,7 @@ export class AgentService {
   constructor(
     private readonly mcpBase: McpBaseService,
     private readonly courseMcp: CourseMcpClient,
+    private readonly enrollmentMcp: EnrollmentMcpClient,
   ) {
     this.openai = new OpenAI({
       apiKey: OPENAI_CONFIG.apiKey,
@@ -203,14 +205,32 @@ export class AgentService {
       finalCompletionOptions.max_completion_tokens = OPENAI_CONFIG.maxTokens
     }
 
-    const finalResponse = await this.openai.chat.completions.create(finalCompletionOptions)
+    try {
+      const finalResponse = await this.openai.chat.completions.create(finalCompletionOptions)
+      const finalChoice = finalResponse.choices[0]
 
-    const finalChoice = finalResponse.choices[0]
+      // Log if we got empty response
+      if (!finalChoice.message.content) {
+        this.logger.warn('OpenAI returned empty content in final response')
+        this.logger.debug(`Tool results: ${JSON.stringify(results, null, 2)}`)
+      }
 
-    return {
-      results,
-      finalResponse: finalChoice.message.content || undefined,
-      hasMoreTools: (finalChoice.message.tool_calls?.length ?? 0) > 0,
+      return {
+        results,
+        finalResponse: finalChoice.message.content || undefined,
+        hasMoreTools: (finalChoice.message.tool_calls?.length ?? 0) > 0,
+      }
+    } catch (error) {
+      this.logger.error('Failed to get final response from OpenAI:', error.message)
+      this.logger.debug(`Messages sent: ${JSON.stringify(messages, null, 2)}`)
+
+      // Return results but with no final response
+      // The calling service will handle fallback message
+      return {
+        results,
+        finalResponse: undefined,
+        hasMoreTools: false,
+      }
     }
   }
 
@@ -253,6 +273,14 @@ export class AgentService {
 
     if (lowerToolName.includes('course')) {
       return MCP_SERVERS.course.url
+    }
+
+    if (
+      lowerToolName.includes('enrollment') ||
+      lowerToolName.includes('progress') ||
+      lowerToolName.includes('learning')
+    ) {
+      return MCP_SERVERS.enrollment.url
     }
 
     // Default to first enabled server

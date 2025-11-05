@@ -3,6 +3,8 @@ export enum QueryType {
   LESSON = 'LESSON',
   FLASHCARD = 'FLASHCARD',
   ASSESSMENT = 'ASSESSMENT',
+  ENROLLMENT = 'ENROLLMENT',
+  PROGRESS = 'PROGRESS',
   GENERAL = 'GENERAL',
 }
 
@@ -122,12 +124,66 @@ export function detectQueryType(query: string): QueryType {
     '結果',
   ]
 
+  // Enrollment/Progress-specific keywords
+  const enrollmentKeywords = [
+    // English - Enrollment
+    'enroll',
+    'enrollment',
+    'enrolled',
+    'register',
+    'registered',
+    'registration',
+    'signed up',
+    'sign up',
+    'my courses',
+    // English - Progress
+    'progress',
+    'progression',
+    'advancement',
+    'learning',
+    'study',
+    'complete',
+    'completion',
+    'streak',
+    'stats',
+    'statistics',
+    // Vietnamese - Enrollment
+    'đăng ký',
+    'ghi danh',
+    'đã đăng ký',
+    'các khóa học',
+    'khóa của tôi',
+    'khóa đã đăng ký',
+    // Vietnamese - Progress
+    'tiến độ',
+    'tiến trình',
+    'quá trình học',
+    'học tập',
+    'hoàn thành',
+    'chuỗi',
+    'thống kê',
+    // Japanese - Enrollment
+    '登録', // touroku
+    '受講', // jukou
+    'コース', // kousu
+    '登録済み', // touroku zumi
+    // Japanese - Progress
+    '進捗', // shinchoku
+    '進度', // shindo
+    '進行', // shinkou
+    '学習', // gakushuu
+    '完了', // kanryou
+    '統計', // toukei
+  ]
+
   const hasCourseKeyword = courseKeywords.some((keyword) => lowerQuery.includes(keyword))
   const hasLessonKeyword = lessonKeywords.some((keyword) => lowerQuery.includes(keyword))
   const hasFlashcardKeyword = flashcardKeywords.some((keyword) => lowerQuery.includes(keyword))
   const hasAssessmentKeyword = assessmentKeywords.some((keyword) => lowerQuery.includes(keyword))
+  const hasEnrollmentKeyword = enrollmentKeywords.some((keyword) => lowerQuery.includes(keyword))
 
-  // Priority: Course > Flashcard > Assessment > Lesson > General
+  // Priority: Enrollment > Course > Flashcard > Assessment > Lesson > General
+  if (hasEnrollmentKeyword) return QueryType.ENROLLMENT
   if (hasCourseKeyword) return QueryType.COURSE
   if (hasFlashcardKeyword) return QueryType.FLASHCARD
   if (hasAssessmentKeyword) return QueryType.ASSESSMENT
