@@ -206,13 +206,22 @@ export class AgentService {
     }
 
     try {
+      this.logger.log('🔄 Calling OpenAI with tool results...')
+      const startTime = Date.now()
+
       const finalResponse = await this.openai.chat.completions.create(finalCompletionOptions)
+
+      const elapsed = Date.now() - startTime
+      this.logger.log(`✅ OpenAI response received in ${elapsed}ms`)
+
       const finalChoice = finalResponse.choices[0]
 
       // Log if we got empty response
       if (!finalChoice.message.content) {
-        this.logger.warn('OpenAI returned empty content in final response')
+        this.logger.warn('⚠️ OpenAI returned empty content in final response')
         this.logger.debug(`Tool results: ${JSON.stringify(results, null, 2)}`)
+      } else {
+        this.logger.log(`✅ Final response: ${finalChoice.message.content.substring(0, 200)}...`)
       }
 
       return {
@@ -221,7 +230,8 @@ export class AgentService {
         hasMoreTools: (finalChoice.message.tool_calls?.length ?? 0) > 0,
       }
     } catch (error) {
-      this.logger.error('Failed to get final response from OpenAI:', error.message)
+      this.logger.error('❌ Failed to get final response from OpenAI:', error.message)
+      this.logger.error('Stack:', error.stack)
       this.logger.debug(`Messages sent: ${JSON.stringify(messages, null, 2)}`)
 
       // Return results but with no final response
@@ -281,6 +291,14 @@ export class AgentService {
       lowerToolName.includes('learning')
     ) {
       return MCP_SERVERS.enrollment.url
+    }
+
+    if (
+      lowerToolName.includes('flashcard') ||
+      lowerToolName.includes('deck') ||
+      lowerToolName.includes('generate_flashcard')
+    ) {
+      return MCP_SERVERS.flashcard.url
     }
 
     // Default to first enabled server

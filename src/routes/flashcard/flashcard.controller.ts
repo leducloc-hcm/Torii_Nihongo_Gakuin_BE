@@ -189,4 +189,17 @@ export class FlashcardController {
   async getPublicDeckCards(@Param('id', ParseIntPipe) deckId: number) {
     return await this.flashcardService.getDeckCards(deckId)
   }
+
+  // AI Generation endpoint (called by MCP server)
+  @Post('generate')
+  @IsPublic()
+  @HttpCode(HttpStatus.OK)
+  async generateFlashcards(@Body() body: { topic: string; level: string; count?: number; language?: string }) {
+    return await this.flashcardService.generateFlashcards(
+      body.topic,
+      body.level,
+      body.count || 20,
+      body.language || 'vi',
+    )
+  }
 }

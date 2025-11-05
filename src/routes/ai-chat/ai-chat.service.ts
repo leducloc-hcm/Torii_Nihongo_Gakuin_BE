@@ -11,6 +11,7 @@ import {
   requiresMultipleTools,
   generateMultiToolHint,
   suggestToolCombination,
+  QueryType,
 } from 'src/mcp-client/shared/query-detection.utils'
 
 @Injectable()
@@ -96,7 +97,15 @@ export class AIChatService {
     const needsMultipleTools = requiresMultipleTools(query)
     const suggestedTools = needsMultipleTools ? suggestToolCombination(query) : []
 
+    // Detect flashcard generation request
+    const isFlashcardGeneration =
+      queryType === QueryType.FLASHCARD &&
+      (query.toLowerCase().includes('tạo') ||
+        query.toLowerCase().includes('create') ||
+        query.toLowerCase().includes('generate'))
+
     this.logger.log(`Query type detected: ${queryType}`)
+    this.logger.log(`Is flashcard generation: ${isFlashcardGeneration}`)
     if (needsMultipleTools) {
       this.logger.log(`Multi-tool query detected. Suggested tools: [${suggestedTools.join(', ')}]`)
     }
@@ -132,6 +141,19 @@ export class AIChatService {
 
     // Get response from Agent
     const agentResponse = await this.agentService.getResponse(messages, true)
+
+    // DEBUG: Log tool calls
+    if (agentResponse.toolCalls && agentResponse.toolCalls.length > 0) {
+      this.logger.log(`✅ AI called ${agentResponse.toolCalls.length} tools:`)
+      agentResponse.toolCalls.forEach((tc) => {
+        this.logger.log(`  - ${tc.name}(${tc.arguments})`)
+      })
+    } else {
+      this.logger.warn(`⚠️ AI did NOT call any tools (expected for flashcard generation: ${isFlashcardGeneration})`)
+      if (isFlashcardGeneration) {
+        this.logger.error(`🚨 CRITICAL: AI should have called generate_flashcard_suggestions tool!`)
+      }
+    }
 
     // Add assistant's response to messages (including tool_calls if any)
     const assistantMessage: any = {
@@ -198,11 +220,14 @@ export class AIChatService {
 
     // AUTO-EXECUTE TOOLS immediately without waiting for approval
     const toolNames = agentResponse.toolCalls.map((tc) => tc.name).join(', ')
-    this.logger.log(`Auto-executing ${agentResponse.toolCalls.length} tool(s): [${toolNames}]`)
+    this.logger.log(`🔧 Auto-executing ${agentResponse.toolCalls.length} tool(s): [${toolNames}]`)
 
     await this.queryRepo.update(queryRecord.id, {
       status: QueryStatus.PROCESSING,
     })
+
+    this.logger.log('📞 Calling agentService.executeApprovedTools...')
+    const executeStartTime = Date.now()
 
     const executeResult = await this.agentService.executeApprovedTools({
       toolCalls: agentResponse.toolCalls.map((tc) => ({
@@ -214,6 +239,12 @@ export class AIChatService {
       userId,
       messages, // Pass conversation history with tool_calls
     })
+
+    const executeElapsed = Date.now() - executeStartTime
+    this.logger.log(`✅ executeApprovedTools completed in ${executeElapsed}ms`)
+    this.logger.log(`   - Tool results count: ${executeResult.results?.length || 0}`)
+    this.logger.log(`   - Has finalResponse: ${!!executeResult.finalResponse}`)
+    this.logger.log(`   - FinalResponse preview: ${executeResult.finalResponse?.substring(0, 100)}...`)
 
     // Save tool results to query
     await this.queryRepo.update(queryRecord.id, {

@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common'
 import { FlashcardRepository } from './flashcard.repo'
+import { FlashcardGenerationService } from './flashcard-generation.service'
 import {
   CreateFlashcardDeckInput,
   UpdateFlashcardDeckInput,
@@ -13,7 +14,10 @@ import {
 
 @Injectable()
 export class FlashcardService {
-  constructor(private readonly flashcardRepository: FlashcardRepository) {}
+  constructor(
+    private readonly flashcardRepository: FlashcardRepository,
+    private readonly flashcardGenerationService: FlashcardGenerationService,
+  ) {}
 
   // Deck operations
   async createDeck(userId: number, data: CreateFlashcardDeckInput) {
@@ -310,5 +314,20 @@ export class FlashcardService {
     // For now, return 0 as placeholder
     // TODO: Implement proper today review count
     return 0
+  }
+
+  // AI Generation method (called by MCP server)
+  async generateFlashcards(topic: string, level: string, count: number = 20, language: string = 'vi') {
+    const result = await this.flashcardGenerationService.generateFlashcards(topic, level, count, language)
+
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to generate flashcards')
+    }
+
+    // Format the response for MCP server
+    return {
+      flashcards: result.flashcards,
+      metadata: result.metadata,
+    }
   }
 }
