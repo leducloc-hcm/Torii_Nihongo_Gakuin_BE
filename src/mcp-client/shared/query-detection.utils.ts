@@ -78,23 +78,39 @@ export function detectQueryType(query: string): QueryType {
   const flashcardKeywords = [
     // English
     'flashcard',
+    'flashcards', // plural form
     'card',
+    'cards', // plural form
     'vocabulary',
     'vocab',
     'memorize',
     'review',
     'practice',
+    'deck',
+    'create flashcard',
+    'generate flashcard',
+    'make flashcard',
     // Vietnamese
     'thẻ',
+    'các thẻ',
     'từ vựng',
     'ôn tập',
     'luyện tập',
     'ghi nhớ',
+    'bộ thẻ',
+    'tạo flashcard',
+    'tạo flashcards',
+    'tạo thẻ',
+    'gen flashcard',
     // Japanese
     'フラッシュカード',
     '単語',
     '復習',
     '暗記',
+    'カード',
+    'デッキ',
+    'カードを作成',
+    'カードを生成',
   ]
 
   // Assessment-specific keywords
@@ -182,7 +198,18 @@ export function detectQueryType(query: string): QueryType {
   const hasAssessmentKeyword = assessmentKeywords.some((keyword) => lowerQuery.includes(keyword))
   const hasEnrollmentKeyword = enrollmentKeywords.some((keyword) => lowerQuery.includes(keyword))
 
-  // Priority: Enrollment > Course > Flashcard > Assessment > Lesson > General
+  // Check for flashcard CREATION intent (high priority)
+  const isFlashcardCreation =
+    hasFlashcardKeyword &&
+    (lowerQuery.includes('tạo') ||
+      lowerQuery.includes('create') ||
+      lowerQuery.includes('generate') ||
+      lowerQuery.includes('make') ||
+      lowerQuery.includes('gen'))
+
+  // Priority: Flashcard Creation > Enrollment > Course > Flashcard > Assessment > Lesson > General
+  // CRITICAL: Flashcard creation takes HIGHEST priority to ensure tool is called
+  if (isFlashcardCreation) return QueryType.FLASHCARD
   if (hasEnrollmentKeyword) return QueryType.ENROLLMENT
   if (hasCourseKeyword) return QueryType.COURSE
   if (hasFlashcardKeyword) return QueryType.FLASHCARD

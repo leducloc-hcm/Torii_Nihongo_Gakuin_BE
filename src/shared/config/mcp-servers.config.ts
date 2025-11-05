@@ -1,3 +1,5 @@
+import { flatten } from '@nestjs/common'
+
 export interface MCPServerConfig {
   name: string
   url: string
@@ -17,6 +19,12 @@ export const MCP_SERVERS: Record<string, MCPServerConfig> = {
     url: process.env.MCP_ENROLLMENT_SERVER_URL || 'http://localhost:8000/enrollment/mcp',
     enabled: process.env.MCP_ENROLLMENT_ENABLED !== 'false',
     description: 'Enrollment management and user progress tracking',
+  },
+  flashcard: {
+    name: 'flashcard-mcp',
+    url: process.env.MCP_FLASHCARD_SERVER_URL || 'http://localhost:8000/flashcard/mcp',
+    enabled: process.env.MCP_FLASHCARD_ENABLED !== 'false',
+    description: 'Flashcard management and study aid features',
   },
 }
 
