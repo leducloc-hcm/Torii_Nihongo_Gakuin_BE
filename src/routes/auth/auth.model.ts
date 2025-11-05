@@ -4,10 +4,22 @@ import { z } from 'zod'
 
 export const RegisterBodySchema = UserSchema.pick({
   email: true,
-  password: true,
   name: true,
 })
   .extend({
+    password: z
+      .string()
+      .min(8, 'Password must be at least 8 characters long')
+      .max(100)
+      .refine((v) => /[A-Z]/.test(v), { message: 'Must include at least 1 uppercase letter (A–Z)' })
+      .refine((v) => /[a-z]/.test(v), { message: 'Must include at least 1 lowercase letter (a–z)' })
+      .refine((v) => /\d/.test(v), { message: 'Must include at least 1 digit (0–9)' })
+      .refine((v) => /[!@#$%^&*()_\-+[\]{};:'",.<>/?\\|`~]/.test(v), {
+        message: 'Must include at least 1 special character',
+      })
+      .refine((v) => !/(.)\1\1/.test(v), {
+        message: 'No character may repeat 3+ times in a row',
+      }),
     confirmPassword: z.string().min(6).max(100),
     code: z.string().length(6),
   })
@@ -135,8 +147,20 @@ export const ForgotPasswordBodySchema = z
   .object({
     email: z.string().email(),
     code: z.string().length(6),
-    newPassword: z.string().min(6).max(100),
-    confirmNewPassword: z.string().min(6).max(100),
+    newPassword: z
+      .string()
+      .min(8, 'Password must be at least 8 characters long')
+      .max(100)
+      .refine((v) => /[A-Z]/.test(v), { message: 'Must include at least 1 uppercase letter (A–Z)' })
+      .refine((v) => /[a-z]/.test(v), { message: 'Must include at least 1 lowercase letter (a–z)' })
+      .refine((v) => /\d/.test(v), { message: 'Must include at least 1 digit (0–9)' })
+      .refine((v) => /[!@#$%^&*()_\-+[\]{};:'",.<>/?\\|`~]/.test(v), {
+        message: 'Must include at least 1 special character',
+      })
+      .refine((v) => !/(.)\1\1/.test(v), {
+        message: 'No character may repeat 3+ times in a row',
+      }),
+    confirmNewPassword: z.string().min(8).max(100),
   })
   .strict()
   .superRefine(({ confirmNewPassword, newPassword }, ctx) => {
