@@ -115,4 +115,86 @@ export class PaymentController {
 
     return { success: true, order }
   }
+
+  // ===== Payment Management Endpoints =====
+
+  @Get('orders/:orderId/payments')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Customer, RoleName.Admin, RoleName.Staff)
+  @HttpCode(HttpStatus.OK)
+  async getOrderPayments(@ActiveUser('userId') userId: number, @Param('orderId', ParseIntPipe) orderId: number) {
+    return this.paymentService.getOrderPayments(orderId, userId)
+  }
+
+  @Get('orders/:orderId/payments/summary')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Customer, RoleName.Admin, RoleName.Staff)
+  @HttpCode(HttpStatus.OK)
+  async getOrderPaymentSummary(@ActiveUser('userId') userId: number, @Param('orderId', ParseIntPipe) orderId: number) {
+    return this.paymentService.getOrderPaymentSummary(orderId, userId)
+  }
+
+  @Get('payments/:paymentId')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Customer, RoleName.Admin, RoleName.Staff)
+  @HttpCode(HttpStatus.OK)
+  async getPaymentById(@ActiveUser('userId') userId: number, @Param('paymentId', ParseIntPipe) paymentId: number) {
+    return this.paymentService.getPaymentById(paymentId, userId)
+  }
+
+  // Admin payment management
+  @Get('admin/payments')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Admin, RoleName.Staff)
+  @HttpCode(HttpStatus.OK)
+  async getAllPayments(
+    @Query('page', new ParseIntPipe({ optional: true })) page?: number,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+    @Query('status') status?: string,
+    @Query('method') method?: string,
+    @Query('orderId', new ParseIntPipe({ optional: true })) orderId?: number,
+    @Query('userId', new ParseIntPipe({ optional: true })) userId?: number,
+  ) {
+    return this.paymentService.getAllPayments({
+      page: page || 1,
+      limit: limit || 10,
+      status,
+      method,
+      orderId,
+      userId,
+    })
+  }
+
+  @Post('admin/payments/:paymentId/refund')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Admin, RoleName.Staff)
+  @HttpCode(HttpStatus.CREATED)
+  async createRefund(
+    @Param('paymentId', ParseIntPipe) paymentId: number,
+    @Body() refundData: { amount: number; reason?: string },
+  ) {
+    return this.paymentService.createRefund(paymentId, refundData.amount, refundData.reason)
+  }
+
+  // ===== Payment Retry Endpoints =====
+
+  @Post('orders/:orderId/retry')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Customer, RoleName.Admin, RoleName.Staff)
+  @HttpCode(HttpStatus.CREATED)
+  async retryFailedPayment(@ActiveUser('userId') userId: number, @Param('orderId', ParseIntPipe) orderId: number) {
+    return this.paymentService.retryFailedPayment(orderId, userId)
+  }
+
+  @Get('failed')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Customer, RoleName.Admin, RoleName.Staff)
+  @HttpCode(HttpStatus.OK)
+  async getFailedPayments(
+    @ActiveUser('userId') userId: number,
+    @Query('page', new ParseIntPipe({ optional: true })) page?: number,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+  ) {
+    return this.paymentService.getFailedPayments(userId, { page: page || 1, limit: limit || 10 })
+  }
 }

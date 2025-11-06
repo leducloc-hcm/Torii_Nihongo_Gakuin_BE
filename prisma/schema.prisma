@@ -58,9 +58,6 @@ model User {
   orders      Order[]
   reviews     Review[]
 
-  affiliateCodes AffiliateCode[]
-  referrals      AffiliateReferral[] @relation("ReferralReferrer")
-
   blogs Blog[]
 
   aiThreads  AIThread[]
@@ -1045,7 +1042,7 @@ model Reward {
   type   RewardType
   name   String
   points Int        @default(0)
-  stock  Int?
+  stock  Int? 
   redemptions RewardRedemption[]
 }
 
@@ -1059,7 +1056,7 @@ model RewardRedemption {
   reward Reward @relation(fields: [rewardId], references: [id])
 }
 
-// ===== Commerce, Cart, Orders, Coupons, Affiliates =====
+// ===== Commerce, Cart, Orders, Coupons =====
 model Cart {
   id        Int      @id @default(autoincrement())
   userId    Int      @unique
@@ -1087,18 +1084,40 @@ model Order {
   id            Int           @id @default(autoincrement())
   userId        Int
   totalAmount   Int
-  status        PaymentStatus @default(PENDING)
-  providerRef   String?
+  status        OrderStatus   @default(PENDING)
+  providerRef   String?       // Keep for backward compatibility during transition
   createdAt     DateTime      @default(now())
-  affiliateCode String?
+  updatedAt     DateTime      @updatedAt @default(now())
   
   // Coupon support
   couponId Int?
 
-  user   User        @relation(fields: [userId], references: [id])
-  items  OrderItem[]
-  coupon Coupon? @relation("OrderCoupon", fields: [couponId], references: [id])
+  user       User        @relation(fields: [userId], references: [id])
+  items      OrderItem[]
+  payments   Payment[]
+  coupon     Coupon?     @relation("OrderCoupon", fields: [couponId], references: [id])
   redemption CouponRedemption? @relation("OrderRedemption")
+}
+
+model Payment {
+  id                     Int       @id @default(autoincrement())
+  orderId                Int
+  amount                 Int
+  method                 PaymentMethod @default(SEPAY)
+  status                 PaymentStatus @default(PENDING)
+  providerRef            String?
+  providerTransactionId  String?   @unique
+  providerResponse       Json?
+  failureReason          String?
+  processedAt            DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([status])
+  @@index([providerRef])
 }
 
 model OrderItem {
@@ -1230,24 +1249,6 @@ model CouponAuditLog {
   @@index([userId])
 }
 
-model AffiliateCode {
-  id        Int      @id @default(autoincrement())
-  code      String   @unique
-  ownerId   Int
-  ratePct   Int      @default(10)
-  createdAt DateTime @default(now())
-
-  owner User @relation(fields: [ownerId], references: [id])
-}
-
-model AffiliateReferral {
-  id           Int      @id @default(autoincrement())
-  referrerId   Int
-  refereeEmail String
-  createdAt    DateTime @default(now())
-
-  referrer User @relation("ReferralReferrer", fields: [referrerId], references: [id])
-}
 
 // ===== Ratings & Reviews, Blog, Ads =====
 model Review {
@@ -1494,11 +1495,29 @@ enum MediaKind {
   OTHER
 }
 
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
+
 enum PaymentStatus {
   PENDING
+  PROCESSING
   PAID
   FAILED
   REFUNDED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  SEPAY
+  VNPAY
+  MOMO
+  BANK_TRANSFER
+  CASH
 }
 
 enum OrderItemType {

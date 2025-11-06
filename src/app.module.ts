@@ -34,6 +34,7 @@ import { QuizAnswerModule } from './routes/quiz-answer/quiz-answer.module'
 import { RedisModule } from './shared/redis/redis.module'
 import { AIChatModule } from 'src/routes/ai-chat/ai-chat.module'
 import { CouponModule } from './routes/coupon/coupon.module'
+import { WorkersModule } from './shared/workers/workers.module'
 
 @Module({
   imports: [
@@ -70,6 +71,7 @@ import { CouponModule } from './routes/coupon/coupon.module'
     QuizAnswerModule,
     AIChatModule,
     CouponModule,
+    WorkersModule,
   ],
   controllers: [AppController],
   providers: [AppService],

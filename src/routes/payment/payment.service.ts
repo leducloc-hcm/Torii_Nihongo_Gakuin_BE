@@ -5,6 +5,7 @@ import { PrismaService } from 'src/shared/services/prisma.service'
 import { CartService } from '../cart/cart.service'
 import { CouponService } from '../coupon/coupon.service'
 import { SepayService } from './sepay.service'
+import { PaymentTransactionService } from './payment-transaction.service'
 
 @Injectable()
 export class PaymentService {
@@ -17,6 +18,7 @@ export class PaymentService {
     @Inject(forwardRef(() => CouponService))
     private readonly couponService: CouponService,
     private readonly sepayService: SepayService,
+    private readonly paymentTransactionService: PaymentTransactionService,
   ) {}
 
   async getOrderStatus(orderId: number, userId: number) {
@@ -309,6 +311,263 @@ export class PaymentService {
 
   async getOrderByPaymentCode(paymentCode: string) {
     return await this.sepayService.getOrderByPaymentCode(paymentCode)
+  }
+
+  // ===== Payment Management Methods =====
+
+  async getOrderPayments(orderId: number, userId: number) {
+    // Verify user owns the order
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, userId },
+    })
+
+    if (!order) {
+      throw new NotFoundException('Order not found')
+    }
+
+    return await this.paymentTransactionService.getOrderPayments(orderId)
+  }
+
+  async getOrderPaymentSummary(orderId: number, userId: number) {
+    // Verify user owns the order
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, userId },
+    })
+
+    if (!order) {
+      throw new NotFoundException('Order not found')
+    }
+
+    return await this.paymentTransactionService.getOrderPaymentSummary(orderId)
+  }
+
+  async getPaymentById(paymentId: number, userId: number) {
+    const payment = await this.prisma.payment.findFirst({
+      where: {
+        id: paymentId,
+        order: { userId },
+      },
+      include: {
+        order: {
+          select: {
+            id: true,
+            totalAmount: true,
+            status: true,
+            userId: true,
+          },
+        },
+      },
+    })
+
+    if (!payment) {
+      throw new NotFoundException('Payment not found')
+    }
+
+    return payment
+  }
+
+  // Admin methods
+  async getAllPayments(
+    params: {
+      page?: number
+      limit?: number
+      status?: string
+      method?: string
+      orderId?: number
+      userId?: number
+    } = {},
+  ) {
+    const { page = 1, limit = 10, status, method, orderId, userId } = params
+    const skip = (page - 1) * limit
+
+    const where: any = {}
+    if (status) {
+      where.status = status
+    }
+    if (method) {
+      where.method = method
+    }
+    if (orderId) {
+      where.orderId = orderId
+    }
+    if (userId) {
+      where.order = { userId }
+    }
+
+    const [payments, total] = await Promise.all([
+      this.prisma.payment.findMany({
+        where,
+        include: {
+          order: {
+            select: {
+              id: true,
+              totalAmount: true,
+              status: true,
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.payment.count({ where }),
+    ])
+
+    return {
+      payments,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    }
+  }
+
+  async createRefund(paymentId: number, refundAmount: number, reason?: string) {
+    return await this.paymentTransactionService.createRefund(paymentId, refundAmount, reason)
+  }
+
+  // ===== Payment Retry Methods =====
+
+  async retryFailedPayment(
+    orderId: number,
+    userId: number,
+  ): Promise<{
+    success: boolean
+    message: string
+    qrUrl?: string
+    orderId: number
+    amount: number
+    content?: string
+    paymentId?: number
+  }> {
+    // Verify user owns the order
+    const order = await this.prisma.order.findFirst({
+      where: {
+        id: orderId,
+        userId,
+        status: {
+          in: ['PENDING', 'PROCESSING'], // Allow retry for these statuses
+        },
+      },
+      include: {
+        payments: true,
+        items: {
+          include: {
+            course: {
+              select: {
+                id: true,
+                title: true,
+              },
+            },
+          },
+        },
+        coupon: {
+          select: {
+            code: true,
+            title: true,
+          },
+        },
+      },
+    })
+
+    if (!order) {
+      throw new NotFoundException('Order not found or cannot be retried')
+    }
+
+    // Check if there are any pending payments
+    const pendingPayments = order.payments.filter((p) => p.status === 'PENDING')
+    if (pendingPayments.length > 0) {
+      throw new BadRequestException('Order already has pending payments')
+    }
+
+    // Calculate remaining amount to pay
+    const paidAmount = order.payments.filter((p) => p.status === 'PAID').reduce((sum, p) => sum + p.amount, 0)
+
+    const remainingAmount = order.totalAmount - paidAmount
+
+    if (remainingAmount <= 0) {
+      throw new BadRequestException('Order is already fully paid')
+    }
+
+    // Create new payment for retry
+    const courseNames = order.items.map((item) => item.course?.title || 'Unknown Course').join(', ')
+    const orderInfo = `Thanh toán lại - ${courseNames}${order.coupon?.code ? ` (${order.coupon.code})` : ''} - Đơn hàng ${order.id}`
+
+    const paymentData = await this.sepayService.createPaymentUrl({
+      orderId: order.id,
+      amount: remainingAmount,
+      orderInfo,
+      userId,
+    })
+
+    this.logger.log(`Created retry payment for order ${order.id}, remaining amount: ${remainingAmount}`)
+
+    return {
+      success: true,
+      message: 'Payment retry created successfully',
+      ...paymentData,
+    }
+  }
+
+  async getFailedPayments(userId: number, params: { page?: number; limit?: number } = {}) {
+    const { page = 1, limit = 10 } = params
+    const skip = (page - 1) * limit
+
+    const [payments, total] = await Promise.all([
+      this.prisma.payment.findMany({
+        where: {
+          status: 'FAILED',
+          order: { userId },
+        },
+        include: {
+          order: {
+            include: {
+              items: {
+                include: {
+                  course: {
+                    select: {
+                      id: true,
+                      title: true,
+                      thumbnailUrl: true,
+                    },
+                  },
+                },
+              },
+              coupon: {
+                select: {
+                  code: true,
+                  title: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.payment.count({
+        where: {
+          status: 'FAILED',
+          order: { userId },
+        },
+      }),
+    ])
+
+    return {
+      payments,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    }
   }
 
   async buyCourseDirectWithCoupon(

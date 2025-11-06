@@ -7,6 +7,7 @@ import { GoogleCalendarService } from 'src/shared/services/google-calendar.servi
 import { NotificationGateway } from 'src/websockets/notification.gateway'
 import { CartService } from '../cart/cart.service'
 import { ClassFolderService } from '../online-class/class-folder.service'
+import { PaymentTransactionService } from './payment-transaction.service'
 
 interface SepayConfig {
   accountNumber: string
@@ -51,6 +52,7 @@ export class SepayService {
     private readonly notificationGateway: NotificationGateway,
     private readonly cartService: CartService,
     private readonly classFolderService: ClassFolderService,
+    private readonly paymentTransactionService: PaymentTransactionService,
   ) {
     this.config = {
       accountNumber: this.configService.get<string>('SEPAY_ACCOUNT_NUMBER') || '',
@@ -69,6 +71,7 @@ export class SepayService {
     orderId: number
     amount: number
     content: string
+    paymentId: number
   }> {
     if (payload.amount < 10000) {
       throw new BadRequestException('Số tiền tối thiểu là 10,000 VND')
@@ -77,7 +80,15 @@ export class SepayService {
     // Generate payment content code
     const paymentCode = `TKPTPR DHMC${payload.orderId}T${Date.now()}`
 
-    // Update order with provider reference
+    // Create payment record
+    const payment = await this.paymentTransactionService.createPayment({
+      orderId: payload.orderId,
+      amount: payload.amount,
+      method: 'SEPAY',
+      providerRef: paymentCode,
+    })
+
+    // Update order with provider reference (for backward compatibility)
     await this.prisma.order.update({
       where: { id: payload.orderId },
       data: {
@@ -97,13 +108,14 @@ export class SepayService {
       message: `Đơn hàng #${payload.orderId} đang chờ thanh toán. Vui lòng quét mã QR.`,
     })
 
-    this.logger.log(`Created SePay QR for order ${payload.orderId}, amount: ${payload.amount}`)
+    this.logger.log(`Created SePay QR for order ${payload.orderId}, amount: ${payload.amount}, payment: ${payment.id}`)
 
     return {
       qrUrl,
       orderId: payload.orderId,
       amount: payload.amount,
       content: paymentCode,
+      paymentId: payment.id,
     }
   }
 
@@ -131,51 +143,41 @@ export class SepayService {
         throw new BadRequestException('Payment code not found in transaction content')
       }
 
-      // Find order by provider reference
-      const order = await this.prisma.order.findFirst({
-        where: { providerRef: paymentCode },
-        include: {
-          user: true,
-          items: {
-            include: {
-              course: {
-                select: {
-                  id: true,
-                  title: true,
-                  slug: true,
-                  thumbnailUrl: true,
-                  courseType: true,
-                },
-              },
-            },
-          },
-          coupon: true,
-        },
-      })
+      // Find payment by provider reference
+      const payment = await this.paymentTransactionService.getPaymentByProviderRef(paymentCode)
 
-      if (!order) {
-        throw new BadRequestException(`Order not found for payment code: ${paymentCode}`)
+      if (!payment) {
+        throw new BadRequestException(`Payment not found for payment code: ${paymentCode}`)
       }
 
-      if (order.status !== 'PENDING') {
-        this.logger.warn(`Order ${order.id} already processed with status: ${order.status}`)
+      if (payment.status !== 'PENDING') {
+        this.logger.warn(`Payment ${payment.id} already processed with status: ${payment.status}`)
         return {
           success: false,
-          message: 'Order already processed',
-          orderId: order.id,
+          message: 'Payment already processed',
+          orderId: payment.orderId,
+          transactionId: webhookData.id,
         }
       }
 
+      const order = payment.order
+
       // Verify amount (allow 1% tolerance for fees)
-      const expectedAmount = order.totalAmount
+      const expectedAmount = payment.amount
       const receivedAmount = webhookData.transferAmount
       const tolerance = expectedAmount * 0.01
 
       if (receivedAmount < expectedAmount - tolerance) {
+        // Mark payment as failed
+        await this.paymentTransactionService.markPaymentFailed(
+          payment.id,
+          `Amount mismatch. Expected: ${expectedAmount}, Received: ${receivedAmount}`,
+        )
+
         // Send payment failed notification
         this.notificationGateway.notifyPaymentFailed(order.userId, {
           orderId: order.id,
-          amount: order.totalAmount,
+          amount: expectedAmount,
           errorMessage: `Số tiền không khớp. Mong đợi: ${expectedAmount}, Nhận: ${receivedAmount}`,
         })
 
@@ -186,11 +188,13 @@ export class SepayService {
 
       // Process payment in transaction
       const result = await this.prisma.$transaction(async (tx) => {
-        // Update order status
+        // Mark payment as paid
+        await this.paymentTransactionService.markPaymentPaid(payment.id, webhookData.id, webhookData)
+
+        // Update order with transaction reference (for backward compatibility)
         await tx.order.update({
           where: { id: order.id },
           data: {
-            status: 'PAID',
             providerRef: `${paymentCode}:${webhookData.id}`, // Include transaction ID
           },
         })
@@ -426,7 +430,7 @@ export class SepayService {
             if (order) {
               await this.prisma.order.update({
                 where: { id: order.id },
-                data: { status: 'FAILED' },
+                data: { status: 'CANCELLED' },
               })
 
               // Update coupon redemption to FAILED
@@ -508,26 +512,8 @@ export class SepayService {
    * Get order by payment code
    */
   async getOrderByPaymentCode(paymentCode: string) {
-    return await this.prisma.order.findFirst({
-      where: { providerRef: { contains: paymentCode } },
-      include: {
-        user: true,
-        items: {
-          include: {
-            course: {
-              select: {
-                id: true,
-                title: true,
-                slug: true,
-                thumbnailUrl: true,
-                price: true,
-              },
-            },
-          },
-        },
-        coupon: true,
-      },
-    })
+    const payment = await this.paymentTransactionService.getPaymentByProviderRef(paymentCode)
+    return payment?.order || null
   }
 
   /**
