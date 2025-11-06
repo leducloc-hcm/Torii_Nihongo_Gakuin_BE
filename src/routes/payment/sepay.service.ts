@@ -25,7 +25,7 @@ interface CreatePaymentRequest {
 }
 
 interface SepayWebhookData {
-  id: string
+  id: string | number // Can be either string or number from the provider
   gateway: string
   transactionDate: string
   accountNumber?: string
@@ -156,7 +156,7 @@ export class SepayService {
           success: false,
           message: 'Payment already processed',
           orderId: payment.orderId,
-          transactionId: webhookData.id,
+          transactionId: String(webhookData.id),
         }
       }
 
@@ -189,13 +189,13 @@ export class SepayService {
       // Process payment in transaction
       const result = await this.prisma.$transaction(async (tx) => {
         // Mark payment as paid
-        await this.paymentTransactionService.markPaymentPaid(payment.id, webhookData.id, webhookData)
+        await this.paymentTransactionService.markPaymentPaid(payment.id, String(webhookData.id), webhookData)
 
         // Update order with transaction reference (for backward compatibility)
         await tx.order.update({
           where: { id: order.id },
           data: {
-            providerRef: `${paymentCode}:${webhookData.id}`, // Include transaction ID
+            providerRef: `${paymentCode}:${String(webhookData.id)}`, // Include transaction ID
           },
         })
 
@@ -399,21 +399,21 @@ export class SepayService {
 
       this.notificationGateway.notifyPaymentSuccess(order.userId, {
         orderId: order.id,
-        transactionId: webhookData.id,
+        transactionId: String(webhookData.id),
         amount: receivedAmount,
         courseIds: result.map((e) => e.courseId),
         message: `Thanh toán thành công cho đơn hàng #${order.id}. Bạn đã được ghi danh vào ${result.length} khóa học.`,
       })
 
       this.logger.log(
-        `Payment successful for order ${order.id}, transaction ${webhookData.id}, created ${result.length} enrollments`,
+        `Payment successful for order ${order.id}, transaction ${String(webhookData.id)}, created ${result.length} enrollments`,
       )
 
       return {
         success: true,
         message: 'Payment processed successfully',
         orderId: order.id,
-        transactionId: webhookData.id,
+        transactionId: String(webhookData.id),
       }
     } catch (error) {
       this.logger.error(`SePay webhook error: ${error.message}`, error.stack)
