@@ -614,48 +614,6 @@ export class OnlineClassService {
     return `room_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`
   }
 
-  private async notifyStudentsClassStarted(classId: number, classTitle: string): Promise<void> {
-    try {
-      // Get all enrolled students
-      const enrolledStudents = await this.prisma.enrollment.findMany({
-        where: {
-          course: {
-            Class: {
-              some: { id: classId },
-            },
-          },
-        },
-        select: {
-          userId: true,
-          user: {
-            select: {
-              name: true,
-              email: true,
-            },
-          },
-        },
-      })
-
-      // Send notifications to each student
-      for (const enrollment of enrolledStudents) {
-        await this.notificationService.create({
-          userId: enrollment.userId,
-          type: 'SYSTEM',
-          title: 'Class Started',
-          message: `${classTitle} has started. Join now!`,
-          priority: 'HIGH',
-          entityId: classId,
-          entityType: 'CLASS',
-        })
-      }
-
-      this.logger.log(`Notified ${enrolledStudents.length} students about class ${classId} starting`)
-    } catch (error) {
-      this.logger.error('Failed to notify students:', error)
-      // Don't throw error, just log it
-    }
-  }
-
   // Placeholder methods for additional functionality
   async startRecording(classId: string, lecturerId: number, options: StartRecordingDto): Promise<any> {
     // Verify class exists and lecturer has permission

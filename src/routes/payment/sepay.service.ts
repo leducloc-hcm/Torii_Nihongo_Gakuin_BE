@@ -186,216 +186,242 @@ export class SepayService {
         )
       }
 
-      // Process payment in transaction
-      const result = await this.prisma.$transaction(async (tx) => {
-        // Mark payment as paid
-        await this.paymentTransactionService.markPaymentPaid(payment.id, String(webhookData.id), webhookData)
+      // Process payment in transaction with increased timeout
+      const result = await this.prisma.$transaction(
+        async (tx) => {
+          // Mark payment as paid
+          await this.paymentTransactionService.markPaymentPaid(payment.id, String(webhookData.id), webhookData)
 
-        // Update order with transaction reference (for backward compatibility)
-        await tx.order.update({
-          where: { id: order.id },
-          data: {
-            providerRef: `${paymentCode}:${String(webhookData.id)}`, // Include transaction ID
-          },
-        })
+          // Update order with transaction reference (for backward compatibility)
+          await tx.order.update({
+            where: { id: order.id },
+            data: {
+              providerRef: `${paymentCode}:${String(webhookData.id)}`, // Include transaction ID
+            },
+          })
 
-        // Create enrollments
-        const enrollments: Array<{
-          courseId: number
-          courseTitle: string
-          courseThumbnail?: string
-          expiresAt: Date
-        }> = []
+          // Create enrollments and class memberships (database operations only)
+          const enrollments: Array<{
+            courseId: number
+            courseTitle: string
+            courseThumbnail?: string
+            expiresAt: Date
+            classId?: number
+            isNewEnrollment: boolean
+            isNewClassMember: boolean
+          }> = []
 
-        const expiresAt = new Date()
-        expiresAt.setFullYear(expiresAt.getFullYear() + 1)
+          const expiresAt = new Date()
+          expiresAt.setFullYear(expiresAt.getFullYear() + 1)
 
-        for (const item of order.items) {
-          if (item.courseId) {
-            const existingEnrollment = await tx.enrollment.findUnique({
-              where: {
-                userId_courseId: {
-                  userId: order.userId,
-                  courseId: item.courseId,
-                },
-              },
-            })
-
-            if (!existingEnrollment) {
-              await tx.enrollment.create({
-                data: {
-                  userId: order.userId,
-                  courseId: item.courseId,
-                  courseType: item.course!.courseType,
-                  expiresAt,
+          for (const item of order.items) {
+            if (item.courseId) {
+              const existingEnrollment = await tx.enrollment.findUnique({
+                where: {
+                  userId_courseId: {
+                    userId: order.userId,
+                    courseId: item.courseId,
+                  },
                 },
               })
 
-              enrollments.push({
-                courseId: item.courseId,
-                courseTitle: item.course?.title || 'Unknown Course',
-                courseThumbnail: item.course?.thumbnailUrl || undefined,
-                expiresAt,
-              })
+              let isNewEnrollment = false
+              let isNewClassMember = false
 
-              if (item.classId) {
-                const existingMember = await tx.classMember.findUnique({
-                  where: {
-                    classId_userId: {
-                      userId: order.userId,
-                      classId: item.classId,
-                    },
+              if (!existingEnrollment) {
+                await tx.enrollment.create({
+                  data: {
+                    userId: order.userId,
+                    courseId: item.courseId,
+                    courseType: item.course!.courseType,
+                    expiresAt,
                   },
                 })
-                if (!existingMember) {
-                  await tx.classMember.create({
-                    data: {
-                      userId: order.userId,
-                      classId: item.classId,
-                      role: 'CUSTOMER', // Enrolled users are customers in the class
+                isNewEnrollment = true
+
+                if (item.classId) {
+                  const existingMember = await tx.classMember.findUnique({
+                    where: {
+                      classId_userId: {
+                        userId: order.userId,
+                        classId: item.classId,
+                      },
                     },
                   })
-
-                  // Grant folder access to the new member
-                  try {
-                    await this.classFolderService.grantFolderAccessToMember(item.classId, order.userId, 'CUSTOMER')
-                  } catch (folderError) {
-                    this.logger.warn(
-                      `Failed to grant folder access for user ${order.userId} to class ${item.classId}:`,
-                      folderError,
-                    )
-                    // Don't throw, continue with other operations
-                  }
-
-                  try {
-                    const calendarResult = await this.googleCalendarService.generateClassCalendar(
-                      item.classId,
-                      order.userId,
-                    )
-
-                    if (calendarResult.success && calendarResult.calendarData && calendarResult.events) {
-                      // Get class details for email
-                      const classDetails = await this.prisma.class.findUnique({
-                        where: { id: item.classId },
-                        include: {
-                          lecturer: {
-                            select: { name: true },
-                          },
-                          course: {
-                            select: { title: true },
-                          },
-                        },
-                      })
-
-                      if (classDetails && calendarResult.events.length > 0) {
-                        // Map events to session format for email template
-                        const sessions = calendarResult.events.map((event) => ({
-                          id: event.id,
-                          title: event.title,
-                          scheduledAt: event.scheduledAt,
-                          lecturerName: event.lecturerName,
-                        }))
-
-                        await this.emailService.sendCalendarInvite({
-                          email: order.user.email,
-                          studentName: order.user.name,
-                          classTitle: classDetails.title,
-                          courseTitle: classDetails.course?.title,
-                          lecturerName: classDetails.lecturer.name,
-                          sessionsCount: calendarResult.events.length,
-                          firstSessionDate: calendarResult.events[0].scheduledAt,
-                          lastSessionDate: calendarResult.events[calendarResult.events.length - 1].scheduledAt,
-                          classId: item.classId,
-                          calendarData: calendarResult.calendarData,
-                          bulkGoogleCalendarUrl: calendarResult.bulkGoogleCalendarUrl,
-                          sessions: sessions,
-                        })
-
-                        this.logger.log(`Calendar invite sent for class ${item.classId} to user ${order.userId}`)
-                      }
-                    }
-                  } catch (calendarError) {
-                    this.logger.error(
-                      `Failed to send calendar invite for class ${item.classId}: ${calendarError.message}`,
-                    )
-                    // Don't throw error as calendar failure shouldn't break the payment process
+                  if (!existingMember) {
+                    await tx.classMember.create({
+                      data: {
+                        userId: order.userId,
+                        classId: item.classId,
+                        role: 'CUSTOMER', // Enrolled users are customers in the class
+                      },
+                    })
+                    isNewClassMember = true
                   }
                 }
-              }
-              // Send enrollment notification for each course
-              this.notificationGateway.notifyEnrollmentCreated(order.userId, {
-                courseId: item.courseId,
-                courseTitle: item.course?.title || 'Unknown Course',
-                courseThumbnail: item.course?.thumbnailUrl || undefined,
-                expiresAt,
-              })
-              // Send welcome email for the course
-              try {
-                await this.emailService.sendCourseWelcome({
-                  email: order.user.email,
-                  studentName: order.user.name,
+
+                enrollments.push({
+                  courseId: item.courseId,
                   courseTitle: item.course?.title || 'Unknown Course',
                   courseThumbnail: item.course?.thumbnailUrl || undefined,
                   expiresAt,
-                  courseId: item.courseId,
+                  classId: item.classId || undefined,
+                  isNewEnrollment,
+                  isNewClassMember,
                 })
-                this.logger.log(`Welcome email sent for course ${item.courseId} to user ${order.userId}`)
-              } catch (emailError) {
-                this.logger.error(`Failed to send welcome email for course ${item.courseId}: ${emailError.message}`)
-                // Don't throw error as email failure shouldn't break the payment process
               }
             }
           }
-        }
 
-        // Update coupon redemption status to COMPLETED
-        if (order.couponId) {
-          await tx.couponRedemption.updateMany({
-            where: {
-              orderId: order.id,
-              couponId: order.couponId,
-              status: 'PENDING',
-            },
-            data: {
-              status: 'COMPLETED',
-              completedAt: new Date(),
-            },
-          })
+          // Update coupon redemption status to COMPLETED
+          if (order.couponId) {
+            await tx.couponRedemption.updateMany({
+              where: {
+                orderId: order.id,
+                couponId: order.couponId,
+                status: 'PENDING',
+              },
+              data: {
+                status: 'COMPLETED',
+                completedAt: new Date(),
+              },
+            })
 
-          this.logger.log(`Coupon redemption completed for order ${order.id}, coupon ${order.couponId}`)
-        }
+            this.logger.log(`Coupon redemption completed for order ${order.id}, coupon ${order.couponId}`)
+          }
 
-        // Activate gift coupon if this is a gift coupon purchase
-        if (order.coupon && order.couponId && order.coupon.type === 'GIFT' && order.coupon.status === 'DRAFT') {
-          await tx.coupon.update({
-            where: { id: order.couponId },
-            data: {
-              status: 'ACTIVE',
-              purchasedAt: new Date(),
-            },
-          })
+          // Activate gift coupon if this is a gift coupon purchase
+          if (order.coupon && order.couponId && order.coupon.type === 'GIFT' && order.coupon.status === 'DRAFT') {
+            await tx.coupon.update({
+              where: { id: order.couponId },
+              data: {
+                status: 'ACTIVE',
+                purchasedAt: new Date(),
+              },
+            })
 
-          // Create audit log for gift coupon activation
-          await tx.couponAuditLog.create({
-            data: {
-              couponId: order.couponId,
-              userId: order.userId,
-              action: 'ACTIVATED',
-              oldValues: JSON.stringify({ status: 'DRAFT' }),
-              newValues: JSON.stringify({ status: 'ACTIVE', purchasedAt: new Date() }),
-              note: 'Gift coupon activated after payment completion',
-            },
-          })
+            // Create audit log for gift coupon activation
+            await tx.couponAuditLog.create({
+              data: {
+                couponId: order.couponId,
+                userId: order.userId,
+                action: 'ACTIVATED',
+                oldValues: JSON.stringify({ status: 'DRAFT' }),
+                newValues: JSON.stringify({ status: 'ACTIVE', purchasedAt: new Date() }),
+                note: 'Gift coupon activated after payment completion',
+              },
+            })
 
-          this.logger.log(`Gift coupon ${order.coupon.code} activated after payment for order ${order.id}`)
-        }
+            this.logger.log(`Gift coupon ${order.coupon.code} activated after payment for order ${order.id}`)
+          }
 
-        return enrollments
-      })
+          return enrollments
+        },
+        {
+          timeout: 15000, // Increase timeout to 15 seconds
+        },
+      )
 
+      // Clear cart after successful transaction
       await this.cartService.clearCart(order.userId)
 
-      // Send calendar invites for classes with live sessions
+      // Process external operations after transaction (these can fail without affecting payment)
+      for (const enrollment of result) {
+        if (enrollment.isNewEnrollment) {
+          // Send enrollment notification
+          this.notificationGateway.notifyEnrollmentCreated(order.userId, {
+            courseId: enrollment.courseId,
+            courseTitle: enrollment.courseTitle,
+            courseThumbnail: enrollment.courseThumbnail,
+            expiresAt: enrollment.expiresAt,
+          })
+
+          // Send welcome email for the course
+          try {
+            await this.emailService.sendCourseWelcome({
+              email: order.user.email,
+              studentName: order.user.name,
+              courseTitle: enrollment.courseTitle,
+              courseThumbnail: enrollment.courseThumbnail,
+              expiresAt: enrollment.expiresAt,
+              courseId: enrollment.courseId,
+            })
+            this.logger.log(`Welcome email sent for course ${enrollment.courseId} to user ${order.userId}`)
+          } catch (emailError) {
+            this.logger.error(`Failed to send welcome email for course ${enrollment.courseId}: ${emailError.message}`)
+            // Don't throw error as email failure shouldn't break the payment process
+          }
+
+          // Handle class-specific operations
+          if (enrollment.classId && enrollment.isNewClassMember) {
+            // Grant folder access to the new member
+            try {
+              await this.classFolderService.grantFolderAccessToMember(enrollment.classId, order.userId, 'CUSTOMER')
+            } catch (folderError) {
+              this.logger.warn(
+                `Failed to grant folder access for user ${order.userId} to class ${enrollment.classId}:`,
+                folderError,
+              )
+              // Don't throw, continue with other operations
+            }
+
+            // Generate and send calendar invite
+            try {
+              const calendarResult = await this.googleCalendarService.generateClassCalendar(
+                enrollment.classId,
+                order.userId,
+              )
+
+              if (calendarResult.success && calendarResult.calendarData && calendarResult.events) {
+                // Get class details for email
+                const classDetails = await this.prisma.class.findUnique({
+                  where: { id: enrollment.classId },
+                  include: {
+                    lecturer: {
+                      select: { name: true },
+                    },
+                    course: {
+                      select: { title: true },
+                    },
+                  },
+                })
+
+                if (classDetails && calendarResult.events.length > 0) {
+                  // Map events to session format for email template
+                  const sessions = calendarResult.events.map((event) => ({
+                    id: event.id,
+                    title: event.title,
+                    scheduledAt: event.scheduledAt,
+                    lecturerName: event.lecturerName,
+                  }))
+
+                  await this.emailService.sendCalendarInvite({
+                    email: order.user.email,
+                    studentName: order.user.name,
+                    classTitle: classDetails.title,
+                    courseTitle: classDetails.course?.title,
+                    lecturerName: classDetails.lecturer.name,
+                    sessionsCount: calendarResult.events.length,
+                    firstSessionDate: calendarResult.events[0].scheduledAt,
+                    lastSessionDate: calendarResult.events[calendarResult.events.length - 1].scheduledAt,
+                    classId: enrollment.classId,
+                    calendarData: calendarResult.calendarData,
+                    bulkGoogleCalendarUrl: calendarResult.bulkGoogleCalendarUrl,
+                    sessions: sessions,
+                  })
+
+                  this.logger.log(`Calendar invite sent for class ${enrollment.classId} to user ${order.userId}`)
+                }
+              }
+            } catch (calendarError) {
+              this.logger.error(
+                `Failed to send calendar invite for class ${enrollment.classId}: ${calendarError.message}`,
+              )
+              // Don't throw error as calendar failure shouldn't break the payment process
+            }
+          }
+        }
+      }
 
       this.notificationGateway.notifyPaymentSuccess(order.userId, {
         orderId: order.id,
