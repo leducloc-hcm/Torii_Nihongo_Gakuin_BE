@@ -26,6 +26,12 @@ export const MCP_SERVERS: Record<string, MCPServerConfig> = {
     enabled: process.env.MCP_FLASHCARD_ENABLED !== 'false',
     description: 'Flashcard management and study aid features',
   },
+  blog: {
+    name: 'blog-mcp',
+    url: process.env.MCP_BLOG_SERVER_URL || 'http://localhost:8000/blog/mcp',
+    enabled: process.env.MCP_BLOG_ENABLED !== 'false',
+    description: 'Blog search and content retrieval for learning resources',
+  },
 }
 
 export function getEnabledMCPServers(): MCPServerConfig[] {

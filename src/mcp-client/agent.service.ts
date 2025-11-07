@@ -301,6 +301,10 @@ export class AgentService {
       return MCP_SERVERS.flashcard.url
     }
 
+    if (lowerToolName.includes('blog') || lowerToolName.includes('post') || lowerToolName.includes('article')) {
+      return MCP_SERVERS.blog.url
+    }
+
     // Default to first enabled server
     const enabledServers = getEnabledMCPServers()
     return enabledServers.length > 0 ? enabledServers[0].url : null

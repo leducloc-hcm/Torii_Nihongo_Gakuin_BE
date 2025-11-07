@@ -5,6 +5,7 @@ export enum QueryType {
   ASSESSMENT = 'ASSESSMENT',
   ENROLLMENT = 'ENROLLMENT',
   PROGRESS = 'PROGRESS',
+  BLOG = 'BLOG',
   GENERAL = 'GENERAL',
 }
 
@@ -192,11 +193,50 @@ export function detectQueryType(query: string): QueryType {
     '統計', // toukei
   ]
 
+  // Blog-specific keywords
+  const blogKeywords = [
+    // English
+    'blog',
+    'post',
+    'article',
+    'read',
+    'tips',
+    'guide',
+    'tutorial',
+    'explanation',
+    'grammar',
+    'culture',
+    'strategy',
+    // Vietnamese
+    'bài viết',
+    'blog',
+    'article',
+    'đọc',
+    'mẹo',
+    'hướng dẫn',
+    'giải thích',
+    'ngữ pháp',
+    'văn hóa',
+    'chiến lược',
+    'tips',
+    'mẹo học',
+    'bài về',
+    // Japanese
+    'ブログ', // blog
+    '記事', // kiji - article
+    '投稿', // toukou - post
+    '文法', // bunpou - grammar
+    '文化', // bunka - culture
+    'ヒント', // hint - tips
+    'ガイド', // guide
+  ]
+
   const hasCourseKeyword = courseKeywords.some((keyword) => lowerQuery.includes(keyword))
   const hasLessonKeyword = lessonKeywords.some((keyword) => lowerQuery.includes(keyword))
   const hasFlashcardKeyword = flashcardKeywords.some((keyword) => lowerQuery.includes(keyword))
   const hasAssessmentKeyword = assessmentKeywords.some((keyword) => lowerQuery.includes(keyword))
   const hasEnrollmentKeyword = enrollmentKeywords.some((keyword) => lowerQuery.includes(keyword))
+  const hasBlogKeyword = blogKeywords.some((keyword) => lowerQuery.includes(keyword))
 
   // Check for flashcard CREATION intent (high priority)
   const isFlashcardCreation =
@@ -207,9 +247,10 @@ export function detectQueryType(query: string): QueryType {
       lowerQuery.includes('make') ||
       lowerQuery.includes('gen'))
 
-  // Priority: Flashcard Creation > Enrollment > Course > Flashcard > Assessment > Lesson > General
+  // Priority: Flashcard Creation > Blog > Enrollment > Course > Flashcard > Assessment > Lesson > General
   // CRITICAL: Flashcard creation takes HIGHEST priority to ensure tool is called
   if (isFlashcardCreation) return QueryType.FLASHCARD
+  if (hasBlogKeyword) return QueryType.BLOG
   if (hasEnrollmentKeyword) return QueryType.ENROLLMENT
   if (hasCourseKeyword) return QueryType.COURSE
   if (hasFlashcardKeyword) return QueryType.FLASHCARD
@@ -267,6 +308,7 @@ export interface MultiToolRequirement {
   requiresLesson: boolean
   requiresFlashcard: boolean
   requiresAssessment: boolean
+  requiresBlog: boolean
   toolCategories: QueryType[]
 }
 
@@ -295,22 +337,28 @@ export function detectMultiToolRequirement(query: string): MultiToolRequirement 
   // Assessment keywords
   const assessmentKeywords = ['test', 'quiz', 'exam', 'bài kiểm tra', 'bài thi', 'テスト', '試験']
 
+  // Blog keywords
+  const blogKeywords = ['blog', 'post', 'article', 'bài viết', 'tips', 'guide', 'mẹo', 'hướng dẫn', 'ブログ', '記事']
+
   const requiresCourse = courseKeywords.some((keyword) => lowerQuery.includes(keyword))
   const requiresLesson = lessonKeywords.some((keyword) => lowerQuery.includes(keyword))
   const requiresFlashcard = flashcardKeywords.some((keyword) => lowerQuery.includes(keyword))
   const requiresAssessment = assessmentKeywords.some((keyword) => lowerQuery.includes(keyword))
+  const requiresBlog = blogKeywords.some((keyword) => lowerQuery.includes(keyword))
 
   const toolCategories: QueryType[] = []
   if (requiresCourse) toolCategories.push(QueryType.COURSE)
   if (requiresLesson) toolCategories.push(QueryType.LESSON)
   if (requiresFlashcard) toolCategories.push(QueryType.FLASHCARD)
   if (requiresAssessment) toolCategories.push(QueryType.ASSESSMENT)
+  if (requiresBlog) toolCategories.push(QueryType.BLOG)
 
   return {
     requiresCourse,
     requiresLesson,
     requiresFlashcard,
     requiresAssessment,
+    requiresBlog,
     toolCategories,
   }
 }
