@@ -158,16 +158,13 @@ ENV OPENAI_MODEL=gpt-5-nano-2025-08-07
 ENV OPENAI_TEMPERATURE=1
 ENV OPENAI_MAX_TOKENS=0
 
-# MCP Server Configuration
 ENV MCP_ENABLED=true
 ENV MCP_TOOL_APPROVAL_REQUIRED=false
 ENV MCP_MAX_TOOL_EXECUTIONS=10
 
-# Course MCP Server
 ENV MCP_COURSE_SERVER_URL=https://agent.torii-nihongo-gakuin.io.vn/course/mcp
 ENV MCP_COURSE_ENABLED=true
 
-# Enrollment MCP Server
 ENV MCP_ENROLLMENT_SERVER_URL=https://agent.torii-nihongo-gakuin.io.vn/enrollment/mcp
 ENV MCP_ENROLLMENT_ENABLED=true
 

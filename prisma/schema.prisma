@@ -1599,6 +1599,7 @@ enum MediaStatus {
 
 enum QueryType {
   COURSE
+  BLOG
   LESSON
   FLASHCARD
   ASSESSMENT

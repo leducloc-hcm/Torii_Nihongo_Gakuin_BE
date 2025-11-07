@@ -133,14 +133,7 @@ export class AgentService {
 
     const toolPromises = request.toolCalls.map(async (toolCall) => {
       try {
-        this.logger.log(`\n=== Executing tool: ${toolCall.name} ===`)
-        this.logger.log(`Arguments: ${JSON.stringify(toolCall.arguments, null, 2)}`)
-
         const result = await this.executeToolCall(toolCall.name, toolCall.arguments)
-
-        this.logger.log(`Tool ${toolCall.name} result:`)
-        this.logger.log(`  Success: ${result.result !== null}`)
-        this.logger.log(`  Error: ${result.error || 'none'}`)
         if (result.result) {
           this.logger.log(`  Result preview: ${JSON.stringify(result.result).substring(0, 200)}...`)
         }
@@ -165,24 +158,16 @@ export class AgentService {
       }
     })
 
-    // Wait for all tools to complete
     results.push(...(await Promise.all(toolPromises)))
 
-    // Build tool response messages
     const toolMessages: ChatCompletionMessageParam[] = results.map((result) => ({
       role: 'tool' as const,
       tool_call_id: result.toolCallId,
       content: result.error || JSON.stringify(result.result),
     }))
 
-    // Rebuild conversation with tool results
-    // OpenAI requires: messages history + assistant message with tool_calls + tool responses
-    const messages: ChatCompletionMessageParam[] = [
-      ...(request.messages || []), // Previous conversation (should include assistant message with tool_calls)
-      ...toolMessages, // Tool results
-    ]
+    const messages: ChatCompletionMessageParam[] = [...(request.messages || []), ...toolMessages]
 
-    // Debug: Log the messages to verify structure
     this.logger.debug('Messages being sent to OpenAI:')
     messages.forEach((msg, idx) => {
       if (msg.role === 'assistant' && 'tool_calls' in msg) {
@@ -200,7 +185,6 @@ export class AgentService {
       temperature: OPENAI_CONFIG.temperature,
     }
 
-    // Only add max_completion_tokens if it's defined (not unlimited)
     if (OPENAI_CONFIG.maxTokens !== undefined) {
       finalCompletionOptions.max_completion_tokens = OPENAI_CONFIG.maxTokens
     }
@@ -216,7 +200,6 @@ export class AgentService {
 
       const finalChoice = finalResponse.choices[0]
 
-      // Log if we got empty response
       if (!finalChoice.message.content) {
         this.logger.warn('⚠️ OpenAI returned empty content in final response')
         this.logger.debug(`Tool results: ${JSON.stringify(results, null, 2)}`)
@@ -244,9 +227,6 @@ export class AgentService {
     }
   }
 
-  /**
-   * Execute a single tool call
-   */
   private async executeToolCall(toolName: string, args: Record<string, any>): Promise<MCPToolResult> {
     // Determine which MCP server to use based on tool name
     const serverUrl = this.getServerUrlForTool(toolName)
@@ -265,7 +245,6 @@ export class AgentService {
     this.logger.debug(`  Error: ${result.error || 'none'}`)
     this.logger.debug(`  Data: ${result.data ? JSON.stringify(result.data).substring(0, 300) : 'null'}`)
 
-    // Convert FastMCPResult to MCPToolResult
     return {
       toolCallId: '', // Will be set by the caller
       toolName: toolName,
@@ -275,9 +254,6 @@ export class AgentService {
     }
   }
 
-  /**
-   * Map tool name to MCP server URL
-   */
   private getServerUrlForTool(toolName: string): string | null {
     const lowerToolName = toolName.toLowerCase()
 
@@ -301,14 +277,15 @@ export class AgentService {
       return MCP_SERVERS.flashcard.url
     }
 
+    if (lowerToolName.includes('blog') || lowerToolName.includes('post') || lowerToolName.includes('article')) {
+      return MCP_SERVERS.blog.url
+    }
+
     // Default to first enabled server
     const enabledServers = getEnabledMCPServers()
     return enabledServers.length > 0 ? enabledServers[0].url : null
   }
 
-  /**
-   * Get all available tools
-   */
   getAvailableTools(): ChatCompletionTool[] {
     return this.allTools
   }

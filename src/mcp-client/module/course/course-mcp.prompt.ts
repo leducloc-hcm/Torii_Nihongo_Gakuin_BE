@@ -7,6 +7,7 @@ import { QueryType } from 'src/mcp-client/shared/query-detection.utils'
 import { getCoursePrompt } from './course-specific.prompt'
 import { getEnrollmentPrompt } from '../enrollment/enrollment-mcp.prompt'
 import { getFlashcardPrompt } from '../flashcard/flashcard-mcp.prompt'
+import { BLOG_MCP_SYSTEM_PROMPT } from '../blog/blog-mcp.prompt'
 
 @Injectable()
 export class PromptService {
@@ -51,6 +52,11 @@ export class PromptService {
 
     const flashcardPrompt = getFlashcardPrompt(queryType, userId)
     if (flashcardPrompt) return flashcardPrompt
+
+    // Check for blog query
+    if (queryType === QueryType.BLOG) {
+      return BLOG_MCP_SYSTEM_PROMPT
+    }
 
     // Default to general assistance
     return `Focus: General Assistance

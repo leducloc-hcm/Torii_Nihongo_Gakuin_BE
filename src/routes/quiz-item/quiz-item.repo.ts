@@ -93,30 +93,40 @@ export class QuizItemRepository {
     return await this.prisma.quizItem.findUnique({
       where: { id },
       include: {
-        quiz: {
+        questions: {
           include: {
-            author: true,
-            items: {
+            question: {
               include: {
+                options: {
+                  select: {
+                    id: true,
+                    image: true,
+                    content: true,
+                    isCorrect: true,
+                    mediaId: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        questionGroups: {
+          include: {
+            group: {
+              include: {
+                media: true,
                 questions: {
                   include: {
                     question: {
                       include: {
-                        quizItems: {
-                          include: {
-                            question: {
-                              include: {
-                                options: {
-                                  select: {
-                                    id: true,
-                                    image: true,
-                                    content: true,
-                                    mediaId: true,
-                                  },
-                                },
-                                media: true,
-                              },
-                            },
+                        media: true,
+                        options: {
+                          select: {
+                            id: true,
+                            image: true,
+                            content: true,
+                            isCorrect: true,
+                            mediaId: true,
                           },
                         },
                       },

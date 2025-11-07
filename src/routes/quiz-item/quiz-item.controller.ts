@@ -21,7 +21,7 @@ export class QuizItemController {
 
   @Post()
   @Auth([AuthType.Bearer])
-  @Roles(Role.LECTURER, Role.ADMIN)
+  @Roles(Role.LECTURER, Role.ADMIN, Role.STAFF)
   async createQuizItem(@ActiveUser('userId') userId: number, @Body() dto: CreateQuizItemDto) {
     return await this.quizItemService.createQuizItem(userId, dto)
   }
@@ -38,7 +38,7 @@ export class QuizItemController {
 
   @Put(':id')
   @Auth([AuthType.Bearer])
-  @Roles(Role.LECTURER, Role.ADMIN)
+  @Roles(Role.LECTURER, Role.ADMIN, Role.STAFF)
   async updateQuizItem(
     @ActiveUser('userId') userId: number,
     @Param('id', ParseIntPipe) id: number,
@@ -49,14 +49,14 @@ export class QuizItemController {
 
   @Delete(':id')
   @Auth([AuthType.Bearer])
-  @Roles(Role.LECTURER, Role.ADMIN)
+  @Roles(Role.LECTURER, Role.ADMIN, Role.STAFF)
   async deleteQuizItem(@ActiveUser('userId') userId: number, @Param('id', ParseIntPipe) id: number) {
     return await this.quizItemService.deleteQuizItem(userId, id)
   }
 
   @Post('quiz/:quizId/bulk-add')
   @Auth([AuthType.Bearer])
-  @Roles(Role.LECTURER, Role.ADMIN)
+  @Roles(Role.LECTURER, Role.ADMIN, Role.STAFF)
   @ApiOperation({ summary: 'Bulk add questions to quiz' })
   @ApiResponse({ status: 201, description: 'Questions added successfully' })
   async bulkAddQuestions(
@@ -69,7 +69,7 @@ export class QuizItemController {
 
   @Post('quiz/:quizId/reorder')
   @Auth([AuthType.Bearer])
-  @Roles(Role.LECTURER, Role.ADMIN)
+  @Roles(Role.LECTURER, Role.ADMIN, Role.STAFF)
   @ApiOperation({ summary: 'Reorder quiz items' })
   @ApiResponse({ status: 200, description: 'Quiz items reordered successfully' })
   async reorderQuizItems(
