@@ -88,6 +88,7 @@ export class QuizRepository {
                                 id: true,
                                 image: true,
                                 content: true,
+                                isCorrect: true,
                                 mediaId: true,
                               },
                             },
