@@ -747,16 +747,28 @@ export class QuestionGroupRepository {
   }
 
   async isQuestionGroupUsed(groupId: number): Promise<boolean> {
-    const [assessmentItemsCount, quizItemsCount] = await Promise.all([
-      this.prisma.assessmentItemGroup.count({
-        where: { groupId },
+    const groupQuestions = await this.prisma.questionGroupQuestion.findMany({
+      where: { groupId },
+      select: { questionId: true },
+    })
+
+    const questionIds = groupQuestions.map((gq) => gq.questionId)
+
+    if (questionIds.length === 0) {
+      return false
+    }
+
+    // Check xem có câu hỏi nào trong group đã có answer chưa
+    const [assessmentAnswersCount, quizAnswersCount] = await Promise.all([
+      this.prisma.assessmentAnswer.count({
+        where: { questionId: { in: questionIds } },
       }),
-      this.prisma.quizItemGroup.count({
-        where: { groupId },
+      this.prisma.quizAnswer.count({
+        where: { questionId: { in: questionIds } },
       }),
     ])
 
-    return assessmentItemsCount > 0 || quizItemsCount > 0
+    return assessmentAnswersCount > 0 || quizAnswersCount > 0
   }
 
   async findVersionsByUuid(uuid: string): Promise<any[]> {
