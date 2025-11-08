@@ -247,14 +247,23 @@ export class FlashcardRepository {
   }
 
   async deleteCard(id: number, userId: number) {
-    return await this.prismaService.flashcard.delete({
-      where: {
-        id,
-        deck: {
-          ownerId: userId,
+    try {
+      await this.prismaService.cardProgress.deleteMany({
+        where: {
+          cardId: id,
         },
-      },
-    })
+      })
+      return await this.prismaService.flashcard.delete({
+        where: {
+          id,
+          deck: {
+            ownerId: userId,
+          },
+        },
+      })
+    } catch (error) {
+      console.log(error)
+    }
   }
 
   // Progress operations

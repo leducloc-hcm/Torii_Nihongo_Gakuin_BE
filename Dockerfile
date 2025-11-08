@@ -171,4 +171,9 @@ ENV MCP_ENROLLMENT_ENABLED=true
 ENV MCP_FLASHCARD_SERVER_URL=https://agent.torii-nihongo-gakuin.io.vn/flashcard/mcp
 ENV MCP_FLASHCARD_ENABLED=true
 
+ENV MCP_BLOG_SERVER_URL=https://agent.torii-nihongo-gakuin.io.vn/blog/mcp
+ENV MCP_BLOG_ENABLED=true
+# Frontend URL for redirects
+ENV FRONTEND_URL=http://localhost:3000
+
 CMD ["node", "dist/src/main.js"]
