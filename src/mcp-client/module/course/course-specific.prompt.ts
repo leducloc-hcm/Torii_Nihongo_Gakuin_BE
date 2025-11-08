@@ -12,59 +12,71 @@ export function getCoursePrompt(queryType: QueryType): string {
 - Explain course structure, modules, and expected outcomes
 - Highlight prerequisites and target JLPT levels
 
-CRITICAL - MANDATORY Display Format for EVERY Course:
+CRITICAL - MANDATORY Response Format:
 
-**YOU MUST follow this EXACT format for each course:**
+**When you receive course search results, you MUST include the complete JSON data in your response wrapped in markdown code fence.**
 
-**Structure for each course:**
+**Response Structure:**
+1. Brief intro message explaining what you found
+2. JSON code block with complete course data
+3. Optional follow-up question or suggestion
 
-Optional Line (if thumbnailUrl is valid):
-   - Image: ![Course Title](thumbnailUrl)
-   - ONLY if thumbnailUrl is NOT null AND NOT empty string ("")
-   - If thumbnailUrl is null/empty → SKIP this line
+**Example Response Format:**
+"Tôi tìm thấy {count} khóa học về {topic}:
 
-Next Line: Course heading with link (MANDATORY)
-   - Format: ### [Course Title](http://localhost:3000/customer/explore-course/slug)
-   - Use heading level 3 (three hash marks)
-   - **CRITICAL: Use EXACT course title from tool data - DO NOT translate or modify**
-   - **CRITICAL: Use EXACT slug from tool data**
-   - Make the course title a clickable link
-   - This heading with link is REQUIRED for every course
+\`\`\`json
+{
+  "courses": [
+    {
+      "id": 1,
+      "title": "Khóa học N5 cơ bản",
+      "slug": "khoa-hoc-n5-co-ban",
+      "level": "N5",
+      "thumbnailUrl": "https://example.com/image.jpg",
+      "description": "Khóa học tiếng Nhật cơ bản...",
+      "courseType": "VIDEO_QUIZ",
+      "price": 1000000,
+      "moduleCount": 10,
+      "lessonCount": 50
+    }
+  ],
+  "count": 1
+}
+\`\`\`
 
-Following Lines: Course details as bullet points
-   - Dash Cấp độ colon space Level (N5/N4/N3/N2/N1)
-   - Dash Loại colon space Type (Video + Quiz, Live Only, etc.)
-   - Dash Giá colon space Price VNĐ
+Bạn muốn xem chi tiết khóa học nào? Click vào card để xem!"
 
-**COMPLETE EXAMPLE Vietnamese (with thumbnail):**
-Line 1: Thumbnail image
-Line 2: Three hashes space open bracket Course Title close bracket open paren localhost URL with slug close paren
-Line 3: Dash Cấp độ colon space N5
-Line 4: Dash Loại colon space Video + Quiz
-Line 5: Dash Giá colon space 10.000 VNĐ
+**For Course Details:**
+"# Chi tiết khóa học
 
-Example output format:
-Image with course thumbnail
-Heading with link: Level 3 heading containing clickable link to course page
-Bullet: Course level information
-Bullet: Course type information  
-Bullet: Price information
+\`\`\`json
+{
+  "course": {
+    "id": 1,
+    "title": "...",
+    "slug": "...",
+    "modules": [...],
+    "lessons": [...]
+  }
+}
+\`\`\`
 
-**COMPLETE EXAMPLE Vietnamese (without thumbnail):**
-Line 1: Three hashes space open bracket Course Title close bracket open paren localhost URL with slug close paren
-Line 2: Dash Cấp độ colon space N5
-Line 3: Dash Loại colon space Live Only
-Line 4: Dash Giá colon space 10.000 VNĐ
-
-**IMPORTANT:** The heading (three hashes) makes the title stand out visually while the link makes it clickable
+[Add summary or highlights here]"
 
 **CRITICAL RULES:**
-1. **USE EXACT DATA:** Use the EXACT "title" and "slug" from tool response - DO NOT translate, DO NOT modify, DO NOT interpret
-2. **THUMBNAIL CHECK:** Check thumbnailUrl field - if it exists AND is not empty string (""), DISPLAY the image using EXACT URL
-3. **MANDATORY LINK:** ALWAYS show clickable link for every course using format: http://localhost:3000/customer/explore-course/{EXACT_SLUG}
-4. **NO SUMMARIZATION:** Show ALL courses returned by tool - display each one with full details
-5. **EXAMPLE:** If tool returns "N5 Course" → Display "N5 Course" (NOT "Khóa học N5")
-6. **EXAMPLE:** If thumbnailUrl = "" (empty string) → Skip image, but MUST show link and details`
+1. **ALWAYS INCLUDE JSON:** Every course response MUST have JSON code block
+2. **USE EXACT DATA:** Include complete course data from tool result
+3. **NO TRANSLATION:** Keep all field values as-is from tool response
+4. **COMPLETE DATA:** Include all courses returned - don't summarize or skip
+5. **PROPER ESCAPING:** Use escaped backticks in template literal (three backslashes + backticks)
+
+The frontend will parse this JSON and render beautiful course cards with:
+- Course thumbnail image
+- Clickable course title linking to /customer/explore-course/{slug}
+- Level badge (N5, N4, N3, N2, N1)
+- Course type (Video + Quiz, Live Only)
+- Price in VNĐ format
+- Module and lesson counts`
   }
 
   return ''

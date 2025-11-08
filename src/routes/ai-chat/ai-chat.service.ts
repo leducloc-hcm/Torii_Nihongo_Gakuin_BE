@@ -227,6 +227,7 @@ export class AIChatService {
     })
 
     this.logger.log('📞 Calling agentService.executeApprovedTools...')
+    this.logger.log(`📋 QueryType being passed: ${queryType}`)
     const executeStartTime = Date.now()
 
     const executeResult = await this.agentService.executeApprovedTools({
@@ -238,6 +239,7 @@ export class AIChatService {
       threadId,
       userId,
       messages, // Pass conversation history with tool_calls
+      queryType, // Pass queryType to format the final response correctly
     })
 
     const executeElapsed = Date.now() - executeStartTime

@@ -12,6 +12,7 @@ import {
 } from 'src/mcp-client/mcp.model'
 import { CourseMcpClient } from 'src/mcp-client/module/course/course-mcp.service'
 import { EnrollmentMcpClient } from 'src/mcp-client/module/enrollment/enrollment-mcp.service'
+import { QueryType } from 'src/mcp-client/shared/query-detection.utils'
 import { getEnabledMCPServers, MCP_SERVERS } from 'src/shared/config/mcp-servers.config'
 import { OPENAI_CONFIG, MCP_CONFIG } from 'src/shared/config/openai.config'
 
@@ -167,6 +168,58 @@ export class AgentService {
     }))
 
     const messages: ChatCompletionMessageParam[] = [...(request.messages || []), ...toolMessages]
+
+    // Add format instructions based on query type before final response
+    this.logger.log(`🔍 QueryType for final response: "${request.queryType}" (type: ${typeof request.queryType})`)
+
+    if (request.queryType === 'COURSE' || request.queryType === QueryType.COURSE) {
+      this.logger.log('📋 Adding COURSE format instructions to messages')
+      messages.push({
+        role: 'user',
+        content: `IMPORTANT: You must format your response with the course data in JSON format.
+
+Structure your response exactly like this:
+
+Brief intro message in Vietnamese
+
+\`\`\`json
+{
+  "courses": [complete array of all course objects from tool result],
+  "count": total number
+}
+\`\`\`
+
+Optional follow-up question
+
+Each course object must include: id, title, slug, level, thumbnailUrl, courseType, price, moduleCount, lessonCount.
+Use the EXACT data from the tool result - do not translate or modify any values.
+Do NOT create a plain text list. The JSON code block is MANDATORY.`,
+      })
+    } else if (request.queryType === 'BLOG' || request.queryType === QueryType.BLOG) {
+      this.logger.log('📋 Adding BLOG format instructions to messages')
+      messages.push({
+        role: 'user',
+        content: `IMPORTANT: You must format your response with the blog data in JSON format.
+
+Structure your response exactly like this:
+
+Brief intro message
+
+\`\`\`json
+{
+  "blogs": [complete array of all blog objects from tool result],
+  "count": total number
+}
+\`\`\`
+
+Optional follow-up
+
+Include complete blog data: id, title, slug, date, image, excerpt, tags.
+Use EXACT data from tool result. JSON code block is MANDATORY.`,
+      })
+    } else {
+      this.logger.warn(`⚠️ No format instructions added - queryType was: "${request.queryType}"`)
+    }
 
     this.logger.debug('Messages being sent to OpenAI:')
     messages.forEach((msg, idx) => {

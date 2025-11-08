@@ -77,7 +77,7 @@ export class PromptService {
     return `I need to use the following tools to answer your question:\n${toolsList}\n\nWould you like me to proceed?`
   }
 
-  getFinalResponsePrompt(toolResults: any[]): string {
+  getFinalResponsePrompt(toolResults: any[], queryType?: QueryType): string {
     const resultsText = toolResults
       .map((result) => {
         const data = result.error ? `Error: ${result.error}` : JSON.stringify(result.result, null, 2)
@@ -85,6 +85,96 @@ export class PromptService {
       })
       .join('\n\n')
 
+    // Special handling for COURSE queries - use JSON format
+    if (queryType === QueryType.COURSE) {
+      return `Based on the tool results below, provide a response following the EXACT format specified in the course-specific prompt.
+
+Tool Results:
+${resultsText}
+
+**CRITICAL - YOU MUST USE JSON FORMAT:**
+
+1. **ALWAYS INCLUDE JSON CODE BLOCK** - Every course response MUST contain the complete JSON data wrapped in markdown code fence:
+   \`\`\`json
+   {
+     "courses": [...complete course data...],
+     "count": number
+   }
+   \`\`\`
+
+2. **Response Structure:**
+   - Brief intro message in the user's language (Vietnamese/English/Japanese)
+   - JSON code block with ALL courses from tool results
+   - Optional follow-up question or suggestion
+
+3. **Include Complete Data** for each course:
+   - id (number)
+   - title (string)
+   - slug (string) - REQUIRED for navigation
+   - level (string): N5, N4, N3, N2, or N1
+   - thumbnailUrl (string or null)
+   - description (string)
+   - courseType (string): VIDEO_QUIZ or LIVE_ONLY
+   - price (number)
+   - moduleCount (number)
+   - lessonCount (number)
+
+4. **DO NOT:**
+   - Translate or modify course data
+   - Summarize or skip courses
+   - Use plain text lists instead of JSON
+   - Create markdown links/images (frontend handles this)
+
+5. **Example Response:**
+   "Tôi tìm thấy 10 khóa học phù hợp:
+   
+   \`\`\`json
+   {
+     "courses": [
+       {
+         "id": 1,
+         "title": "Course N5",
+         "slug": "course-n5",
+         "level": "N5",
+         "thumbnailUrl": null,
+         "courseType": "VIDEO_QUIZ",
+         "price": 10000,
+         "moduleCount": 5,
+         "lessonCount": 20
+       }
+     ],
+     "count": 10
+   }
+   \`\`\`
+   
+   Bạn muốn xem chi tiết khóa nào?"
+
+The frontend will automatically render beautiful course cards from this JSON data.`
+    }
+
+    // Special handling for BLOG queries - use JSON format
+    if (queryType === QueryType.BLOG) {
+      return `Based on the tool results below, provide a response following the EXACT format specified in the blog-specific prompt.
+
+Tool Results:
+${resultsText}
+
+**CRITICAL - YOU MUST USE JSON FORMAT:**
+
+1. **ALWAYS INCLUDE JSON CODE BLOCK** - Every blog response MUST contain the complete JSON data wrapped in markdown code fence
+
+2. **Response Structure:**
+   - Brief intro message in the user's language
+   - JSON code block with ALL blog posts from tool results
+   - Optional follow-up suggestion
+
+3. **Include Complete Data** for each blog:
+   - id, title, slug, date, image, excerpt, tags
+
+The frontend will automatically render beautiful blog cards from this JSON data.`
+    }
+
+    // Default format for other query types
     return `Based on the tool results below, provide a comprehensive, well-formatted answer to the user's question.
 
 Tool Results:
@@ -102,55 +192,9 @@ Instructions:
 3. Synthesize the information from all tool results
 4. Format the response clearly with markdown (headings, lists, tables as appropriate)
 5. Include specific details like course names, levels, dates, etc.
-6. **CRITICAL - MANDATORY Course Display Format:**
-   
-   FOR EVERY SINGLE COURSE you mention, you MUST include these elements in this order:
-   
-   a) Thumbnail image (if thumbnailUrl field has a valid value):
-      - Check if thumbnailUrl exists AND is not empty string
-      - Use markdown image syntax: exclamation mark open bracket title close bracket open paren thumbnailUrl close paren
-      - Put on its own line FIRST
-      - Skip this line if thumbnailUrl is null, empty string, or missing
-   
-   b) Clickable course link (MANDATORY - NEVER SKIP THIS):
-      - Use markdown link syntax pointing to: http://localhost:3000/customer/explore-course/SLUG
-      - Replace SLUG with the actual slug value from course data
-      - Use the course title as link text
-      - This link is REQUIRED for every course, even if you skip the image
-   
-   c) Course information (as bullet points):
-      - Cấp độ (Level): N5, N4, N3, N2, or N1
-      - Loại (Type): Video + Quiz, Live Only, or other courseType value
-      - Giá (Price): Show price in VNĐ format if available
-      - For LIVE_ONLY courses: List all scheduled sessions with dates and times from OnlineClass data
-   
-   MANDATORY FORMAT CHECKLIST for each course:
-   ✓ Image line (if thumbnail exists)
-   ✓ Clickable link line with correct slug
-   ✓ Level bullet point
-   ✓ Type bullet point  
-   ✓ Price bullet point (if available)
-   ✓ Sessions list (for LIVE courses only)
-   
-   EXAMPLE Vietnamese response for VIDEO_QUIZ course:
-   First line: Image markdown with thumbnailUrl
-   Second line: Link markdown with slug
-   Third line: Dash Cấp độ colon space level
-   Fourth line: Dash Loại colon space Video + Quiz
-   Fifth line: Dash Giá colon space price VNĐ
-   
-   EXAMPLE Vietnamese response for LIVE_ONLY course:
-   Include "Các buổi học đã lên lịch:" followed by bullet list of sessions with dates/times
-   
-   YOU MUST SHOW ALL COURSES from the tool result data - do not summarize or skip courses!
-   If tool returns 8 courses, show all 8 courses with full details and links!
-7. If any tool returned an error, acknowledge it gracefully in the appropriate language
-8. When mentioning missing courses/data, use proper perspective:
-   - ✅ "Hiện tại chưa có khóa học N1 trong hệ thống"
-   - ✅ "We don't have N1 courses available yet"
-   - ✅ "現在、N1コースはご用意しておりません"
-   - ❌ NOT "không có trong hệ thống của bạn"
-9. End with helpful next steps or suggestions in the user's language
-10. Keep the tone friendly and encouraging`
+6. If any tool returned an error, acknowledge it gracefully in the appropriate language
+7. When mentioning missing courses/data, use proper perspective
+8. End with helpful next steps or suggestions in the user's language
+9. Keep the tone friendly and encouraging`
   }
 }
