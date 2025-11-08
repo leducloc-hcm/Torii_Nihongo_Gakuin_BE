@@ -1,19 +1,12 @@
-import { Controller, Get, Post, Body, Param, Query, ParseIntPipe, HttpStatus, HttpCode, Request } from '@nestjs/common'
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger'
-import { AssessmentAttemptService } from './assessment-attempt.service'
+import { Body, Controller, Get, Param, ParseIntPipe, Post, Query } from '@nestjs/common'
+import { ApiTags } from '@nestjs/swagger'
+import { ActiveUser } from 'src/shared/decorators/active-user.decorator'
 import {
+  AssessmentAttemptQueryDto,
   StartAssessmentAttemptDto,
   SubmitAssessmentAttemptDto,
-  AssessmentAttemptQueryDto,
-  GradeAssessmentAttemptDto,
-  AssessmentAttemptResponseDto,
-  AssessmentAttemptStatsDto,
-  AssessmentAttemptListResponseDto,
-  LeaderboardEntryDto,
-  AssessmentStatisticsDto,
 } from './assessment-attempt.dto'
-import { JLPTLevel } from '@prisma/client'
-import { ActiveUser } from 'src/shared/decorators/active-user.decorator'
+import { AssessmentAttemptService } from './assessment-attempt.service'
 
 @ApiTags('Assessment Attempts')
 @Controller('assessment-attempts')

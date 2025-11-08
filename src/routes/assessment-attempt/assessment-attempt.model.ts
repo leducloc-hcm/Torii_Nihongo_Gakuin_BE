@@ -37,6 +37,7 @@ export type AssessmentAttemptWithStats = AssessmentAttempt & {
   totalQuestions: number
   correctAnswers: number
   accuracy: number
+  maxScore: number // Tổng điểm tối đa (từ ScoreProfile hoặc item scores)
   sectionScores: SectionScore[]
   levelEvaluation: LevelEvaluation
 }
