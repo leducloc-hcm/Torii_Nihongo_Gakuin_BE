@@ -157,6 +157,7 @@ export class AssessmentAttemptService {
     }
 
     let finalScore: number
+    let maxScore: number
     let levelEvaluation: any
     let sectionScores: SectionScore[] = []
     let totalQuestions = 0
@@ -165,6 +166,7 @@ export class AssessmentAttemptService {
     if (assessmentType === 'TEST') {
       const testResult = await this.calculateTestScore(attemptId)
       finalScore = testResult.totalScore
+      maxScore = testResult.maxScore
       totalQuestions = testResult.totalQuestions
       correctAnswers = testResult.correctAnswers
 
@@ -175,12 +177,13 @@ export class AssessmentAttemptService {
         totalPassed: scoreProfile.minTotalPass ? finalScore >= scoreProfile.minTotalPass : true,
         sectionsPassed: true,
         suggestedLevel: null,
-        recommendation: `Test completed with score: ${finalScore}/${scoreProfile.maxTotal || 100}`,
+        recommendation: `Test completed with score: ${finalScore}/${maxScore}`,
       }
     } else {
       // EXAM scoring: bucket-based JLPT with ScoreProfile
       const examResult = await this.calculateExamScore(attemptId, scoreProfile, attempt.assessment.level)
       finalScore = examResult.totalScore
+      maxScore = examResult.maxScore
       sectionScores = examResult.sectionScores
       totalQuestions = sectionScores.reduce((sum, section) => sum + section.totalQuestions, 0)
       correctAnswers = sectionScores.reduce((sum, section) => sum + section.correctAnswers, 0)
@@ -205,6 +208,7 @@ export class AssessmentAttemptService {
       totalQuestions,
       correctAnswers,
       accuracy: Math.round(accuracy * 100) / 100,
+      maxScore,
       sectionScores,
       levelEvaluation,
     } as AssessmentAttemptWithStats
@@ -279,32 +283,39 @@ export class AssessmentAttemptService {
    */
   private async calculateTestScore(attemptId: number): Promise<{
     totalScore: number
+    maxScore: number
     totalQuestions: number
     correctAnswers: number
   }> {
     const answersWithScores = await this.assessmentAttemptRepo.getAttemptAnswersWithScores(attemptId)
 
     let totalScore = 0
+    let maxScore = 0
     let totalQuestions = 0
     let correctAnswers = 0
 
     for (const answer of answersWithScores) {
       totalQuestions++
+      const scorePerQuestion = answer.scorePerQuestion || 1
+      maxScore += scorePerQuestion
+
       if (answer.isCorrect) {
         correctAnswers++
-        totalScore += answer.scorePerQuestion || 1 // Default to 1 if not set
+        totalScore += scorePerQuestion
       }
     }
 
     return {
       totalScore,
+      maxScore,
       totalQuestions,
       correctAnswers,
     }
   }
 
   /**
-   * Calculate EXAM score: using ScoreProfile sections
+   * Calculate EXAM score: using ScoreProfile sections and item scorePerQuestion
+   * FIXED: Now correctly uses scorePerQuestion from AssessmentItem
    */
   private async calculateExamScore(
     attemptId: number,
@@ -312,6 +323,7 @@ export class AssessmentAttemptService {
     assessmentLevel: JLPTLevel,
   ): Promise<{
     totalScore: number
+    maxScore: number
     sectionScores: SectionScore[]
   }> {
     const answersWithScores = await this.assessmentAttemptRepo.getAttemptAnswersWithScores(attemptId)
@@ -322,35 +334,65 @@ export class AssessmentAttemptService {
       throw new Error('Score profile has no sections defined')
     }
 
-    // Group answers by section type
-    const answersBySection = new Map<string, { correct: number; total: number }>()
+    // Group answers by section type and calculate actual earned points
+    const answersBySection = new Map<
+      string,
+      {
+        earnedPoints: number
+        maxPoints: number
+        correct: number
+        total: number
+      }
+    >()
 
     for (const answer of answersWithScores) {
-      const sectionType = answer.question.type
-      const current = answersBySection.get(sectionType) || { correct: 0, total: 0 }
+      const sectionType = answer.question.section.type
+      const scorePerQuestion = answer.scorePerQuestion || 1
+
+      const current = answersBySection.get(sectionType) || {
+        earnedPoints: 0,
+        maxPoints: 0,
+        correct: 0,
+        total: 0,
+      }
 
       current.total++
+      current.maxPoints += scorePerQuestion
+
       if (answer.isCorrect) {
         current.correct++
+        current.earnedPoints += scorePerQuestion
       }
 
       answersBySection.set(sectionType, current)
     }
 
-    // Calculate score for each section
+    // Calculate score for each section using ScoreProfile criteria
     const sectionScores: SectionScore[] = []
     let totalScore = 0
+    let maxScore = 0
 
     for (const section of sections) {
-      const stats = answersBySection.get(section.type) || { correct: 0, total: 0 }
+      const stats = answersBySection.get(section.type) || {
+        earnedPoints: 0,
+        maxPoints: 0,
+        correct: 0,
+        total: 0,
+      }
 
-      // Calculate earned score (weighted if weight is provided)
-      const rawScore = stats.total > 0 ? stats.correct / stats.total : 0
+      // Calculate raw percentage (0-1)
+      const rawScore = stats.maxPoints > 0 ? stats.earnedPoints / stats.maxPoints : 0
+
+      // Scale to section's maxScore
       const scaledScore = rawScore * section.maxScore
-      const earnedScore = section.weight ? scaledScore * section.weight : scaledScore
 
-      // Check if section passed
-      const passed = section.minPass ? earnedScore >= section.minPass : true
+      // Weight is already a percentage (50 means 50%), not a multiplier
+      // So we don't need to divide by 100 or multiply
+      // The earnedScore is just the scaledScore
+      const earnedScore = scaledScore
+
+      // Check if section passed (minPass is in the scaled score range)
+      const passed = section.minPass ? scaledScore >= section.minPass : true
 
       sectionScores.push({
         sectionType: section.type,
@@ -362,10 +404,12 @@ export class AssessmentAttemptService {
       })
 
       totalScore += earnedScore
+      maxScore += section.maxScore
     }
 
     return {
       totalScore: Math.round(totalScore * 100) / 100,
+      maxScore,
       sectionScores,
     }
   }

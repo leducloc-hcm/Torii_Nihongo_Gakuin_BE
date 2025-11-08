@@ -217,6 +217,30 @@ Optional follow-up
 Include complete blog data: id, title, slug, date, image, excerpt, tags.
 Use EXACT data from tool result. JSON code block is MANDATORY.`,
       })
+    } else if (request.queryType === 'FLASHCARD' || request.queryType === QueryType.FLASHCARD) {
+      this.logger.log('📋 Adding FLASHCARD format instructions to messages')
+      messages.push({
+        role: 'user',
+        content: `IMPORTANT: If this is a flashcard SEARCH query (not generation), you must format your response with JSON.
+
+Structure your response exactly like this:
+
+Brief intro message
+
+\`\`\`json
+{
+  "decks": [complete array of all flashcard deck objects from tool result],
+  "count": total number
+}
+\`\`\`
+
+Optional follow-up
+
+Include complete deck data: id, title, level, card_count, owner_name, createdAt, updatedAt.
+Use EXACT data from tool result. JSON code block is MANDATORY for search results.
+
+NOTE: This is ONLY for search results. Flashcard GENERATION uses a different format.`,
+      })
     } else {
       this.logger.warn(`⚠️ No format instructions added - queryType was: "${request.queryType}"`)
     }
