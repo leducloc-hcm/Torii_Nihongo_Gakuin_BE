@@ -29,6 +29,14 @@ export class LessonProgressController {
     return this.progressService.getCourseProgress(userId, courseId)
   }
 
+  @Get('progress-summary')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Customer)
+  @HttpCode(HttpStatus.OK)
+  async getProgressSummary(@ActiveUser('userId') userId: number) {
+    return this.progressService.getProgressSummary(userId)
+  }
+
   @Get('courses/:courseId/details')
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Customer)

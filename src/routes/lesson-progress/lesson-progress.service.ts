@@ -236,4 +236,8 @@ export class LessonProgressService {
       }
     )
   }
+  async getProgressSummary(userId: number) {
+    const summary = await this.progressRepository.getProgressSummary(userId)
+    return summary
+  }
 }

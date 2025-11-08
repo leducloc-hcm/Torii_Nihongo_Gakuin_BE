@@ -161,7 +161,32 @@ export type LessonProgressWithRelations = {
 }
 
 // Exported Zod types
+// Progress Summary Schema
+export const ProgressSummarySchema = z.object({
+  enrollment: z.object({
+    id: z.number(),
+    createdAt: z.date(),
+    expiresAt: z.date().nullable(),
+  }),
+  course: z.object({
+    id: z.number(),
+    title: z.string(),
+    slug: z.string(),
+    thumbnailUrl: z.string().nullable(),
+    level: z.enum(['N5', 'N4', 'N3', 'N2', 'N1']),
+  }),
+  progress: z.object({
+    totalLessons: z.number(),
+    completedLessons: z.number(),
+    progressPercentage: z.number(),
+    totalWatchedTime: z.number(),
+    totalDuration: z.number(),
+    watchTimePercentage: z.number(),
+  }),
+})
+
 export type LessonProgress = z.infer<typeof LessonProgressSchema>
 export type UpdateProgressType = z.infer<typeof UpdateProgressSchema>
 export type CourseProgressType = z.infer<typeof CourseProgressSchema>
 export type CourseProgressDetailsType = z.infer<typeof CourseProgressDetailsSchema>
+export type ProgressSummaryType = z.infer<typeof ProgressSummarySchema>
