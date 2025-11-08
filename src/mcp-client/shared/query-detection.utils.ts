@@ -247,12 +247,33 @@ export function detectQueryType(query: string): QueryType {
       lowerQuery.includes('make') ||
       lowerQuery.includes('gen'))
 
-  // Priority: Flashcard Creation > Blog > Enrollment > Course > Flashcard > Assessment > Lesson > General
+  // Check if this is asking about MY/PERSONAL courses vs AVAILABLE courses
+  const isPersonalCourseQuery =
+    (lowerQuery.includes('của tôi') ||
+      lowerQuery.includes('của mình') ||
+      lowerQuery.includes('my ') ||
+      lowerQuery.includes('đã đăng ký') ||
+      lowerQuery.includes('enrolled')) &&
+    hasCourseKeyword
+
+  const isAvailableCourseQuery =
+    (lowerQuery.includes('của website') ||
+      lowerQuery.includes('có những') ||
+      lowerQuery.includes('có các') ||
+      lowerQuery.includes('danh sách') ||
+      lowerQuery.includes('available') ||
+      lowerQuery.includes('all courses') ||
+      lowerQuery.includes('tất cả')) &&
+    hasCourseKeyword
+
+  // Priority: Flashcard Creation > Blog > Available Courses > Personal Courses/Enrollment > Course > Flashcard > Assessment > Lesson > General
   // CRITICAL: Flashcard creation takes HIGHEST priority to ensure tool is called
   if (isFlashcardCreation) return QueryType.FLASHCARD
   if (hasBlogKeyword) return QueryType.BLOG
-  if (hasEnrollmentKeyword) return QueryType.ENROLLMENT
-  if (hasCourseKeyword) return QueryType.COURSE
+  if (isAvailableCourseQuery) return QueryType.COURSE // Ask about website courses = COURSE query
+  if (isPersonalCourseQuery) return QueryType.ENROLLMENT // Ask about MY courses = ENROLLMENT query
+  if (hasEnrollmentKeyword && !hasCourseKeyword) return QueryType.ENROLLMENT // Pure enrollment keywords
+  if (hasCourseKeyword) return QueryType.COURSE // General course keywords default to COURSE
   if (hasFlashcardKeyword) return QueryType.FLASHCARD
   if (hasAssessmentKeyword) return QueryType.ASSESSMENT
   if (hasLessonKeyword) return QueryType.LESSON

@@ -326,7 +326,6 @@ export class AssessmentAttemptRepository {
       }
     }>
   > {
-    // Get the attempt to find the assessment ID
     const attempt = await this.prisma.assessmentAttempt.findUnique({
       where: { id: attemptId },
       select: { assessmentId: true },
@@ -334,12 +333,12 @@ export class AssessmentAttemptRepository {
 
     if (!attempt) return []
 
-    // Get answers with question details
     const answers = await this.prisma.assessmentAnswer.findMany({
       where: { attemptId },
       include: {
         question: {
           select: {
+            id: true,
             type: true,
           },
         },
@@ -349,20 +348,86 @@ export class AssessmentAttemptRepository {
       },
     })
 
-    return answers.map((answer) => ({
-      id: answer.id,
-      questionId: answer.questionId,
-      selectedOptionId: answer.selectedOptionId,
-      timeSpentSec: answer.timeSpentSec,
-      isCorrect: answer.selectedOption?.isCorrect || false,
-      scorePerQuestion: 1, // Default score
-      question: {
-        type: answer.question.type,
+    // Get all items for this assessment to find scorePerQuestion
+    const items = await this.prisma.assessmentItem.findMany({
+      where: {
         section: {
-          type: 'UNKNOWN',
+          assessmentId: attempt.assessmentId,
         },
       },
-    }))
+      include: {
+        section: {
+          select: {
+            type: true,
+          },
+        },
+        questionGroups: {
+          include: {
+            group: {
+              include: {
+                questions: {
+                  select: {
+                    questionId: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        questions: {
+          select: {
+            questionId: true,
+          },
+        },
+      },
+    })
+
+    // Build a map: questionId -> { scorePerQuestion, sectionType }
+    const questionScoreMap = new Map<number, { scorePerQuestion: number; sectionType: string }>()
+
+    for (const item of items) {
+      const scorePerQuestion = item.scorePerQuestion || 1
+
+      // Add questions from direct questions (via AssessmentItemQuestion join table)
+      for (const itemQuestion of item.questions) {
+        questionScoreMap.set(itemQuestion.questionId, {
+          scorePerQuestion,
+          sectionType: item.section.type,
+        })
+      }
+
+      // Add questions from question groups (via AssessmentItemGroup -> QuestionGroup -> QuestionGroupQuestion)
+      for (const itemGroup of item.questionGroups) {
+        for (const groupQuestion of itemGroup.group.questions) {
+          questionScoreMap.set(groupQuestion.questionId, {
+            scorePerQuestion,
+            sectionType: item.section.type,
+          })
+        }
+      }
+    }
+
+    return answers.map((answer) => {
+      const scoreInfo = questionScoreMap.get(answer.questionId) || {
+        scorePerQuestion: 1,
+        sectionType: 'UNKNOWN',
+      }
+
+      return {
+        id: answer.id,
+        questionId: answer.questionId,
+        selectedOptionId: answer.selectedOptionId,
+        timeSpentSec: answer.timeSpentSec,
+        isCorrect: answer.selectedOption?.isCorrect || false,
+        scorePerQuestion: scoreInfo.scorePerQuestion,
+        question: {
+          type: answer.question.type,
+          section: {
+            type: scoreInfo.sectionType,
+          },
+        },
+      }
+    })
   }
 
   /**

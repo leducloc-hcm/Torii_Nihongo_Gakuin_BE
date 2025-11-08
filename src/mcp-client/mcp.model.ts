@@ -101,6 +101,7 @@ export interface ExecuteToolsRequest {
   threadId: number
   userId: number
   messages?: ChatCompletionMessageParam[]
+  queryType?: string // Add queryType to know how to format the final response
 }
 
 export interface ExecuteToolsResponse {
