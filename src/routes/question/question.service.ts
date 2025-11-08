@@ -18,12 +18,8 @@ export class QuestionService {
     files?: { image?: Express.Multer.File[]; audio?: Express.Multer.File[] },
   ): Promise<any> {
     const { mediaId, ...questionData } = createDto
-
-    // Handle file uploads
     let uploadedMediaId = mediaId
-
     if (files?.image?.[0] || files?.audio?.[0]) {
-      // Upload files to S3 and create media record
       let imageUrl: string | undefined
       let audioUrl: string | undefined
       let imageFile: Express.Multer.File | undefined
@@ -43,14 +39,11 @@ export class QuestionService {
 
       // Create media record in database with both files info
       if (imageUrl || audioUrl) {
-        // Primary URL is image if available, otherwise audio
         const primaryUrl = imageUrl || audioUrl!
         const primaryKind = imageUrl ? 'IMAGE' : 'AUDIO'
 
-        // Build metadata to store info about both files
         const metadata: any = {}
         if (imageUrl && audioUrl) {
-          // Both files uploaded
           metadata.hasMultiple = true
           metadata.image = {
             url: imageUrl,
@@ -253,11 +246,9 @@ export class QuestionService {
 
       // Create media record in database with both files info
       if (imageUrl || audioUrl) {
-        // Primary URL is image if available, otherwise audio
         const primaryUrl = imageUrl || audioUrl!
         const primaryKind = imageUrl ? 'IMAGE' : 'AUDIO'
 
-        // Build metadata to store info about both files
         const metadata: any = {}
         if (imageUrl && audioUrl) {
           // Both files uploaded

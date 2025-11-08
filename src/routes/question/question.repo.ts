@@ -418,13 +418,8 @@ export class QuestionRepository {
   }
 
   async isQuestionUsed(questionId: number): Promise<boolean> {
-    const [assessmentItemsCount, quizItemsCount, assessmentAnswersCount, quizAnswersCount] = await Promise.all([
-      this.prisma.assessmentItemQuestion.count({
-        where: { questionId },
-      }),
-      this.prisma.quizItemQuestion.count({
-        where: { questionId },
-      }),
+    // check có ai làm bài chưa
+    const [assessmentAnswersCount, quizAnswersCount] = await Promise.all([
       this.prisma.assessmentAnswer.count({
         where: { questionId },
       }),
@@ -433,7 +428,7 @@ export class QuestionRepository {
       }),
     ])
 
-    return assessmentItemsCount > 0 || quizItemsCount > 0 || assessmentAnswersCount > 0 || quizAnswersCount > 0
+    return assessmentAnswersCount > 0 || quizAnswersCount > 0
   }
 
   async findVersionsByUuid(uuid: string): Promise<any[]> {
