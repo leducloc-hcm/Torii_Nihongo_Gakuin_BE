@@ -35,6 +35,7 @@ import { RedisModule } from './shared/redis/redis.module'
 import { AIChatModule } from 'src/routes/ai-chat/ai-chat.module'
 import { CouponModule } from './routes/coupon/coupon.module'
 import { WorkersModule } from './shared/workers/workers.module'
+import { DashboardModule } from './routes/dashboard/dashboard.module'
 
 @Module({
   imports: [
@@ -72,6 +73,7 @@ import { WorkersModule } from './shared/workers/workers.module'
     AIChatModule,
     CouponModule,
     WorkersModule,
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [AppService],
