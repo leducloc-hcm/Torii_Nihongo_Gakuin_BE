@@ -11,6 +11,16 @@ import {
   DashboardStatsSchema,
   QuickStatsSchema,
   TimePeriod,
+  // Customer Dashboard Schemas
+  CustomerCourseStatsSchema,
+  CustomerStudyTimeSchema,
+  CustomerAssessmentStatsSchema,
+  CustomerFlashcardStatsSchema,
+  CustomerPaymentSummarySchema,
+  CustomerProgressItemSchema,
+  CustomerFlashcardDeckSchema,
+  CustomerRecentPaymentSchema,
+  CustomerDashboardSchema,
 } from './dashboard.model'
 
 // Export TimePeriod enum for use in other files
@@ -37,3 +47,14 @@ export class DashboardStatsDTO extends createZodDto(DashboardStatsSchema) {}
 
 // Quick Stats DTOs for summary cards
 export class QuickStatsDTO extends createZodDto(QuickStatsSchema) {}
+
+// Customer Dashboard DTOs
+export class CustomerCourseStatsDTO extends createZodDto(CustomerCourseStatsSchema) {}
+export class CustomerStudyTimeDTO extends createZodDto(CustomerStudyTimeSchema) {}
+export class CustomerAssessmentStatsDTO extends createZodDto(CustomerAssessmentStatsSchema) {}
+export class CustomerFlashcardStatsDTO extends createZodDto(CustomerFlashcardStatsSchema) {}
+export class CustomerPaymentSummaryDTO extends createZodDto(CustomerPaymentSummarySchema) {}
+export class CustomerProgressItemDTO extends createZodDto(CustomerProgressItemSchema) {}
+export class CustomerFlashcardDeckDTO extends createZodDto(CustomerFlashcardDeckSchema) {}
+export class CustomerRecentPaymentDTO extends createZodDto(CustomerRecentPaymentSchema) {}
+export class CustomerDashboardDTO extends createZodDto(CustomerDashboardSchema) {}

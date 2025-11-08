@@ -10,6 +10,13 @@ import {
   QuickStatsType,
   RevenueByPeriodType,
   UserGrowthByPeriodType,
+  // Customer Dashboard Types
+  CustomerDashboardType,
+  CustomerCourseStatsType,
+  CustomerStudyTimeType,
+  CustomerAssessmentStatsType,
+  CustomerFlashcardStatsType,
+  CustomerPaymentSummaryType,
 } from './dashboard.model'
 
 @Injectable()
@@ -254,5 +261,143 @@ export class DashboardService {
       default:
         return date.toLocaleDateString('vi-VN')
     }
+  }
+
+  // === Customer Dashboard Methods ===
+
+  async getCustomerDashboard(userId: number): Promise<CustomerDashboardType> {
+    const [
+      courseStats,
+      studyTime,
+      assessmentStats,
+      flashcardStats,
+      paymentSummary,
+      recentProgress,
+      flashcardDecks,
+      recentPayments,
+    ] = await Promise.all([
+      this.getCustomerCourseStats(userId),
+      this.getCustomerStudyTime(userId),
+      this.getCustomerAssessmentStats(userId),
+      this.getCustomerFlashcardStats(userId),
+      this.getCustomerPaymentSummary(userId),
+      this.dashboardRepo.getCustomerProgress(userId, 5),
+      this.dashboardRepo.getCustomerFlashcardDecks(userId, 5),
+      this.dashboardRepo.getCustomerRecentPayments(userId, 5),
+    ])
+
+    return {
+      courseStats,
+      studyTime,
+      assessmentStats,
+      flashcardStats,
+      paymentSummary,
+      recentProgress: recentProgress.map((progress) => ({
+        ...progress,
+        thumbnailUrl: progress.thumbnailUrl || undefined,
+        lastStudiedAt: progress.lastStudiedAt || undefined,
+        estimatedTimeToComplete: this.calculateEstimatedTimeToComplete(
+          progress.totalLessons - progress.completedLessons,
+          studyTime.averageDailyMinutes,
+        ),
+      })),
+      flashcardDecks: flashcardDecks.map((deck) => ({
+        ...deck,
+        courseId: deck.courseId || undefined,
+        courseName: deck.courseName || undefined,
+        lastReviewedAt: deck.lastReviewedAt || undefined,
+      })),
+      recentPayments: recentPayments.map((payment) => ({
+        ...payment,
+        courseId: payment.courseId || 0, // Provide default value for required field
+        paymentMethod: payment.paymentMethod || undefined,
+        status: payment.status as 'success' | 'pending' | 'failed',
+      })),
+      lastUpdated: new Date(),
+    }
+  }
+
+  async getCustomerCourseStats(userId: number): Promise<CustomerCourseStatsType> {
+    const stats = await this.dashboardRepo.getCustomerCourseStats(userId)
+
+    const completionRate = stats.totalCourses > 0 ? (stats.completedCourses / stats.totalCourses) * 100 : 0
+
+    return {
+      ...stats,
+      completionRate: Math.round(completionRate * 100) / 100,
+    }
+  }
+
+  async getCustomerStudyTime(userId: number): Promise<CustomerStudyTimeType> {
+    return await this.dashboardRepo.getCustomerStudyTime(userId)
+  }
+
+  async getCustomerAssessmentStats(userId: number): Promise<CustomerAssessmentStatsType> {
+    return await this.dashboardRepo.getCustomerAssessmentStats(userId)
+  }
+
+  async getCustomerFlashcardStats(userId: number): Promise<CustomerFlashcardStatsType> {
+    return await this.dashboardRepo.getCustomerFlashcardStats(userId)
+  }
+
+  async getCustomerPaymentSummary(userId: number): Promise<CustomerPaymentSummaryType> {
+    const paymentSummary = await this.dashboardRepo.getCustomerPaymentSummary(userId)
+
+    return {
+      ...paymentSummary,
+      lastPaymentDate: paymentSummary.lastPaymentDate || undefined,
+    }
+  }
+
+  async getCustomerProgress(userId: number, limit: number = 10) {
+    const progress = await this.dashboardRepo.getCustomerProgress(userId, limit)
+    const studyTime = await this.dashboardRepo.getCustomerStudyTime(userId)
+
+    return progress.map((item) => ({
+      ...item,
+      thumbnailUrl: item.thumbnailUrl || undefined,
+      lastStudiedAt: item.lastStudiedAt || undefined,
+      estimatedTimeToComplete: this.calculateEstimatedTimeToComplete(
+        item.totalLessons - item.completedLessons,
+        studyTime.averageDailyMinutes,
+      ),
+    }))
+  }
+
+  async getCustomerFlashcardDecks(userId: number, limit: number = 10) {
+    const decks = await this.dashboardRepo.getCustomerFlashcardDecks(userId, limit)
+
+    return decks.map((deck) => ({
+      ...deck,
+      courseId: deck.courseId || undefined,
+      courseName: deck.courseName || undefined,
+      lastReviewedAt: deck.lastReviewedAt || undefined,
+    }))
+  }
+
+  async getCustomerRecentPayments(userId: number, limit: number = 10) {
+    const payments = await this.dashboardRepo.getCustomerRecentPayments(userId, limit)
+
+    return payments.map((payment) => ({
+      ...payment,
+      courseId: payment.courseId || 0, // Provide default value for required field
+      paymentMethod: payment.paymentMethod || undefined,
+      status: payment.status as 'success' | 'pending' | 'failed',
+    }))
+  }
+
+  // Helper method for calculating estimated time to complete
+  private calculateEstimatedTimeToComplete(remainingLessons: number, averageDailyMinutes: number): number | undefined {
+    if (remainingLessons <= 0 || averageDailyMinutes <= 0) return undefined
+
+    // Assume average lesson is 15 minutes
+    const averageLessonMinutes = 15
+    const totalMinutesNeeded = remainingLessons * averageLessonMinutes
+
+    // Calculate days needed based on average daily study time
+    const daysNeeded = Math.ceil(totalMinutesNeeded / averageDailyMinutes)
+
+    // Convert to minutes for consistency
+    return daysNeeded * 24 * 60
   }
 }
