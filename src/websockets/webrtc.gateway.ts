@@ -104,17 +104,21 @@ export class WebRTCGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     if (existingSocketId && existingSocketId !== client.id) {
       // Check if existing socket is still connected
-      const existingSocket = this.server.sockets.sockets.get(existingSocketId)
+      if (this.server && this.server.sockets && this.server.sockets.sockets) {
+        const existingSocket = this.server.sockets.sockets.get(existingSocketId)
 
-      if (existingSocket && existingSocket.connected) {
-        // Disconnect the existing socket
-        this.logger.warn(
-          `🚫 User ${displayName} (${userId}) already connected to class ${classId}. Disconnecting old connection.`,
-        )
-        existingSocket.emit('error', {
-          message: 'You have joined this class from another tab/window. This connection will be closed.',
-        })
-        existingSocket.disconnect(true)
+        if (existingSocket && existingSocket.connected) {
+          // Disconnect the existing socket
+          this.logger.warn(
+            `🚫 User ${displayName} (${userId}) already connected to class ${classId}. Disconnecting old connection.`,
+          )
+          existingSocket.emit('error', {
+            message: 'You have joined this class from another tab/window. This connection will be closed.',
+          })
+          existingSocket.disconnect(true)
+        }
+      } else {
+        this.logger.warn('Server not properly initialized, cannot check existing socket')
       }
     }
 
