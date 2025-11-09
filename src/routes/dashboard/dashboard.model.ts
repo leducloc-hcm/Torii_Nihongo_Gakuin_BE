@@ -103,6 +103,13 @@ export const CustomerCourseStatsSchema = z.object({
   completionRate: z.number().min(0).max(100), // Percentage
 })
 
+export const DailyStudyTimeSchema = z.object({
+  date: z.string(), // YYYY-MM-DD format
+  lessonMinutes: z.number().int().nonnegative(),
+  assessmentMinutes: z.number().int().nonnegative(),
+  totalMinutes: z.number().int().nonnegative(),
+})
+
 export const CustomerStudyTimeSchema = z.object({
   totalStudyMinutes: z.number().int().nonnegative(),
   todayStudyMinutes: z.number().int().nonnegative(),
@@ -110,6 +117,19 @@ export const CustomerStudyTimeSchema = z.object({
   thisMonthStudyMinutes: z.number().int().nonnegative(),
   averageDailyMinutes: z.number().nonnegative(),
   studyStreak: z.number().int().nonnegative(), // Days of consecutive study
+  dailyBreakdown: z.array(DailyStudyTimeSchema), // Last 30 days
+  lessonTimeBreakdown: z.object({
+    totalMinutes: z.number().int().nonnegative(),
+    todayMinutes: z.number().int().nonnegative(),
+    thisWeekMinutes: z.number().int().nonnegative(),
+    thisMonthMinutes: z.number().int().nonnegative(),
+  }),
+  assessmentTimeBreakdown: z.object({
+    totalMinutes: z.number().int().nonnegative(),
+    todayMinutes: z.number().int().nonnegative(),
+    thisWeekMinutes: z.number().int().nonnegative(),
+    thisMonthMinutes: z.number().int().nonnegative(),
+  }),
 })
 
 export const CustomerAssessmentStatsSchema = z.object({
@@ -204,6 +224,7 @@ export type DashboardStatsType = z.infer<typeof DashboardStatsSchema>
 export type QuickStatsType = z.infer<typeof QuickStatsSchema>
 
 // Customer Dashboard Types
+export type DailyStudyTimeType = z.infer<typeof DailyStudyTimeSchema>
 export type CustomerCourseStatsType = z.infer<typeof CustomerCourseStatsSchema>
 export type CustomerStudyTimeType = z.infer<typeof CustomerStudyTimeSchema>
 export type CustomerAssessmentStatsType = z.infer<typeof CustomerAssessmentStatsSchema>

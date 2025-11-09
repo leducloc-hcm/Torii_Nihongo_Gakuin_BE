@@ -14,6 +14,7 @@ import {
   CustomerDashboardType,
   CustomerCourseStatsType,
   CustomerStudyTimeType,
+  DailyStudyTimeType,
   CustomerAssessmentStatsType,
   CustomerFlashcardStatsType,
   CustomerPaymentSummaryType,
