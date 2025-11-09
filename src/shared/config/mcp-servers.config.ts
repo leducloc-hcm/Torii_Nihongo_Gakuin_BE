@@ -32,6 +32,18 @@ export const MCP_SERVERS: Record<string, MCPServerConfig> = {
     enabled: process.env.MCP_BLOG_ENABLED !== 'false',
     description: 'Blog search and content retrieval for learning resources',
   },
+  assessment: {
+    name: 'assessment-mcp',
+    url: process.env.MCP_ASSESSMENT_SERVER_URL || 'http://localhost:8000/assessment/mcp',
+    enabled: process.env.MCP_ASSESSMENT_ENABLED !== 'false',
+    description: 'Assessment and testing tools for language proficiency',
+  },
+  assessmentHistory: {
+    name: 'assessment-history-mcp',
+    url: process.env.MCP_ASSESSMENT_HISTORY_SERVER_URL || 'http://localhost:8000/assessment-history/mcp',
+    enabled: process.env.MCP_ASSESSMENT_HISTORY_ENABLED !== 'false',
+    description: 'User assessment history and performance tracking',
+  },
 }
 
 export function getEnabledMCPServers(): MCPServerConfig[] {
