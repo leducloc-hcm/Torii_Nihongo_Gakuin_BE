@@ -1,28 +1,7 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Put,
-  Delete,
-  Body,
-  Param,
-  Query,
-  UseGuards,
-  Request,
-  HttpStatus,
-  HttpException,
-} from '@nestjs/common'
+import { Controller, Get, Post, Body, Param, UseGuards, HttpStatus, HttpException } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger'
 import { RolesGuard } from '../../shared/guards/roles.guard'
 
-import {
-  CreateOnlineClassDto,
-  UpdateOnlineClassDto,
-  ClassListQueryDto,
-  ShareDocumentDto,
-  ParticipantActionDto,
-  StartRecordingDto,
-} from './online-class.dto'
 import { OnlineClassService } from './online-class.service'
 import { ActiveUser } from 'src/shared/decorators/active-user.decorator'
 import { IsPublic, Auth } from 'src/shared/decorators/auth.decorator'
@@ -60,6 +39,15 @@ export class OnlineClassController {
   @ApiResponse({ status: 200, description: 'My assigned online classes retrieved successfully' })
   async getMyAssignedOnlineClasses(@ActiveUser('userId') userId: number) {
     return await this.onlineClassService.getMyAssignedOnlineClasses(userId)
+  }
+
+  @Get('upcoming-sessions')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Lecturer, RoleName.Customer)
+  @ApiOperation({ summary: 'Get upcoming online class sessions' })
+  @ApiResponse({ status: 200, description: 'Upcoming online class sessions retrieved successfully' })
+  async getUpcomingOnlineClassSessions(@ActiveUser('userId') userId: number) {
+    return await this.onlineClassService.getUpcomingOnlineClassSessions(userId)
   }
 
   @Post(':classId/sessions/:sessionId/join')

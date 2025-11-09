@@ -6,6 +6,7 @@ import {
   ProgressWhereUniqueInput,
   ProgressWhereInput,
   LessonProgressWithRelations,
+  ProgressSummaryType,
 } from './lesson-progress.model'
 
 @Injectable()
@@ -229,5 +230,89 @@ export class LessonProgressRepository {
         },
       },
     })
+  }
+
+  async getProgressSummary(userId: number): Promise<ProgressSummaryType[]> {
+    // Get the first 4 enrolled courses for the user
+    const enrollments = await this.prisma.enrollment.findMany({
+      where: { userId },
+      take: 4,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        course: {
+          select: {
+            id: true,
+            title: true,
+            slug: true,
+            thumbnailUrl: true,
+            level: true,
+          },
+        },
+      },
+    })
+
+    if (enrollments.length === 0) {
+      return []
+    }
+
+    // Get progress statistics for each course
+    const progressSummaries = await Promise.all(
+      enrollments.map(async (enrollment) => {
+        const courseId = enrollment.courseId
+
+        // Get total lessons count for this course
+        const totalLessons = await this.getCourseTotalLessons(courseId)
+
+        // Get completed lessons count for this course
+        const completedLessons = await this.getUserCourseCompletedLessons(userId, courseId)
+
+        // Get total watch time and duration for this course
+        const progressData = await this.prisma.lessonProgress.findMany({
+          where: {
+            userId,
+            lesson: {
+              module: {
+                courseId,
+              },
+            },
+          },
+          include: {
+            lesson: {
+              select: {
+                durationSec: true,
+              },
+            },
+          },
+        })
+
+        const totalWatchedTime = progressData.reduce((sum, progress) => sum + progress.watchedSec, 0)
+        const totalDuration = progressData.reduce((sum, progress) => sum + (progress.lesson.durationSec || 0), 0)
+
+        // Calculate progress percentage
+        const progressPercentage = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0
+
+        // Calculate watch time percentage
+        const watchTimePercentage = totalDuration > 0 ? Math.round((totalWatchedTime / totalDuration) * 100) : 0
+
+        return {
+          enrollment: {
+            id: enrollment.id,
+            createdAt: enrollment.createdAt,
+            expiresAt: enrollment.expiresAt,
+          },
+          course: enrollment.course,
+          progress: {
+            totalLessons,
+            completedLessons,
+            progressPercentage,
+            totalWatchedTime,
+            totalDuration,
+            watchTimePercentage,
+          },
+        }
+      }),
+    )
+
+    return progressSummaries
   }
 }

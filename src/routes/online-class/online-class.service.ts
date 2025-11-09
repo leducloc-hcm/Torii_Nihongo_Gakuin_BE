@@ -1075,4 +1075,59 @@ export class OnlineClassService {
       throw new BadRequestException('Failed to retrieve assigned online classes')
     }
   }
+  async getUpcomingOnlineClassSessions(userId: number) {
+    try {
+      const now = new Date()
+
+      // Get upcoming sessions for classes where the user is either the lecturer or a member
+      const sessions = await this.prisma.liveSession.findMany({
+        where: {
+          scheduledAt: {
+            gte: now,
+          },
+          endedAt: null,
+          class: {
+            OR: [
+              { lecturerId: userId },
+              {
+                members: {
+                  some: {
+                    userId: userId,
+                  },
+                },
+              },
+            ],
+          },
+        },
+        include: {
+          class: {
+            select: {
+              id: true,
+              title: true,
+              description: true,
+              lecturer: {
+                select: {
+                  id: true,
+                  name: true,
+                  lecturerProfile: {
+                    select: {
+                      avatar: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        orderBy: {
+          scheduledAt: 'asc',
+        },
+      })
+
+      return sessions
+    } catch (error) {
+      this.logger.error('Failed to get upcoming online class sessions:', error)
+      throw new BadRequestException('Failed to retrieve upcoming online class sessions')
+    }
+  }
 }
