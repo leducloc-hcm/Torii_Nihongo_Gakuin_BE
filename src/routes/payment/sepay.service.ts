@@ -74,7 +74,7 @@ export class SepayService {
     paymentId: number
   }> {
     if (payload.amount < 10000) {
-      throw new BadRequestException('Số tiền tối thiểu là 10,000 VND')
+      throw new BadRequestException('Minimum amount is 10,000 VND')
     }
 
     // Generate payment content code
@@ -105,7 +105,7 @@ export class SepayService {
       orderId: payload.orderId,
       amount: payload.amount,
       qrUrl,
-      message: `Đơn hàng #${payload.orderId} đang chờ thanh toán. Vui lòng quét mã QR.`,
+      message: `Order #${payload.orderId} is pending payment. Please scan the QR code.`,
     })
 
     this.logger.log(`Created SePay QR for order ${payload.orderId}, amount: ${payload.amount}, payment: ${payment.id}`)
@@ -178,7 +178,25 @@ export class SepayService {
         this.notificationGateway.notifyPaymentFailed(order.userId, {
           orderId: order.id,
           amount: expectedAmount,
-          errorMessage: `Số tiền không khớp. Mong đợi: ${expectedAmount}, Nhận: ${receivedAmount}`,
+          errorMessage: `Amount mismatch. Expected: ${expectedAmount}, Received: ${receivedAmount}`,
+        })
+
+        // Create notification record for amount mismatch
+        await this.prisma.notification.create({
+          data: {
+            userId: order.userId,
+            type: 'SYSTEM',
+            title: 'Payment Failed',
+            message: `Payment for order #${order.id} failed due to amount mismatch. Expected: ${expectedAmount}, Received: ${receivedAmount}. Please try again.`,
+            priority: 'HIGH',
+            data: {
+              orderId: order.id,
+              paymentId: payment.id,
+              expectedAmount,
+              receivedAmount,
+              errorType: 'AMOUNT_MISMATCH',
+            },
+          },
         })
 
         throw new BadRequestException(
@@ -336,6 +354,24 @@ export class SepayService {
             expiresAt: enrollment.expiresAt,
           })
 
+          // Create notification record for enrollment
+          await this.prisma.notification.create({
+            data: {
+              userId: order.userId,
+              type: 'SYSTEM',
+              title: 'Course Enrollment',
+              message: `You have been successfully enrolled in "${enrollment.courseTitle}". Your access expires on ${enrollment.expiresAt.toLocaleDateString()}.`,
+              priority: 'NORMAL',
+              data: {
+                courseId: enrollment.courseId,
+                courseTitle: enrollment.courseTitle,
+                courseThumbnail: enrollment.courseThumbnail,
+                expiresAt: enrollment.expiresAt,
+                classId: enrollment.classId,
+              },
+            },
+          })
+
           // Send welcome email for the course
           try {
             await this.emailService.sendCourseWelcome({
@@ -428,7 +464,7 @@ export class SepayService {
         transactionId: String(webhookData.id),
         amount: receivedAmount,
         courseIds: result.map((e) => e.courseId),
-        message: `Thanh toán thành công cho đơn hàng #${order.id}. Bạn đã được ghi danh vào ${result.length} khóa học.`,
+        message: `Payment successful for order #${order.id}. You have been enrolled in ${result.length} course(s).`,
       })
 
       this.logger.log(

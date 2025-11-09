@@ -7,7 +7,7 @@ import { NotificationGateway } from '../../websockets/notification.gateway'
 @Injectable()
 export class PaymentTimeoutWorker {
   private readonly logger = new Logger(PaymentTimeoutWorker.name)
-  private readonly PAYMENT_TIMEOUT_MINUTES = 15
+  private readonly PAYMENT_TIMEOUT_MINUTES = 6
 
   constructor(
     private readonly prisma: PrismaService,
@@ -153,8 +153,8 @@ export class PaymentTimeoutWorker {
       this.notificationGateway.notifyPaymentFailed(order.user.id, {
         orderId: order.id,
         amount: payment.amount,
-        errorMessage: `Thanh toán đã hết hạn sau ${this.PAYMENT_TIMEOUT_MINUTES} phút. Vui lòng thử lại.`,
-        message: `Đơn hàng #${order.id} - ${courseNames}${order.coupon?.code ? ` (${order.coupon.code})` : ''}`,
+        errorMessage: `Payment has expired after ${this.PAYMENT_TIMEOUT_MINUTES} minutes. Please try again.`,
+        message: `Order #${order.id} - ${courseNames}${order.coupon?.code ? ` (${order.coupon.code})` : ''}`,
       })
 
       // Create notification record
@@ -162,8 +162,8 @@ export class PaymentTimeoutWorker {
         data: {
           userId: order.user.id,
           type: 'SYSTEM',
-          title: 'Thanh toán hết hạn',
-          message: `Thanh toán cho đơn hàng #${order.id} đã hết hạn sau ${this.PAYMENT_TIMEOUT_MINUTES} phút. Bạn có thể thử thanh toán lại.`,
+          title: 'Payment Expired',
+          message: `Payment for order #${order.id} has expired after ${this.PAYMENT_TIMEOUT_MINUTES} minutes. You can try to pay again.`,
           priority: 'NORMAL',
           data: {
             orderId: order.id,
