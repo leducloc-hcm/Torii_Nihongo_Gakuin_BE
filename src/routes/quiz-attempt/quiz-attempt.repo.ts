@@ -161,6 +161,23 @@ export class QuizAttemptRepository {
                     },
                   },
                 },
+                questionGroups: {
+                  include: {
+                    group: {
+                      include: {
+                        questions: {
+                          include: {
+                            question: {
+                              include: {
+                                options: true,
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
               },
             },
           },
@@ -176,12 +193,23 @@ export class QuizAttemptRepository {
       throw new BadRequestException(QUIZ_ATTEMPT_ERRORS.ALREADY_SUBMITTED)
     }
 
-    // Collect all questions from quiz items
-    const allQuestions = attempt.quiz.items.flatMap((item) => item.questions.map((q) => q.question))
-    const questionIds = allQuestions.map((q) => q.id)
+    // Collect questions from both direct questions and question groups
+    const directQuestions = attempt.quiz.items
+      .flatMap((item) => item.questions || [])
+      .map((q) => q.question)
+      .filter((q) => q != null)
+
+    const groupQuestions = attempt.quiz.items
+      .flatMap((item) => item.questionGroups || [])
+      .flatMap((qg) => qg.group?.questions || [])
+      .map((q) => q.question)
+      .filter((q) => q != null)
+
+    const allQuestionsWithDuplicates = [...directQuestions, ...groupQuestions]
+    const uniqueQuestions = Array.from(new Map(allQuestionsWithDuplicates.map((q) => [q.id, q])).values())
+    const questionIds = uniqueQuestions.map((q) => q.id)
     const answerQuestionIds = data.answers.map((answer) => answer.questionId)
 
-    // Create answers data - include both answered and unanswered questions
     const answersData: Array<{
       attemptId: number
       questionId: number
@@ -189,14 +217,12 @@ export class QuizAttemptRepository {
       isCorrect: boolean
     }> = []
 
-    // Process answered questions
     for (const answer of data.answers) {
-      const question = allQuestions.find((q) => q.id === answer.questionId)
+      const question = uniqueQuestions.find((q) => q.id === answer.questionId)
       if (!question) continue
 
       let isCorrect = false
 
-      // Check if selected option is correct
       if (answer.selectedOptionId && question.options) {
         const selectedOption = question.options.find((opt: any) => opt.id === answer.selectedOptionId)
         isCorrect = selectedOption?.isCorrect || false
@@ -221,7 +247,7 @@ export class QuizAttemptRepository {
       })
     }
 
-    // Calculate statistics
+    // Calculate statistics (no scoring, just display info)
     const totalQuestions = questionIds.length
     const correctAnswers = answersData.filter((a) => a.isCorrect).length
     const answeredQuestions = data.answers.length
@@ -229,34 +255,33 @@ export class QuizAttemptRepository {
     const incorrectAnswers = totalQuestions - correctAnswers
     const accuracyPercentage = totalQuestions > 0 ? (correctAnswers / totalQuestions) * 100 : 0
 
-    // Save answers and update attempt
+    // Save answers and mark as submitted (no score stored)
     await this.prisma.$transaction(async (tx) => {
-      // Create answers
+      // Create all answers (answered + unanswered)
       await tx.quizAnswer.createMany({
         data: answersData,
       })
 
-      // Update attempt as submitted with statistics
+      // Mark attempt as submitted
       await tx.quizAttempt.update({
         where: { id: attemptId },
         data: {
           submittedAt: new Date(),
-          score: accuracyPercentage, // Store accuracy percentage in score field
         },
       })
     })
 
-    // Return updated attempt with statistics
+    // Return attempt with statistics for display only
     const updatedAttempt = await this.findById(attemptId)
     return {
       ...updatedAttempt!,
       statistics: {
-        totalQuestions,
-        answeredQuestions,
-        unansweredQuestions,
-        correctAnswers,
-        incorrectAnswers,
-        accuracyPercentage: Math.round(accuracyPercentage * 100) / 100, // Round to 2 decimals
+        totalQuestions, // Tổng số câu
+        correctAnswers, // Số câu đúng
+        incorrectAnswers, // Số câu sai
+        answeredQuestions, // Số câu đã trả lời
+        unansweredQuestions, // Số câu chưa trả lời
+        accuracyPercentage: Math.round(accuracyPercentage * 100) / 100, // % đúng (làm tròn 2 chữ số)
       },
     }
   }
