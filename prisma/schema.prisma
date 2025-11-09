@@ -1609,6 +1609,7 @@ enum QueryType {
   ENROLLMENT
   PROGRESS
   GENERAL
+  ASSESSMENT_HISTORY
 }
 
 enum QueryStatus {

@@ -437,8 +437,10 @@ export class DashboardRepository {
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
     const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
 
-    const result = await this.prisma.$queryRaw<
+    // Get lesson study time
+    const lessonTimeResult = await this.prisma.$queryRaw<
       Array<{
         total_study_minutes: bigint
         today_study_minutes: bigint
@@ -473,20 +475,173 @@ export class DashboardRepository {
       WHERE lp."userId" = ${userId}
     `
 
-    const stats = result[0] || {
+    // Get assessment study time (time spent on assessments and quizzes)
+    const assessmentTimeResult = await this.prisma.$queryRaw<
+      Array<{
+        total_assessment_minutes: bigint
+        today_assessment_minutes: bigint
+        week_assessment_minutes: bigint
+        month_assessment_minutes: bigint
+      }>
+    >`
+      SELECT 
+        COALESCE(SUM(
+          CASE 
+            WHEN aa."submittedAt" IS NOT NULL AND aa."startedAt" IS NOT NULL
+            THEN EXTRACT(EPOCH FROM (aa."submittedAt" - aa."startedAt")) / 60
+            ELSE 0
+          END
+        ), 0) + COALESCE(SUM(
+          CASE 
+            WHEN qa."submittedAt" IS NOT NULL AND qa."startedAt" IS NOT NULL
+            THEN EXTRACT(EPOCH FROM (qa."submittedAt" - qa."startedAt")) / 60
+            ELSE 0
+          END
+        ), 0) as total_assessment_minutes,
+        
+        COALESCE(SUM(
+          CASE 
+            WHEN aa."submittedAt" IS NOT NULL AND aa."startedAt" IS NOT NULL 
+            AND aa."submittedAt"::date = ${todayStart}::date
+            THEN EXTRACT(EPOCH FROM (aa."submittedAt" - aa."startedAt")) / 60
+            ELSE 0
+          END
+        ), 0) + COALESCE(SUM(
+          CASE 
+            WHEN qa."submittedAt" IS NOT NULL AND qa."startedAt" IS NOT NULL 
+            AND qa."submittedAt"::date = ${todayStart}::date
+            THEN EXTRACT(EPOCH FROM (qa."submittedAt" - qa."startedAt")) / 60
+            ELSE 0
+          END
+        ), 0) as today_assessment_minutes,
+        
+        COALESCE(SUM(
+          CASE 
+            WHEN aa."submittedAt" IS NOT NULL AND aa."startedAt" IS NOT NULL 
+            AND aa."submittedAt" >= ${weekStart}
+            THEN EXTRACT(EPOCH FROM (aa."submittedAt" - aa."startedAt")) / 60
+            ELSE 0
+          END
+        ), 0) + COALESCE(SUM(
+          CASE 
+            WHEN qa."submittedAt" IS NOT NULL AND qa."startedAt" IS NOT NULL 
+            AND qa."submittedAt" >= ${weekStart}
+            THEN EXTRACT(EPOCH FROM (qa."submittedAt" - qa."startedAt")) / 60
+            ELSE 0
+          END
+        ), 0) as week_assessment_minutes,
+        
+        COALESCE(SUM(
+          CASE 
+            WHEN aa."submittedAt" IS NOT NULL AND aa."startedAt" IS NOT NULL 
+            AND aa."submittedAt" >= ${monthStart}
+            THEN EXTRACT(EPOCH FROM (aa."submittedAt" - aa."startedAt")) / 60
+            ELSE 0
+          END
+        ), 0) + COALESCE(SUM(
+          CASE 
+            WHEN qa."submittedAt" IS NOT NULL AND qa."startedAt" IS NOT NULL 
+            AND qa."submittedAt" >= ${monthStart}
+            THEN EXTRACT(EPOCH FROM (qa."submittedAt" - qa."startedAt")) / 60
+            ELSE 0
+          END
+        ), 0) as month_assessment_minutes
+      FROM (SELECT ${userId} as user_id) u
+      LEFT JOIN "AssessmentAttempt" aa ON aa."userId" = u.user_id
+      LEFT JOIN "QuizAttempt" qa ON qa."userId" = u.user_id
+    `
+
+    // Get daily breakdown for the last 30 days
+    const dailyBreakdownResult = await this.prisma.$queryRaw<
+      Array<{
+        study_date: Date
+        lesson_minutes: bigint
+        assessment_minutes: bigint
+        total_minutes: bigint
+      }>
+    >`
+      WITH date_series AS (
+        SELECT generate_series(
+          ${thirtyDaysAgo}::date, 
+          ${todayStart}::date, 
+          '1 day'::interval
+        )::date as study_date
+      ),
+      lesson_daily AS (
+        SELECT 
+          lp."updatedAt"::date as study_date,
+          COALESCE(SUM(lp."watchedSec"), 0) / 60 as lesson_minutes
+        FROM lesson_progress lp
+        WHERE lp."userId" = ${userId}
+          AND lp."updatedAt" >= ${thirtyDaysAgo}
+        GROUP BY lp."updatedAt"::date
+      ),
+      assessment_daily AS (
+        SELECT 
+          COALESCE(aa."submittedAt"::date, qa."submittedAt"::date) as study_date,
+          COALESCE(SUM(
+            CASE 
+              WHEN aa."submittedAt" IS NOT NULL AND aa."startedAt" IS NOT NULL
+              THEN EXTRACT(EPOCH FROM (aa."submittedAt" - aa."startedAt")) / 60
+              ELSE 0
+            END
+          ), 0) + COALESCE(SUM(
+            CASE 
+              WHEN qa."submittedAt" IS NOT NULL AND qa."startedAt" IS NOT NULL
+              THEN EXTRACT(EPOCH FROM (qa."submittedAt" - qa."startedAt")) / 60
+              ELSE 0
+            END
+          ), 0) as assessment_minutes
+        FROM (SELECT ${userId} as user_id) u
+        LEFT JOIN "AssessmentAttempt" aa ON aa."userId" = u.user_id 
+          AND aa."submittedAt" >= ${thirtyDaysAgo}
+        LEFT JOIN "QuizAttempt" qa ON qa."userId" = u.user_id 
+          AND qa."submittedAt" >= ${thirtyDaysAgo}
+        WHERE COALESCE(aa."submittedAt", qa."submittedAt") IS NOT NULL
+        GROUP BY COALESCE(aa."submittedAt"::date, qa."submittedAt"::date)
+      )
+      SELECT 
+        ds.study_date,
+        COALESCE(ld.lesson_minutes, 0) as lesson_minutes,
+        COALESCE(ad.assessment_minutes, 0) as assessment_minutes,
+        COALESCE(ld.lesson_minutes, 0) + COALESCE(ad.assessment_minutes, 0) as total_minutes
+      FROM date_series ds
+      LEFT JOIN lesson_daily ld ON ds.study_date = ld.study_date
+      LEFT JOIN assessment_daily ad ON ds.study_date = ad.study_date
+      ORDER BY ds.study_date ASC
+    `
+
+    const lessonStats = lessonTimeResult[0] || {
       total_study_minutes: 0n,
       today_study_minutes: 0n,
       week_study_minutes: 0n,
       month_study_minutes: 0n,
     }
 
-    // Calculate study streak
+    const assessmentStats = assessmentTimeResult[0] || {
+      total_assessment_minutes: 0n,
+      today_assessment_minutes: 0n,
+      week_assessment_minutes: 0n,
+      month_assessment_minutes: 0n,
+    }
+
+    // Calculate study streak based on both lesson progress and assessment completion
     const streakResult = await this.prisma.$queryRaw<Array<{ streak_days: bigint }>>`
       WITH daily_study AS (
-        SELECT DISTINCT lp."updatedAt"::date as study_date
-        FROM lesson_progress lp
-        WHERE lp."userId" = ${userId}
-          AND lp."watchedSec" > 0
+        SELECT DISTINCT study_date 
+        FROM (
+          SELECT lp."updatedAt"::date as study_date
+          FROM lesson_progress lp
+          WHERE lp."userId" = ${userId} AND lp."watchedSec" > 0
+          UNION
+          SELECT aa."submittedAt"::date as study_date
+          FROM "AssessmentAttempt" aa
+          WHERE aa."userId" = ${userId} AND aa."submittedAt" IS NOT NULL
+          UNION
+          SELECT qa."submittedAt"::date as study_date
+          FROM "QuizAttempt" qa
+          WHERE qa."userId" = ${userId} AND qa."submittedAt" IS NOT NULL
+        ) combined_study
         ORDER BY study_date DESC
       ),
       streak_calc AS (
@@ -509,23 +664,61 @@ export class DashboardRepository {
     `
 
     const streak = streakResult[0]?.streak_days || 0n
-    const totalMinutes = Number(stats.total_study_minutes)
+
+    // Calculate total study time
+    const totalLessonMinutes = Number(lessonStats.total_study_minutes)
+    const totalAssessmentMinutes = Number(assessmentStats.total_assessment_minutes)
+    const totalMinutes = totalLessonMinutes + totalAssessmentMinutes
+
+    // Calculate active days
     const daysActive = await this.prisma.$queryRaw<Array<{ active_days: bigint }>>`
-      SELECT COUNT(DISTINCT lp."updatedAt"::date) as active_days
-      FROM lesson_progress lp
-      WHERE lp."userId" = ${userId} AND lp."watchedSec" > 0
+      SELECT COUNT(DISTINCT study_date) as active_days
+      FROM (
+        SELECT lp."updatedAt"::date as study_date
+        FROM lesson_progress lp
+        WHERE lp."userId" = ${userId} AND lp."watchedSec" > 0
+        UNION
+        SELECT aa."submittedAt"::date as study_date
+        FROM "AssessmentAttempt" aa
+        WHERE aa."userId" = ${userId} AND aa."submittedAt" IS NOT NULL
+        UNION
+        SELECT qa."submittedAt"::date as study_date
+        FROM "QuizAttempt" qa
+        WHERE qa."userId" = ${userId} AND qa."submittedAt" IS NOT NULL
+      ) combined_study
     `
 
     const activeDays = Number(daysActive[0]?.active_days || 1)
     const averageDailyMinutes = totalMinutes / Math.max(activeDays, 1)
 
+    // Format daily breakdown
+    const dailyBreakdown = dailyBreakdownResult.map((day) => ({
+      date: day.study_date.toISOString().split('T')[0], // YYYY-MM-DD format
+      lessonMinutes: Number(day.lesson_minutes),
+      assessmentMinutes: Number(day.assessment_minutes),
+      totalMinutes: Number(day.total_minutes),
+    }))
+
     return {
       totalStudyMinutes: totalMinutes,
-      todayStudyMinutes: Number(stats.today_study_minutes),
-      thisWeekStudyMinutes: Number(stats.week_study_minutes),
-      thisMonthStudyMinutes: Number(stats.month_study_minutes),
+      todayStudyMinutes: Number(lessonStats.today_study_minutes) + Number(assessmentStats.today_assessment_minutes),
+      thisWeekStudyMinutes: Number(lessonStats.week_study_minutes) + Number(assessmentStats.week_assessment_minutes),
+      thisMonthStudyMinutes: Number(lessonStats.month_study_minutes) + Number(assessmentStats.month_assessment_minutes),
       averageDailyMinutes: Math.round(averageDailyMinutes * 100) / 100,
       studyStreak: Number(streak),
+      dailyBreakdown,
+      lessonTimeBreakdown: {
+        totalMinutes: totalLessonMinutes,
+        todayMinutes: Number(lessonStats.today_study_minutes),
+        thisWeekMinutes: Number(lessonStats.week_study_minutes),
+        thisMonthMinutes: Number(lessonStats.month_study_minutes),
+      },
+      assessmentTimeBreakdown: {
+        totalMinutes: totalAssessmentMinutes,
+        todayMinutes: Number(assessmentStats.today_assessment_minutes),
+        thisWeekMinutes: Number(assessmentStats.week_assessment_minutes),
+        thisMonthMinutes: Number(assessmentStats.month_assessment_minutes),
+      },
     }
   }
 

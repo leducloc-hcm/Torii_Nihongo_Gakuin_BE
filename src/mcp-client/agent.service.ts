@@ -12,6 +12,8 @@ import {
 } from 'src/mcp-client/mcp.model'
 import { CourseMcpClient } from 'src/mcp-client/module/course/course-mcp.service'
 import { EnrollmentMcpClient } from 'src/mcp-client/module/enrollment/enrollment-mcp.service'
+import { ASSESSMENT_MCP_PROMPT } from 'src/mcp-client/module/assessment/assessment-mcp.prompt'
+import { ASSESSMENT_HISTORY_MCP_PROMPT } from 'src/mcp-client/module/assessment_history/history-mcp.prompt'
 import { QueryType } from 'src/mcp-client/shared/query-detection.utils'
 import { getEnabledMCPServers, MCP_SERVERS } from 'src/shared/config/mcp-servers.config'
 import { OPENAI_CONFIG, MCP_CONFIG } from 'src/shared/config/openai.config'
@@ -134,7 +136,7 @@ export class AgentService {
 
     const toolPromises = request.toolCalls.map(async (toolCall) => {
       try {
-        const result = await this.executeToolCall(toolCall.name, toolCall.arguments)
+        const result = await this.executeToolCall(toolCall.name, toolCall.arguments, request.userId)
         if (result.result) {
           this.logger.log(`  Result preview: ${JSON.stringify(result.result).substring(0, 200)}...`)
         }
@@ -172,15 +174,37 @@ export class AgentService {
     // Add format instructions based on query type before final response
     this.logger.log(`🔍 QueryType for final response: "${request.queryType}" (type: ${typeof request.queryType})`)
 
+    // Inject module-specific system prompt at the BEGINNING for ASSESSMENT or ASSESSMENT_HISTORY
+    if (request.queryType === 'ASSESSMENT' || request.queryType === QueryType.ASSESSMENT) {
+      this.logger.log('📋 Injecting ASSESSMENT module system prompt at the beginning')
+      messages.unshift({
+        role: 'system',
+        content: ASSESSMENT_MCP_PROMPT,
+      })
+    } else if (request.queryType === 'ASSESSMENT_HISTORY' || request.queryType === QueryType.ASSESSMENT_HISTORY) {
+      this.logger.log('📊 Injecting ASSESSMENT_HISTORY module system prompt at the beginning')
+      messages.unshift({
+        role: 'system',
+        content: ASSESSMENT_HISTORY_MCP_PROMPT,
+      })
+    }
+
+    // Add user instructions for other types
     if (request.queryType === 'COURSE' || request.queryType === QueryType.COURSE) {
       this.logger.log('📋 Adding COURSE format instructions to messages')
       messages.push({
         role: 'user',
-        content: `IMPORTANT: You must format your response with the course data in JSON format.
+        content: `CRITICAL INSTRUCTION - READ CAREFULLY:
 
-Structure your response exactly like this:
+You MUST respond with ONLY the JSON code block below. NOTHING ELSE.
 
-Brief intro message in Vietnamese
+DO NOT write:
+- "Đây là các khóa học..." ❌
+- "Website có..." ❌
+- "Bạn muốn..." ❌
+- Any greeting, intro, or follow-up text ❌
+
+Your ENTIRE response must be EXACTLY this format:
 
 \`\`\`json
 {
@@ -189,21 +213,26 @@ Brief intro message in Vietnamese
 }
 \`\`\`
 
-Optional follow-up question
+That's it. Nothing before the \`\`\`json. Nothing after the closing \`\`\`.
 
-Each course object must include: id, title, slug, level, thumbnailUrl, courseType, price, moduleCount, lessonCount.
-Use the EXACT data from the tool result - do not translate or modify any values.
-Do NOT create a plain text list. The JSON code block is MANDATORY.`,
+Include in each course: id, title, slug, level, thumbnailUrl, courseType, price, moduleCount, lessonCount
+Use EXACT data from tool result - do not modify.`,
       })
     } else if (request.queryType === 'BLOG' || request.queryType === QueryType.BLOG) {
       this.logger.log('📋 Adding BLOG format instructions to messages')
       messages.push({
         role: 'user',
-        content: `IMPORTANT: You must format your response with the blog data in JSON format.
+        content: `CRITICAL INSTRUCTION - READ CAREFULLY:
 
-Structure your response exactly like this:
+You MUST respond with ONLY the JSON code block below. NOTHING ELSE.
 
-Brief intro message
+DO NOT write:
+- "Tôi tìm thấy..." ❌
+- "Dưới đây là..." ❌
+- "Bạn muốn..." ❌
+- Any greeting, intro, or follow-up text ❌
+
+Your ENTIRE response must be EXACTLY this format:
 
 \`\`\`json
 {
@@ -212,20 +241,26 @@ Brief intro message
 }
 \`\`\`
 
-Optional follow-up
+That's it. Nothing before the \`\`\`json. Nothing after the closing \`\`\`.
 
-Include complete blog data: id, title, slug, date, image, excerpt, tags.
-Use EXACT data from tool result. JSON code block is MANDATORY.`,
+Include in each blog: id, title, slug, date, image, excerpt, tags
+Use EXACT data from tool result - do not modify.`,
       })
     } else if (request.queryType === 'FLASHCARD' || request.queryType === QueryType.FLASHCARD) {
       this.logger.log('📋 Adding FLASHCARD format instructions to messages')
       messages.push({
         role: 'user',
-        content: `IMPORTANT: If this is a flashcard SEARCH query (not generation), you must format your response with JSON.
+        content: `CRITICAL INSTRUCTION - READ CAREFULLY:
 
-Structure your response exactly like this:
+You MUST respond with ONLY the JSON code block below. NOTHING ELSE.
 
-Brief intro message
+DO NOT write:
+- "Đây là bộ flashcard..." ❌
+- "Website có..." ❌
+- "Bạn muốn xem..." ❌
+- Any greeting, intro, or follow-up text ❌
+
+Your ENTIRE response must be EXACTLY this format:
 
 \`\`\`json
 {
@@ -234,14 +269,25 @@ Brief intro message
 }
 \`\`\`
 
-Optional follow-up
+That's it. Nothing before the \`\`\`json. Nothing after the closing \`\`\`.
 
-Include complete deck data: id, title, level, card_count, owner_name, createdAt, updatedAt.
-Use EXACT data from tool result. JSON code block is MANDATORY for search results.
+Include in each deck: id, title, level, card_count, owner_name, createdAt, updatedAt
+Use EXACT data from tool result - do not modify.
 
 NOTE: This is ONLY for search results. Flashcard GENERATION uses a different format.`,
       })
-    } else {
+    } else if (
+      request.queryType !== 'ASSESSMENT' &&
+      request.queryType !== QueryType.ASSESSMENT &&
+      request.queryType !== 'ASSESSMENT_HISTORY' &&
+      request.queryType !== QueryType.ASSESSMENT_HISTORY &&
+      request.queryType !== 'COURSE' &&
+      request.queryType !== QueryType.COURSE &&
+      request.queryType !== 'BLOG' &&
+      request.queryType !== QueryType.BLOG &&
+      request.queryType !== 'FLASHCARD' &&
+      request.queryType !== QueryType.FLASHCARD
+    ) {
       this.logger.warn(`⚠️ No format instructions added - queryType was: "${request.queryType}"`)
     }
 
@@ -304,12 +350,24 @@ NOTE: This is ONLY for search results. Flashcard GENERATION uses a different for
     }
   }
 
-  private async executeToolCall(toolName: string, args: Record<string, any>): Promise<MCPToolResult> {
+  private async executeToolCall(toolName: string, args: Record<string, any>, userId?: number): Promise<MCPToolResult> {
     // Determine which MCP server to use based on tool name
     const serverUrl = this.getServerUrlForTool(toolName)
 
     if (!serverUrl) {
       throw new Error(`No MCP server found for tool: ${toolName}`)
+    }
+
+    // Auto-inject user_id for assessment history tools that require it
+    const lowerToolName = toolName.toLowerCase()
+    const isHistoryTool =
+      lowerToolName.includes('my_assessment') ||
+      lowerToolName.includes('progress_summary') ||
+      lowerToolName.includes('history')
+
+    if (isHistoryTool && userId && !args.user_id) {
+      this.logger.log(`🔐 Auto-injecting user_id=${userId} for history tool: ${toolName}`)
+      args = { ...args, user_id: userId }
     }
 
     this.logger.debug(`Calling MCP server: ${serverUrl}`)
@@ -356,6 +414,26 @@ NOTE: This is ONLY for search results. Flashcard GENERATION uses a different for
 
     if (lowerToolName.includes('blog') || lowerToolName.includes('post') || lowerToolName.includes('article')) {
       return MCP_SERVERS.blog.url
+    }
+
+    // Assessment History tools (user's past attempts, progress, results)
+    if (
+      lowerToolName.includes('my_assessment') ||
+      lowerToolName.includes('attempt_result') ||
+      lowerToolName.includes('progress_summary') ||
+      lowerToolName.includes('history')
+    ) {
+      return MCP_SERVERS.assessmentHistory.url
+    }
+
+    // Assessment Search tools (find available tests/exams)
+    if (
+      lowerToolName.includes('assessment') ||
+      lowerToolName.includes('test') ||
+      lowerToolName.includes('quiz') ||
+      lowerToolName.includes('exam')
+    ) {
+      return MCP_SERVERS.assessment.url
     }
 
     // Default to first enabled server

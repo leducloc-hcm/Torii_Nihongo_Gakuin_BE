@@ -195,7 +195,6 @@ export class QuestionGroupService {
       } else {
         parsedQuestions = [questions as number]
       }
-      // Filter out NaN values
       parsedQuestions = parsedQuestions.filter((q) => !isNaN(q))
     }
 

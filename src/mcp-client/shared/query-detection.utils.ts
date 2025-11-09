@@ -3,6 +3,7 @@ export enum QueryType {
   LESSON = 'LESSON',
   FLASHCARD = 'FLASHCARD',
   ASSESSMENT = 'ASSESSMENT',
+  ASSESSMENT_HISTORY = 'ASSESSMENT_HISTORY',
   ENROLLMENT = 'ENROLLMENT',
   PROGRESS = 'PROGRESS',
   BLOG = 'BLOG',
@@ -114,7 +115,7 @@ export function detectQueryType(query: string): QueryType {
     'カードを生成',
   ]
 
-  // Assessment-specific keywords
+  // Assessment-specific keywords (search for tests/exams)
   const assessmentKeywords = [
     // English
     'test',
@@ -123,22 +124,75 @@ export function detectQueryType(query: string): QueryType {
     'assessment',
     'question',
     'answer',
-    'score',
-    'result',
     // Vietnamese
     'bài kiểm tra',
     'bài thi',
     'câu hỏi',
     'đáp án',
-    'điểm',
-    'kết quả',
+    'đề thi',
+    'practice test',
+    'mock exam',
     // Japanese
     'テスト',
     '試験',
     '問題',
     '答え',
-    '点数',
-    '結果',
+  ]
+
+  // Assessment History keywords (user's past attempts & progress)
+  const assessmentHistoryKeywords = [
+    // English - History
+    'history',
+    'my test',
+    'my exam',
+    'my quiz',
+    'completed',
+    'attempted',
+    'past test',
+    'previous test',
+    'did i',
+    'have i',
+    // English - Results
+    'score',
+    'result',
+    'grade',
+    'performance',
+    'how did i',
+    // English - Progress
+    'progress',
+    'improvement',
+    'trend',
+    'statistics',
+    'stats',
+    'summary',
+    // Vietnamese - History
+    'lịch sử',
+    'đã làm',
+    'đã thi',
+    'bài đã làm',
+    'tôi đã',
+    'mình đã',
+    'các bài đã',
+    // Vietnamese - Results
+    'điểm',
+    'kết quả',
+    'điểm số',
+    'thành tích',
+    'làm được',
+    // Vietnamese - Progress
+    'tiến độ',
+    'tiến bộ',
+    'cải thiện',
+    'thống kê',
+    'tổng hợp',
+    // Japanese - History
+    '履歴', // rireki
+    'した', // past tense
+    '受けた', // uketa - took (test)
+    // Japanese - Progress
+    '進捗', // shinchoku
+    '改善', // kaizen
+    '統計', // toukei
   ]
 
   // Enrollment/Progress-specific keywords
@@ -235,10 +289,10 @@ export function detectQueryType(query: string): QueryType {
   const hasLessonKeyword = lessonKeywords.some((keyword) => lowerQuery.includes(keyword))
   const hasFlashcardKeyword = flashcardKeywords.some((keyword) => lowerQuery.includes(keyword))
   const hasAssessmentKeyword = assessmentKeywords.some((keyword) => lowerQuery.includes(keyword))
+  const hasAssessmentHistoryKeyword = assessmentHistoryKeywords.some((keyword) => lowerQuery.includes(keyword))
   const hasEnrollmentKeyword = enrollmentKeywords.some((keyword) => lowerQuery.includes(keyword))
   const hasBlogKeyword = blogKeywords.some((keyword) => lowerQuery.includes(keyword))
 
-  // Check for flashcard CREATION intent (high priority)
   const isFlashcardCreation =
     hasFlashcardKeyword &&
     (lowerQuery.includes('tạo') ||
@@ -247,7 +301,17 @@ export function detectQueryType(query: string): QueryType {
       lowerQuery.includes('make') ||
       lowerQuery.includes('gen'))
 
-  // Check if this is asking about MY/PERSONAL courses vs AVAILABLE courses
+  // Check for flashcard SEARCH intent (also high priority)
+  const isFlashcardSearch =
+    hasFlashcardKeyword &&
+    (lowerQuery.includes('tìm') ||
+      lowerQuery.includes('search') ||
+      lowerQuery.includes('find') ||
+      lowerQuery.includes('show') ||
+      lowerQuery.includes('list') ||
+      lowerQuery.includes('deck') ||
+      lowerQuery.includes('bộ'))
+
   const isPersonalCourseQuery =
     (lowerQuery.includes('của tôi') ||
       lowerQuery.includes('của mình') ||
@@ -266,15 +330,34 @@ export function detectQueryType(query: string): QueryType {
       lowerQuery.includes('tất cả')) &&
     hasCourseKeyword
 
-  // Priority: Flashcard Creation > Blog > Available Courses > Personal Courses/Enrollment > Course > Flashcard > Assessment > Lesson > General
-  // CRITICAL: Flashcard creation takes HIGHEST priority to ensure tool is called
+  // Check for specific assessment queries (test, exam, quiz SEARCH)
+  const isAssessmentSearchQuery =
+    hasAssessmentKeyword &&
+    (lowerQuery.includes('tìm') ||
+      lowerQuery.includes('search') ||
+      lowerQuery.includes('find') ||
+      lowerQuery.includes('có những') ||
+      lowerQuery.includes('có các') ||
+      lowerQuery.includes('available') ||
+      lowerQuery.includes('list') ||
+      lowerQuery.includes('show'))
+
+  // Check for assessment HISTORY queries (user's past attempts)
+  const isAssessmentHistoryQuery = hasAssessmentHistoryKeyword
+
+  // Priority: Flashcard Creation > Flashcard Search > Blog > Assessment History > Assessment Search > Available Courses > Personal Courses/Enrollment > Course > Lesson > General
+  // CRITICAL: Flashcard operations take HIGHEST priority to ensure correct tool is called
+  // CRITICAL: Assessment History must come BEFORE Assessment Search (more specific)
   if (isFlashcardCreation) return QueryType.FLASHCARD
+  if (isFlashcardSearch) return QueryType.FLASHCARD
   if (hasBlogKeyword) return QueryType.BLOG
+  if (isAssessmentHistoryQuery) return QueryType.ASSESSMENT_HISTORY // NEW: User's test history
+  if (isAssessmentSearchQuery) return QueryType.ASSESSMENT // Search for available tests
   if (isAvailableCourseQuery) return QueryType.COURSE // Ask about website courses = COURSE query
   if (isPersonalCourseQuery) return QueryType.ENROLLMENT // Ask about MY courses = ENROLLMENT query
   if (hasEnrollmentKeyword && !hasCourseKeyword) return QueryType.ENROLLMENT // Pure enrollment keywords
-  if (hasCourseKeyword) return QueryType.COURSE // General course keywords default to COURSE
-  if (hasFlashcardKeyword) return QueryType.FLASHCARD
+  if (hasCourseKeyword && !hasFlashcardKeyword) return QueryType.COURSE // CHANGED: Only if NO flashcard keyword
+  if (hasFlashcardKeyword) return QueryType.FLASHCARD // MOVED: Any other flashcard keyword
   if (hasAssessmentKeyword) return QueryType.ASSESSMENT
   if (hasLessonKeyword) return QueryType.LESSON
 
