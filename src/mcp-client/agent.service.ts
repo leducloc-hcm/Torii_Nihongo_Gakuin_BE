@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common'
 import OpenAI from 'openai'
 import { ChatCompletionMessageParam, ChatCompletionTool } from 'openai/resources/chat/completions'
 import { McpBaseService } from 'src/mcp-client/mcp-client.service'
@@ -19,7 +19,7 @@ import { getEnabledMCPServers, MCP_SERVERS } from 'src/shared/config/mcp-servers
 import { OPENAI_CONFIG, MCP_CONFIG } from 'src/shared/config/openai.config'
 
 @Injectable()
-export class AgentService {
+export class AgentService implements OnModuleInit {
   private readonly logger = new Logger(AgentService.name)
   private readonly openai: OpenAI
   private allTools: ChatCompletionTool[] = []
@@ -33,6 +33,15 @@ export class AgentService {
     this.openai = new OpenAI({
       apiKey: OPENAI_CONFIG.apiKey,
     })
+  }
+
+  /**
+   * Load tools eagerly when module initializes
+   */
+  async onModuleInit() {
+    this.logger.log('🚀 AgentService initializing - loading MCP tools...')
+    await this.loadTools()
+    this.logger.log(`✅ AgentService ready with ${this.allTools.length} tools`)
   }
 
   /**
