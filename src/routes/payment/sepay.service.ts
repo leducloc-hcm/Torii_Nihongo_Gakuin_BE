@@ -181,6 +181,14 @@ export class SepayService {
           errorMessage: `Amount mismatch. Expected: ${expectedAmount}, Received: ${receivedAmount}`,
         })
 
+        // Notify staff and admin about payment failure
+        await this.notifyStaffAndAdminAboutPayment(
+          'FAILED',
+          order,
+          undefined,
+          `Amount mismatch. Expected: ${expectedAmount}, Received: ${receivedAmount}`,
+        )
+
         // Create notification record for amount mismatch
         await this.prisma.notification.create({
           data: {
@@ -467,6 +475,9 @@ export class SepayService {
         message: `Payment successful for order #${order.id}. You have been enrolled in ${result.length} course(s).`,
       })
 
+      // Notify staff and admin about successful payment
+      await this.notifyStaffAndAdminAboutPayment('SUCCESS', order, String(webhookData.id))
+
       this.logger.log(
         `Payment successful for order ${order.id}, transaction ${String(webhookData.id)}, created ${result.length} enrollments`,
       )
@@ -487,6 +498,14 @@ export class SepayService {
           if (paymentCode) {
             const order = await this.prisma.order.findFirst({
               where: { providerRef: paymentCode },
+              include: {
+                user: {
+                  select: {
+                    name: true,
+                    email: true,
+                  },
+                },
+              },
             })
 
             if (order) {
@@ -514,6 +533,9 @@ export class SepayService {
                 amount: order.totalAmount,
                 errorMessage: error.message,
               })
+
+              // Notify staff and admin about payment failure
+              await this.notifyStaffAndAdminAboutPayment('FAILED', order, undefined, error.message)
             }
           }
         } catch (notifError) {
@@ -585,5 +607,124 @@ export class SepayService {
   private extractPaymentCode(content: string): string | null {
     const match = content.match(/TKPTPR DHMC\d+T\d+/)
     return match ? match[0] : null
+  }
+
+  /**
+   * Get all staff and admin users for notifications
+   */
+  private async getStaffAndAdminUsers(): Promise<number[]> {
+    try {
+      const staffAndAdminUsers = await this.prisma.user.findMany({
+        where: {
+          role: {
+            in: ['STAFF', 'ADMIN'],
+          },
+          deletedAt: null, // Only active users
+        },
+        select: {
+          id: true,
+        },
+      })
+
+      return staffAndAdminUsers.map((user) => user.id)
+    } catch (error) {
+      this.logger.error(`Failed to get staff and admin users: ${error.message}`)
+      return []
+    }
+  }
+
+  /**
+   * Notify staff and admin about payment result
+   */
+  private async notifyStaffAndAdminAboutPayment(
+    paymentResult: 'SUCCESS' | 'FAILED',
+    order: any,
+    transactionId?: string,
+    errorMessage?: string,
+  ): Promise<void> {
+    try {
+      const staffAndAdminIds = await this.getStaffAndAdminUsers()
+
+      if (staffAndAdminIds.length === 0) {
+        this.logger.warn('No staff or admin users found to notify')
+        return
+      }
+
+      const basePaymentData = {
+        orderId: order.id,
+        userId: order.userId,
+        customerName: order.user.name,
+        customerEmail: order.user.email,
+        amount: order.totalAmount,
+      }
+
+      if (paymentResult === 'SUCCESS') {
+        // Get course information for the notification
+        const courseTitles = order.items.filter((item: any) => item.course).map((item: any) => item.course.title)
+
+        const courseIds = order.items.filter((item: any) => item.courseId).map((item: any) => item.courseId)
+
+        this.notificationGateway.notifyStaffAndAdminPaymentSuccess(staffAndAdminIds, {
+          ...basePaymentData,
+          transactionId,
+          courseIds,
+          courseTitles,
+        })
+
+        // Create notification records for staff and admin
+        await this.prisma.notification.createMany({
+          data: staffAndAdminIds.map((userId) => ({
+            userId,
+            type: 'SYSTEM',
+            title: 'Payment Success',
+            message: `Payment successful for order #${order.id} from ${order.user.name} (${order.user.email}). Amount: ${order.totalAmount.toLocaleString('vi-VN')} VND. Courses: ${courseTitles.join(', ')}.`,
+            priority: 'NORMAL',
+            data: {
+              orderId: order.id,
+              customerId: order.userId,
+              customerName: order.user.name,
+              customerEmail: order.user.email,
+              amount: order.totalAmount,
+              transactionId,
+              courseIds,
+              courseTitles,
+              notificationType: 'PAYMENT_SUCCESS_ADMIN',
+            },
+          })),
+        })
+      } else {
+        this.notificationGateway.notifyStaffAndAdminPaymentFailed(staffAndAdminIds, {
+          ...basePaymentData,
+          errorMessage,
+        })
+
+        // Create notification records for staff and admin
+        await this.prisma.notification.createMany({
+          data: staffAndAdminIds.map((userId) => ({
+            userId,
+            type: 'SYSTEM',
+            title: 'Payment Failed',
+            message: `Payment failed for order #${order.id} from ${order.user.name} (${order.user.email}). Amount: ${order.totalAmount.toLocaleString('vi-VN')} VND. Error: ${errorMessage || 'Unknown error'}.`,
+            priority: 'HIGH',
+            data: {
+              orderId: order.id,
+              customerId: order.userId,
+              customerName: order.user.name,
+              customerEmail: order.user.email,
+              amount: order.totalAmount,
+              errorMessage,
+              notificationType: 'PAYMENT_FAILED_ADMIN',
+            },
+          })),
+        })
+      }
+
+      this.logger.log(
+        `Notified ${staffAndAdminIds.length} staff/admin users about ${paymentResult.toLowerCase()} payment for order ${order.id}`,
+      )
+    } catch (error) {
+      this.logger.error(`Failed to notify staff/admin about payment: ${error.message}`)
+      // Don't throw - notification failure shouldn't break payment processing
+    }
   }
 }

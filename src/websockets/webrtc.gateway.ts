@@ -84,7 +84,12 @@ export class WebRTCGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly activeSessions = new Map<string, string>()
 
   handleConnection(client: Socket) {
-    const { classId, userId, role, displayName, avatar } = client.handshake.query as Record<string, string>
+    const query = client.handshake.query
+    const classId = Array.isArray(query.classId) ? query.classId[0] : query.classId
+    const userId = Array.isArray(query.userId) ? query.userId[0] : query.userId
+    const role = Array.isArray(query.role) ? query.role[0] : query.role
+    const displayName = Array.isArray(query.displayName) ? query.displayName[0] : query.displayName
+    const avatar = Array.isArray(query.avatar) ? query.avatar[0] : query.avatar
 
     if (!classId || !userId || !role || !displayName) {
       this.logger.warn('Missing connection params', { classId, userId, role, displayName })

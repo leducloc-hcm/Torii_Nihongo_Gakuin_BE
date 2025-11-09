@@ -18,19 +18,15 @@ import { Auth } from 'src/shared/decorators/auth.decorator'
 import { RoleName } from 'src/shared/constants/role.constant'
 import { Roles } from 'src/shared/decorators/roles.decorator'
 import { AuthType } from 'src/shared/constants/auth.constant'
-import { UseGuards } from '@nestjs/common'
-import { RolesGuard } from 'src/shared/guards/roles.guard'
 
 @ApiTags('Class Folders')
 @Controller()
-@UseGuards(RolesGuard)
 @ApiBearerAuth()
 export class ClassFolderController {
   constructor(private readonly classFolderService: ClassFolderService) {}
 
   @Get('folders/my-folders')
   @Auth([AuthType.Bearer])
-  @Roles(RoleName.Customer, RoleName.Lecturer, RoleName.Staff, RoleName.Admin)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Get all folders accessible by user, grouped by class' })
   @ApiResponse({ status: 200, description: 'Folders retrieved successfully' })
@@ -46,7 +42,6 @@ export class ClassFolderController {
 
   @Get('online-classes/:classId/folder')
   @Auth([AuthType.Bearer])
-  @Roles(RoleName.Customer, RoleName.Lecturer, RoleName.Staff, RoleName.Admin)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Get folder information for a class' })
   @ApiResponse({ status: 200, description: 'Folder information retrieved successfully' })
@@ -67,7 +62,6 @@ export class ClassFolderController {
 
   @Get('online-classes/:classId/folder/contents')
   @Auth([AuthType.Bearer])
-  @Roles(RoleName.Customer, RoleName.Lecturer, RoleName.Staff, RoleName.Admin)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Get folder contents (folders and resources) with optional parentId' })
   @ApiResponse({ status: 200, description: 'Folder contents retrieved successfully' })
@@ -88,7 +82,6 @@ export class ClassFolderController {
 
   @Post('online-classes/:classId/folder/folders')
   @Auth([AuthType.Bearer])
-  @Roles(RoleName.Lecturer, RoleName.Admin, RoleName.Staff)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create child folder' })
   @ApiResponse({ status: 201, description: 'Folder created successfully' })
@@ -113,7 +106,6 @@ export class ClassFolderController {
 
   @Post('online-classes/:classId/folder/upload/material')
   @Auth([AuthType.Bearer])
-  @Roles(RoleName.Lecturer, RoleName.Admin, RoleName.Staff)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Generate presigned URL for material upload' })
   @ApiResponse({ status: 200, description: 'Presigned upload URL generated successfully' })
@@ -139,7 +131,6 @@ export class ClassFolderController {
 
   @Post('online-classes/:classId/folder/resources')
   @Auth([AuthType.Bearer])
-  @Roles(RoleName.Lecturer, RoleName.Admin, RoleName.Staff)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create resource record after file upload' })
   @ApiResponse({ status: 201, description: 'Resource created successfully' })
@@ -177,7 +168,6 @@ export class ClassFolderController {
 
   @Delete('online-classes/:classId/folder/resources/:resourceId')
   @Auth([AuthType.Bearer])
-  @Roles(RoleName.Lecturer, RoleName.Admin, RoleName.Staff, RoleName.Customer)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete a resource from class folder' })
   @ApiResponse({ status: 200, description: 'Resource deleted successfully' })
@@ -196,7 +186,6 @@ export class ClassFolderController {
 
   @Patch('online-classes/:classId/folder/permissions/:userId')
   @Auth([AuthType.Bearer])
-  @Roles(RoleName.Lecturer, RoleName.Admin)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Update member folder permission (lecturer only)' })
   @ApiResponse({ status: 200, description: 'Permission updated successfully' })
@@ -216,7 +205,6 @@ export class ClassFolderController {
 
   @Delete('online-classes/:classId/folder/folders/:folderId')
   @Auth([AuthType.Bearer])
-  @Roles(RoleName.Lecturer, RoleName.Admin, RoleName.Staff)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete child folder and all its contents' })
   @ApiResponse({ status: 200, description: 'Folder deleted successfully or content info returned' })

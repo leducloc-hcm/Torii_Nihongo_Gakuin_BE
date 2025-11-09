@@ -206,4 +206,81 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
     })
     this.logger.log(`Sent enrollment notification to user ${userId}, course ${enrollmentData.courseId}`)
   }
+
+  /**
+   * Notify staff and admin about payment results
+   */
+  notifyStaffAndAdminPaymentSuccess(
+    staffAndAdminIds: number[],
+    paymentData: {
+      orderId: number
+      userId: number
+      customerName: string
+      customerEmail: string
+      transactionId?: string
+      amount: number
+      courseIds?: number[]
+      courseTitles?: string[]
+    },
+  ) {
+    const notification: ClassNotification = {
+      type: 'notification:new',
+      message: `Thanh toán thành công - Đơn hàng #${paymentData.orderId} từ ${paymentData.customerName}`,
+      data: {
+        notificationType: 'PAYMENT_SUCCESS_ADMIN',
+        paymentStatus: 'SUCCESS',
+        isAdminNotification: true,
+        ...paymentData,
+      },
+    }
+
+    staffAndAdminIds.forEach((userId) => {
+      this.sendNotification(userId.toString(), notification)
+    })
+
+    this.logger.log(
+      `Sent payment success notification to ${staffAndAdminIds.length} staff/admin users for order ${paymentData.orderId}`,
+    )
+  }
+
+  notifyStaffAndAdminPaymentFailed(
+    staffAndAdminIds: number[],
+    paymentData: {
+      orderId: number
+      userId: number
+      customerName: string
+      customerEmail: string
+      amount: number
+      errorMessage?: string
+    },
+  ) {
+    const notification: ClassNotification = {
+      type: 'notification:new',
+      message: `Thanh toán thất bại - Đơn hàng #${paymentData.orderId} từ ${paymentData.customerName}`,
+      data: {
+        notificationType: 'PAYMENT_FAILED_ADMIN',
+        paymentStatus: 'FAILED',
+        isAdminNotification: true,
+        ...paymentData,
+      },
+    }
+
+    staffAndAdminIds.forEach((userId) => {
+      this.sendNotification(userId.toString(), notification)
+    })
+
+    this.logger.log(
+      `Sent payment failed notification to ${staffAndAdminIds.length} staff/admin users for order ${paymentData.orderId}`,
+    )
+  }
+
+  /**
+   * Send notification to multiple users by their IDs
+   */
+  notifyMultipleUsers(userIds: number[], notification: ClassNotification) {
+    userIds.forEach((userId) => {
+      this.sendNotification(userId.toString(), notification)
+    })
+    this.logger.log(`Sent notification to ${userIds.length} users: ${notification.type}`)
+  }
 }
