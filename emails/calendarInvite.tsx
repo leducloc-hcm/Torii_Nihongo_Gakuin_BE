@@ -19,7 +19,7 @@ interface EmailProps {
   }>
 }
 
-const logoUrl = 'https://mconnectv1.s3.ap-southeast-1.amazonaws.com/Torii_Nihongo_Gakuin_Logo.png'
+const logoUrl = 'https://torii-nihongo-gakuin-s3.s3.ap-southeast-1.amazonaws.com/Torii_Nihongo_Gakuin_Logo.png'
 const appUrl = 'https://torii-nihongo-gakuin.io.vn'
 
 export const CalendarInviteEmail = ({
