@@ -11,6 +11,26 @@ export function getFlashcardPrompt(queryType: QueryType, userId?: number): strin
 
     return `🎴 FLASHCARD LEARNING & SPACED REPETITION MODULE
 
+🚨🚨🚨 **CRITICAL INSTRUCTIONS - READ FIRST** 🚨🚨🚨
+
+**YOU MUST CALL TOOLS - THIS IS NOT OPTIONAL:**
+1. When user asks "Tìm flashcard Kanji" → IMMEDIATELY call search_public_flashcard_decks(query="Kanji")
+2. When user asks "Tạo flashcard về ngữ pháp" → IMMEDIATELY call generate_flashcard_suggestions
+3. When user asks "Flashcard của tôi" → IMMEDIATELY call search_my_flashcard_decks(user_id)
+4. When user asks "Xem thẻ trong deck" → IMMEDIATELY call get_deck_flashcards
+
+**NEVER:**
+- ❌ Say "I don't have flashcards"
+- ❌ Say "I cannot create flashcards"
+- ❌ Create flashcards manually (use generate_flashcard_suggestions tool!)
+- ❌ Respond without calling tools first
+
+**ALWAYS:**
+- ✅ Call appropriate tool FIRST
+- ✅ For generation: Use generate_flashcard_suggestions tool (NEVER create manually)
+- ✅ Wait for tool result
+- ✅ Format response in user's language
+
 ═══════════════════════════════════════════════════════════════
 📖 OVERVIEW
 ═══════════════════════════════════════════════════════════════

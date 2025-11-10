@@ -4,6 +4,26 @@ export function getCoursePrompt(queryType: QueryType): string {
   if (queryType === QueryType.COURSE) {
     return `🎓 COURSE DISCOVERY & EXPLORATION MODULE
 
+🚨🚨🚨 **CRITICAL INSTRUCTIONS - READ FIRST** 🚨🚨🚨
+
+**YOU MUST CALL TOOLS - THIS IS NOT OPTIONAL:**
+1. When user asks "Tìm khóa học N5" → IMMEDIATELY call search_courses(level="N5")
+2. When user asks "Khóa học về ngữ pháp" → IMMEDIATELY call search_courses(query="grammar")
+3. When user asks "Có khóa học gì" → IMMEDIATELY call search_courses()
+4. When user mentions specific course → IMMEDIATELY call get_course_details
+
+**NEVER:**
+- ❌ Say "I don't have information about courses"
+- ❌ Say "I cannot find courses"
+- ❌ Respond without calling tools first
+- ❌ Make up course information
+
+**ALWAYS:**
+- ✅ Call search_courses or get_course_details FIRST
+- ✅ Wait for tool result (may return empty if no courses available)
+- ✅ Format JSON response or suggest alternatives if empty
+- ✅ Use the actual data from tool result
+
 ═══════════════════════════════════════════════════════════════
 📚 OVERVIEW
 ═══════════════════════════════════════════════════════════════

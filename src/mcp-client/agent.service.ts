@@ -13,7 +13,10 @@ import {
 import { CourseMcpClient } from 'src/mcp-client/module/course/course-mcp.service'
 import { EnrollmentMcpClient } from 'src/mcp-client/module/enrollment/enrollment-mcp.service'
 import { ASSESSMENT_MCP_PROMPT } from 'src/mcp-client/module/assessment/assessment-mcp.prompt'
-import { ASSESSMENT_HISTORY_MCP_PROMPT } from 'src/mcp-client/module/assessment_history/history-mcp.prompt'
+import {
+  ASSESSMENT_HISTORY_MCP_PROMPT,
+  getAssessmentHistoryPrompt,
+} from 'src/mcp-client/module/assessment_history/history-mcp.prompt'
 import { QueryType } from 'src/mcp-client/shared/query-detection.utils'
 import { getEnabledMCPServers, MCP_SERVERS } from 'src/shared/config/mcp-servers.config'
 import { OPENAI_CONFIG, MCP_CONFIG } from 'src/shared/config/openai.config'
@@ -66,18 +69,38 @@ export class AgentService {
     }
   }
 
-  async getResponse(messages: ChatCompletionMessageParam[], useTools = true): Promise<AgentResponse> {
+  async getResponse(
+    messages: ChatCompletionMessageParam[],
+    useTools = true,
+    forceTools = false,
+  ): Promise<AgentResponse> {
     if (!this.toolsLoaded) {
       await this.loadTools()
     }
 
     try {
+      // Determine tool_choice based on parameters
+      let toolChoice: 'auto' | 'required' | undefined = undefined
+      if (useTools && this.allTools.length > 0) {
+        toolChoice = forceTools ? 'required' : 'auto'
+      }
+
       const completionOptions: any = {
         model: OPENAI_CONFIG.model,
         messages,
         tools: useTools && this.allTools.length > 0 ? this.allTools : undefined,
-        tool_choice: useTools && this.allTools.length > 0 ? 'auto' : undefined,
+        tool_choice: toolChoice,
         temperature: OPENAI_CONFIG.temperature,
+      }
+
+      // Log tools availability
+      this.logger.debug(`🔧 Tools available: ${this.allTools.length} tools`)
+      this.logger.debug(`🔧 Use tools: ${useTools}`)
+      this.logger.debug(`🔧 Force tools: ${forceTools} (tool_choice: ${toolChoice})`)
+      if (this.allTools.length > 0) {
+        this.logger.debug(
+          `🔧 Tool names: ${this.allTools.map((t) => ('function' in t ? t.function.name : 'custom')).join(', ')}`,
+        )
       }
 
       // Only add max_completion_tokens if it's defined (not unlimited)
@@ -185,7 +208,7 @@ export class AgentService {
       this.logger.log('📊 Injecting ASSESSMENT_HISTORY module system prompt at the beginning')
       messages.unshift({
         role: 'system',
-        content: ASSESSMENT_HISTORY_MCP_PROMPT,
+        content: getAssessmentHistoryPrompt(QueryType.ASSESSMENT_HISTORY, request.userId),
       })
     }
 
@@ -358,15 +381,25 @@ NOTE: This is ONLY for search results. Flashcard GENERATION uses a different for
       throw new Error(`No MCP server found for tool: ${toolName}`)
     }
 
-    // Auto-inject user_id for assessment history tools that require it
+    // Auto-inject user_id for tools that require authenticated user context
     const lowerToolName = toolName.toLowerCase()
-    const isHistoryTool =
+    const requiresUserId =
       lowerToolName.includes('my_assessment') ||
       lowerToolName.includes('progress_summary') ||
-      lowerToolName.includes('history')
+      lowerToolName.includes('history') ||
+      lowerToolName.includes('enrollment') ||
+      lowerToolName.includes('my_') || // Any "my_*" tool requires user_id
+      lowerToolName.includes('user_')
 
-    if (isHistoryTool && userId && !args.user_id) {
-      this.logger.log(`🔐 Auto-injecting user_id=${userId} for history tool: ${toolName}`)
+    if (requiresUserId && userId) {
+      // ALWAYS override user_id with authenticated userId to prevent security issues
+      if (args.user_id && args.user_id !== userId) {
+        this.logger.warn(
+          `⚠️  Overriding user_id=${args.user_id} with authenticated userId=${userId} for tool: ${toolName}`,
+        )
+      } else {
+        this.logger.log(`🔐 Auto-injecting user_id=${userId} for tool: ${toolName}`)
+      }
       args = { ...args, user_id: userId }
     }
 

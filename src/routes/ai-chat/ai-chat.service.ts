@@ -139,8 +139,19 @@ export class AIChatService {
       content: query,
     })
 
+    // Determine if we should FORCE tool calling
+    // Force tools for queries that MUST fetch data (user-specific data)
+    const shouldForceTools =
+      queryType === QueryType.ASSESSMENT_HISTORY || // "Tôi đã làm bài test nào?"
+      queryType === QueryType.ENROLLMENT || // "Khóa học của tôi"
+      (queryType === QueryType.FLASHCARD && isFlashcardGeneration) // "Tạo flashcard"
+
+    if (shouldForceTools) {
+      this.logger.log(`🎯 FORCING tool calls for queryType: ${queryType}`)
+    }
+
     // Get response from Agent
-    const agentResponse = await this.agentService.getResponse(messages, true)
+    const agentResponse = await this.agentService.getResponse(messages, true, shouldForceTools)
 
     // DEBUG: Log tool calls
     if (agentResponse.toolCalls && agentResponse.toolCalls.length > 0) {

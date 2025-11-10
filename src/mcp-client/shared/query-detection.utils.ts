@@ -610,8 +610,8 @@ export function detectQueryType(query: string): QueryType {
     'blog',
     'article',
     'đọc',
-    'bài',
-    'bài về',
+    // NOTE: 'bài' removed - too generic, conflicts with 'bài test', 'bài thi'
+    'bài về', // Keep this - more specific (article about)
 
     // 🇻🇳 Vietnamese - Learning content
     'mẹo',
@@ -742,9 +742,25 @@ export function detectQueryType(query: string): QueryType {
     hasCourseKeyword
 
   // Check for specific assessment queries (test, exam, quiz SEARCH)
+  // CRITICAL: Strong assessment indicators (test, trial, mock, exam) should trigger ASSESSMENT even without explicit search words
+  const hasStrongAssessmentKeyword =
+    lowerQuery.includes('test') ||
+    lowerQuery.includes('exam') ||
+    lowerQuery.includes('quiz') ||
+    lowerQuery.includes('trial') ||
+    lowerQuery.includes('mock') ||
+    lowerQuery.includes('practice') ||
+    lowerQuery.includes('đề thi') ||
+    lowerQuery.includes('bài test') ||
+    lowerQuery.includes('bài thi') ||
+    lowerQuery.includes('試験') ||
+    lowerQuery.includes('テスト') ||
+    lowerQuery.includes('模擬')
+
   const isAssessmentSearchQuery =
     hasAssessmentKeyword &&
-    (lowerQuery.includes('tìm') ||
+    (hasStrongAssessmentKeyword || // Strong indicators don't need search words
+      lowerQuery.includes('tìm') ||
       lowerQuery.includes('search') ||
       lowerQuery.includes('find') ||
       lowerQuery.includes('có những') ||
@@ -757,7 +773,15 @@ export function detectQueryType(query: string): QueryType {
       lowerQuery.includes('hiển thị') ||
       lowerQuery.includes('探す') ||
       lowerQuery.includes('見せて') ||
-      lowerQuery.includes('ある'))
+      lowerQuery.includes('ある') ||
+      // Assessment suggestion patterns
+      lowerQuery.includes('how about') ||
+      lowerQuery.includes('what about') ||
+      lowerQuery.includes('thế nào về') ||
+      lowerQuery.includes('về việc') ||
+      lowerQuery.includes('còn') ||
+      lowerQuery.includes('はどう') ||
+      lowerQuery.includes('について'))
 
   // Check for assessment HISTORY queries (user's past attempts)
   // Must be very specific to avoid false positives
@@ -780,14 +804,36 @@ export function detectQueryType(query: string): QueryType {
         lowerQuery.includes('した') ||
         lowerQuery.includes('受けた')))
 
-  // Priority: Flashcard Creation > Flashcard Search > Blog > Assessment History > Assessment Search > Available Courses > Personal Courses/Enrollment > Course > Lesson > General
+  // Check for BLOG-specific patterns (more specific than just keywords)
+  // Blog queries usually ask about learning CONTENT/TIPS, not tests/courses
+  const isBlogQuery =
+    hasBlogKeyword &&
+    !hasAssessmentKeyword && // Not if it has test/exam keywords
+    !hasFlashcardKeyword && // Not if it has flashcard keywords
+    (lowerQuery.includes('bài viết') || // Explicit "article"
+      lowerQuery.includes('blog') || // Explicit "blog"
+      lowerQuery.includes('article') || // Explicit "article"
+      lowerQuery.includes('mẹo') || // Tips
+      lowerQuery.includes('tips') ||
+      lowerQuery.includes('hướng dẫn') || // Guide
+      lowerQuery.includes('guide') ||
+      lowerQuery.includes('cách học') || // How to learn
+      lowerQuery.includes('how to') ||
+      lowerQuery.includes('đọc') || // Read
+      lowerQuery.includes('read') ||
+      lowerQuery.includes('記事') || // Article (JP)
+      lowerQuery.includes('ヒント') || // Tips (JP)
+      lowerQuery.includes('コツ')) // Tips/tricks (JP)
+
+  // Priority: Flashcard Creation > Flashcard Search > Assessment History > Assessment Search > Blog > Available Courses > Personal Courses/Enrollment > Course > Lesson > General
   // CRITICAL: Flashcard operations take HIGHEST priority to ensure correct tool is called
   // CRITICAL: Assessment History must come BEFORE Assessment Search (more specific)
+  // CRITICAL: Assessment checks must come BEFORE Blog to avoid false positives with 'bài test'
   if (isFlashcardCreation) return QueryType.FLASHCARD
   if (isFlashcardSearch) return QueryType.FLASHCARD
-  if (hasBlogKeyword) return QueryType.BLOG
   if (isAssessmentHistoryQuery) return QueryType.ASSESSMENT_HISTORY // NEW: User's test history
   if (isAssessmentSearchQuery) return QueryType.ASSESSMENT // Search for available tests
+  if (isBlogQuery) return QueryType.BLOG // MOVED: After assessment checks
   if (isAvailableCourseQuery) return QueryType.COURSE // Ask about website courses = COURSE query
   if (isPersonalCourseQuery) return QueryType.ENROLLMENT // Ask about MY courses = ENROLLMENT query
   if (hasEnrollmentKeyword && !hasCourseKeyword) return QueryType.ENROLLMENT // Pure enrollment keywords
@@ -795,6 +841,7 @@ export function detectQueryType(query: string): QueryType {
   if (hasFlashcardKeyword) return QueryType.FLASHCARD // MOVED: Any other flashcard keyword
   if (hasAssessmentKeyword) return QueryType.ASSESSMENT
   if (hasLessonKeyword) return QueryType.LESSON
+  if (hasBlogKeyword) return QueryType.BLOG // Fallback: generic blog keywords
 
   return QueryType.GENERAL
 }

@@ -8,6 +8,26 @@ export function getEnrollmentPrompt(queryType: QueryType, userId?: number): stri
 
     return `📚 ENROLLMENT & LEARNING PROGRESS MODULE
 
+🚨🚨🚨 **CRITICAL INSTRUCTIONS - READ FIRST** 🚨🚨🚨
+
+**YOU MUST CALL TOOLS - THIS IS NOT OPTIONAL:**
+1. When user asks "Các khóa học của tôi?" → IMMEDIATELY call get_user_enrollments(user_id)
+2. When user asks "Tiến độ học" → IMMEDIATELY call get_course_progress(user_id, course_id)
+3. When user asks "Thống kê học tập" → IMMEDIATELY call get_user_learning_stats(user_id)
+4. When user asks "Tôi đang học gì?" → IMMEDIATELY call get_user_enrollments(user_id)
+
+**NEVER:**
+- ❌ Say "I don't have access to your enrollments"
+- ❌ Say "I cannot retrieve your courses"
+- ❌ Respond without calling tools first
+- ❌ Make assumptions about user's courses
+
+**ALWAYS:**
+- ✅ Call appropriate tool FIRST
+- ✅ Wait for tool result
+- ✅ Then format response in user's language
+- ✅ Use the actual data from tool result
+
 ═══════════════════════════════════════════════════════════════
 📖 OVERVIEW
 ═══════════════════════════════════════════════════════════════
