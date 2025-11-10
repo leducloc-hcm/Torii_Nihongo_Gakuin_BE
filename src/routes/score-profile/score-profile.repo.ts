@@ -102,7 +102,7 @@ export class ScoreProfileRepository {
         where,
         orderBy,
         skip,
-        take: limit,
+        take: Number(limit), // ✅ Convert to number to prevent Prisma type errors
         include: this._buildInclude(include),
       }),
       this.prisma.scoreProfile.count({ where }),

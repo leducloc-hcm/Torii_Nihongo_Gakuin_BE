@@ -247,14 +247,38 @@ export class QuizRepository {
   }
 
   async clone(originalId: number, userId: number, newTitle: string): Promise<Quiz> {
-    // Get original quiz with all items
+    // Get original quiz with all items including full question and group details
     const original = await this.prisma.quiz.findUnique({
       where: { id: originalId },
       include: {
         items: {
           include: {
-            questions: true,
-            questionGroups: true,
+            questions: {
+              include: {
+                question: {
+                  include: {
+                    options: true,
+                  },
+                },
+              },
+            },
+            questionGroups: {
+              include: {
+                group: {
+                  include: {
+                    questions: {
+                      include: {
+                        question: {
+                          include: {
+                            options: true,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
           },
         },
       },
@@ -264,6 +288,101 @@ export class QuizRepository {
       throw new Error('Original quiz not found')
     }
 
+    // Step 1: Clone all unique questions with version increment
+    const questionIdMap = new Map<number, number>() // oldId -> newId
+    const uniqueQuestionIds = new Set<number>()
+
+    // Collect all unique question IDs from items
+    original.items.forEach((item) => {
+      item.questions.forEach((q) => uniqueQuestionIds.add(q.questionId))
+      item.questionGroups.forEach((qg) => {
+        qg.group.questions.forEach((gq) => uniqueQuestionIds.add(gq.questionId))
+      })
+    })
+
+    // Clone questions with version increment
+    for (const oldQuestionId of uniqueQuestionIds) {
+      const originalQuestion = await this.prisma.question.findUnique({
+        where: { id: oldQuestionId },
+        include: { options: true },
+      })
+
+      if (originalQuestion) {
+        const newQuestion = await this.prisma.question.create({
+          data: {
+            uuid: originalQuestion.uuid, // Keep same uuid for version grouping
+            version: originalQuestion.version + 1, // Increment version
+            type: originalQuestion.type,
+            level: originalQuestion.level,
+            difficulty: originalQuestion.difficulty,
+            stem: originalQuestion.stem,
+            passage: originalQuestion.passage,
+            mediaId: originalQuestion.mediaId,
+            explanation: originalQuestion.explanation,
+            readingLength: originalQuestion.readingLength,
+            options: {
+              create: originalQuestion.options.map((opt) => ({
+                content: opt.content,
+                mediaId: opt.mediaId,
+                isCorrect: opt.isCorrect,
+                order: opt.order,
+              })),
+            },
+          },
+        })
+
+        questionIdMap.set(oldQuestionId, newQuestion.id)
+      }
+    }
+
+    // Step 2: Clone all unique question groups with version increment
+    const groupIdMap = new Map<number, number>() // oldId -> newId
+    const uniqueGroupIds = new Set<number>()
+
+    // Collect all unique group IDs
+    original.items.forEach((item) => {
+      item.questionGroups.forEach((qg) => uniqueGroupIds.add(qg.groupId))
+    })
+
+    // Clone groups with version increment
+    for (const oldGroupId of uniqueGroupIds) {
+      const originalGroup = await this.prisma.questionGroup.findUnique({
+        where: { id: oldGroupId },
+        include: {
+          questions: {
+            include: {
+              question: true,
+            },
+          },
+        },
+      })
+
+      if (originalGroup) {
+        const newGroup = await this.prisma.questionGroup.create({
+          data: {
+            uuid: originalGroup.uuid, // Keep same uuid for version grouping
+            version: originalGroup.version + 1, // Increment version
+            type: originalGroup.type,
+            title: originalGroup.title,
+            passage: originalGroup.passage,
+            mediaId: originalGroup.mediaId,
+            order: originalGroup.order,
+            metadata: originalGroup.metadata as any,
+            questions: {
+              create: originalGroup.questions.map((gq) => ({
+                questionId: questionIdMap.get(gq.questionId) || gq.questionId, // Use new question ID
+                order: gq.order,
+                score: gq.score,
+              })),
+            },
+          },
+        })
+
+        groupIdMap.set(oldGroupId, newGroup.id)
+      }
+    }
+
+    // Step 3: Create new quiz with cloned questions and groups
     return await this.prisma.quiz.create({
       data: {
         title: newTitle,
@@ -276,13 +395,13 @@ export class QuizRepository {
             order: item.order,
             questions: {
               create: item.questions.map((q) => ({
-                questionId: q.questionId,
+                questionId: questionIdMap.get(q.questionId) || q.questionId, // Use new question ID
                 order: q.order,
               })),
             },
             questionGroups: {
               create: item.questionGroups.map((qg) => ({
-                groupId: qg.groupId,
+                groupId: groupIdMap.get(qg.groupId) || qg.groupId, // Use new group ID
                 order: qg.order,
               })),
             },

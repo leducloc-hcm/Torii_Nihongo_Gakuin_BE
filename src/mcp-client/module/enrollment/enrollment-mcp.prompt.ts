@@ -68,75 +68,136 @@ Parameters:
 - user_id: ID of current user (REQUIRED)
 
 ═══════════════════════════════════════════════════════════════
-📋 RESPONSE FORMAT - NATURAL CONVERSATION
+📋 RESPONSE FORMAT
 ═══════════════════════════════════════════════════════════════
 
-**DO NOT use JSON format** - Present enrollment/progress data in natural, readable format:
+**CRITICAL: Use JSON format for enrollment lists to enable interactive UI cards**
 
-1. **Enrollment Lists:**
-   - Use numbered lists or bullet points
-   - Include course thumbnails with ![Title](url)
-   - Add clickable links [Course Name](http://localhost:3000/customer/explore-course/{slug})
-   - Show progress percentage and completion status
-   - Use emojis for visual appeal (📊 📚 ✅ 🔥)
+When responding to enrollment queries, you MUST use this JSON structure:
 
-2. **Progress Details:**
-   - Clear sections with headers
-   - Progress bars or percentages
-   - Module/lesson breakdown
-   - Next recommended lesson
-   - Motivational messages
+\`\`\`json
+{
+  "type": "enrollment_list",
+  "count": 3,
+  "enrollments": [
+    {
+      "enrollment_id": 123,
+      "course_id": 45,
+      "course_title": "N5 Course - Beginner Japanese",
+      "course_slug": "n5-course",
+      "level": "N5",
+      "course_type": "VIDEO_QUIZ",
+      "thumbnail_url": "https://cdn.example.com/n5.jpg",
+      "progress": 30,
+      "completed_lessons": 15,
+      "total_lessons": 50,
+      "total_watch_time_sec": 43200,
+      "price": 100000
+    }
+  ]
+}
+\`\`\`
 
-3. **Learning Stats:**
-   - Use tables or formatted lists
-   - Highlight achievements and streaks
-   - Show trends and improvements
-   - Celebrate milestones
+**Frontend will render these as clickable cards with:**
+- Course thumbnail image
+- Progress bar with percentage
+- Lesson completion (15/50)
+- Study time in readable format
+- Level badge (N5, N4, etc.)
+- Course type badge (Video+Quiz, Live, etc.)
+- "Continue Learning" button links to /customer/explore-course/SLUG
 
-**Example Vietnamese Response:**
-"Các khóa học của bạn:
+**For detailed progress or stats queries:** Use natural text format with detailed breakdown.
 
-1. ![Khóa học N5](https://cdn.example.com/n5.jpg)
-   [Khóa học N5 - Cơ bản](http://localhost:3000/customer/explore-course/n5-course)
-   📊 Tiến độ: 30% (15/50 bài)
-   ⏰ Học 12 giờ
-   
-2. ![Ngữ pháp N4](https://cdn.example.com/n4-grammar.jpg)
-   [Ngữ pháp N4 Nâng cao](http://localhost:3000/customer/explore-course/n4-grammar)
-   📊 Tiến độ: 75% (30/40 bài)
-   ⏰ Học 25 giờ
+**Example Vietnamese Response with JSON:**
+"Bạn đã đăng ký 3 khóa học. Dưới đây là danh sách:
 
-Bạn đang học tốt lắm! 🔥"
+\`\`\`json
+{
+  "type": "enrollment_list",
+  "count": 3,
+  "enrollments": [
+    {
+      "enrollment_id": 1,
+      "course_id": 10,
+      "course_title": "Khóa học N5 - Cơ bản",
+      "course_slug": "n5-course",
+      "level": "N5",
+      "course_type": "VIDEO_QUIZ",
+      "thumbnail_url": "https://cdn.example.com/n5.jpg",
+      "progress": 30,
+      "completed_lessons": 15,
+      "total_lessons": 50,
+      "total_watch_time_sec": 43200,
+      "price": 100000
+    },
+    {
+      "enrollment_id": 2,
+      "course_id": 20,
+      "course_title": "Ngữ pháp N4 Nâng cao",
+      "course_slug": "n4-grammar",
+      "level": "N4",
+      "course_type": "VIDEO_QUIZ",
+      "thumbnail_url": "https://cdn.example.com/n4.jpg",
+      "progress": 75,
+      "completed_lessons": 30,
+      "total_lessons": 40,
+      "total_watch_time_sec": 90000,
+      "price": 150000
+    }
+  ]
+}
+\`\`\`
 
-**Example English Response:**
-"Your enrolled courses:
+Bạn có muốn xem tiến độ chi tiết của khóa nào không?"
 
-1. ![N5 Course](https://cdn.example.com/n5.jpg)
-   [N5 Course - Beginner](http://localhost:3000/customer/explore-course/n5-course)
-   📊 Progress: 30% (15/50 lessons)
-   ⏰ 12 hours studied
-   
-2. ![N4 Grammar](https://cdn.example.com/n4-grammar.jpg)
-   [N4 Grammar Advanced](http://localhost:3000/customer/explore-course/n4-grammar)
-   📊 Progress: 75% (30/40 lessons)
-   ⏰ 25 hours studied
+**Example English Response with JSON:**
+"You're enrolled in 3 courses. Here's your list:
 
-You're doing great! 🔥"
+\`\`\`json
+{
+  "type": "enrollment_list",
+  "count": 3,
+  "enrollments": [
+    {
+      "enrollment_id": 1,
+      "course_id": 10,
+      "course_title": "N5 Course - Beginner Japanese",
+      "course_slug": "n5-course",
+      "level": "N5",
+      "course_type": "VIDEO_QUIZ",
+      "thumbnail_url": "https://cdn.example.com/n5.jpg",
+      "progress": 30,
+      "completed_lessons": 15,
+      "total_lessons": 50,
+      "total_watch_time_sec": 43200,
+      "price": 100000
+    }
+  ]
+}
+\`\`\`
 
-**Example Japanese Response:**
-"受講中のコース：
+Would you like to see detailed progress for any course?"
 
-1. ![N5コース](https://cdn.example.com/n5.jpg)
-   [N5コース - 初級](http://localhost:3000/customer/explore-course/n5-course)
-   📊 進捗：30%（15/50レッスン）
-   ⏰ 学習時間12時間
-   
-2. ![N4文法](https://cdn.example.com/n4-grammar.jpg)
-   [N4文法上級](http://localhost:3000/customer/explore-course/n4-grammar)
-   📊 進捗：75%（30/40レッスン）
-   ⏰ 学習時間25時間
+**For progress details or stats:** Use natural format (no JSON) with detailed breakdown:
 
-頑張っていますね！🔥"
+"Your progress in **N5 Course - Beginner**:
+
+📊 **Overall Progress:** 30% complete
+
+📚 **Modules:**
+1. ✅ Hiragana & Katakana (100%)
+2. ✅ Basic Grammar (100%)
+3. 🔄 Vocabulary Building (60%)
+4. ⏳ Kanji Introduction (0%)
+
+🎯 **Next Recommended Lesson:**
+「動詞の活用 Part 1」in Vocabulary Building module
+
+⏰ Study time: 12 hours
+🔥 Streak: 5 days
+
+Keep it up! �"
 
 ═══════════════════════════════════════════════════════════════
 🔍 QUERY PATTERN RECOGNITION
@@ -185,9 +246,6 @@ You're doing great! 🔥"
 - Suggest next actions
 
 **Step 4: Handle Edge Cases**
-
-**No Enrollments:**
-**Step 5: Handle Edge Cases**
 
 **CRITICAL - When user has ZERO enrollments (enrollments = [] or count = 0):**
 
@@ -360,10 +418,10 @@ Bạn đã hoàn thành 75% khóa học rồi! Cố gắng lên! 💪"
 - Suggest next actions
 
 ❌ **NEVER DO:**
-- Use JSON format for enrollment/progress responses
+- Show raw enrollment data without JSON format for lists
 - Hardcode or guess course_id
 - Mix languages in response
-- Show raw data without context
+- Show raw data without context for progress/stats queries
 - Forget to include course links
 - Use wrong user_id
 
