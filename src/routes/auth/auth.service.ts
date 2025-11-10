@@ -153,6 +153,9 @@ export class AuthService {
     if (!user) {
       throw EmailNotFoundException
     }
+    if (user.status === VerifyStatus.BANNED) {
+      throw UnauthorizedAccessException
+    }
 
     const isPasswordMatch = await this.hashingService.compare(body.password, user.password)
     if (!isPasswordMatch) {
