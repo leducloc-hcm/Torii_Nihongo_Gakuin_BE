@@ -5,7 +5,7 @@ interface OTPEmailProps {
   title: string
 }
 
-const logoUrl = 'https://mconnectv1.s3.ap-southeast-1.amazonaws.com/Torii_Nihongo_Gakuin_Logo.png'
+const logoUrl = 'https://torii-nihongo-gakuin-s3.s3.ap-southeast-1.amazonaws.com/Torii_Nihongo_Gakuin_Logo.png'
 
 export const OTPEmail = ({ otpCode, title }: OTPEmailProps) => (
   <Html>
