@@ -83,7 +83,6 @@ export class AssessmentPaperService {
       throw new NotFoundException(`Assessment paper with ID ${id} not found`)
     }
 
-    // Generate new title if not provided
     const title = newTitle || `${original.title} (Copy v${original.version + 1})`
 
     // Check title uniqueness

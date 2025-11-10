@@ -384,7 +384,7 @@ model PlacementBlueprint {
 
 model Question {
   id               Int              @id @default(autoincrement())
-  uuid             String?          @unique @default(uuid())
+  uuid             String?          @default(uuid())
   version          Int              @default(1)
   type             QuestionType
   level            JLPTLevel
@@ -406,6 +406,7 @@ model Question {
   quizAnswers              QuizAnswer[]
   assessmentAnswerProgress AssessmentAnswerProgress[]
   
+  @@unique([uuid, version])
   @@index([uuid])
   @@index([version])
   @@index([type])
@@ -414,7 +415,7 @@ model Question {
 
 model QuestionGroup {
   id          Int       @id @default(autoincrement())
-  uuid        String?    @unique @default(uuid()) 
+  uuid        String?   @default(uuid()) 
   version     Int       @default(1)
   type        QuestionGroupType
   title       String?
@@ -431,6 +432,7 @@ model QuestionGroup {
   assessmentItems AssessmentItemGroup[]
   quizItems       QuizItemGroup[]
   
+  @@unique([uuid, version])
   @@index([uuid])
   @@index([version])
 }
