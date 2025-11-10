@@ -58,9 +58,27 @@ export class OptionRepository {
   }
 
   async update(where: OptionWhereUniqueInput, data: any): Promise<any> {
+    // Sanitize incoming data to match Prisma types (avoid passing strings for booleans)
+    const sanitized: any = { ...data }
+
+    if (Object.prototype.hasOwnProperty.call(sanitized, 'isCorrect')) {
+      const val = sanitized.isCorrect
+      if (typeof val === 'string') {
+        const v = val.trim().toLowerCase()
+        sanitized.isCorrect = v === 'true' || v === '1' || v === 'yes'
+      } else {
+        sanitized.isCorrect = Boolean(val)
+      }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(sanitized, 'order')) {
+      const ord = sanitized.order
+      sanitized.order = typeof ord === 'string' && ord !== '' ? parseInt(ord, 10) : ord
+    }
+
     return await this.prisma.option.update({
       where: where as any,
-      data,
+      data: sanitized,
       include: this.includeQuestion,
     })
   }
