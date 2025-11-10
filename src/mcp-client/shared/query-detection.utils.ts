@@ -695,9 +695,12 @@ export function detectQueryType(query: string): QueryType {
     (lowerQuery.includes('của tôi') ||
       lowerQuery.includes('của mình') ||
       lowerQuery.includes('tôi đã') ||
+      lowerQuery.includes('tôi đă') || // ✅ Common typo for "tôi đã"
       lowerQuery.includes('my ') ||
       lowerQuery.includes('đã đăng ký') ||
       lowerQuery.includes('đã đăng kí') || // ✅ Alternative spelling with í
+      lowerQuery.includes('đă đăng ký') || // ✅ Common typo "đă" instead of "đã"
+      lowerQuery.includes('đă đăng kí') || // ✅ Common typo + alternative spelling
       lowerQuery.includes('đang học') ||
       lowerQuery.includes('enrolled') ||
       lowerQuery.includes('私の') ||
@@ -767,8 +770,11 @@ export function detectQueryType(query: string): QueryType {
 
   // Check for assessment HISTORY queries (user's past attempts)
   // Must be very specific to avoid false positives
+  // CRITICAL: Exclude queries about COURSE progress (those are ENROLLMENT, not ASSESSMENT_HISTORY)
   const isAssessmentHistoryQuery =
-    hasAssessmentHistoryKeyword ||
+    (hasAssessmentHistoryKeyword &&
+      !hasCourseKeyword && // ✅ NOT if asking about courses
+      !isPersonalCourseQuery) || // ✅ NOT if asking about personal courses
     (hasAssessmentKeyword &&
       (lowerQuery.includes('lịch sử') ||
         lowerQuery.includes('đã làm') ||
