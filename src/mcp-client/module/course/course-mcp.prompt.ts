@@ -8,6 +8,7 @@ import { getCoursePrompt } from './course-specific.prompt'
 import { getEnrollmentPrompt } from '../enrollment/enrollment-mcp.prompt'
 import { getFlashcardPrompt } from '../flashcard/flashcard-mcp.prompt'
 import { BLOG_MCP_SYSTEM_PROMPT } from '../blog/blog-mcp.prompt'
+import { getAssessmentHistoryPrompt } from '../assessment_history/history-mcp.prompt'
 
 @Injectable()
 export class PromptService {
@@ -52,6 +53,11 @@ export class PromptService {
 
     const flashcardPrompt = getFlashcardPrompt(queryType, userId)
     if (flashcardPrompt) return flashcardPrompt
+
+    // Check for assessment history query
+    if (queryType === QueryType.ASSESSMENT_HISTORY) {
+      return getAssessmentHistoryPrompt(userId)
+    }
 
     // Check for blog query
     if (queryType === QueryType.BLOG) {

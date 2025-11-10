@@ -173,6 +173,12 @@ ENV MCP_FLASHCARD_ENABLED=true
 
 ENV MCP_BLOG_SERVER_URL=https://agent.torii-nihongo-gakuin.io.vn/blog/mcp
 ENV MCP_BLOG_ENABLED=true
+
+ENV MCP_ASSESSMENT_SERVER_URL=https://agent.torii-nihongo-gakuin.io.vn/assessment/mcp
+ENV MCP_ASSESSMENT_ENABLED=true
+
+ENV MCP_ASSESSMENT_HISTORY_SERVER_URL=https://agent.torii-nihongo-gakuin.io.vn/assessment-history/mcp
+ENV MCP_ASSESSMENT_HISTORY_ENABLED=true
 # Frontend URL for redirects
 ENV FRONTEND_URL=http://localhost:3000
 
