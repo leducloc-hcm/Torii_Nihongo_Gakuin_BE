@@ -157,7 +157,6 @@ export function detectQueryType(query: string): QueryType {
     'deck',
     'decks',
 
-    // 🇬🇧 English - Flashcard actions
     'create flashcard',
     'generate flashcard',
     'make flashcard',
@@ -166,14 +165,12 @@ export function detectQueryType(query: string): QueryType {
     'make cards',
     'add flashcard',
 
-    // 🇬🇧 English - Flashcard search
     'find flashcard',
     'search flashcard',
     'show flashcard',
     'flashcard deck',
     'available flashcard',
 
-    // 🇬🇧 English - Study related
     'vocabulary',
     'vocab',
     'memorize',
@@ -183,7 +180,6 @@ export function detectQueryType(query: string): QueryType {
     'memory card',
     'spaced repetition',
 
-    // 🇻🇳 Vietnamese - Flashcard general
     'flashcard',
     'thẻ',
     'các thẻ',
@@ -192,7 +188,6 @@ export function detectQueryType(query: string): QueryType {
     'bộ thẻ',
     'deck',
 
-    // 🇻🇳 Vietnamese - Flashcard actions
     'tạo flashcard',
     'tạo flashcards',
     'tạo thẻ',
@@ -202,7 +197,6 @@ export function detectQueryType(query: string): QueryType {
     'làm flashcard',
     'thêm flashcard',
 
-    // 🇻🇳 Vietnamese - Flashcard search
     'tìm flashcard',
     'tìm thẻ',
     'có flashcard',
@@ -212,7 +206,6 @@ export function detectQueryType(query: string): QueryType {
     'bộ thẻ nào',
     'xem flashcard',
 
-    // 🇻🇳 Vietnamese - Study related
     'từ vựng',
     'từ vựng',
     'ôn tập',
@@ -221,27 +214,23 @@ export function detectQueryType(query: string): QueryType {
     'học thuộc',
     'ôn luyện',
 
-    // 🇯🇵 Japanese - Flashcard general
     'フラッシュカード',
     'カード',
     'デッキ',
     '単語カード',
     '暗記カード',
 
-    // 🇯🇵 Japanese - Flashcard actions
     'カードを作成',
     'カードを生成',
     'フラッシュカードを作る',
     'カードを作る',
     'フラッシュカードを作成',
 
-    // 🇯🇵 Japanese - Flashcard search
     'カードを探す',
     'フラッシュカードを探す',
     'カードはある',
     'デッキを見せて',
 
-    // 🇯🇵 Japanese - Study related
     '単語',
     '語彙',
     '復習',
@@ -250,9 +239,7 @@ export function detectQueryType(query: string): QueryType {
     '記憶',
   ]
 
-  // Assessment-specific keywords (search for tests/exams)
   const assessmentKeywords = [
-    // 🇬🇧 English - General assessment
     'test',
     'quiz',
     'exam',
@@ -263,7 +250,6 @@ export function detectQueryType(query: string): QueryType {
     'answer',
     'answers',
 
-    // 🇬🇧 English - Practice/Trial tests (10-30 questions, 15-45 min)
     'practice test',
     'trial test',
     'mini test',
@@ -274,7 +260,6 @@ export function detectQueryType(query: string): QueryType {
     'short test',
     'sample test',
 
-    // 🇬🇧 English - Mock/Full exams (100+ questions, 2-3 hours)
     'mock exam',
     'full exam',
     'jlpt exam',
@@ -286,7 +271,6 @@ export function detectQueryType(query: string): QueryType {
     'real exam',
     'final exam',
 
-    // 🇻🇳 Vietnamese - General assessment
     'bài kiểm tra',
     'bài thi',
     'kiểm tra',
@@ -297,7 +281,6 @@ export function detectQueryType(query: string): QueryType {
     'đáp án',
     'trả lời',
 
-    // 🇻🇳 Vietnamese - Practice/Trial tests (TEST - ngắn, 10-30 câu)
     'test thực hành',
     'test thử',
     'bài test',
@@ -389,8 +372,6 @@ export function detectQueryType(query: string): QueryType {
     'my result',
     'my grade',
 
-    // 🇬🇧 English - Progress/Analysis
-    'progress',
     'improvement',
     'trend',
     'statistics',
@@ -428,15 +409,13 @@ export function detectQueryType(query: string): QueryType {
     'làm được bao nhiêu',
 
     // 🇻🇳 Vietnamese - Progress/Analysis
-    'tiến độ',
     'tiến bộ',
     'cải thiện',
     'thống kê',
     'tổng hợp',
     'phân tích',
     'xem lại',
-    'tiến độ học',
-    'quá trình học',
+    // REMOVED: 'tiến độ học', 'quá trình học' - too generic, conflicts with enrollment progress queries
 
     // 🇯🇵 Japanese - History/Past
     '履歴',
@@ -459,14 +438,11 @@ export function detectQueryType(query: string): QueryType {
     '私の結果',
 
     // 🇯🇵 Japanese - Progress/Analysis
-    '進捗',
-    '進度',
     '改善',
     '統計',
     '分析',
     'レビュー',
-    '進捗状況',
-    '学習進捗',
+    // REMOVED: '進捗', '進度', '進捗状況', '学習進捗' - too generic, conflicts with enrollment progress queries
   ]
 
   // Enrollment/Progress-specific keywords
@@ -511,16 +487,21 @@ export function detectQueryType(query: string): QueryType {
 
     // 🇻🇳 Vietnamese - Enrollment
     'đăng ký',
+    'đăng kí', // ✅ Alternative spelling with í
     'ghi danh',
     'đã đăng ký',
+    'đã đăng kí', // ✅ Alternative spelling with í
     'đã ghi danh',
     'các khóa học',
     'khóa của tôi',
     'khóa học của tôi',
     'khoá của tôi',
     'khóa đã đăng ký',
+    'khóa đã đăng kí', // ✅ Alternative spelling with í
     'khóa tôi đăng ký',
+    'khóa tôi đăng kí', // ✅ Alternative spelling with í
     'các khóa đã đăng ký',
+    'các khóa đã đăng kí', // ✅ Alternative spelling with í
     'khóa đang học',
     'đang học khóa',
 
@@ -716,6 +697,7 @@ export function detectQueryType(query: string): QueryType {
       lowerQuery.includes('tôi đã') ||
       lowerQuery.includes('my ') ||
       lowerQuery.includes('đã đăng ký') ||
+      lowerQuery.includes('đã đăng kí') || // ✅ Alternative spelling with í
       lowerQuery.includes('đang học') ||
       lowerQuery.includes('enrolled') ||
       lowerQuery.includes('私の') ||

@@ -79,7 +79,6 @@ export class AgentService {
     }
 
     try {
-      // Determine tool_choice based on parameters
       let toolChoice: 'auto' | 'required' | undefined = undefined
       if (useTools && this.allTools.length > 0) {
         toolChoice = forceTools ? 'required' : 'auto'
@@ -92,18 +91,6 @@ export class AgentService {
         tool_choice: toolChoice,
         temperature: OPENAI_CONFIG.temperature,
       }
-
-      // Log tools availability
-      this.logger.debug(`🔧 Tools available: ${this.allTools.length} tools`)
-      this.logger.debug(`🔧 Use tools: ${useTools}`)
-      this.logger.debug(`🔧 Force tools: ${forceTools} (tool_choice: ${toolChoice})`)
-      if (this.allTools.length > 0) {
-        this.logger.debug(
-          `🔧 Tool names: ${this.allTools.map((t) => ('function' in t ? t.function.name : 'custom')).join(', ')}`,
-        )
-      }
-
-      // Only add max_completion_tokens if it's defined (not unlimited)
       if (OPENAI_CONFIG.maxTokens !== undefined) {
         completionOptions.max_completion_tokens = OPENAI_CONFIG.maxTokens
       }
@@ -271,9 +258,59 @@ Use EXACT data from tool result - do not modify.`,
       })
     } else if (request.queryType === 'FLASHCARD' || request.queryType === QueryType.FLASHCARD) {
       this.logger.log('📋 Adding FLASHCARD format instructions to messages')
-      messages.push({
-        role: 'user',
-        content: `CRITICAL INSTRUCTION - READ CAREFULLY:
+
+      // Check if this is a generation request (generate_flashcard_suggestions tool was called)
+      const isFlashcardGeneration = results.some((r) => r.toolName === 'generate_flashcard_suggestions')
+
+      if (isFlashcardGeneration) {
+        this.logger.log('🎴 Flashcard GENERATION detected - using formatted text response')
+        messages.push({
+          role: 'user',
+          content: `CRITICAL INSTRUCTION - FLASHCARD GENERATION FORMAT:
+
+The tool generate_flashcard_suggestions has returned flashcard data.
+
+You MUST format the response using this EXACT pattern:
+
+📚 Đã tạo [COUNT] flashcards về [TOPIC] (cấp độ [LEVEL])!
+
+**Thẻ 1:**
+🔹 Mặt trước: [front]
+🔸 Mặt sau: [back]
+🔊 Phát âm: [pronunciation]
+📝 Ví dụ: [example]
+💡 Gợi ý nhớ: [hint]
+
+**Thẻ 2:**
+🔹 Mặt trước: [front]
+🔸 Mặt sau: [back]
+🔊 Phát âm: [pronunciation]
+📝 Ví dụ: [example]
+💡 Gợi ý nhớ: [hint]
+
+(repeat for ALL cards - show EVERY card, no truncation!)
+
+---
+
+⚠️ **LƯU Ý QUAN TRỌNG:** Các flashcard này CHƯA được lưu vào hệ thống!
+Bạn cần xác nhận để lưu vào tài khoản của mình.
+
+[Tạo tất cả] [Chỉnh sửa] [Hủy]
+
+MANDATORY RULES:
+- ✅ MUST start each card with "**Thẻ [number]:**"
+- ✅ MUST use emojis: 🔹 🔸 🔊 📝 💡
+- ✅ MUST show ALL cards (no "...see more" or truncation)
+- ✅ MUST include action buttons at the end
+- ✅ MUST include "CHƯA được lưu" warning
+- ❌ DO NOT use JSON format for generation!
+- ❌ DO NOT say "decks": [] or "count": 0`,
+        })
+      } else {
+        this.logger.log('🔍 Flashcard SEARCH detected - using JSON format')
+        messages.push({
+          role: 'user',
+          content: `CRITICAL INSTRUCTION - READ CAREFULLY:
 
 You MUST respond with ONLY the JSON code block below. NOTHING ELSE.
 
@@ -295,10 +332,9 @@ Your ENTIRE response must be EXACTLY this format:
 That's it. Nothing before the \`\`\`json. Nothing after the closing \`\`\`.
 
 Include in each deck: id, title, level, card_count, owner_name, createdAt, updatedAt
-Use EXACT data from tool result - do not modify.
-
-NOTE: This is ONLY for search results. Flashcard GENERATION uses a different format.`,
-      })
+Use EXACT data from tool result - do not modify.`,
+        })
+      }
     } else if (
       request.queryType !== 'ASSESSMENT' &&
       request.queryType !== QueryType.ASSESSMENT &&
