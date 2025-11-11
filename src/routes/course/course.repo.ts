@@ -127,7 +127,13 @@ export class CourseRepository {
                   },
                 },
               },
+              orderBy: {
+                order: 'asc',
+              },
             },
+          },
+          orderBy: {
+            order: 'asc',
           },
         },
       },
