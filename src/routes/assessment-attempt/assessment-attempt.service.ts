@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common'
+import { Injectable, NotFoundException, BadRequestException, ConflictException, Logger } from '@nestjs/common'
 import { AssessmentAttemptRepository } from './assessment-attempt.repo'
 import {
   AssessmentAttemptBase as AssessmentAttempt,
@@ -30,6 +30,8 @@ export interface PaginatedAssessmentAttempts {
 
 @Injectable()
 export class AssessmentAttemptService {
+  private readonly logger = new Logger(AssessmentAttemptService.name)
+
   constructor(private readonly assessmentAttemptRepo: AssessmentAttemptRepository) {}
 
   // ===== Basic CRUD Operations =====
@@ -134,8 +136,6 @@ export class AssessmentAttemptService {
     return this.assessmentAttemptRepo.submitAttempt(attemptId, data)
   }
 
-  // ===== Grading and Scoring =====
-
   async gradeAttempt(attemptId: number): Promise<AssessmentAttemptWithStats> {
     const attempt = await this.assessmentAttemptRepo.findById(attemptId, {
       assessment: true,
@@ -188,8 +188,8 @@ export class AssessmentAttemptService {
       totalQuestions = sectionScores.reduce((sum, section) => sum + section.totalQuestions, 0)
       correctAnswers = sectionScores.reduce((sum, section) => sum + section.correctAnswers, 0)
 
-      // Use comprehensive JLPT evaluation
-      levelEvaluation = this.evaluateExamLevel(sectionScores, scoreProfile, attempt.assessment.level)
+      // Use comprehensive JLPT evaluation with actual maxScore from questions
+      levelEvaluation = this.evaluateExamLevel(sectionScores, scoreProfile, attempt.assessment.level, maxScore)
     }
 
     // Update attempt with score and level suggestion
@@ -276,11 +276,6 @@ export class AssessmentAttemptService {
     return sectionScores
   }
 
-  // ===== New Scoring Methods =====
-
-  /**
-   * Calculate TEST score: simple sum using scorePerQuestion
-   */
   private async calculateTestScore(attemptId: number): Promise<{
     totalScore: number
     maxScore: number
@@ -313,10 +308,6 @@ export class AssessmentAttemptService {
     }
   }
 
-  /**
-   * Calculate EXAM score: using ScoreProfile sections and item scorePerQuestion
-   * FIXED: Now correctly uses scorePerQuestion from AssessmentItem
-   */
   private async calculateExamScore(
     attemptId: number,
     scoreProfile: any,
@@ -327,6 +318,8 @@ export class AssessmentAttemptService {
     sectionScores: SectionScore[]
   }> {
     const answersWithScores = await this.assessmentAttemptRepo.getAttemptAnswersWithScores(attemptId)
+
+    this.logger.log(`🔢 Calculating EXAM score (NO scaling - raw points only)`)
 
     // Get score profile sections
     const sections = scoreProfile.sections || []
@@ -367,10 +360,12 @@ export class AssessmentAttemptService {
       answersBySection.set(sectionType, current)
     }
 
-    // Calculate score for each section using ScoreProfile criteria
+    // Calculate score for each section - NO SCALING, just sum raw points
     const sectionScores: SectionScore[] = []
     let totalScore = 0
     let maxScore = 0
+
+    this.logger.log(`📊 Section-by-section calculation:`)
 
     for (const section of sections) {
       const stats = answersBySection.get(section.type) || {
@@ -380,32 +375,34 @@ export class AssessmentAttemptService {
         total: 0,
       }
 
-      // Calculate raw percentage (0-1)
-      const rawScore = stats.maxPoints > 0 ? stats.earnedPoints / stats.maxPoints : 0
+      // 🚨 NO SCALING - Just use raw earned points from questions
+      const earnedScore = stats.earnedPoints
+      const maxPossible = stats.maxPoints
 
-      // Scale to section's maxScore
-      const scaledScore = rawScore * section.maxScore
+      this.logger.log(
+        `   ${section.type}: ${stats.correct}/${stats.total} correct = ${earnedScore}/${maxPossible} points`,
+      )
 
-      // Weight is already a percentage (50 means 50%), not a multiplier
-      // So we don't need to divide by 100 or multiply
-      // The earnedScore is just the scaledScore
-      const earnedScore = scaledScore
+      // Calculate percentage for display (0-1)
+      const rawScore = maxPossible > 0 ? earnedScore / maxPossible : 0
 
-      // Check if section passed (minPass is in the scaled score range)
-      const passed = section.minPass ? scaledScore >= section.minPass : true
+      // Check if section passed using minPass threshold
+      const passed = section.minPass ? earnedScore >= section.minPass : true
 
       sectionScores.push({
         sectionType: section.type,
         correctAnswers: stats.correct,
         totalQuestions: stats.total,
         rawScore,
-        scaledScore: Math.round(earnedScore * 100) / 100,
+        scaledScore: Math.round(earnedScore * 100) / 100, // Store earnedScore (not scaled!)
         passed,
       })
 
       totalScore += earnedScore
-      maxScore += section.maxScore
+      maxScore += maxPossible // Use actual max from questions, not profile's maxScore
     }
+
+    this.logger.log(`🎯 Final: ${Math.round(totalScore * 100) / 100}/${maxScore} points`)
 
     return {
       totalScore: Math.round(totalScore * 100) / 100,
@@ -414,12 +411,14 @@ export class AssessmentAttemptService {
     }
   }
 
-  /**
-   * Evaluate EXAM level with ScoreProfile criteria
-   */
-  private evaluateExamLevel(sectionScores: SectionScore[], scoreProfile: any, currentLevel: JLPTLevel): any {
+  private evaluateExamLevel(
+    sectionScores: SectionScore[],
+    scoreProfile: any,
+    currentLevel: JLPTLevel,
+    actualMaxScore: number, // 🚨 Use actual max from questions, not profile's maxTotal
+  ): any {
     const totalScore = sectionScores.reduce((sum, section) => sum + section.scaledScore, 0)
-    const maxTotal = scoreProfile.maxTotal || 180
+    const maxTotal = actualMaxScore // Use actual max score from questions
     const minTotalPass = scoreProfile.minTotalPass || 100
 
     // Check if total score meets minimum requirement
@@ -428,6 +427,7 @@ export class AssessmentAttemptService {
     // Check if each section meets minimum requirement
     const sectionsPassed = sectionScores.every((section) => section.passed)
 
+    // 🚨 CRITICAL: MUST pass BOTH total score AND all sections
     const passed = totalPassed && sectionsPassed
 
     // Suggest appropriate level
@@ -453,15 +453,18 @@ export class AssessmentAttemptService {
     } else {
       // Failed - analyze what went wrong
       if (!totalPassed && !sectionsPassed) {
-        recommendation = `Cần cải thiện tất cả các mảng. Tổng điểm (${Math.round(totalScore)}/${maxTotal}) và điểm từng phần đều cần nâng cao.`
+        recommendation = `Chưa đạt yêu cầu. Tổng điểm (${Math.round(totalScore)}/${maxTotal}, cần ${minTotalPass}) và một số phần chưa đạt điểm tối thiểu.`
       } else if (!totalPassed) {
-        recommendation = `Cần cải thiện kết quả tổng thể. Điểm hiện tại: ${Math.round(totalScore)}/${maxTotal} (tối thiểu: ${minTotalPass}).`
+        recommendation = `Chưa đạt yêu cầu tổng điểm. Điểm hiện tại: ${Math.round(totalScore)}/${maxTotal} (tối thiểu: ${minTotalPass}).`
       } else if (!sectionsPassed) {
         const failedSections = sectionScores
           .filter((s) => !s.passed)
-          .map((s) => s.sectionType)
+          .map(
+            (s) =>
+              `${s.sectionType} (${Math.round(s.scaledScore)}/${scoreProfile.sections.find((sec: any) => sec.type === s.sectionType)?.minPass || 'N/A'})`,
+          )
           .join(', ')
-        recommendation = `Tổng điểm đạt yêu cầu, nhưng các phần sau cần cải thiện: ${failedSections}.`
+        recommendation = `Tổng điểm đạt yêu cầu (${Math.round(totalScore)}/${maxTotal}), nhưng các phần sau chưa đạt điểm tối thiểu: ${failedSections}.`
       }
 
       // Suggest appropriate level based on performance
@@ -480,14 +483,13 @@ export class AssessmentAttemptService {
     return {
       currentLevel,
       totalScore: Math.round(totalScore * 100) / 100,
+      passed, // 🚨 Combined pass/fail status (BOTH total AND sections must pass)
       totalPassed,
       sectionsPassed,
       suggestedLevel,
       recommendation,
     }
   }
-
-  // ===== Statistics and Analytics =====
 
   async getAssessmentStatistics(assessmentId: number) {
     return await this.assessmentAttemptRepo.getAssessmentStatistics(assessmentId)
