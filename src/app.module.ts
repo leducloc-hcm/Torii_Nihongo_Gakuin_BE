@@ -21,6 +21,8 @@ import { AssessmentSectionModule } from './routes/assessment-section/assessment-
 import { AssessmentItemModule } from './routes/assessment-item/assessment-item.module'
 import { AssessmentAttemptModule } from './routes/assessment-attempt/assessment-attempt.module'
 import { AssessmentAnswerModule } from './routes/assessment-answer/assessment-answer.module'
+import { AssessmentAssignmentModule } from './routes/assessment-assignment/assessment-assignment.module'
+import { AssessmentProgressModule } from './routes/assessment-progress/assessment-progress.module'
 import { ScoreProfileModule } from './routes/score-profile/score-profile.module'
 import { WebsocketsModule } from './websockets/websockets.module'
 import { OnlineClassModule } from './routes/online-class/online-class.module'
@@ -61,6 +63,8 @@ import { DashboardModule } from './routes/dashboard/dashboard.module'
     AssessmentItemModule,
     AssessmentAttemptModule,
     AssessmentAnswerModule,
+    AssessmentAssignmentModule,
+    AssessmentProgressModule,
     ScoreProfileModule,
     WebsocketsModule,
     OnlineClassModule,

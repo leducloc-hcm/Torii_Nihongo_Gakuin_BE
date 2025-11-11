@@ -136,6 +136,7 @@ export class AgentService {
   }
 
   async executeApprovedTools(request: ExecuteToolsRequest): Promise<ExecuteToolsResponse> {
+    const executeStartTime = Date.now()
     const results: MCPToolResult[] = []
 
     if (request.toolCalls.length > 1) {
@@ -144,6 +145,7 @@ export class AgentService {
       )
     }
 
+    const toolCallsStartTime = Date.now()
     const toolPromises = request.toolCalls.map(async (toolCall) => {
       try {
         const result = await this.executeToolCall(toolCall.name, toolCall.arguments, request.userId)
@@ -172,6 +174,8 @@ export class AgentService {
     })
 
     results.push(...(await Promise.all(toolPromises)))
+    const toolCallsTime = Date.now() - toolCallsStartTime
+    this.logger.log(`⏱️  Tool calls completed in ${toolCallsTime}ms`)
 
     const toolMessages: ChatCompletionMessageParam[] = results.map((result) => ({
       role: 'tool' as const,
@@ -373,12 +377,15 @@ Use EXACT data from tool result - do not modify.`,
 
     try {
       this.logger.log('🔄 Calling OpenAI with tool results...')
-      const startTime = Date.now()
+      const openaiStartTime = Date.now()
 
       const finalResponse = await this.openai.chat.completions.create(finalCompletionOptions)
 
-      const elapsed = Date.now() - startTime
-      this.logger.log(`✅ OpenAI response received in ${elapsed}ms`)
+      const openaiTime = Date.now() - openaiStartTime
+      this.logger.log(`✅ OpenAI response received in ${openaiTime}ms`)
+      this.logger.log(
+        `⏱️  Total executeApprovedTools: ${Date.now() - executeStartTime}ms (Tools: ${toolCallsTime}ms, OpenAI: ${openaiTime}ms)`,
+      )
 
       const finalChoice = finalResponse.choices[0]
 

@@ -149,16 +149,7 @@ export class AssessmentPaperRepository {
                   include: {
                     question: {
                       include: {
-                        options: {
-                          select: {
-                            id: true,
-                            content: true,
-                            mediaId: true,
-                            order: true,
-                            isCorrect: false,
-                            image: true,
-                          },
-                        },
+                        options: true,
                         media: true,
                       },
                     },
@@ -177,9 +168,9 @@ export class AssessmentPaperRepository {
                                     id: true,
                                     content: true,
                                     mediaId: true,
-                                    image: true,
                                   },
                                 },
+                                media: true,
                               },
                             },
                           },
@@ -190,7 +181,6 @@ export class AssessmentPaperRepository {
                   },
                 },
               },
-              orderBy: { order: 'asc' },
             },
           },
         },

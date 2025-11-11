@@ -313,9 +313,11 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
   }
 
   async handleQuery(userId: number, dto: SendQueryDto) {
+    const queryStartTime = Date.now()
     const { threadId, query } = dto
 
     this.logger.log(`[handleQuery] User ID: ${userId} | Thread ID: ${threadId}`)
+    this.logger.log(`⏱️  Query started at: ${new Date().toLocaleTimeString()}`)
 
     const cacheKey = this.getThreadCacheKey(threadId)
     let thread = await this.redis.get(cacheKey)
@@ -401,6 +403,9 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
       this.logger.log(`Multi-tool query detected. Suggested tools: [${suggestedTools.join(', ')}]`)
     }
 
+    const detectionTime = Date.now() - queryStartTime
+    this.logger.log(`⏱️  [+${detectionTime}ms] Query type detected`)
+
     // Build chat messages with language detection and multi-tool hint
     let systemPrompt = this.promptService.getSystemPrompt(queryType, undefined, query, userId)
     this.logger.debug(`[System Prompt] Generated for userId: ${userId}, queryType: ${queryType}`)
@@ -442,7 +447,10 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
     }
 
     // Get response from Agent
+    const aiCallStartTime = Date.now()
     const agentResponse = await this.agentService.getResponse(messages, true, shouldForceTools)
+    const aiCallTime = Date.now() - aiCallStartTime
+    this.logger.log(`⏱️  [+${Date.now() - queryStartTime}ms] Initial AI call completed (took ${aiCallTime}ms)`)
 
     // DEBUG: Log tool calls
     if (agentResponse.toolCalls && agentResponse.toolCalls.length > 0) {
@@ -546,6 +554,7 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
 
     const executeElapsed = Date.now() - executeStartTime
     this.logger.log(`✅ executeApprovedTools completed in ${executeElapsed}ms`)
+    this.logger.log(`⏱️  [+${Date.now() - queryStartTime}ms] Tool execution completed`)
     this.logger.log(`   - Tool results count: ${executeResult.results?.length || 0}`)
     this.logger.log(`   - Has finalResponse: ${!!executeResult.finalResponse}`)
     this.logger.log(`   - FinalResponse preview: ${executeResult.finalResponse?.substring(0, 100)}...`)
@@ -603,11 +612,19 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
       toolCalls: executeResult.results,
     })
 
+    this.logger.log(`⏱️  [+${Date.now() - queryStartTime}ms] Message saved to DB`)
+
     setTimeout(() => {
       void this.invalidateThreadCache(threadId, userId)
         .then(() => this.logger.debug(`Cache invalidated for thread ${threadId}`))
         .catch((error) => this.logger.error(`Failed to invalidate cache for thread ${threadId}:`, error))
     }, 100) // 100ms delay to ensure DB commit completes
+
+    const totalTime = Date.now() - queryStartTime
+    this.logger.log(`⏱️  ✅ TOTAL QUERY TIME: ${totalTime}ms (${(totalTime / 1000).toFixed(2)}s)`)
+    this.logger.log(
+      `⏱️  📊 Breakdown: Detection=${detectionTime}ms, AI=${aiCallTime}ms, Tools+Response=${executeElapsed}ms`,
+    )
 
     return {
       queryId: queryRecord.id,

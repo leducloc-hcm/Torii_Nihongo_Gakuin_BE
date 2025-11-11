@@ -152,6 +152,13 @@ export class AssessmentAssignmentRepository {
     return count > 0
   }
 
+  async isUserInClass(classId: number, userId: number): Promise<boolean> {
+    const count = await this.prisma.classMember.count({
+      where: { classId, userId },
+    })
+    return count > 0
+  }
+
   async getStats(where?: any) {
     const now = new Date()
 

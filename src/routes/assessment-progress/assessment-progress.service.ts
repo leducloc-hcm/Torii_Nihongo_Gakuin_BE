@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common'
 import { AssessmentProgressRepository } from './assessment-progress.repo'
+import { AssessmentAssignmentService } from '../assessment-assignment/assessment-assignment.service'
 import {
   CreateAssessmentProgressDTO,
   UpdateAssessmentProgressDTO,
@@ -13,7 +14,10 @@ import {
 
 @Injectable()
 export class AssessmentProgressService {
-  constructor(private readonly progressRepository: AssessmentProgressRepository) {}
+  constructor(
+    private readonly progressRepository: AssessmentProgressRepository,
+    private readonly assignmentService: AssessmentAssignmentService,
+  ) {}
 
   // ============= START ASSESSMENT =============
 
@@ -51,6 +55,12 @@ export class AssessmentProgressService {
     }
 
     if (assignmentId) {
+      // Verify user has access to the assignment (either directly assigned or class member)
+      const hasAccess = await this.assignmentService.checkUserAccess(assignmentId, userId)
+      if (!hasAccess) {
+        throw new ForbiddenException('You do not have access to this assignment')
+      }
+
       progressData.assignment = { connect: { id: assignmentId } }
     }
 

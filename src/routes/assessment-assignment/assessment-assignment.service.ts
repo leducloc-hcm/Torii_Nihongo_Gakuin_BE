@@ -224,9 +224,9 @@ export class AssessmentAssignmentService {
 
     // Check if assigned via class
     if (assignment.classId) {
-      // Would need to check class membership
-      // This requires class repository, simplified for now
-      return true
+      // Verify the user is actually a member of the target class
+      const isMember = await this.assignmentRepository.isUserInClass(assignment.classId, userId)
+      return isMember
     }
 
     return false
