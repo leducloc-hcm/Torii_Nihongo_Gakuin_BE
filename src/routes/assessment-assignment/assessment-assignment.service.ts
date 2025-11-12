@@ -52,7 +52,6 @@ export class AssessmentAssignmentService {
     const { page, limit, assessmentId, assignedById, assignedToId, classId, status, isPastDue, sortBy, sortOrder } =
       queryDto
 
-    // Convert page and limit to numbers to ensure Prisma receives correct types
     const pageNum = Number(page) || 1
     const limitNum = Number(limit) || 10
 

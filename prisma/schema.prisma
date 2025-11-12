@@ -508,6 +508,7 @@ model AssessmentProgress {
   user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   assignment AssessmentAssignment? @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
   answers    AssessmentAnswerProgress[]
+  attempts   AssessmentAttempt[] // 🆕 Thêm quan hệ với Attempt
 
   @@unique([assessmentId, userId])
   @@index([assessmentId])
@@ -611,6 +612,7 @@ model AssessmentAttempt {
   id              Int        @id @default(autoincrement())
   assessmentId    Int
   userId          Int
+  progressId      Int?       // 🆕 Liên kết với Progress
   startedAt       DateTime   @default(now())
   submittedAt     DateTime?
   score           Float?
@@ -618,7 +620,8 @@ model AssessmentAttempt {
   earnedScore     Float?
 
   assessment AssessmentPaper  @relation(fields: [assessmentId], references: [id])
-  user       User        @relation(fields: [userId], references: [id])
+  user       User             @relation(fields: [userId], references: [id])
+  progress   AssessmentProgress? @relation(fields: [progressId], references: [id], onDelete: SetNull) // 🆕
   answers    AssessmentAnswer[]
 }
 model AssessmentAnswer {

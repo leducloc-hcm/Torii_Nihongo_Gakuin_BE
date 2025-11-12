@@ -50,6 +50,41 @@ export class AssessmentAttemptService {
     return this.assessmentAttemptRepo.startAttempt(userId, data)
   }
 
+  async startAttemptFromProgress(userId: number, progressId: number): Promise<AssessmentAttempt> {
+    // Validate progress exists and belongs to user
+    const progress = await this.assessmentAttemptRepo.getProgressById(progressId)
+    if (!progress) {
+      throw new NotFoundException('Assessment progress not found')
+    }
+
+    if (progress.userId !== userId) {
+      throw new BadRequestException('Assessment progress does not belong to this user')
+    }
+
+    if (!progress.isSubmitted) {
+      throw new BadRequestException('Assessment progress must be submitted before creating attempt')
+    }
+
+    // Check if attempt already exists for this progress
+    const existingAttempts = await this.assessmentAttemptRepo.findMany({
+      userId,
+      assessmentId: progress.assessmentId,
+      page: 1,
+      limit: 10,
+      includeAnswers: false,
+      includeUser: false,
+      includeAssessment: false,
+      sortBy: 'startedAt',
+      sortOrder: 'desc',
+    })
+
+    if (existingAttempts.attempts.some((attempt) => (attempt as any).progressId === progressId)) {
+      throw new ConflictException('Attempt already exists for this progress')
+    }
+
+    return this.assessmentAttemptRepo.createAttemptFromProgress(progressId)
+  }
+
   async getAttempt(
     id: number,
     includeRelations?: {
@@ -145,8 +180,16 @@ export class AssessmentAttemptService {
       throw new NotFoundException(ASSESSMENT_ATTEMPT_ERRORS.NOT_FOUND)
     }
 
-    if (!(await this.assessmentAttemptRepo.isSubmitted(attemptId))) {
-      throw new BadRequestException(ASSESSMENT_ATTEMPT_ERRORS.SUBMISSION_REQUIRED)
+    // Check if attempt was created from progress (has progressId)
+    const attemptWithProgress = attempt as any
+    if (attemptWithProgress.progressId) {
+      // This attempt was created from AssessmentProgress, answers should already exist
+      this.logger.log(`🎯 Grading attempt ${attemptId} created from progress ${attemptWithProgress.progressId}`)
+    } else {
+      // Regular attempt, check if submitted
+      if (!(await this.assessmentAttemptRepo.isSubmitted(attemptId))) {
+        throw new BadRequestException(ASSESSMENT_ATTEMPT_ERRORS.SUBMISSION_REQUIRED)
+      }
     }
 
     const assessmentType = attempt.assessment.type

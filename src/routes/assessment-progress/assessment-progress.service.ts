@@ -19,32 +19,32 @@ export class AssessmentProgressService {
     private readonly assignmentService: AssessmentAssignmentService,
   ) {}
 
-  // ============= START ASSESSMENT =============
+  private calculateTimeSpent(startedAt: Date, lastSavedAt?: Date | null): number {
+    const endTime = lastSavedAt ? new Date(lastSavedAt) : new Date()
+    const startTime = new Date(startedAt)
+    const diffMs = endTime.getTime() - startTime.getTime()
+    return Math.floor(diffMs / 1000) // Convert milliseconds to seconds
+  }
+
+  private enrichProgressWithTimeSpent(progress: any): any {
+    if (!progress) return progress
+
+    const timeSpentSec = this.calculateTimeSpent(progress.startedAt, progress.lastSavedAt)
+
+    return {
+      ...progress,
+      timeSpentSec,
+    }
+  }
 
   async startAssessment(startDto: StartAssessmentDTO, userId: number) {
     const { assessmentId, assignmentId } = startDto
 
-    // Check if assessment exists
     const assessmentExists = await this.progressRepository.checkAssessmentExists(assessmentId)
     if (!assessmentExists) {
       throw new BadRequestException(`Assessment with ID ${assessmentId} does not exist`)
     }
 
-    // Check if user already has a progress for this assessment
-    const existing = await this.progressRepository.getProgressByUserAndAssessment(userId, assessmentId)
-    if (existing) {
-      // If already submitted, cannot start again
-      if (existing.isSubmitted) {
-        throw new BadRequestException('You have already completed this assessment')
-      }
-      // Return existing progress to continue
-      return {
-        message: 'Resuming existing progress',
-        progress: existing,
-      }
-    }
-
-    // Create new progress
     const progressData: any = {
       assessment: { connect: { id: assessmentId } },
       user: { connect: { id: userId } },
@@ -68,7 +68,7 @@ export class AssessmentProgressService {
 
     return {
       message: 'Assessment started successfully',
-      progress,
+      progress: this.enrichProgressWithTimeSpent(progress),
     }
   }
 
@@ -229,7 +229,7 @@ export class AssessmentProgressService {
 
     return {
       hasStarted: true,
-      progress,
+      progress: this.enrichProgressWithTimeSpent(progress),
     }
   }
 
@@ -242,7 +242,7 @@ export class AssessmentProgressService {
       throw new ForbiddenException('You do not have access to this progress')
     }
 
-    return progress
+    return this.enrichProgressWithTimeSpent(progress)
   }
 
   async getAllMyProgresses(userId: number, queryDto: QueryAssessmentProgressDTO) {
@@ -258,12 +258,18 @@ export class AssessmentProgressService {
       orderBy[sortBy] = sortOrder
     }
 
-    return this.progressRepository.findManyWithPagination({
+    const result = await this.progressRepository.findManyWithPagination({
       page,
       limit,
       where,
       orderBy,
     })
+
+    // Enrich each progress item with computed timeSpentSec
+    return {
+      ...result,
+      items: result.items.map((progress) => this.enrichProgressWithTimeSpent(progress)),
+    }
   }
 
   // ============= GET ANSWERS =============

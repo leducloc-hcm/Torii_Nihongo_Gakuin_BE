@@ -10,6 +10,15 @@ export class StartAssessmentAttemptDto {
   assessmentId!: number
 }
 
+// ===== Start Attempt from Progress DTO =====
+export class StartAttemptFromProgressDto {
+  @ApiProperty({
+    example: 456,
+    description: 'ID of the assessment progress to create attempt from',
+  })
+  progressId!: number
+}
+
 // ===== Submit Answer DTO =====
 export class SubmitAnswerDto {
   @ApiProperty({
