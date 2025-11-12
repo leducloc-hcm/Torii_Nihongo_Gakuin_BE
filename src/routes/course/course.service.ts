@@ -49,7 +49,6 @@ export class CourseService {
     if (files?.thumbnail?.[0]) {
       imageUrl = (await this.s3Service.uploadFileToS3(files.thumbnail[0], 'thumbnails')).url
     }
-
     // Validate lecturer exists if provided
     if (lecturerIds) {
       const lecturerExists = await Promise.all(

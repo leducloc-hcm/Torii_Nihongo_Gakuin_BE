@@ -12,7 +12,7 @@ import {
   UseGuards,
   ParseIntPipe,
   UseInterceptors,
-  UploadedFile,
+  UploadedFiles,
 } from '@nestjs/common'
 import { CourseService } from './course.service'
 import {
@@ -51,7 +51,7 @@ export class CourseController {
   async create(
     @ActiveUser('userId') userId: number,
     @Body() createCourseDto: CreateCourseDTO,
-    @UploadedFile() files?: { thumbnail?: Express.Multer.File[] },
+    @UploadedFiles() files?: { thumbnail?: Express.Multer.File[] },
   ) {
     return this.courseService.create(createCourseDto, userId, files)
   }
@@ -152,7 +152,7 @@ export class CourseController {
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateCourseDto: UpdateCourseDTO,
-    @UploadedFile() files?: { thumbnail?: Express.Multer.File[] },
+    @UploadedFiles() files?: { thumbnail?: Express.Multer.File[] },
   ) {
     return this.courseService.update(id, updateCourseDto, files)
   }
