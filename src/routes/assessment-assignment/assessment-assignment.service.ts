@@ -52,6 +52,10 @@ export class AssessmentAssignmentService {
     const { page, limit, assessmentId, assignedById, assignedToId, classId, status, isPastDue, sortBy, sortOrder } =
       queryDto
 
+    // Convert page and limit to numbers to ensure Prisma receives correct types
+    const pageNum = Number(page) || 1
+    const limitNum = Number(limit) || 10
+
     const where: any = {}
 
     if (assessmentId) where.assessmentId = assessmentId
@@ -76,8 +80,8 @@ export class AssessmentAssignmentService {
     }
 
     return this.assignmentRepository.findManyWithPagination({
-      page,
-      limit,
+      page: pageNum,
+      limit: limitNum,
       where,
       orderBy,
     })
@@ -145,10 +149,14 @@ export class AssessmentAssignmentService {
   async getMyAssignments(userId: number, queryDto: MyAssignmentsQueryDTO) {
     const { page, limit, status, upcoming, overdue, sortBy, sortOrder } = queryDto
 
+    // Convert page and limit to numbers to ensure Prisma receives correct types
+    const pageNum = Number(page) || 1
+    const limitNum = Number(limit) || 10
+
     return this.assignmentRepository.getMyAssignments({
       userId,
-      page,
-      limit,
+      page: pageNum,
+      limit: limitNum,
       status,
       upcoming,
       overdue,
