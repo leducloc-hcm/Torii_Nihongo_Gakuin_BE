@@ -1017,6 +1017,54 @@ export function suggestToolCombination(query: string): string[] {
     }
   }
 
+  // 🆕 Determine blog tools
+  if (requirement.requiresBlog) {
+    if (isSearchQuery(query) || lowerQuery.includes('tìm') || lowerQuery.includes('find')) {
+      tools.push('search_blog_posts')
+    } else if (lowerQuery.includes('mới nhất') || lowerQuery.includes('recent') || lowerQuery.includes('latest')) {
+      tools.push('get_recent_blogs')
+    }
+  }
+
+  // 🆕 Determine assessment tools
+  if (requirement.requiresAssessment) {
+    // Check if asking about user's history (MY tests) vs available tests
+    const isHistoryQuery =
+      lowerQuery.includes('của tôi') ||
+      lowerQuery.includes('của mình') ||
+      lowerQuery.includes('my ') ||
+      lowerQuery.includes('đã làm') ||
+      lowerQuery.includes('đã thi') ||
+      lowerQuery.includes('lịch sử') ||
+      lowerQuery.includes('history') ||
+      lowerQuery.includes('kết quả') ||
+      lowerQuery.includes('result') ||
+      lowerQuery.includes('điểm') ||
+      lowerQuery.includes('score')
+
+    if (isHistoryQuery) {
+      tools.push('get_my_assessment_history')
+    } else if (isSearchQuery(query) || lowerQuery.includes('tìm') || lowerQuery.includes('find')) {
+      tools.push('search_assessments')
+    }
+  }
+
+  // 🆕 Determine flashcard tools
+  if (requirement.requiresFlashcard) {
+    const isFlashcardCreation =
+      lowerQuery.includes('tạo') ||
+      lowerQuery.includes('create') ||
+      lowerQuery.includes('generate') ||
+      lowerQuery.includes('gen') ||
+      lowerQuery.includes('sinh')
+
+    if (isFlashcardCreation) {
+      tools.push('generate_flashcard_suggestions')
+    } else if (isSearchQuery(query) || lowerQuery.includes('tìm') || lowerQuery.includes('find')) {
+      tools.push('search_flashcard_decks')
+    }
+  }
+
   return [...new Set(tools)] // Remove duplicates
 }
 
@@ -1031,8 +1079,23 @@ export function generateMultiToolHint(query: string): string {
     return ''
   }
 
-  const categories = requirement.toolCategories.join(' and ')
+  const categories = requirement.toolCategories.join(', ')
   const toolsList = suggestedTools.join(', ')
 
-  return `HINT: This query requires information about ${categories}. Consider calling multiple tools: [${toolsList}] to provide a complete answer.`
+  return `🔧 MULTI-TOOL QUERY DETECTED 🔧
+
+This query requires information about: ${categories}
+
+🎯 RECOMMENDED TOOLS TO CALL TOGETHER:
+${suggestedTools.map((tool) => `  - ${tool}`).join('\n')}
+
+⚠️ CRITICAL INSTRUCTION:
+You MUST call ALL ${suggestedTools.length} tools above in a SINGLE response to answer this query completely.
+Do NOT call just one tool - you will be missing important data.
+
+Example: If user asks "tìm các blog và kết quả bài test của tôi", you MUST call BOTH:
+  1. search_blog_posts (for blog data)
+  2. get_my_assessment_history (for test history data)
+
+Calling only ONE tool will result in an incomplete answer!`
 }

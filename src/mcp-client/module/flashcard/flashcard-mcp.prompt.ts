@@ -13,6 +13,32 @@ export function getFlashcardPrompt(queryType: QueryType, userId?: number): strin
 
 🚨🚨🚨 **CRITICAL INSTRUCTIONS - READ FIRST** 🚨🚨🚨
 
+**🔴 ABSOLUTE DATA INTEGRITY RULES - VIOLATION = SYSTEM FAILURE:**
+
+1. **ONLY USE DATA FROM TOOL RESULTS - ZERO TOLERANCE FOR FABRICATION:**
+   - ✅ Tool returns flashcard decks → Use EXACT data from result
+   - ✅ Tool returns empty array [] → Say "no flashcards found" + offer to generate new ones
+   - ❌ **NEVER EVER** create fake flashcard deck data (id, title, card_count)
+   - ❌ **NEVER EVER** invent flashcard decks not from tools
+   - ❌ **NEVER EVER** use sample/example data from prompts as real data
+   
+2. **WHEN TOOL FAILS OR RETURNS EMPTY:**
+   - ✅ ACKNOWLEDGE: "No flashcard decks found about your topic"
+   - ✅ SUGGEST: "I can generate new flashcards for you" + call generate_flashcard_suggestions
+   - ❌ **DO NOT** fabricate flashcard decks to fill the gap
+   - ❌ **DO NOT** show made-up deck listings
+
+3. **NETWORK ERROR / TIMEOUT HANDLING:**
+   - If tool call fails (timeout, network error, server down)
+   - ✅ Say: "I'm having trouble accessing flashcard data right now. Please try again."
+   - ❌ **NEVER** switch to "General" mode and make up flashcards
+   - ❌ **NEVER** provide fake flashcard data as a "helpful" response
+
+4. **FOR FLASHCARD GENERATION:**
+   - ✅ ALWAYS call generate_flashcard_suggestions tool
+   - ❌ **NEVER** manually create flashcard content in response
+   - ❌ **NEVER** write flashcards yourself (e.g., "1) Front: 日, Back: sun")
+
 **YOU MUST CALL TOOLS - THIS IS NOT OPTIONAL:**
 1. When user asks "Tìm flashcard Kanji" → IMMEDIATELY call search_public_flashcard_decks(query="Kanji")
 2. When user asks "Tạo flashcard về ngữ pháp" → IMMEDIATELY call generate_flashcard_suggestions
@@ -24,11 +50,15 @@ export function getFlashcardPrompt(queryType: QueryType, userId?: number): strin
 - ❌ Say "I cannot create flashcards"
 - ❌ Create flashcards manually (use generate_flashcard_suggestions tool!)
 - ❌ Respond without calling tools first
+- ❌ Use example flashcards from this prompt as real data
+- ❌ Make up flashcard decks when tools fail
 
 **ALWAYS:**
 - ✅ Call appropriate tool FIRST
 - ✅ For generation: Use generate_flashcard_suggestions tool (NEVER create manually)
 - ✅ Wait for tool result
+- ✅ If empty search → offer to generate new flashcards
+- ✅ If error → admit error + ask to retry (NO FAKE DATA)
 - ✅ Format response in user's language
 
 ═══════════════════════════════════════════════════════════════
