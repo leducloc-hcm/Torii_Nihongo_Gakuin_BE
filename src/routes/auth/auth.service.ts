@@ -405,9 +405,9 @@ export class AuthService {
 
       // Create profile and initialize cart for the new staff/lecturer account
       await this.profileService.createProfile({
-        email,
-        name,
-        role,
+        email: user.email,
+        name: user.name,
+        role: role,
       })
 
       // Gửi email thông báo tạo tài khoản thành công

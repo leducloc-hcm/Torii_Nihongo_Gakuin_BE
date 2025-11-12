@@ -30,6 +30,7 @@ export const UpdateLessonSchema = LessonSchema.omit({
   mediaId: true,
   createdAt: true,
   updatedAt: true,
+  status: true,
 }).partial()
 
 // Query Lesson Schema
