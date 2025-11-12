@@ -22,6 +22,7 @@ import {
   CreateClassDTO,
   UpdateClassDTO,
   CreateSessionDTO,
+  UpdateCourseStatusDTOForAdmin,
 } from './course.dto'
 import { Auth, IsPublic } from 'src/shared/decorators/auth.decorator'
 import { AuthType } from 'src/shared/constants/auth.constant'
@@ -31,6 +32,8 @@ import { RoleName } from 'src/shared/constants/role.constant'
 import { ActiveUser } from 'src/shared/decorators/active-user.decorator'
 import { LessonProgressService } from '../lesson-progress/lesson-progress.service'
 import { UpdateProgressDTO } from '../lesson-progress/lesson-progress.dto'
+import { FileFieldsInterceptor } from '@nestjs/platform-express'
+import { imageUploadOptions } from 'src/shared/config/upload.config'
 
 @Controller('courses')
 @UseGuards(RolesGuard)
@@ -44,8 +47,13 @@ export class CourseController {
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Admin, RoleName.Staff)
   @HttpCode(HttpStatus.CREATED)
-  async create(@ActiveUser('userId') userId: number, @Body() createCourseDto: CreateCourseDTO) {
-    return this.courseService.create(createCourseDto, userId)
+  @UseInterceptors(FileFieldsInterceptor([{ name: 'thumbnail', maxCount: 1 }], imageUploadOptions))
+  async create(
+    @ActiveUser('userId') userId: number,
+    @Body() createCourseDto: CreateCourseDTO,
+    @UploadedFile() files?: { thumbnail?: Express.Multer.File[] },
+  ) {
+    return this.courseService.create(createCourseDto, userId, files)
   }
 
   @Get()
@@ -55,6 +63,15 @@ export class CourseController {
   async findAll(@Query() queryDto: QueryCourseDTO) {
     return this.courseService.findAll(queryDto)
   }
+
+  @Get('admin/pending-review')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Admin)
+  @HttpCode(HttpStatus.OK)
+  async findPendingReviewCourses() {
+    return this.courseService.getPendingReviewCourses()
+  }
+
   @Get('public/all')
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Customer)
@@ -104,14 +121,41 @@ export class CourseController {
     return this.courseService.findBySlug(slug, includeReviews)
   }
 
+  @Put('pending-review/:id')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Staff)
+  @HttpCode(HttpStatus.OK)
+  async pendingReview(@Param('id', ParseIntPipe) id: number) {
+    return this.courseService.pendingReview(id)
+  }
+
+  @Put('admin/publish/:id')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Admin)
+  @HttpCode(HttpStatus.OK)
+  async publish(@Param('id', ParseIntPipe) id: number) {
+    return this.courseService.publish(id)
+  }
+  @Put('admin/status/:id')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Admin)
+  @HttpCode(HttpStatus.OK)
+  async updateCourseStatus(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateCourseStatusDTOForAdmin) {
+    return this.courseService.updateCourseStatus(id, body)
+  }
+
   @Put(':id')
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Admin, RoleName.Staff)
   @HttpCode(HttpStatus.OK)
-  async update(@Param('id', ParseIntPipe) id: number, @Body() updateCourseDto: UpdateCourseDTO) {
-    return this.courseService.update(id, updateCourseDto)
+  @UseInterceptors(FileFieldsInterceptor([{ name: 'thumbnail', maxCount: 1 }], imageUploadOptions))
+  async update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateCourseDto: UpdateCourseDTO,
+    @UploadedFile() files?: { thumbnail?: Express.Multer.File[] },
+  ) {
+    return this.courseService.update(id, updateCourseDto, files)
   }
-
   @Delete(':id')
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Admin, RoleName.Staff)

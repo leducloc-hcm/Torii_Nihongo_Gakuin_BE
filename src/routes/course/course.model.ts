@@ -28,6 +28,7 @@ export const CreateCourseSchema = CourseSchema.omit({
   createdAt: true,
   updatedAt: true,
   createdBy: true,
+  status: true,
 })
 
 // Update Course Schema
@@ -35,7 +36,28 @@ export const UpdateCourseSchema = CourseSchema.omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+  status: true,
 }).partial()
+
+export const UpdateCourseStatusSchemaForAdmin = CourseSchema.omit({
+  id: true,
+  slug: true,
+  title: true,
+  subtitle: true,
+  description: true,
+  level: true,
+  courseType: true,
+  thumbnailUrl: true,
+  price: true,
+  createdAt: true,
+  updatedAt: true,
+  createdBy: true,
+  lecturerIds: true,
+})
+  .partial()
+  .extend({
+    status: z.enum(['DRAFT', 'PENDING_REVIEW', 'PUBLISHED', 'ARCHIVED']),
+  })
 
 // Query Course Schema
 export const QueryCourseSchema = z.object({
@@ -272,3 +294,4 @@ export type QueryCourseType = z.infer<typeof QueryCourseSchema>
 export type CourseResponseType = z.infer<typeof CourseResponseSchema>
 export type CourseListItemType = z.infer<typeof CourseListItemSchema>
 export type PublishedCourseListItemType = z.infer<typeof PublishedCourseListItemSchema>
+export type UpdateCourseStatusTypeForAdmin = z.infer<typeof UpdateCourseStatusSchemaForAdmin>

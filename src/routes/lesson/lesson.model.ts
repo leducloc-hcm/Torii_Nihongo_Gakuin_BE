@@ -21,6 +21,7 @@ export const CreateLessonSchema = LessonSchema.omit({
   mediaId: true,
   createdAt: true,
   updatedAt: true,
+  status: true,
 })
 
 // Update Lesson Schema
@@ -30,6 +31,7 @@ export const UpdateLessonSchema = LessonSchema.omit({
   mediaId: true,
   createdAt: true,
   updatedAt: true,
+  status: true,
 }).partial()
 
 // Query Lesson Schema

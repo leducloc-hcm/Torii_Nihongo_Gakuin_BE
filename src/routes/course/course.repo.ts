@@ -235,4 +235,12 @@ export class CourseRepository {
       },
     }) as Promise<Course[]>
   }
+  async findAllPendingReviewCourses(params: { where?: CourseWhereInput }): Promise<CourseWithRelations[]> {
+    const { where = {} } = params
+
+    const whereWithStatus = { ...where, status: 'PENDING_REVIEW' as const }
+
+    const { courses } = await this.findAll({ where: whereWithStatus })
+    return courses
+  }
 }

@@ -10,9 +10,16 @@ import {
   UpdateClassDTO,
   CreateSessionDTO,
 } from './course.dto'
-import { CourseWithRelations, CourseWhereInput, CourseOrderByInput } from './course.model'
+import {
+  CourseWithRelations,
+  CourseWhereInput,
+  CourseOrderByInput,
+  UpdateCourseStatusTypeForAdmin,
+} from './course.model'
 import { LectureProfileRepository } from 'src/routes/profile/profile.repo'
 import { EnrollmentService } from '../enrollment/enrollment.service'
+import { S3Service } from 'src/shared/services/s3.service'
+import { PrismaService } from 'src/shared/services/prisma.service'
 
 @Injectable()
 export class CourseService {
@@ -22,15 +29,25 @@ export class CourseService {
     private readonly lecturerRepository: LectureProfileRepository,
     private readonly enrollmentService: EnrollmentService,
     private readonly classFolderService: ClassFolderService,
+    private readonly s3Service: S3Service,
+    private readonly prisma: PrismaService,
   ) {}
 
-  async create(createCourseDto: CreateCourseDTO, userId: number): Promise<CourseWithRelations> {
+  async create(
+    createCourseDto: CreateCourseDTO,
+    userId: number,
+    files?: { thumbnail?: Express.Multer.File[] },
+  ): Promise<CourseWithRelations> {
     const { slug, lecturerIds, ...courseData } = createCourseDto
 
     // Check if slug already exists
     const slugExists = await this.courseRepository.checkSlugExists(slug)
     if (slugExists) {
       throw new ConflictException(`Course with slug '${slug}' already exists`)
+    }
+    let imageUrl = createCourseDto.thumbnailUrl
+    if (files?.thumbnail?.[0]) {
+      imageUrl = (await this.s3Service.uploadFileToS3(files.thumbnail[0], 'thumbnails')).url
     }
 
     // Validate lecturer exists if provided
@@ -46,6 +63,8 @@ export class CourseService {
     return this.courseRepository.create({
       slug,
       ...courseData,
+      status: 'DRAFT',
+      thumbnailUrl: imageUrl,
       lecturerIds: lecturerIds.map((id) => Number(id)),
       createdBy: userId,
     })
@@ -136,7 +155,11 @@ export class CourseService {
     return course
   }
 
-  async update(id: number, updateCourseDto: UpdateCourseDTO): Promise<CourseWithRelations> {
+  async update(
+    id: number,
+    updateCourseDto: UpdateCourseDTO,
+    files?: { thumbnail?: Express.Multer.File[] },
+  ): Promise<CourseWithRelations> {
     // Check if course exists
     const existingCourse = await this.findOne(id)
 
@@ -148,6 +171,10 @@ export class CourseService {
       }
     }
 
+    let imageUrl = existingCourse.thumbnailUrl
+    if (files?.thumbnail?.[0]) {
+      imageUrl = (await this.s3Service.uploadFileToS3(files.thumbnail[0], 'thumbnails')).url
+    }
     // Validate lecturers exist if provided
     if (updateCourseDto.lecturerIds) {
       const lecturerExists = await Promise.all(
@@ -166,6 +193,7 @@ export class CourseService {
       where: { id },
       data: {
         ...courseData,
+        thumbnailUrl: imageUrl,
         ...(lecturerIds !== undefined && {
           lecturerIds: lecturerIds === null ? [] : lecturerIds.map((id) => Number(id)),
         }),
@@ -432,5 +460,71 @@ export class CourseService {
       ...course,
       lecturers: lecturerArray,
     }
+  }
+  async publish(id: number): Promise<CourseWithRelations> {
+    // Check if course exists
+    const existingCourse = await this.findOne(id)
+
+    if (existingCourse.status === 'PUBLISHED') {
+      throw new BadRequestException(`Course with ID ${id} is already published`)
+    }
+
+    // Update course status and all lessons in the course to PUBLISHED using transaction
+    await this.prisma.$transaction(async (prisma) => {
+      // Update course status
+      await prisma.course.update({
+        where: { id },
+        data: { status: 'PUBLISHED' },
+      })
+
+      // Update all lessons in the course modules to PUBLISHED (except those already GLOBAL_PUBLIC)
+      await prisma.lesson.updateMany({
+        where: {
+          module: {
+            courseId: id,
+          },
+          status: {
+            not: 'GLOBAL_PUBLIC',
+          },
+        },
+        data: {
+          status: 'PUBLISHED',
+        },
+      })
+    })
+
+    // Return the updated course with relations
+    const updatedCourse = await this.courseRepository.findOne({ id })
+    if (!updatedCourse) {
+      throw new NotFoundException(`Course with ID ${id} not found after update`)
+    }
+    return updatedCourse
+  }
+  async pendingReview(id: number): Promise<CourseWithRelations> {
+    // Check if course exists
+    const existingCourse = await this.findOne(id)
+
+    if (existingCourse.status !== 'DRAFT') {
+      throw new BadRequestException(`Only courses in DRAFT status can be submitted for review`)
+    }
+
+    // Update course status to PENDING_REVIEW
+    return this.courseRepository.update({
+      where: { id },
+      data: { status: 'PENDING_REVIEW' },
+    })
+  }
+  async getPendingReviewCourses() {
+    return this.courseRepository.findAllPendingReviewCourses({ where: {} })
+  }
+  async updateCourseStatus(id: number, body: UpdateCourseStatusTypeForAdmin) {
+    // Check if course exists
+    const existingCourse = await this.findOne(id)
+
+    // Update course status
+    return this.courseRepository.update({
+      where: { id },
+      data: { status: body.status },
+    })
   }
 }
