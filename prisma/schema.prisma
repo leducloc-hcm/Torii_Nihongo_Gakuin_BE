@@ -474,7 +474,7 @@ model AssessmentAssignment {
   startAt        DateTime?
   dueAt          DateTime?
   lockAfterDue   Boolean @default(false)
-  maxAttempts    Int?               // giới hạn số lần làm bài
+  maxAttempts    Int?         
   status         AssignmentStatus   @default(PENDING)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt

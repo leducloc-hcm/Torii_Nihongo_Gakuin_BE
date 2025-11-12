@@ -23,6 +23,10 @@ export class QuestionGroupService {
   ): Promise<any> {
     const { questions, mediaId, metadata, ...groupData } = createDto
 
+    // Remove invalid fields that don't exist in schema
+    delete (groupData as any).image
+    delete (groupData as any).audio
+
     let parsedQuestions: number[] = []
     if (questions) {
       if (Array.isArray(questions)) {
@@ -181,6 +185,35 @@ export class QuestionGroupService {
 
     const { questions, mediaId, ...groupData } = updateDto
 
+    // Check if image/audio fields are sent in form-data (even if empty)
+    const hasImageField = 'image' in (updateDto as any)
+    const hasAudioField = 'audio' in (updateDto as any)
+    const hasImageFile = files?.image?.[0]
+    const hasAudioFile = files?.audio?.[0]
+
+    // Remove invalid fields that don't exist in schema
+    delete (groupData as any).image
+    delete (groupData as any).audio
+
+    // Parse mediaId: convert empty string or "null" string to actual null
+    // Form-data might send mediaId as string even though type says number
+    let parsedMediaId: number | null | undefined = mediaId
+    const mediaIdValue = mediaId as any
+    if (typeof mediaIdValue === 'string') {
+      const strValue = mediaIdValue.trim().toLowerCase()
+      if (strValue === '' || strValue === 'null') {
+        parsedMediaId = null
+      } else {
+        const parsed = parseInt(mediaIdValue, 10)
+        parsedMediaId = isNaN(parsed) ? undefined : parsed
+      }
+    }
+
+    // If image/audio field sent but no file uploaded → user wants to remove media
+    if ((hasImageField && !hasImageFile) || (hasAudioField && !hasAudioFile)) {
+      parsedMediaId = null
+    }
+
     let parsedQuestions: number[] | undefined
     if (questions) {
       if (Array.isArray(questions)) {
@@ -199,9 +232,13 @@ export class QuestionGroupService {
     }
 
     // Handle file uploads
-    let updatedMediaId = mediaId
+    let updatedMediaId = parsedMediaId
+    console.log('Parsed mediaId:', parsedMediaId, 'Original:', mediaId)
 
-    if (files?.image?.[0] || files?.audio?.[0]) {
+    // If mediaId is explicitly null (not undefined), user wants to remove media
+    if (parsedMediaId === null) {
+      updatedMediaId = null
+    } else if (files?.image?.[0] || files?.audio?.[0]) {
       // Upload files to S3 and create media record
       let imageUrl: string | undefined
       let audioUrl: string | undefined
@@ -255,7 +292,8 @@ export class QuestionGroupService {
       }
     }
 
-    if (updatedMediaId) {
+    // Validate mediaId only if it's a number (not null or undefined)
+    if (updatedMediaId && typeof updatedMediaId === 'number') {
       const mediaExists = await this.questionGroupRepository.checkMediaExists(updatedMediaId)
       if (!mediaExists) {
         throw new BadRequestException(`Media with ID ${updatedMediaId} does not exist`)
@@ -275,8 +313,12 @@ export class QuestionGroupService {
       metadata: groupData.metadata || null,
     }
 
-    if (updatedMediaId) {
-      updateData.media = { connect: { id: updatedMediaId } }
+    if (updatedMediaId !== undefined) {
+      if (updatedMediaId === null) {
+        updateData.media = { disconnect: true }
+      } else {
+        updateData.media = { connect: { id: updatedMediaId } }
+      }
     }
 
     return this.questionGroupRepository.updateWithQuestions(id, updateData, parsedQuestions)
