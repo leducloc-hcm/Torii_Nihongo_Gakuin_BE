@@ -19,7 +19,6 @@ export class QuestionService {
   ): Promise<any> {
     const { mediaId, ...questionData } = createDto
 
-    // Remove invalid fields that don't exist in schema
     delete (questionData as any).image
     delete (questionData as any).audio
 
@@ -42,7 +41,6 @@ export class QuestionService {
         audioFile = files.audio[0]
       }
 
-      // Create media record in database with both files info
       if (imageUrl || audioUrl) {
         const primaryUrl = imageUrl || audioUrl!
         const primaryKind = imageUrl ? 'IMAGE' : 'AUDIO'
@@ -142,11 +140,6 @@ export class QuestionService {
       where.difficulty = difficulty
     }
 
-    // Note: readingLength filter may need adjustment based on Prisma schema
-    // if (readingLength !== undefined && readingLength !== null) {
-    //   where.readingLength = readingLength
-    // }
-
     if (keyword) {
       where.OR = [
         { stem: { contains: keyword, mode: 'insensitive' } },
@@ -159,7 +152,6 @@ export class QuestionService {
       where.mediaId = hasMedia ? { not: null } : null
     }
 
-    // Build order by clause
     const orderBy: QuestionOrderByInput = {}
     if (sortBy && sortOrder) {
       orderBy[sortBy] = sortOrder
