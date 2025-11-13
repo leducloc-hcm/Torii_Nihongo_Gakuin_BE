@@ -89,9 +89,15 @@ export class AssessmentProgressRepository {
     const { page = 1, limit = 10, where, orderBy } = params
     const skip = (page - 1) * limit
 
+    // Thêm điều kiện chỉ hiển thị những bài chưa submitted
+    const whereCondition: Prisma.AssessmentProgressWhereInput = {
+      ...where,
+      isSubmitted: false,
+    }
+
     const [items, total] = await Promise.all([
-      this.findMany({ where, orderBy, skip, take: limit }),
-      this.prisma.assessmentProgress.count({ where }),
+      this.findMany({ where: whereCondition, orderBy, skip, take: limit }),
+      this.prisma.assessmentProgress.count({ where: whereCondition }),
     ])
 
     return {
