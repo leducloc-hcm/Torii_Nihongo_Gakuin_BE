@@ -126,10 +126,19 @@ export class AssessmentProgressService {
 
       progressData.assignmentId = assignmentId
     }
+
+    console.log('🔍 Debug progressData before create:', progressData)
+
     const progress = await this.progressRepository.create(progressData)
 
-    if (progress.answers && assignmentId) {
-      await this.assignmentRepository.updateStatus(assignmentId, 'IN_PROGRESS')
+    // Update assignment status to IN_PROGRESS if this is an assignment-based assessment
+    if (assignmentId) {
+      try {
+        await this.assignmentRepository.updateStatus(assignmentId, 'IN_PROGRESS')
+      } catch (error: any) {
+        // Log warning but don't fail the creation if assignment update fails
+        console.warn(`Failed to update assignment ${assignmentId} status to IN_PROGRESS:`, error.message)
+      }
     }
 
     return {
@@ -142,6 +151,7 @@ export class AssessmentProgressService {
   async saveAnswer(saveDto: SaveAnswerProgressDTO, userId: number) {
     const { progressId, questionId, selectedOptionId, timeSpentSec, isFlagged } = saveDto
 
+    // Validate progress exists and belongs to user
     const progress = await this.progressRepository.findUnique({ id: progressId })
     if (!progress) {
       throw new NotFoundException(`Progress with ID ${progressId} not found`)
@@ -153,32 +163,25 @@ export class AssessmentProgressService {
       throw new BadRequestException('Cannot modify answers after submission')
     }
 
-    const existingAnswer = await this.progressRepository.findAnswerByProgressAndQuestion(progressId, questionId)
-
-    if (existingAnswer) {
-      return this.progressRepository.updateAnswer(
-        { id: existingAnswer.id },
-        {
-          selectedOption: selectedOptionId ? { connect: { id: selectedOptionId } } : { disconnect: true },
-          timeSpentSec,
-          isFlagged,
-          lastUpdatedAt: new Date(),
-        },
-      )
-    } else {
-      const answerData: any = {
+    // Use upsert to handle both create and update in a single atomic operation
+    return this.progressRepository.upsertAnswer({
+      where: {
+        progressId_questionId: { progressId, questionId },
+      },
+      create: {
         progress: { connect: { id: progressId } },
         question: { connect: { id: questionId } },
+        selectedOption: selectedOptionId ? { connect: { id: selectedOptionId } } : undefined,
         timeSpentSec: timeSpentSec || 0,
         isFlagged: isFlagged || false,
-      }
-
-      if (selectedOptionId) {
-        answerData.selectedOption = { connect: { id: selectedOptionId } }
-      }
-
-      return this.progressRepository.createAnswer(answerData)
-    }
+      },
+      update: {
+        selectedOption: selectedOptionId ? { connect: { id: selectedOptionId } } : { disconnect: true },
+        timeSpentSec: timeSpentSec,
+        isFlagged: isFlagged,
+        lastUpdatedAt: new Date(),
+      },
+    })
   }
 
   async updateAnswer(answerId: number, updateDto: UpdateAnswerProgressDTO, userId: number) {
@@ -265,8 +268,14 @@ export class AssessmentProgressService {
       },
     )
 
-    if (updated.assessmentId) {
-      await this.assignmentRepository.updateStatus(updated.assessmentId, 'SUBMITTED')
+    // Update assignment status if this progress is linked to an assignment
+    if (updated.assignmentId) {
+      try {
+        await this.assignmentRepository.updateStatus(updated.assignmentId, 'SUBMITTED')
+      } catch (error: any) {
+        // Log warning but don't fail the submission if assignment update fails
+        console.warn(`Failed to update assignment ${updated.assignmentId} status:`, error.message)
+      }
     }
 
     return {
