@@ -72,12 +72,9 @@ export class AssessmentProgressService {
     }
   }
 
-  // ============= SAVE ANSWER =============
-
   async saveAnswer(saveDto: SaveAnswerProgressDTO, userId: number) {
     const { progressId, questionId, selectedOptionId, timeSpentSec, isFlagged } = saveDto
 
-    // Validate progress exists and belongs to user
     const progress = await this.progressRepository.findUnique({ id: progressId })
     if (!progress) {
       throw new NotFoundException(`Progress with ID ${progressId} not found`)
@@ -89,11 +86,9 @@ export class AssessmentProgressService {
       throw new BadRequestException('Cannot modify answers after submission')
     }
 
-    // Check if answer already exists
     const existingAnswer = await this.progressRepository.findAnswerByProgressAndQuestion(progressId, questionId)
 
     if (existingAnswer) {
-      // Update existing answer
       return this.progressRepository.updateAnswer(
         { id: existingAnswer.id },
         {

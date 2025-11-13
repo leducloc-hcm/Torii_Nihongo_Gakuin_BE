@@ -48,8 +48,6 @@ export class AssessmentProgressController {
     return this.progressService.submitAssessment(submitDto, userId)
   }
 
-  // ============= SAVE & AUTO-SAVE =============
-
   @Post('answers')
   @Auth([AuthType.Bearer])
   @HttpCode(HttpStatus.CREATED)
