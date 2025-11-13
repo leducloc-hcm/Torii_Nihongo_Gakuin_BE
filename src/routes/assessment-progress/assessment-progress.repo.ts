@@ -80,17 +80,17 @@ export class AssessmentProgressRepository {
     })
   }
 
-  async findManyWithPagination(params: {
-    where?: Prisma.AssessmentProgressWhereInput
-    orderBy?: Prisma.AssessmentProgressOrderByWithRelationInput
-  }) {
+  async findManyWithPagination(params: { where?: Prisma.AssessmentProgressWhereInput }) {
+    const { where } = params
+
     // Thêm điều kiện chỉ hiển thị những bài chưa submitted
     const whereCondition: Prisma.AssessmentProgressWhereInput = {
+      ...where,
       isSubmitted: false,
       assignmentId: null,
     }
 
-    const [items] = await Promise.all([
+    const items = await Promise.all([
       this.findMany({ where: whereCondition }),
       this.prisma.assessmentProgress.count({ where: whereCondition }),
     ])
@@ -100,21 +100,17 @@ export class AssessmentProgressRepository {
     }
   }
 
-  async findManyWithPaginationAssignment(params: {
-    where?: Prisma.AssessmentProgressWhereInput
-    orderBy?: Prisma.AssessmentProgressOrderByWithRelationInput
-  }) {
-    const { where, orderBy } = params
+  async findManyWithPaginationAssignment(params: { where?: Prisma.AssessmentProgressWhereInput }) {
+    const { where } = params
 
-    // Thêm điều kiện chỉ hiển thị những bài chưa submitted
     const whereCondition: Prisma.AssessmentProgressWhereInput = {
       ...where,
       isSubmitted: false,
       assignmentId: { not: null },
     }
 
-    const [items, total] = await Promise.all([
-      this.findMany({ where: whereCondition, orderBy }),
+    const items = await Promise.all([
+      this.findMany({ where: whereCondition }),
       this.prisma.assessmentProgress.count({ where: whereCondition }),
     ])
 
@@ -262,22 +258,22 @@ export class AssessmentProgressRepository {
 
   async checkExists(id: number): Promise<boolean> {
     const count = await this.prisma.assessmentProgress.count({ where: { id } })
-    return (await count) > 0
+    return count > 0
   }
 
   async checkAnswerExists(id: number): Promise<boolean> {
     const count = await this.prisma.assessmentAnswerProgress.count({ where: { id } })
-    return (await count) > 0
+    return count > 0
   }
 
   async checkAssessmentExists(id: number): Promise<boolean> {
     const count = await this.prisma.assessmentPaper.count({ where: { id } })
-    return (await count) > 0
+    return count > 0
   }
 
   async checkUserExists(id: number): Promise<boolean> {
     const count = await this.prisma.user.count({ where: { id } })
-    return (await count) > 0
+    return count > 0
   }
 
   async getProgressByUserAndAssessment(userId: number, assessmentId: number) {
@@ -373,7 +369,7 @@ export class AssessmentProgressRepository {
       where: { assessmentId, isSubmitted: true },
       _avg: { timeSpentSec: true },
     })
-    return (await result._avg.timeSpentSec) || 0
+    return result._avg.timeSpentSec || 0
   }
 
   // Method này không còn phù hợp vì đã bỏ unique constraint

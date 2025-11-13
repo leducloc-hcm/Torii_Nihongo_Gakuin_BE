@@ -153,6 +153,7 @@ export class AssessmentProgressService {
 
     // Validate progress exists and belongs to user
     const progress = await this.progressRepository.findUnique({ id: progressId })
+    console.log('progress', progress)
     if (!progress) {
       throw new NotFoundException(`Progress with ID ${progressId} not found`)
     }
@@ -313,54 +314,28 @@ export class AssessmentProgressService {
     return this.enrichProgressWithTimeSpent(progress)
   }
 
-  async getAllMyProgresses(userId: number, queryDto: QueryAssessmentProgressDTO) {
-    const { assessmentId, assignmentId, isSubmitted, sortBy, sortOrder } = queryDto
-
-    const where: any = { userId }
-    if (assessmentId) where.assessmentId = assessmentId
-    if (assignmentId) where.assignmentId = assignmentId
-    if (isSubmitted !== undefined) where.isSubmitted = isSubmitted
-
-    const orderBy: any = {}
-    if (sortBy && sortOrder) {
-      orderBy[sortBy] = sortOrder
+  async getAllMyProgresses(userId: number) {
+    const whereCondition = {
+      userId,
+      assignmentId: null,
+      isSubmitted: false,
     }
 
-    const result = await this.progressRepository.findManyWithPagination({
-      where,
-      orderBy,
+    return await this.progressRepository.findManyWithPagination({
+      where: whereCondition,
     })
-
-    // Enrich each progress item with computed timeSpentSec
-    return {
-      ...result,
-      items: result.items.map((progress) => this.enrichProgressWithTimeSpent(progress)),
-    }
   }
 
-  async getAllMyProgressesAssignment(userId: number, queryDto: QueryAssessmentProgressDTO) {
-    const { assessmentId, assignmentId, isSubmitted, sortBy, sortOrder } = queryDto
-
-    const where: any = { userId }
-    if (assessmentId) where.assessmentId = assessmentId
-    if (assignmentId) where.assignmentId = assignmentId
-    if (isSubmitted !== undefined) where.isSubmitted = isSubmitted
-
-    const orderBy: any = {}
-    if (sortBy && sortOrder) {
-      orderBy[sortBy] = sortOrder
+  async getAllMyProgressesAssignment(userId: number) {
+    const whereCondition = {
+      userId,
+      assignmentId: { not: null },
+      isSubmitted: false,
     }
 
-    const result = await this.progressRepository.findManyWithPaginationAssignment({
-      where,
-      orderBy,
+    return await this.progressRepository.findManyWithPaginationAssignment({
+      where: whereCondition,
     })
-
-    // Enrich each progress item with computed timeSpentSec
-    return {
-      ...result,
-      items: result.items.map((progress) => this.enrichProgressWithTimeSpent(progress)),
-    }
   }
 
   // ============= GET ANSWERS =============
@@ -440,7 +415,6 @@ export class AssessmentProgressService {
 
     return this.progressRepository.findManyWithPagination({
       where,
-      orderBy,
     })
   }
 }

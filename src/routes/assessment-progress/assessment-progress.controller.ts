@@ -76,18 +76,15 @@ export class AssessmentProgressController {
   @Get('my')
   @Auth([AuthType.Bearer])
   @HttpCode(HttpStatus.OK)
-  async getAllMyProgresses(@ActiveUser('userId') userId: number, @Query() queryDto: QueryAssessmentProgressDTO) {
-    return this.progressService.getAllMyProgresses(userId, queryDto)
+  async getAllMyProgresses(@ActiveUser('userId') userId: number) {
+    return this.progressService.getAllMyProgresses(userId)
   }
 
   @Get('my-assignments')
   @Auth([AuthType.Bearer])
   @HttpCode(HttpStatus.OK)
-  async getAllMyProgressesAssignment(
-    @ActiveUser('userId') userId: number,
-    @Query() queryDto: QueryAssessmentProgressDTO,
-  ) {
-    return this.progressService.getAllMyProgressesAssignment(userId, queryDto)
+  async getAllMyProgressesAssignment(@ActiveUser('userId') userId: number) {
+    return this.progressService.getAllMyProgressesAssignment(userId)
   }
 
   @Get('my/stats')
