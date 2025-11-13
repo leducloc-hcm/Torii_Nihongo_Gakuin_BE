@@ -45,6 +45,18 @@ export class AssessmentProgressService {
       throw new BadRequestException(`Assessment with ID ${assessmentId} does not exist`)
     }
 
+    // Kiểm tra xem có bài đang trong tiến trình làm chưa (chưa submit)
+    const existingProgress = await this.progressRepository.getProgressByUserAndAssessment(userId, assessmentId)
+
+    if (existingProgress && !existingProgress.isSubmitted) {
+      // Nếu đang có bài chưa submit thì trả về bài đó để tiếp tục
+      return {
+        message: 'Assessment resumed - continuing from where you left off',
+        progress: this.enrichProgressWithTimeSpent(existingProgress),
+        isResuming: true,
+      }
+    }
+
     const progressData: any = {
       assessment: { connect: { id: assessmentId } },
       user: { connect: { id: userId } },
@@ -69,6 +81,7 @@ export class AssessmentProgressService {
     return {
       message: 'Assessment started successfully',
       progress: this.enrichProgressWithTimeSpent(progress),
+      isResuming: false,
     }
   }
 
