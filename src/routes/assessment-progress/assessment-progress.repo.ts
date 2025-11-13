@@ -6,8 +6,6 @@ import { Prisma } from '@prisma/client'
 export class AssessmentProgressRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  // ============= ASSESSMENT PROGRESS CRUD =============
-
   async create(data: Prisma.AssessmentProgressCreateInput) {
     return this.prisma.assessmentProgress.create({
       data,
@@ -217,9 +215,10 @@ export class AssessmentProgressRepository {
   }
 
   async getProgressByUserAndAssessment(userId: number, assessmentId: number) {
-    return this.prisma.assessmentProgress.findUnique({
+    return this.prisma.assessmentProgress.findFirst({
       where: {
-        assessmentId_userId: { assessmentId, userId },
+        assessmentId,
+        userId,
       },
       include: {
         assessment: true,
@@ -231,6 +230,7 @@ export class AssessmentProgressRepository {
           },
         },
       },
+      orderBy: { startedAt: 'desc' }, // Lấy progress mới nhất
     })
   }
 
@@ -278,10 +278,21 @@ export class AssessmentProgressRepository {
     return result._avg.timeSpentSec || 0
   }
 
-  async deleteUserProgress(userId: number, assessmentId: number) {
-    return this.prisma.assessmentProgress.delete({
+  // Method này không còn phù hợp vì đã bỏ unique constraint
+  // async deleteUserProgress(userId: number, assessmentId: number) {
+  //   return this.prisma.assessmentProgress.delete({
+  //     where: {
+  //       assessmentId_userId: { assessmentId, userId },
+  //     },
+  //   })
+  // }
+
+  async deleteUserProgresses(userId: number, assessmentId: number) {
+    // Xóa tất cả progress của user cho assessment này
+    return this.prisma.assessmentProgress.deleteMany({
       where: {
-        assessmentId_userId: { assessmentId, userId },
+        assessmentId,
+        userId,
       },
     })
   }

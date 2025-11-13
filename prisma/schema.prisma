@@ -510,9 +510,11 @@ model AssessmentProgress {
   answers    AssessmentAnswerProgress[]
   attempts   AssessmentAttempt[] // 🆕 Thêm quan hệ với Attempt
 
-  @@unique([assessmentId, userId])
+  // ✅ Bỏ unique constraint để cho phép làm nhiều lần
+  // @@unique([assessmentId, userId]) - REMOVED
   @@index([assessmentId])
   @@index([userId])
+  @@index([assessmentId, userId]) // Thêm index thay vì unique
 }
 
 model AssessmentAnswerProgress {

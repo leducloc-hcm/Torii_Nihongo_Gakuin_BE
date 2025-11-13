@@ -83,7 +83,7 @@ export class AssessmentPaperService {
       throw new NotFoundException(`Assessment paper with ID ${id} not found`)
     }
 
-    const title = newTitle || `${original.title} (Copy v${original.version + 1})`
+    const title = newTitle || `${original.title} (v${original.version + 1})`
 
     return this.assessmentPaperRepo.clone(id, title, original.version + 1)
   }
