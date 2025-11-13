@@ -90,10 +90,7 @@ export class AssessmentProgressRepository {
       assignmentId: null,
     }
 
-    const items = await Promise.all([
-      this.findMany({ where: whereCondition }),
-      this.prisma.assessmentProgress.count({ where: whereCondition }),
-    ])
+    const items = await this.findMany({ where: whereCondition })
 
     return {
       items,
@@ -109,10 +106,7 @@ export class AssessmentProgressRepository {
       assignmentId: { not: null },
     }
 
-    const items = await Promise.all([
-      this.findMany({ where: whereCondition }),
-      this.prisma.assessmentProgress.count({ where: whereCondition }),
-    ])
+    const items = await this.findMany({ where: whereCondition })
 
     return {
       items,
