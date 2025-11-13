@@ -80,6 +80,16 @@ export class AssessmentProgressController {
     return this.progressService.getAllMyProgresses(userId, queryDto)
   }
 
+  @Get('my-assignments')
+  @Auth([AuthType.Bearer])
+  @HttpCode(HttpStatus.OK)
+  async getAllMyProgressesAssignment(
+    @ActiveUser('userId') userId: number,
+    @Query() queryDto: QueryAssessmentProgressDTO,
+  ) {
+    return this.progressService.getAllMyProgressesAssignment(userId, queryDto)
+  }
+
   @Get('my/stats')
   @Auth([AuthType.Bearer])
   @HttpCode(HttpStatus.OK)

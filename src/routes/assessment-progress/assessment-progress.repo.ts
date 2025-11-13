@@ -81,33 +81,45 @@ export class AssessmentProgressRepository {
   }
 
   async findManyWithPagination(params: {
-    page?: number
-    limit?: number
     where?: Prisma.AssessmentProgressWhereInput
     orderBy?: Prisma.AssessmentProgressOrderByWithRelationInput
   }) {
-    const { page = 1, limit = 10, where, orderBy } = params
-    const skip = (page - 1) * limit
-
     // Thêm điều kiện chỉ hiển thị những bài chưa submitted
     const whereCondition: Prisma.AssessmentProgressWhereInput = {
-      ...where,
       isSubmitted: false,
+      assignmentId: null,
     }
 
-    const [items, total] = await Promise.all([
-      this.findMany({ where: whereCondition, orderBy, skip, take: limit }),
+    const [items] = await Promise.all([
+      this.findMany({ where: whereCondition }),
       this.prisma.assessmentProgress.count({ where: whereCondition }),
     ])
 
     return {
       items,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
+    }
+  }
+
+  async findManyWithPaginationAssignment(params: {
+    where?: Prisma.AssessmentProgressWhereInput
+    orderBy?: Prisma.AssessmentProgressOrderByWithRelationInput
+  }) {
+    const { where, orderBy } = params
+
+    // Thêm điều kiện chỉ hiển thị những bài chưa submitted
+    const whereCondition: Prisma.AssessmentProgressWhereInput = {
+      ...where,
+      isSubmitted: false,
+      assignmentId: { not: null },
+    }
+
+    const [items, total] = await Promise.all([
+      this.findMany({ where: whereCondition, orderBy }),
+      this.prisma.assessmentProgress.count({ where: whereCondition }),
+    ])
+
+    return {
+      items,
     }
   }
 
@@ -237,6 +249,38 @@ export class AssessmentProgressRepository {
         },
       },
       orderBy: { startedAt: 'desc' }, // Lấy progress mới nhất
+    })
+  }
+
+  async getProgressByUserAssessmentAndAssignment(userId: number, assessmentId: number, assignmentId: number | null) {
+    return this.prisma.assessmentProgress.findFirst({
+      where: {
+        assessmentId,
+        userId,
+        assignmentId, // null nếu làm direct, hoặc assignmentId cụ thể nếu làm via assignment
+      },
+      include: {
+        assessment: true,
+        assignment: true,
+        answers: {
+          include: {
+            question: true,
+            selectedOption: true,
+          },
+        },
+      },
+      orderBy: { startedAt: 'desc' }, // Lấy progress mới nhất
+    })
+  }
+
+  async countUserAttemptsForAssignment(userId: number, assessmentId: number, assignmentId: number) {
+    return this.prisma.assessmentProgress.count({
+      where: {
+        assessmentId,
+        userId,
+        assignmentId,
+        isSubmitted: true,
+      },
     })
   }
 

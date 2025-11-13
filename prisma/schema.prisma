@@ -508,7 +508,7 @@ model AssessmentProgress {
   user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   assignment AssessmentAssignment? @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
   answers    AssessmentAnswerProgress[]
-  attempts   AssessmentAttempt[] // 🆕 Thêm quan hệ với Attempt
+  attempts   AssessmentAttempt[] 
 
   @@index([assessmentId])
   @@index([userId])
@@ -1666,7 +1666,7 @@ enum RedemptionStatus {
   PENDING
   COMPLETED
   FAILED
-  PARTIALLY_COMPLETED // for gift coupons with pending class selections
+  PARTIALLY_COMPLETED
 }
 
 enum CouponAuditAction {
@@ -1684,5 +1684,5 @@ enum AssignmentStatus {
   PENDING
   IN_PROGRESS
   SUBMITTED
-  GRADED
+  EXPIRED
 }

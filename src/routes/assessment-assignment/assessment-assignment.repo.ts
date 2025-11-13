@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common'
+import { AssignmentStatus } from '@prisma/client'
 import { PrismaService } from 'src/shared/services/prisma.service'
 
 @Injectable()
@@ -45,6 +46,12 @@ export class AssessmentAssignmentRepository {
     return await this.prisma.assessmentAssignment.create({
       data,
       include: this.defaultInclude,
+    })
+  }
+  async updateStatus(id: number, status: AssignmentStatus) {
+    return await this.prisma.assessmentAssignment.update({
+      where: { id },
+      data: { status },
     })
   }
 

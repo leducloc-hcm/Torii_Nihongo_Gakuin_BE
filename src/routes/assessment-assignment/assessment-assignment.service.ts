@@ -6,10 +6,14 @@ import {
   QueryAssessmentAssignmentDTO,
   MyAssignmentsQueryDTO,
 } from './assessment-assignment.dto'
+import { AssessmentProgressRepository } from 'src/routes/assessment-progress/assessment-progress.repo'
 
 @Injectable()
 export class AssessmentAssignmentService {
-  constructor(private readonly assignmentRepository: AssessmentAssignmentRepository) {}
+  constructor(
+    private readonly assignmentRepository: AssessmentAssignmentRepository,
+    private readonly progressRepository: AssessmentProgressRepository,
+  ) {}
 
   async create(createDto: CreateAssessmentAssignmentDTO, assignedById: number) {
     const { assessmentId, assignedToId, classId, ...assignmentData } = createDto
@@ -148,11 +152,10 @@ export class AssessmentAssignmentService {
   async getMyAssignments(userId: number, queryDto: MyAssignmentsQueryDTO) {
     const { page, limit, status, upcoming, overdue, sortBy, sortOrder } = queryDto
 
-    // Convert page and limit to numbers to ensure Prisma receives correct types
     const pageNum = Number(page) || 1
     const limitNum = Number(limit) || 10
 
-    return this.assignmentRepository.getMyAssignments({
+    const result = await this.assignmentRepository.getMyAssignments({
       userId,
       page: pageNum,
       limit: limitNum,
@@ -162,6 +165,30 @@ export class AssessmentAssignmentService {
       sortBy,
       sortOrder,
     })
+
+    // Đếm số lần làm bài cho mỗi assignment
+    if (result.data && result.data.length > 0) {
+      const assignmentsWithAttempts = await Promise.all(
+        result.data.map(async (assignment) => {
+          const attemptCount = await this.progressRepository.countUserAttemptsForAssignment(
+            userId,
+            assignment.assessmentId,
+            assignment.id,
+          )
+          return {
+            ...assignment,
+            attemptCount,
+          }
+        }),
+      )
+
+      return {
+        ...result,
+        data: assignmentsWithAttempts,
+      }
+    }
+
+    return result
   }
 
   async getCreatedByMe(userId: number, queryDto: QueryAssessmentAssignmentDTO) {
@@ -237,6 +264,21 @@ export class AssessmentAssignmentService {
     }
 
     return false
+  }
+
+  async getAssignmentById(assignmentId: number, userId: number) {
+    const assignment = await this.assignmentRepository.findUnique({ id: assignmentId })
+    if (!assignment) {
+      return null
+    }
+
+    // Check if user has access
+    const hasAccess = await this.checkUserAccess(assignmentId, userId)
+    if (!hasAccess) {
+      return null
+    }
+
+    return assignment
   }
 
   async isOverdue(assignmentId: number): Promise<boolean> {
