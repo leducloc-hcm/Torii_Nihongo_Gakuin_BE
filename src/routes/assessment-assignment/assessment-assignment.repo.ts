@@ -169,7 +169,7 @@ export class AssessmentAssignmentRepository {
   async getStats(where?: any) {
     const now = new Date()
 
-    const [total, pending, inProgress, submitted, graded, overdue] = await Promise.all([
+    const [total, pending, inProgress, submitted, expired, overdue] = await Promise.all([
       this.prisma.assessmentAssignment.count({ where }),
       this.prisma.assessmentAssignment.count({
         where: { ...where, status: 'PENDING' },
@@ -181,7 +181,7 @@ export class AssessmentAssignmentRepository {
         where: { ...where, status: 'SUBMITTED' },
       }),
       this.prisma.assessmentAssignment.count({
-        where: { ...where, status: 'GRADED' },
+        where: { ...where, status: 'EXPIRED' },
       }),
       this.prisma.assessmentAssignment.count({
         where: {
@@ -197,7 +197,7 @@ export class AssessmentAssignmentRepository {
       pending,
       inProgress,
       submitted,
-      graded,
+      expired,
       overdue,
     }
   }
@@ -333,5 +333,273 @@ export class AssessmentAssignmentRepository {
         startedAt: 'desc',
       },
     })
+  }
+
+  // ============= STUDENT PROGRESS TRACKING =============
+
+  /**
+   * Get all students in class and their assignment progress
+   * Includes attempt count, submission dates, and status
+   */
+  async getStudentsProgressForAssignment(assignmentId: number) {
+    const assignment = await this.findUnique({ id: assignmentId })
+    if (!assignment) {
+      throw new Error('Assignment not found')
+    }
+
+    let students: any[] = []
+
+    // Get students based on assignment type
+    if (assignment.assignedToId) {
+      // Individual assignment
+      const user = await this.prisma.user.findUnique({
+        where: { id: assignment.assignedToId },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      })
+      if (user) students = [user]
+    } else if (assignment.classId) {
+      // Class assignment
+      const classMembers = await this.prisma.classMember.findMany({
+        where: { classId: assignment.classId },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+        },
+      })
+      students = classMembers.map((member) => member.user)
+    }
+
+    // Get progress for each student
+    const studentsWithProgress = await Promise.all(
+      students.map(async (student) => {
+        // Count total attempts
+        const totalAttempts = await this.prisma.assessmentProgress.count({
+          where: {
+            assignmentId,
+            userId: student.id,
+          },
+        })
+
+        // Count submitted attempts
+        const submittedAttempts = await this.prisma.assessmentProgress.count({
+          where: {
+            assignmentId,
+            userId: student.id,
+            isSubmitted: true,
+          },
+        })
+
+        // Get latest progress
+        const latestProgress = await this.prisma.assessmentProgress.findFirst({
+          where: {
+            assignmentId,
+            userId: student.id,
+          },
+          orderBy: {
+            startedAt: 'desc',
+          },
+          include: {
+            attempts: {
+              select: {
+                id: true,
+                score: true,
+                submittedAt: true,
+              },
+              orderBy: {
+                submittedAt: 'desc',
+              },
+              take: 1,
+            },
+          },
+        })
+
+        // Get all attempts with scores
+        const attempts = await this.prisma.assessmentAttempt.findMany({
+          where: {
+            progress: {
+              assignmentId,
+              userId: student.id,
+            },
+          },
+          select: {
+            id: true,
+            score: true,
+            submittedAt: true,
+            userId: true,
+            assessmentId: true,
+          },
+          orderBy: {
+            submittedAt: 'desc',
+          },
+        })
+
+        let status = 'NOT_STARTED'
+        if (totalAttempts > 0) {
+          if (submittedAttempts > 0) {
+            status = 'SUBMITTED'
+          } else {
+            status = 'IN_PROGRESS'
+          }
+        }
+
+        return {
+          student,
+          status,
+          totalAttempts,
+          submittedAttempts,
+          latestProgress: latestProgress
+            ? {
+                id: latestProgress.id,
+                startedAt: latestProgress.startedAt,
+                completedAt: latestProgress.completedAt,
+                isSubmitted: latestProgress.isSubmitted,
+                latestScore: attempts.length > 0 ? attempts[0].score : null,
+              }
+            : null,
+          attempts: attempts.map((attempt) => ({
+            id: attempt.id,
+            score: attempt.score,
+            submittedAt: attempt.submittedAt,
+            userId: attempt.userId,
+          })),
+        }
+      }),
+    )
+
+    return {
+      assignment: {
+        id: assignment.id,
+        note: assignment.note,
+        dueAt: assignment.dueAt,
+        maxAttempts: assignment.maxAttempts,
+        assessment: assignment.assessment,
+      },
+      students: studentsWithProgress,
+      summary: {
+        totalStudents: students.length,
+        notStarted: studentsWithProgress.filter((s) => s.status === 'NOT_STARTED').length,
+        inProgress: studentsWithProgress.filter((s) => s.status === 'IN_PROGRESS').length,
+        submitted: studentsWithProgress.filter((s) => s.status === 'SUBMITTED').length,
+      },
+    }
+  }
+
+  /**
+   * Get detailed progress for a specific student
+   * Shows all attempts, detailed scores, and answer breakdown
+   */
+  async getStudentDetailedProgressForAssignment(assignmentId: number, studentId: number) {
+    const assignment = await this.findUnique({ id: assignmentId })
+    if (!assignment) {
+      throw new Error('Assignment not found')
+    }
+
+    const student = await this.prisma.user.findUnique({
+      where: { id: studentId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+      },
+    })
+
+    if (!student) {
+      throw new Error('Student not found')
+    }
+
+    // Get all progress records for this student
+    const progresses = await this.prisma.assessmentProgress.findMany({
+      where: {
+        assignmentId,
+        userId: studentId,
+      },
+      include: {
+        answers: {
+          include: {
+            question: {
+              select: {
+                id: true,
+                stem: true,
+                type: true,
+              },
+            },
+            selectedOption: {
+              select: {
+                id: true,
+                content: true,
+                isCorrect: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        startedAt: 'desc',
+      },
+    })
+
+    // Get all attempts for this student's progresses
+    const allAttempts = await this.prisma.assessmentAttempt.findMany({
+      where: {
+        progress: {
+          assignmentId,
+          userId: studentId,
+        },
+      },
+      select: {
+        id: true,
+        score: true,
+        submittedAt: true,
+        userId: true,
+        assessmentId: true,
+        progressId: true,
+      },
+      orderBy: {
+        submittedAt: 'desc',
+      },
+    })
+
+    // Calculate statistics
+    const totalAttempts = progresses.length
+    const submittedAttempts = progresses.filter((p) => p.isSubmitted).length
+    const bestScore = allAttempts.length > 0 ? Math.max(...allAttempts.map((a) => a.score || 0)) : null
+    const latestScore = allAttempts.length > 0 ? allAttempts[0]?.score || null : null
+    const averageScore =
+      allAttempts.length > 0 ? allAttempts.reduce((sum, a) => sum + (a.score || 0), 0) / allAttempts.length : null
+
+    return {
+      assignment: {
+        id: assignment.id,
+        note: assignment.note,
+        dueAt: assignment.dueAt,
+        maxAttempts: assignment.maxAttempts,
+        assessment: assignment.assessment,
+      },
+      student,
+
+      attempts: allAttempts.map((attempt) => ({
+        id: attempt.id,
+        score: attempt.score,
+        submittedAt: attempt.submittedAt,
+        progressId: attempt.progressId,
+      })),
+      progresses: progresses.map((progress) => ({
+        id: progress.id,
+        startedAt: progress.startedAt,
+        completedAt: progress.completedAt,
+        isSubmitted: progress.isSubmitted,
+        timeSpentSec: progress.timeSpentSec,
+        answersCount: progress.answers.length,
+      })),
+    }
   }
 }

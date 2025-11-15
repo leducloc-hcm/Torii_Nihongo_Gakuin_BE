@@ -65,16 +65,29 @@ export class AssessmentAssignmentService {
     if (assignedById) where.assignedById = assignedById
     if (assignedToId) where.assignedToId = assignedToId
     if (classId) where.classId = classId
-    if (status) where.status = status
 
-    if (isPastDue !== undefined) {
+    if (status && isPastDue === undefined) {
+      where.status = status
+    } else if (status && isPastDue !== undefined) {
       const now = new Date()
       if (isPastDue) {
         where.dueAt = { lt: now }
-        where.status = { in: ['PENDING', 'IN_PROGRESS'] }
+        where.status = status
+      } else {
+        where.status = status
+        where.OR = [{ dueAt: null }, { dueAt: { gte: now } }]
+      }
+    } else if (isPastDue !== undefined && !status) {
+      const now = new Date()
+      if (isPastDue) {
+        where.dueAt = { lt: now }
+        where.status = { in: ['PENDING', 'IN_PROGRESS', 'SUBMITTED'] }
       } else {
         where.OR = [{ dueAt: null }, { dueAt: { gte: now } }]
       }
+    } else if (status && !isPastDue) {
+      // Chỉ có status, không có isPastDue
+      where.status = status
     }
 
     const orderBy: any = {}
@@ -288,7 +301,7 @@ export class AssessmentAssignmentService {
     }
 
     const now = new Date()
-    return assignment.dueAt < now && !['SUBMITTED', 'GRADED'].includes(assignment.status)
+    return assignment.dueAt < now && !['SUBMITTED', 'EXPIRED', 'GRADED'].includes(assignment.status)
   }
 
   async getUpcoming(userId: number, days: number = 7) {
@@ -313,5 +326,49 @@ export class AssessmentAssignmentService {
       sortBy: 'dueAt',
       sortOrder: 'asc',
     })
+  }
+
+  // ============= STUDENT PROGRESS TRACKING =============
+
+  /**
+   * Get all students in the class and their assignment progress
+   * Shows attempt count, submission dates, and completion status
+   */
+  async getStudentsProgress(assignmentId: number, requesterId: number) {
+    const assignment = await this.assignmentRepository.findUnique({ id: assignmentId })
+    if (!assignment) {
+      throw new NotFoundException(`Assignment with ID ${assignmentId} not found`)
+    }
+
+    // Only the creator can view student progress
+    if (assignment.assignedById !== requesterId) {
+      throw new ForbiddenException('You can only view student progress for assignments you created')
+    }
+
+    return this.assignmentRepository.getStudentsProgressForAssignment(assignmentId)
+  }
+
+  /**
+   * Get detailed progress for a specific student on an assignment
+   * Shows all attempts, scores, and detailed information
+   */
+  async getStudentDetailedProgress(assignmentId: number, studentId: number, requesterId: number) {
+    const assignment = await this.assignmentRepository.findUnique({ id: assignmentId })
+    if (!assignment) {
+      throw new NotFoundException(`Assignment with ID ${assignmentId} not found`)
+    }
+
+    // Only the creator can view student progress
+    if (assignment.assignedById !== requesterId) {
+      throw new ForbiddenException('You can only view student progress for assignments you created')
+    }
+
+    // Check if student has access to this assignment
+    const hasAccess = await this.checkUserAccess(assignmentId, studentId)
+    if (!hasAccess) {
+      throw new BadRequestException('Student does not have access to this assignment')
+    }
+
+    return this.assignmentRepository.getStudentDetailedProgressForAssignment(assignmentId, studentId)
   }
 }

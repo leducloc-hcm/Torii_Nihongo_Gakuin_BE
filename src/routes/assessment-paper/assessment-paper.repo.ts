@@ -894,6 +894,16 @@ export class AssessmentPaperRepository {
             email: true,
           },
         },
+        assessment: {
+          select: {
+            scoreProfile: {
+              select: {
+                maxTotal: true,
+                minTotalPass: true,
+              },
+            },
+          },
+        },
       },
     })
   }

@@ -143,4 +143,26 @@ export class AssessmentAssignmentController {
     const isOverdue = await this.assignmentService.isOverdue(id)
     return { isOverdue }
   }
+
+  // ============= STUDENT PROGRESS TRACKING =============
+
+  @Get(':id/students-progress')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Staff, RoleName.Admin, RoleName.Lecturer)
+  @HttpCode(HttpStatus.OK)
+  async getStudentsProgress(@Param('id', ParseIntPipe) id: number, @ActiveUser('userId') userId: number) {
+    return this.assignmentService.getStudentsProgress(id, userId)
+  }
+
+  @Get(':id/student/:studentId/detailed-progress')
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Staff, RoleName.Admin, RoleName.Lecturer)
+  @HttpCode(HttpStatus.OK)
+  async getStudentDetailedProgress(
+    @Param('id', ParseIntPipe) assignmentId: number,
+    @Param('studentId', ParseIntPipe) studentId: number,
+    @ActiveUser('userId') userId: number,
+  ) {
+    return this.assignmentService.getStudentDetailedProgress(assignmentId, studentId, userId)
+  }
 }

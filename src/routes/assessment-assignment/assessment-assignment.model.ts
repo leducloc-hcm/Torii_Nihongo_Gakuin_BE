@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-export const AssignmentStatusEnum = z.enum(['PENDING', 'IN_PROGRESS', 'SUBMITTED', 'GRADED'])
+export const AssignmentStatusEnum = z.enum(['PENDING', 'IN_PROGRESS', 'SUBMITTED', 'EXPIRED', 'GRADED'])
 
 export const AssessmentAssignmentSchema = z.object({
   id: z.number().int().positive(),
@@ -86,7 +86,7 @@ export const AssignmentStatsSchema = z.object({
   pending: z.number().int(),
   inProgress: z.number().int(),
   submitted: z.number().int(),
-  graded: z.number().int(),
+  expired: z.number().int(),
   overdue: z.number().int(),
 })
 
