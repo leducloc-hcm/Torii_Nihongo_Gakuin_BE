@@ -585,7 +585,6 @@ export class AssessmentAssignmentRepository {
         assessment: assignment.assessment,
       },
       student,
-
       attempts: allAttempts.map((attempt) => ({
         id: attempt.id,
         score: attempt.score,

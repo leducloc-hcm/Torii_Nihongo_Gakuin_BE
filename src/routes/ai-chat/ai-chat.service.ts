@@ -448,7 +448,7 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
 
     // Get response from Agent
     const aiCallStartTime = Date.now()
-    const agentResponse = await this.agentService.getResponse(messages, true, shouldForceTools)
+    const agentResponse = await this.agentService.getResponse(messages, true, shouldForceTools, query)
     const aiCallTime = Date.now() - aiCallStartTime
     this.logger.log(`⏱️  [+${Date.now() - queryStartTime}ms] Initial AI call completed (took ${aiCallTime}ms)`)
 

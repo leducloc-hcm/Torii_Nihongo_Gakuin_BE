@@ -18,6 +18,7 @@ import {
   getAssessmentHistoryPrompt,
 } from 'src/mcp-client/module/assessment_history/history-mcp.prompt'
 import { QueryType } from 'src/mcp-client/shared/query-detection.utils'
+import { validateQuery, getValidationPrompts } from 'src/mcp-client/shared/validation.utils'
 import { getEnabledMCPServers, MCP_SERVERS } from 'src/shared/config/mcp-servers.config'
 import { OPENAI_CONFIG, MCP_CONFIG } from 'src/shared/config/openai.config'
 
@@ -73,10 +74,34 @@ export class AgentService {
     messages: ChatCompletionMessageParam[],
     useTools = true,
     forceTools = false,
+    originalQuery?: string,
   ): Promise<AgentResponse> {
     if (!this.toolsLoaded) {
       await this.loadTools()
     }
+
+    // 🔒 VALIDATION: Check domain constraints and JLPT levels
+    if (originalQuery) {
+      const validation = validateQuery(originalQuery)
+      if (!validation.isValid && validation.suggestedResponse) {
+        this.logger.warn(`❌ Query validation failed: ${validation.errorMessage}`)
+        return {
+          content: validation.suggestedResponse,
+          requiresApproval: false,
+          finishReason: 'stop',
+        }
+      }
+    }
+
+    // 🎯 INJECT VALIDATION PROMPTS: Add domain and JLPT validation prompts to messages
+    const validationPrompts = getValidationPrompts()
+    const messagesWithValidation: ChatCompletionMessageParam[] = [
+      {
+        role: 'system',
+        content: validationPrompts,
+      },
+      ...messages,
+    ]
 
     try {
       let toolChoice: 'auto' | 'required' | undefined = undefined
@@ -86,7 +111,7 @@ export class AgentService {
 
       const completionOptions: any = {
         model: OPENAI_CONFIG.model,
-        messages,
+        messages: messagesWithValidation, // Use messages with validation prompts
         tools: useTools && this.allTools.length > 0 ? this.allTools : undefined,
         tool_choice: toolChoice,
         temperature: OPENAI_CONFIG.temperature,
@@ -202,6 +227,13 @@ export class AgentService {
         content: getAssessmentHistoryPrompt(QueryType.ASSESSMENT_HISTORY, request.userId),
       })
     }
+
+    // 🔒 INJECT VALIDATION PROMPTS: Add domain and JLPT validation prompts to all final responses
+    const validationPrompts = getValidationPrompts()
+    messages.unshift({
+      role: 'system',
+      content: validationPrompts,
+    })
 
     // Add user instructions for other types
     if (request.queryType === 'COURSE' || request.queryType === QueryType.COURSE) {

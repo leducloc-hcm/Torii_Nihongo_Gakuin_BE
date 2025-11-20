@@ -18,13 +18,11 @@ export class AssessmentAssignmentService {
   async create(createDto: CreateAssessmentAssignmentDTO, assignedById: number) {
     const { assessmentId, assignedToId, classId, ...assignmentData } = createDto
 
-    // Validate assessment exists
     const assessmentExists = await this.assignmentRepository.checkAssessmentExists(assessmentId)
     if (!assessmentExists) {
       throw new BadRequestException(`Assessment with ID ${assessmentId} does not exist`)
     }
 
-    // Validate assignedTo user exists (if provided)
     if (assignedToId) {
       const userExists = await this.assignmentRepository.checkUserExists(assignedToId)
       if (!userExists) {
@@ -32,7 +30,6 @@ export class AssessmentAssignmentService {
       }
     }
 
-    // Validate class exists (if provided)
     if (classId) {
       const classExists = await this.assignmentRepository.checkClassExists(classId)
       if (!classExists) {
