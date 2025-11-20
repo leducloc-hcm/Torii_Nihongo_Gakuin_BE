@@ -83,13 +83,7 @@ export class AssessmentPaperService {
       throw new NotFoundException(`Assessment paper with ID ${id} not found`)
     }
 
-    const title = newTitle || `${original.title} (Copy v${original.version + 1})`
-
-    // Check title uniqueness
-    const titleExists = await this.assessmentPaperRepo.getTitleExists(title)
-    if (titleExists) {
-      throw new ConflictException(`Assessment paper with title "${title}" already exists`)
-    }
+    const title = newTitle || `${original.title} (v${original.version + 1})`
 
     return this.assessmentPaperRepo.clone(id, title, original.version + 1)
   }

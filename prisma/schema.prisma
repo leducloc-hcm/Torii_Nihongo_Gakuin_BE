@@ -474,7 +474,7 @@ model AssessmentAssignment {
   startAt        DateTime?
   dueAt          DateTime?
   lockAfterDue   Boolean @default(false)
-  maxAttempts    Int?               // giới hạn số lần làm bài
+  maxAttempts    Int?         
   status         AssignmentStatus   @default(PENDING)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -508,10 +508,11 @@ model AssessmentProgress {
   user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   assignment AssessmentAssignment? @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
   answers    AssessmentAnswerProgress[]
+  attempts   AssessmentAttempt[] 
 
-  @@unique([assessmentId, userId])
   @@index([assessmentId])
   @@index([userId])
+  @@index([assessmentId, userId]) 
 }
 
 model AssessmentAnswerProgress {
@@ -611,6 +612,7 @@ model AssessmentAttempt {
   id              Int        @id @default(autoincrement())
   assessmentId    Int
   userId          Int
+  progressId      Int?       // 🆕 Liên kết với Progress
   startedAt       DateTime   @default(now())
   submittedAt     DateTime?
   score           Float?
@@ -618,7 +620,8 @@ model AssessmentAttempt {
   earnedScore     Float?
 
   assessment AssessmentPaper  @relation(fields: [assessmentId], references: [id])
-  user       User        @relation(fields: [userId], references: [id])
+  user       User             @relation(fields: [userId], references: [id])
+  progress   AssessmentProgress? @relation(fields: [progressId], references: [id], onDelete: SetNull) // 🆕
   answers    AssessmentAnswer[]
 }
 model AssessmentAnswer {
@@ -1663,7 +1666,7 @@ enum RedemptionStatus {
   PENDING
   COMPLETED
   FAILED
-  PARTIALLY_COMPLETED // for gift coupons with pending class selections
+  PARTIALLY_COMPLETED
 }
 
 enum CouponAuditAction {
@@ -1681,5 +1684,5 @@ enum AssignmentStatus {
   PENDING
   IN_PROGRESS
   SUBMITTED
-  GRADED
+  EXPIRED
 }

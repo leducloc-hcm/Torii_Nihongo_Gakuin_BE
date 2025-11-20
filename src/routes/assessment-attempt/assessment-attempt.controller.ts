@@ -4,6 +4,7 @@ import { ActiveUser } from 'src/shared/decorators/active-user.decorator'
 import {
   AssessmentAttemptQueryDto,
   StartAssessmentAttemptDto,
+  StartAttemptFromProgressDto,
   SubmitAssessmentAttemptDto,
 } from './assessment-attempt.dto'
 import { AssessmentAttemptService } from './assessment-attempt.service'
@@ -16,6 +17,14 @@ export class AssessmentAttemptController {
   @Post('start')
   async startAssessment(@ActiveUser('userId') userId: number, @Body() startAssessmentDto: StartAssessmentAttemptDto) {
     return await this.assessmentAttemptService.startAssessment(userId, startAssessmentDto)
+  }
+
+  @Post('start-from-progress')
+  async startAttemptFromProgress(
+    @ActiveUser('userId') userId: number,
+    @Body() startFromProgressDto: StartAttemptFromProgressDto,
+  ) {
+    return await this.assessmentAttemptService.startAttemptFromProgress(userId, startFromProgressDto.progressId)
   }
 
   @Post(':id/submit')

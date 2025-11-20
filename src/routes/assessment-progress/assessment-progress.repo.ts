@@ -6,10 +6,8 @@ import { Prisma } from '@prisma/client'
 export class AssessmentProgressRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  // ============= ASSESSMENT PROGRESS CRUD =============
-
   async create(data: Prisma.AssessmentProgressCreateInput) {
-    return this.prisma.assessmentProgress.create({
+    return await this.prisma.assessmentProgress.create({
       data,
       include: {
         assessment: { select: { id: true, title: true, type: true, level: true } },
@@ -26,7 +24,7 @@ export class AssessmentProgressRepository {
   }
 
   async findUnique(where: Prisma.AssessmentProgressWhereUniqueInput) {
-    return this.prisma.assessmentProgress.findUnique({
+    return await this.prisma.assessmentProgress.findUnique({
       where,
       include: {
         assessment: { select: { id: true, title: true, type: true, level: true } },
@@ -44,7 +42,7 @@ export class AssessmentProgressRepository {
   }
 
   async findFirst(where: Prisma.AssessmentProgressWhereInput) {
-    return this.prisma.assessmentProgress.findFirst({
+    return await this.prisma.assessmentProgress.findFirst({
       where,
       include: {
         assessment: true,
@@ -68,7 +66,7 @@ export class AssessmentProgressRepository {
     take?: number
   }) {
     const { where, orderBy, skip, take } = params
-    return this.prisma.assessmentProgress.findMany({
+    return await this.prisma.assessmentProgress.findMany({
       where,
       orderBy,
       skip,
@@ -82,33 +80,41 @@ export class AssessmentProgressRepository {
     })
   }
 
-  async findManyWithPagination(params: {
-    page?: number
-    limit?: number
-    where?: Prisma.AssessmentProgressWhereInput
-    orderBy?: Prisma.AssessmentProgressOrderByWithRelationInput
-  }) {
-    const { page = 1, limit = 10, where, orderBy } = params
-    const skip = (page - 1) * limit
+  async findManyWithPagination(params: { where?: Prisma.AssessmentProgressWhereInput }) {
+    const { where } = params
 
-    const [items, total] = await Promise.all([
-      this.findMany({ where, orderBy, skip, take: limit }),
-      this.prisma.assessmentProgress.count({ where }),
-    ])
+    // Thêm điều kiện chỉ hiển thị những bài chưa submitted
+    const whereCondition: Prisma.AssessmentProgressWhereInput = {
+      ...where,
+      isSubmitted: false,
+      assignmentId: null,
+    }
+
+    const items = await this.findMany({ where: whereCondition })
 
     return {
       items,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
+    }
+  }
+
+  async findManyWithPaginationAssignment(params: { where?: Prisma.AssessmentProgressWhereInput }) {
+    const { where } = params
+
+    const whereCondition: Prisma.AssessmentProgressWhereInput = {
+      ...where,
+      isSubmitted: false,
+      assignmentId: { not: null },
+    }
+
+    const items = await this.findMany({ where: whereCondition })
+
+    return {
+      items,
     }
   }
 
   async update(where: Prisma.AssessmentProgressWhereUniqueInput, data: Prisma.AssessmentProgressUpdateInput) {
-    return this.prisma.assessmentProgress.update({
+    return await this.prisma.assessmentProgress.update({
       where,
       data,
       include: {
@@ -126,13 +132,13 @@ export class AssessmentProgressRepository {
   }
 
   async delete(where: Prisma.AssessmentProgressWhereUniqueInput) {
-    return this.prisma.assessmentProgress.delete({ where })
+    return await this.prisma.assessmentProgress.delete({ where })
   }
 
   // ============= ANSWER PROGRESS CRUD =============
 
   async createAnswer(data: Prisma.AssessmentAnswerProgressCreateInput) {
-    return this.prisma.assessmentAnswerProgress.create({
+    return await this.prisma.assessmentAnswerProgress.create({
       data,
       include: {
         question: { select: { id: true, stem: true, type: true } },
@@ -143,7 +149,7 @@ export class AssessmentProgressRepository {
   }
 
   async findAnswer(where: Prisma.AssessmentAnswerProgressWhereUniqueInput) {
-    return this.prisma.assessmentAnswerProgress.findUnique({
+    return await this.prisma.assessmentAnswerProgress.findUnique({
       where,
       include: {
         question: true,
@@ -154,7 +160,7 @@ export class AssessmentProgressRepository {
   }
 
   async findAnswerByProgressAndQuestion(progressId: number, questionId: number) {
-    return this.prisma.assessmentAnswerProgress.findUnique({
+    return await this.prisma.assessmentAnswerProgress.findUnique({
       where: {
         progressId_questionId: { progressId, questionId },
       },
@@ -165,11 +171,59 @@ export class AssessmentProgressRepository {
     })
   }
 
+  async upsertAnswer(params: {
+    where: Prisma.AssessmentAnswerProgressWhereUniqueInput
+    create: Prisma.AssessmentAnswerProgressCreateInput
+    update: Prisma.AssessmentAnswerProgressUpdateInput
+  }) {
+    try {
+      // Try to update first
+      return await this.prisma.assessmentAnswerProgress.update({
+        where: params.where,
+        data: params.update,
+        include: {
+          question: { select: { id: true, stem: true, type: true } },
+          selectedOption: { select: { id: true, content: true, isCorrect: true } },
+          progress: { select: { id: true, assessmentId: true, userId: true } },
+        },
+      })
+    } catch (error: any) {
+      // If record doesn't exist (P2025 error), try to create
+      if (error.code === 'P2025') {
+        try {
+          return await this.prisma.assessmentAnswerProgress.create({
+            data: params.create,
+            include: {
+              question: { select: { id: true, stem: true, type: true } },
+              selectedOption: { select: { id: true, content: true, isCorrect: true } },
+              progress: { select: { id: true, assessmentId: true, userId: true } },
+            },
+          })
+        } catch (createError: any) {
+          // If create fails due to unique constraint (P2002), try update again
+          if (createError.code === 'P2002') {
+            return await this.prisma.assessmentAnswerProgress.update({
+              where: params.where,
+              data: params.update,
+              include: {
+                question: { select: { id: true, stem: true, type: true } },
+                selectedOption: { select: { id: true, content: true, isCorrect: true } },
+                progress: { select: { id: true, assessmentId: true, userId: true } },
+              },
+            })
+          }
+          throw createError
+        }
+      }
+      throw error
+    }
+  }
+
   async updateAnswer(
     where: Prisma.AssessmentAnswerProgressWhereUniqueInput,
     data: Prisma.AssessmentAnswerProgressUpdateInput,
   ) {
-    return this.prisma.assessmentAnswerProgress.update({
+    return await this.prisma.assessmentAnswerProgress.update({
       where,
       data,
       include: {
@@ -180,11 +234,11 @@ export class AssessmentProgressRepository {
   }
 
   async deleteAnswer(where: Prisma.AssessmentAnswerProgressWhereUniqueInput) {
-    return this.prisma.assessmentAnswerProgress.delete({ where })
+    return await this.prisma.assessmentAnswerProgress.delete({ where })
   }
 
   async findManyAnswers(progressId: number) {
-    return this.prisma.assessmentAnswerProgress.findMany({
+    return await this.prisma.assessmentAnswerProgress.findMany({
       where: { progressId },
       include: {
         question: true,
@@ -217,9 +271,10 @@ export class AssessmentProgressRepository {
   }
 
   async getProgressByUserAndAssessment(userId: number, assessmentId: number) {
-    return this.prisma.assessmentProgress.findUnique({
+    return await this.prisma.assessmentProgress.findFirst({
       where: {
-        assessmentId_userId: { assessmentId, userId },
+        assessmentId,
+        userId,
       },
       include: {
         assessment: true,
@@ -231,11 +286,44 @@ export class AssessmentProgressRepository {
           },
         },
       },
+      orderBy: { startedAt: 'desc' }, // Lấy progress mới nhất
+    })
+  }
+
+  async getProgressByUserAssessmentAndAssignment(userId: number, assessmentId: number, assignmentId: number | null) {
+    return await this.prisma.assessmentProgress.findFirst({
+      where: {
+        assessmentId,
+        userId,
+        assignmentId, // null nếu làm direct, hoặc assignmentId cụ thể nếu làm via assignment
+      },
+      include: {
+        assessment: true,
+        assignment: true,
+        answers: {
+          include: {
+            question: true,
+            selectedOption: true,
+          },
+        },
+      },
+      orderBy: { startedAt: 'desc' }, // Lấy progress mới nhất
+    })
+  }
+
+  async countUserAttemptsForAssignment(userId: number, assessmentId: number, assignmentId: number) {
+    return await this.prisma.assessmentProgress.count({
+      where: {
+        assessmentId,
+        userId,
+        assignmentId,
+        isSubmitted: true,
+      },
     })
   }
 
   async getUserProgresses(userId: number) {
-    return this.prisma.assessmentProgress.findMany({
+    return await this.prisma.assessmentProgress.findMany({
       where: { userId },
       include: {
         assessment: { select: { id: true, title: true, type: true, level: true } },
@@ -247,7 +335,7 @@ export class AssessmentProgressRepository {
   }
 
   async getAssessmentProgresses(assessmentId: number) {
-    return this.prisma.assessmentProgress.findMany({
+    return await this.prisma.assessmentProgress.findMany({
       where: { assessmentId },
       include: {
         user: { select: { id: true, name: true, email: true } },
@@ -259,13 +347,13 @@ export class AssessmentProgressRepository {
   }
 
   async getCompletedCount(userId: number): Promise<number> {
-    return this.prisma.assessmentProgress.count({
+    return await this.prisma.assessmentProgress.count({
       where: { userId, isSubmitted: true },
     })
   }
 
   async getInProgressCount(userId: number): Promise<number> {
-    return this.prisma.assessmentProgress.count({
+    return await this.prisma.assessmentProgress.count({
       where: { userId, isSubmitted: false },
     })
   }
@@ -278,10 +366,21 @@ export class AssessmentProgressRepository {
     return result._avg.timeSpentSec || 0
   }
 
-  async deleteUserProgress(userId: number, assessmentId: number) {
-    return this.prisma.assessmentProgress.delete({
+  // Method này không còn phù hợp vì đã bỏ unique constraint
+  // async deleteUserProgress(userId: number, assessmentId: number) {
+  //   return await this.prisma.assessmentProgress.delete({
+  //     where: {
+  //       assessmentId_userId: { assessmentId, userId },
+  //     },
+  //   })
+  // }
+
+  async deleteUserProgresses(userId: number, assessmentId: number) {
+    // Xóa tất cả progress của user cho assessment này
+    return await this.prisma.assessmentProgress.deleteMany({
       where: {
-        assessmentId_userId: { assessmentId, userId },
+        assessmentId,
+        userId,
       },
     })
   }

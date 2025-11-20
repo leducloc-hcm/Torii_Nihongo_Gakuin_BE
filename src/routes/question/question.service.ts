@@ -18,6 +18,10 @@ export class QuestionService {
     files?: { image?: Express.Multer.File[]; audio?: Express.Multer.File[] },
   ): Promise<any> {
     const { mediaId, ...questionData } = createDto
+
+    delete (questionData as any).image
+    delete (questionData as any).audio
+
     let uploadedMediaId = mediaId
     if (files?.image?.[0] || files?.audio?.[0]) {
       let imageUrl: string | undefined
@@ -37,7 +41,6 @@ export class QuestionService {
         audioFile = files.audio[0]
       }
 
-      // Create media record in database with both files info
       if (imageUrl || audioUrl) {
         const primaryUrl = imageUrl || audioUrl!
         const primaryKind = imageUrl ? 'IMAGE' : 'AUDIO'
@@ -137,11 +140,6 @@ export class QuestionService {
       where.difficulty = difficulty
     }
 
-    // Note: readingLength filter may need adjustment based on Prisma schema
-    // if (readingLength !== undefined && readingLength !== null) {
-    //   where.readingLength = readingLength
-    // }
-
     if (keyword) {
       where.OR = [
         { stem: { contains: keyword, mode: 'insensitive' } },
@@ -154,7 +152,6 @@ export class QuestionService {
       where.mediaId = hasMedia ? { not: null } : null
     }
 
-    // Build order by clause
     const orderBy: QuestionOrderByInput = {}
     if (sortBy && sortOrder) {
       orderBy[sortBy] = sortOrder
@@ -223,9 +220,41 @@ export class QuestionService {
 
     const { mediaId, ...questionData } = updateDto
 
-    let updatedMediaId = mediaId
+    // Check if image/audio fields are sent in form-data (even if empty)
+    const hasImageField = 'image' in (updateDto as any)
+    const hasAudioField = 'audio' in (updateDto as any)
+    const hasImageFile = files?.image?.[0]
+    const hasAudioFile = files?.audio?.[0]
 
-    if (files?.image?.[0] || files?.audio?.[0]) {
+    // Remove invalid fields that don't exist in schema
+    delete (questionData as any).image
+    delete (questionData as any).audio
+
+    // Parse mediaId: convert empty string or "null" string to actual null
+    // Form-data might send mediaId as string even though type says number
+    let parsedMediaId: number | null | undefined = mediaId
+    const mediaIdValue = mediaId as any
+    if (typeof mediaIdValue === 'string') {
+      const strValue = mediaIdValue.trim().toLowerCase()
+      if (strValue === '' || strValue === 'null') {
+        parsedMediaId = null
+      } else {
+        const parsed = parseInt(mediaIdValue, 10)
+        parsedMediaId = isNaN(parsed) ? undefined : parsed
+      }
+    }
+
+    // If image/audio field sent but no file uploaded → user wants to remove media
+    if ((hasImageField && !hasImageFile) || (hasAudioField && !hasAudioFile)) {
+      parsedMediaId = null
+    }
+
+    let updatedMediaId = parsedMediaId
+
+    // If mediaId is explicitly null (not undefined), user wants to remove media
+    if (parsedMediaId === null) {
+      updatedMediaId = null
+    } else if (files?.image?.[0] || files?.audio?.[0]) {
       // Upload files to S3 and create media record
       let imageUrl: string | undefined
       let audioUrl: string | undefined
@@ -279,7 +308,8 @@ export class QuestionService {
       }
     }
 
-    if (updatedMediaId) {
+    // Validate mediaId only if it's a number (not null or undefined)
+    if (updatedMediaId && typeof updatedMediaId === 'number') {
       const mediaExists = await this.questionRepository.checkMediaExists(updatedMediaId)
       if (!mediaExists) {
         throw new BadRequestException(`Media with ID ${updatedMediaId} does not exist`)
@@ -290,8 +320,12 @@ export class QuestionService {
       ...questionData,
     }
 
-    if (updatedMediaId) {
-      updateData.media = { connect: { id: updatedMediaId } }
+    if (updatedMediaId !== undefined) {
+      if (updatedMediaId === null) {
+        updateData.media = { disconnect: true }
+      } else {
+        updateData.media = { connect: { id: updatedMediaId } }
+      }
     }
 
     return this.questionRepository.update({ id }, updateData)

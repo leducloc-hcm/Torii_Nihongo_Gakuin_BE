@@ -13,8 +13,12 @@ import {
 import { CourseMcpClient } from 'src/mcp-client/module/course/course-mcp.service'
 import { EnrollmentMcpClient } from 'src/mcp-client/module/enrollment/enrollment-mcp.service'
 import { ASSESSMENT_MCP_PROMPT } from 'src/mcp-client/module/assessment/assessment-mcp.prompt'
-import { ASSESSMENT_HISTORY_MCP_PROMPT } from 'src/mcp-client/module/assessment_history/history-mcp.prompt'
+import {
+  ASSESSMENT_HISTORY_MCP_PROMPT,
+  getAssessmentHistoryPrompt,
+} from 'src/mcp-client/module/assessment_history/history-mcp.prompt'
 import { QueryType } from 'src/mcp-client/shared/query-detection.utils'
+import { validateQuery, getValidationPrompts } from 'src/mcp-client/shared/validation.utils'
 import { getEnabledMCPServers, MCP_SERVERS } from 'src/shared/config/mcp-servers.config'
 import { OPENAI_CONFIG, MCP_CONFIG } from 'src/shared/config/openai.config'
 
@@ -66,21 +70,52 @@ export class AgentService {
     }
   }
 
-  async getResponse(messages: ChatCompletionMessageParam[], useTools = true): Promise<AgentResponse> {
+  async getResponse(
+    messages: ChatCompletionMessageParam[],
+    useTools = true,
+    forceTools = false,
+    originalQuery?: string,
+  ): Promise<AgentResponse> {
     if (!this.toolsLoaded) {
       await this.loadTools()
     }
 
+    // 🔒 VALIDATION: Check domain constraints and JLPT levels
+    if (originalQuery) {
+      const validation = validateQuery(originalQuery)
+      if (!validation.isValid && validation.suggestedResponse) {
+        this.logger.warn(`❌ Query validation failed: ${validation.errorMessage}`)
+        return {
+          content: validation.suggestedResponse,
+          requiresApproval: false,
+          finishReason: 'stop',
+        }
+      }
+    }
+
+    // 🎯 INJECT VALIDATION PROMPTS: Add domain and JLPT validation prompts to messages
+    const validationPrompts = getValidationPrompts()
+    const messagesWithValidation: ChatCompletionMessageParam[] = [
+      {
+        role: 'system',
+        content: validationPrompts,
+      },
+      ...messages,
+    ]
+
     try {
-      const completionOptions: any = {
-        model: OPENAI_CONFIG.model,
-        messages,
-        tools: useTools && this.allTools.length > 0 ? this.allTools : undefined,
-        tool_choice: useTools && this.allTools.length > 0 ? 'auto' : undefined,
-        temperature: OPENAI_CONFIG.temperature,
+      let toolChoice: 'auto' | 'required' | undefined = undefined
+      if (useTools && this.allTools.length > 0) {
+        toolChoice = forceTools ? 'required' : 'auto'
       }
 
-      // Only add max_completion_tokens if it's defined (not unlimited)
+      const completionOptions: any = {
+        model: OPENAI_CONFIG.model,
+        messages: messagesWithValidation, // Use messages with validation prompts
+        tools: useTools && this.allTools.length > 0 ? this.allTools : undefined,
+        tool_choice: toolChoice,
+        temperature: OPENAI_CONFIG.temperature,
+      }
       if (OPENAI_CONFIG.maxTokens !== undefined) {
         completionOptions.max_completion_tokens = OPENAI_CONFIG.maxTokens
       }
@@ -126,6 +161,7 @@ export class AgentService {
   }
 
   async executeApprovedTools(request: ExecuteToolsRequest): Promise<ExecuteToolsResponse> {
+    const executeStartTime = Date.now()
     const results: MCPToolResult[] = []
 
     if (request.toolCalls.length > 1) {
@@ -134,6 +170,7 @@ export class AgentService {
       )
     }
 
+    const toolCallsStartTime = Date.now()
     const toolPromises = request.toolCalls.map(async (toolCall) => {
       try {
         const result = await this.executeToolCall(toolCall.name, toolCall.arguments, request.userId)
@@ -162,6 +199,8 @@ export class AgentService {
     })
 
     results.push(...(await Promise.all(toolPromises)))
+    const toolCallsTime = Date.now() - toolCallsStartTime
+    this.logger.log(`⏱️  Tool calls completed in ${toolCallsTime}ms`)
 
     const toolMessages: ChatCompletionMessageParam[] = results.map((result) => ({
       role: 'tool' as const,
@@ -185,9 +224,16 @@ export class AgentService {
       this.logger.log('📊 Injecting ASSESSMENT_HISTORY module system prompt at the beginning')
       messages.unshift({
         role: 'system',
-        content: ASSESSMENT_HISTORY_MCP_PROMPT,
+        content: getAssessmentHistoryPrompt(QueryType.ASSESSMENT_HISTORY, request.userId),
       })
     }
+
+    // 🔒 INJECT VALIDATION PROMPTS: Add domain and JLPT validation prompts to all final responses
+    const validationPrompts = getValidationPrompts()
+    messages.unshift({
+      role: 'system',
+      content: validationPrompts,
+    })
 
     // Add user instructions for other types
     if (request.queryType === 'COURSE' || request.queryType === QueryType.COURSE) {
@@ -248,9 +294,59 @@ Use EXACT data from tool result - do not modify.`,
       })
     } else if (request.queryType === 'FLASHCARD' || request.queryType === QueryType.FLASHCARD) {
       this.logger.log('📋 Adding FLASHCARD format instructions to messages')
-      messages.push({
-        role: 'user',
-        content: `CRITICAL INSTRUCTION - READ CAREFULLY:
+
+      // Check if this is a generation request (generate_flashcard_suggestions tool was called)
+      const isFlashcardGeneration = results.some((r) => r.toolName === 'generate_flashcard_suggestions')
+
+      if (isFlashcardGeneration) {
+        this.logger.log('🎴 Flashcard GENERATION detected - using formatted text response')
+        messages.push({
+          role: 'user',
+          content: `CRITICAL INSTRUCTION - FLASHCARD GENERATION FORMAT:
+
+The tool generate_flashcard_suggestions has returned flashcard data.
+
+You MUST format the response using this EXACT pattern:
+
+📚 Đã tạo [COUNT] flashcards về [TOPIC] (cấp độ [LEVEL])!
+
+**Thẻ 1:**
+🔹 Mặt trước: [front]
+🔸 Mặt sau: [back]
+🔊 Phát âm: [pronunciation]
+📝 Ví dụ: [example]
+💡 Gợi ý nhớ: [hint]
+
+**Thẻ 2:**
+🔹 Mặt trước: [front]
+🔸 Mặt sau: [back]
+🔊 Phát âm: [pronunciation]
+📝 Ví dụ: [example]
+💡 Gợi ý nhớ: [hint]
+
+(repeat for ALL cards - show EVERY card, no truncation!)
+
+---
+
+⚠️ **LƯU Ý QUAN TRỌNG:** Các flashcard này CHƯA được lưu vào hệ thống!
+Bạn cần xác nhận để lưu vào tài khoản của mình.
+
+[Tạo tất cả] [Chỉnh sửa] [Hủy]
+
+MANDATORY RULES:
+- ✅ MUST start each card with "**Thẻ [number]:**"
+- ✅ MUST use emojis: 🔹 🔸 🔊 📝 💡
+- ✅ MUST show ALL cards (no "...see more" or truncation)
+- ✅ MUST include action buttons at the end
+- ✅ MUST include "CHƯA được lưu" warning
+- ❌ DO NOT use JSON format for generation!
+- ❌ DO NOT say "decks": [] or "count": 0`,
+        })
+      } else {
+        this.logger.log('🔍 Flashcard SEARCH detected - using JSON format')
+        messages.push({
+          role: 'user',
+          content: `CRITICAL INSTRUCTION - READ CAREFULLY:
 
 You MUST respond with ONLY the JSON code block below. NOTHING ELSE.
 
@@ -272,10 +368,9 @@ Your ENTIRE response must be EXACTLY this format:
 That's it. Nothing before the \`\`\`json. Nothing after the closing \`\`\`.
 
 Include in each deck: id, title, level, card_count, owner_name, createdAt, updatedAt
-Use EXACT data from tool result - do not modify.
-
-NOTE: This is ONLY for search results. Flashcard GENERATION uses a different format.`,
-      })
+Use EXACT data from tool result - do not modify.`,
+        })
+      }
     } else if (
       request.queryType !== 'ASSESSMENT' &&
       request.queryType !== QueryType.ASSESSMENT &&
@@ -314,12 +409,15 @@ NOTE: This is ONLY for search results. Flashcard GENERATION uses a different for
 
     try {
       this.logger.log('🔄 Calling OpenAI with tool results...')
-      const startTime = Date.now()
+      const openaiStartTime = Date.now()
 
       const finalResponse = await this.openai.chat.completions.create(finalCompletionOptions)
 
-      const elapsed = Date.now() - startTime
-      this.logger.log(`✅ OpenAI response received in ${elapsed}ms`)
+      const openaiTime = Date.now() - openaiStartTime
+      this.logger.log(`✅ OpenAI response received in ${openaiTime}ms`)
+      this.logger.log(
+        `⏱️  Total executeApprovedTools: ${Date.now() - executeStartTime}ms (Tools: ${toolCallsTime}ms, OpenAI: ${openaiTime}ms)`,
+      )
 
       const finalChoice = finalResponse.choices[0]
 
@@ -358,15 +456,25 @@ NOTE: This is ONLY for search results. Flashcard GENERATION uses a different for
       throw new Error(`No MCP server found for tool: ${toolName}`)
     }
 
-    // Auto-inject user_id for assessment history tools that require it
+    // Auto-inject user_id for tools that require authenticated user context
     const lowerToolName = toolName.toLowerCase()
-    const isHistoryTool =
+    const requiresUserId =
       lowerToolName.includes('my_assessment') ||
       lowerToolName.includes('progress_summary') ||
-      lowerToolName.includes('history')
+      lowerToolName.includes('history') ||
+      lowerToolName.includes('enrollment') ||
+      lowerToolName.includes('my_') || // Any "my_*" tool requires user_id
+      lowerToolName.includes('user_')
 
-    if (isHistoryTool && userId && !args.user_id) {
-      this.logger.log(`🔐 Auto-injecting user_id=${userId} for history tool: ${toolName}`)
+    if (requiresUserId && userId) {
+      // ALWAYS override user_id with authenticated userId to prevent security issues
+      if (args.user_id && args.user_id !== userId) {
+        this.logger.warn(
+          `⚠️  Overriding user_id=${args.user_id} with authenticated userId=${userId} for tool: ${toolName}`,
+        )
+      } else {
+        this.logger.log(`🔐 Auto-injecting user_id=${userId} for tool: ${toolName}`)
+      }
       args = { ...args, user_id: userId }
     }
 

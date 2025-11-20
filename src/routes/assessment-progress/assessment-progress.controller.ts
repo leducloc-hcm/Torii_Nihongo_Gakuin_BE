@@ -27,37 +27,31 @@ import { AuthType } from 'src/shared/constants/auth.constant'
 import { Roles } from 'src/shared/decorators/roles.decorator'
 import { RolesGuard } from 'src/shared/guards/roles.guard'
 import { RoleName } from 'src/shared/constants/role.constant'
+import { ActiveUser } from 'src/shared/decorators/active-user.decorator'
 
 @Controller('assessment-progress')
 @UseGuards(RolesGuard)
 export class AssessmentProgressController {
   constructor(private readonly progressService: AssessmentProgressService) {}
 
-  // ============= START & SUBMIT =============
-
   @Post('start')
   @Auth([AuthType.Bearer])
   @HttpCode(HttpStatus.CREATED)
-  async startAssessment(@Body() startDto: StartAssessmentDTO, @Request() req: any) {
-    const userId = req.user.id
+  async startAssessment(@Body() startDto: StartAssessmentDTO, @ActiveUser('userId') userId: number) {
     return this.progressService.startAssessment(startDto, userId)
   }
 
   @Post('submit')
   @Auth([AuthType.Bearer])
   @HttpCode(HttpStatus.OK)
-  async submitAssessment(@Body() submitDto: SubmitAssessmentDTO, @Request() req: any) {
-    const userId = req.user.id
+  async submitAssessment(@Body() submitDto: SubmitAssessmentDTO, @ActiveUser('userId') userId: number) {
     return this.progressService.submitAssessment(submitDto, userId)
   }
-
-  // ============= SAVE & AUTO-SAVE =============
 
   @Post('answers')
   @Auth([AuthType.Bearer])
   @HttpCode(HttpStatus.CREATED)
-  async saveAnswer(@Body() saveDto: SaveAnswerProgressDTO, @Request() req: any) {
-    const userId = req.user.id
+  async saveAnswer(@Body() saveDto: SaveAnswerProgressDTO, @ActiveUser('userId') userId: number) {
     return this.progressService.saveAnswer(saveDto, userId)
   }
 
@@ -67,67 +61,64 @@ export class AssessmentProgressController {
   async updateAnswer(
     @Param('id', ParseIntPipe) answerId: number,
     @Body() updateDto: UpdateAnswerProgressDTO,
-    @Request() req: any,
+    @ActiveUser('userId') userId: number,
   ) {
-    const userId = req.user.id
     return this.progressService.updateAnswer(answerId, updateDto, userId)
   }
 
   @Post('auto-save')
   @Auth([AuthType.Bearer])
   @HttpCode(HttpStatus.OK)
-  async autoSave(@Body() autoSaveDto: AutoSaveProgressDTO, @Request() req: any) {
-    const userId = req.user.id
+  async autoSave(@Body() autoSaveDto: AutoSaveProgressDTO, @ActiveUser('userId') userId: number) {
     return this.progressService.autoSave(autoSaveDto, userId)
   }
-
-  // ============= GET MY PROGRESS =============
 
   @Get('my')
   @Auth([AuthType.Bearer])
   @HttpCode(HttpStatus.OK)
-  async getAllMyProgresses(@Request() req: any, @Query() queryDto: QueryAssessmentProgressDTO) {
-    const userId = req.user.id
-    return this.progressService.getAllMyProgresses(userId, queryDto)
+  async getAllMyProgresses(@ActiveUser('userId') userId: number) {
+    return this.progressService.getAllMyProgresses(userId)
+  }
+
+  @Get('my-assignments')
+  @Auth([AuthType.Bearer])
+  @HttpCode(HttpStatus.OK)
+  async getAllMyProgressesAssignment(@ActiveUser('userId') userId: number) {
+    return this.progressService.getAllMyProgressesAssignment(userId)
   }
 
   @Get('my/stats')
   @Auth([AuthType.Bearer])
   @HttpCode(HttpStatus.OK)
-  async getMyStats(@Request() req: any) {
-    const userId = req.user.id
+  async getMyStats(@ActiveUser('userId') userId: number) {
     return this.progressService.getUserStats(userId)
   }
 
   @Get('assessment/:assessmentId/my')
   @Auth([AuthType.Bearer])
   @HttpCode(HttpStatus.OK)
-  async getMyProgress(@Param('assessmentId', ParseIntPipe) assessmentId: number, @Request() req: any) {
-    const userId = req.user.id
+  async getMyProgress(@Param('assessmentId', ParseIntPipe) assessmentId: number, @ActiveUser('userId') userId: number) {
     return this.progressService.getMyProgress(assessmentId, userId)
   }
 
   @Get(':id')
   @Auth([AuthType.Bearer])
   @HttpCode(HttpStatus.OK)
-  async getProgressById(@Param('id', ParseIntPipe) progressId: number, @Request() req: any) {
-    const userId = req.user.id
+  async getProgressById(@Param('id', ParseIntPipe) progressId: number, @ActiveUser('userId') userId: number) {
     return this.progressService.getProgressById(progressId, userId)
   }
 
   @Get(':id/answers')
   @Auth([AuthType.Bearer])
   @HttpCode(HttpStatus.OK)
-  async getMyAnswers(@Param('id', ParseIntPipe) progressId: number, @Request() req: any) {
-    const userId = req.user.id
+  async getMyAnswers(@Param('id', ParseIntPipe) progressId: number, @ActiveUser('userId') userId: number) {
     return this.progressService.getMyAnswers(progressId, userId)
   }
 
   @Delete(':id')
   @Auth([AuthType.Bearer])
   @HttpCode(HttpStatus.OK)
-  async deleteProgress(@Param('id', ParseIntPipe) progressId: number, @Request() req: any) {
-    const userId = req.user.id
+  async deleteProgress(@Param('id', ParseIntPipe) progressId: number, @ActiveUser('userId') userId: number) {
     return this.progressService.deleteProgress(progressId, userId)
   }
 

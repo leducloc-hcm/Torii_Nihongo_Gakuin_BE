@@ -113,7 +113,7 @@ export class QuestionRepository {
     try {
       return await this.prisma.question.findMany({
         skip,
-        take,
+        take: Number(take), // ✅ Convert to number to prevent Prisma type errors
         where: where as any,
         orderBy: orderBy as any,
         include: {

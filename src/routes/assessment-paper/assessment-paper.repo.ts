@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common'
+import { randomUUID } from 'crypto'
 import { PrismaService } from '../../shared/services/prisma.service'
 import { AssessmentPaper, JLPTLevel, Visibility, AssessmentType } from '@prisma/client'
 import {
@@ -76,6 +77,7 @@ export class AssessmentPaperRepository {
                     question: {
                       include: {
                         options: true,
+                        media: true,
                       },
                     },
                   },
@@ -147,16 +149,7 @@ export class AssessmentPaperRepository {
                   include: {
                     question: {
                       include: {
-                        options: {
-                          select: {
-                            id: true,
-                            content: true,
-                            mediaId: true,
-                            order: true,
-                            isCorrect: false,
-                            image: true,
-                          },
-                        },
+                        options: true,
                         media: true,
                       },
                     },
@@ -175,9 +168,9 @@ export class AssessmentPaperRepository {
                                     id: true,
                                     content: true,
                                     mediaId: true,
-                                    image: true,
                                   },
                                 },
+                                media: true,
                               },
                             },
                           },
@@ -188,7 +181,6 @@ export class AssessmentPaperRepository {
                   },
                 },
               },
-              orderBy: { order: 'asc' },
             },
           },
         },
@@ -520,8 +512,8 @@ export class AssessmentPaperRepository {
       if (originalQuestion) {
         const newQuestion = await this.prisma.question.create({
           data: {
-            uuid: originalQuestion.uuid, // Keep same uuid for version grouping
-            version: originalQuestion.version + 1, // Increment version
+            uuid: randomUUID(), // Generate new UUID for cloned question
+            version: 1, // Start fresh version for new UUID
             type: originalQuestion.type,
             level: originalQuestion.level,
             difficulty: originalQuestion.difficulty,
@@ -572,8 +564,8 @@ export class AssessmentPaperRepository {
       if (originalGroup) {
         const newGroup = await this.prisma.questionGroup.create({
           data: {
-            uuid: originalGroup.uuid, // Keep same uuid for version grouping
-            version: originalGroup.version + 1, // Increment version
+            uuid: randomUUID(), // Generate new UUID for cloned group
+            version: 1, // Start fresh version for new UUID
             type: originalGroup.type,
             title: originalGroup.title,
             passage: originalGroup.passage,
@@ -900,6 +892,16 @@ export class AssessmentPaperRepository {
             id: true,
             name: true,
             email: true,
+          },
+        },
+        assessment: {
+          select: {
+            scoreProfile: {
+              select: {
+                maxTotal: true,
+                minTotalPass: true,
+              },
+            },
           },
         },
       },

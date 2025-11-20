@@ -678,4 +678,73 @@ export class AssessmentAttemptRepository {
       where: { userId, assessmentId },
     })
   }
+
+  // ===== Progress Integration Methods =====
+
+  async createAttemptFromProgress(progressId: number): Promise<AssessmentAttempt> {
+    // Lấy thông tin progress với tất cả answers
+    const progress = await this.prisma.assessmentProgress.findUnique({
+      where: { id: progressId },
+      include: {
+        answers: {
+          include: {
+            question: true,
+            selectedOption: true,
+          },
+        },
+        assessment: true,
+      },
+    })
+
+    if (!progress) {
+      throw new Error('Assessment progress not found')
+    }
+
+    if (!progress.isSubmitted) {
+      throw new Error('Assessment progress must be submitted before creating attempt')
+    }
+
+    // Tạo attempt mới liên kết với progress
+    const attempt = await this.prisma.assessmentAttempt.create({
+      data: {
+        userId: progress.userId,
+        assessmentId: progress.assessmentId,
+        progressId: progress.id,
+        startedAt: progress.startedAt,
+        submittedAt: progress.completedAt || new Date(),
+      },
+    })
+
+    // Copy tất cả answers từ progress sang attempt
+    const answerData = progress.answers.map((progressAnswer) => ({
+      attemptId: attempt.id,
+      questionId: progressAnswer.questionId,
+      selectedOptionId: progressAnswer.selectedOptionId,
+      isCorrect: progressAnswer.selectedOption?.isCorrect || false,
+      timeSpentSec: progressAnswer.timeSpentSec,
+    }))
+
+    await this.prisma.assessmentAnswer.createMany({
+      data: answerData,
+    })
+
+    return attempt
+  }
+
+  async getProgressById(progressId: number) {
+    return await this.prisma.assessmentProgress.findUnique({
+      where: { id: progressId },
+      include: {
+        assessment: true,
+        user: { select: { id: true, name: true, email: true } },
+        assignment: true,
+        answers: {
+          include: {
+            question: true,
+            selectedOption: true,
+          },
+        },
+      },
+    })
+  }
 }

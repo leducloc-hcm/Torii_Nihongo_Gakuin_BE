@@ -1,49 +1,111 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common'
-import { AssessmentProgressRepository } from './assessment-progress.repo'
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
+import { AssessmentAssignmentService } from '../assessment-assignment/assessment-assignment.service'
 import {
-  CreateAssessmentProgressDTO,
-  UpdateAssessmentProgressDTO,
+  AutoSaveProgressDTO,
   QueryAssessmentProgressDTO,
   SaveAnswerProgressDTO,
-  UpdateAnswerProgressDTO,
-  SubmitAssessmentDTO,
   StartAssessmentDTO,
-  AutoSaveProgressDTO,
+  SubmitAssessmentDTO,
+  UpdateAnswerProgressDTO,
 } from './assessment-progress.dto'
+import { AssessmentProgressRepository } from './assessment-progress.repo'
+import { AssessmentAssignmentRepository } from 'src/routes/assessment-assignment/assessment-assignment.repo'
 
 @Injectable()
 export class AssessmentProgressService {
-  constructor(private readonly progressRepository: AssessmentProgressRepository) {}
+  constructor(
+    private readonly progressRepository: AssessmentProgressRepository,
+    private readonly assignmentRepository: AssessmentAssignmentRepository,
+    private readonly assignmentService: AssessmentAssignmentService,
+  ) {}
 
-  // ============= START ASSESSMENT =============
+  private calculateTimeSpent(startedAt: Date, lastSavedAt?: Date | null): number {
+    const endTime = lastSavedAt ? new Date(lastSavedAt) : new Date()
+    const startTime = new Date(startedAt)
+    const diffMs = endTime.getTime() - startTime.getTime()
+    return Math.floor(diffMs / 1000) // Convert milliseconds to seconds
+  }
+
+  private enrichProgressWithTimeSpent(progress: any): any {
+    if (!progress) return progress
+
+    const timeSpentSec = this.calculateTimeSpent(progress.startedAt, progress.lastSavedAt)
+
+    return {
+      ...progress,
+      timeSpentSec,
+    }
+  }
 
   async startAssessment(startDto: StartAssessmentDTO, userId: number) {
     const { assessmentId, assignmentId } = startDto
+    let finalAssessmentId = assessmentId
+    let assignment: any = null
 
-    // Check if assessment exists
-    const assessmentExists = await this.progressRepository.checkAssessmentExists(assessmentId)
+    // Nếu không có assessmentId nhưng có assignmentId, lấy assessmentId từ assignment
+    if (!finalAssessmentId && assignmentId) {
+      // Verify user has access to the assignment and get assessmentId
+      assignment = await this.assignmentService.getAssignmentById(assignmentId, userId)
+      if (!assignment) {
+        throw new ForbiddenException('You do not have access to this assignment')
+      }
+      finalAssessmentId = assignment.assessmentId
+    }
+
+    if (!finalAssessmentId) {
+      throw new BadRequestException('Either assessmentId or assignmentId must be provided')
+    }
+
+    const assessmentExists = await this.progressRepository.checkAssessmentExists(finalAssessmentId)
     if (!assessmentExists) {
-      throw new BadRequestException(`Assessment with ID ${assessmentId} does not exist`)
+      throw new BadRequestException(`Assessment with ID ${finalAssessmentId} does not exist`)
     }
 
-    // Check if user already has a progress for this assessment
-    const existing = await this.progressRepository.getProgressByUserAndAssessment(userId, assessmentId)
-    if (existing) {
-      // If already submitted, cannot start again
-      if (existing.isSubmitted) {
-        throw new BadRequestException('You have already completed this assessment')
-      }
-      // Return existing progress to continue
+    // Kiểm tra xem có bài đang trong tiến trình làm chưa (chưa submit)
+    // Cần check cả assessmentId VÀ assignmentId context để xác định đúng progress
+    const existingProgress = await this.progressRepository.getProgressByUserAssessmentAndAssignment(
+      userId,
+      finalAssessmentId,
+      assignmentId || null,
+    )
+
+    if (existingProgress && !existingProgress.isSubmitted) {
       return {
-        message: 'Resuming existing progress',
-        progress: existing,
+        message: 'Assessment resumed - continuing from where you left off',
+        progress: this.enrichProgressWithTimeSpent(existingProgress),
+        isResuming: true,
       }
     }
 
-    // Create new progress
+    // Nếu có assignmentId, kiểm tra maxAttempts
+    if (assignmentId) {
+      // Lấy assignment nếu chưa có
+      if (!assignment) {
+        assignment = await this.assignmentService.getAssignmentById(assignmentId, userId)
+        if (!assignment) {
+          throw new ForbiddenException('You do not have access to this assignment')
+        }
+      }
+
+      // Kiểm tra maxAttempts nếu được cấu hình
+      if (assignment.maxAttempts !== null && assignment.maxAttempts !== undefined) {
+        const currentAttempts = await this.progressRepository.countUserAttemptsForAssignment(
+          userId,
+          finalAssessmentId,
+          assignmentId,
+        )
+
+        if (currentAttempts >= assignment.maxAttempts) {
+          throw new BadRequestException(
+            `You have reached the maximum number of attempts (${assignment.maxAttempts}) for this assignment`,
+          )
+        }
+      }
+    }
+
     const progressData: any = {
-      assessment: { connect: { id: assessmentId } },
-      user: { connect: { id: userId } },
+      assessmentId: finalAssessmentId, // Sử dụng finalAssessmentId
+      userId, // Sử dụng direct field thay vì connect
       currentSection: 0,
       currentQuestion: 0,
       timeSpentSec: 0,
@@ -51,24 +113,47 @@ export class AssessmentProgressService {
     }
 
     if (assignmentId) {
-      progressData.assignment = { connect: { id: assignmentId } }
+      // If we got here via assignment, we already verified access above
+      if (!assessmentId) {
+        // We got assessmentId from assignment, so we know user has access
+      } else {
+        // Verify user has access to the assignment (either directly assigned or class member)
+        const hasAccess = await this.assignmentService.checkUserAccess(assignmentId, userId)
+        if (!hasAccess) {
+          throw new ForbiddenException('You do not have access to this assignment')
+        }
+      }
+
+      progressData.assignmentId = assignmentId
     }
+
+    console.log('🔍 Debug progressData before create:', progressData)
 
     const progress = await this.progressRepository.create(progressData)
 
+    // Update assignment status to IN_PROGRESS if this is an assignment-based assessment
+    if (assignmentId) {
+      try {
+        await this.assignmentRepository.updateStatus(assignmentId, 'IN_PROGRESS')
+      } catch (error: any) {
+        // Log warning but don't fail the creation if assignment update fails
+        console.warn(`Failed to update assignment ${assignmentId} status to IN_PROGRESS:`, error.message)
+      }
+    }
+
     return {
       message: 'Assessment started successfully',
-      progress,
+      progress: this.enrichProgressWithTimeSpent(progress),
+      isResuming: false,
     }
   }
-
-  // ============= SAVE ANSWER =============
 
   async saveAnswer(saveDto: SaveAnswerProgressDTO, userId: number) {
     const { progressId, questionId, selectedOptionId, timeSpentSec, isFlagged } = saveDto
 
     // Validate progress exists and belongs to user
     const progress = await this.progressRepository.findUnique({ id: progressId })
+    console.log('progress', progress)
     if (!progress) {
       throw new NotFoundException(`Progress with ID ${progressId} not found`)
     }
@@ -79,38 +164,26 @@ export class AssessmentProgressService {
       throw new BadRequestException('Cannot modify answers after submission')
     }
 
-    // Check if answer already exists
-    const existingAnswer = await this.progressRepository.findAnswerByProgressAndQuestion(progressId, questionId)
-
-    if (existingAnswer) {
-      // Update existing answer
-      return this.progressRepository.updateAnswer(
-        { id: existingAnswer.id },
-        {
-          selectedOption: selectedOptionId ? { connect: { id: selectedOptionId } } : { disconnect: true },
-          timeSpentSec,
-          isFlagged,
-          lastUpdatedAt: new Date(),
-        },
-      )
-    } else {
-      // Create new answer
-      const answerData: any = {
+    // Use upsert to handle both create and update in a single atomic operation
+    return this.progressRepository.upsertAnswer({
+      where: {
+        progressId_questionId: { progressId, questionId },
+      },
+      create: {
         progress: { connect: { id: progressId } },
         question: { connect: { id: questionId } },
+        selectedOption: selectedOptionId ? { connect: { id: selectedOptionId } } : undefined,
         timeSpentSec: timeSpentSec || 0,
         isFlagged: isFlagged || false,
-      }
-
-      if (selectedOptionId) {
-        answerData.selectedOption = { connect: { id: selectedOptionId } }
-      }
-
-      return this.progressRepository.createAnswer(answerData)
-    }
+      },
+      update: {
+        selectedOption: selectedOptionId ? { connect: { id: selectedOptionId } } : { disconnect: true },
+        timeSpentSec: timeSpentSec,
+        isFlagged: isFlagged,
+        lastUpdatedAt: new Date(),
+      },
+    })
   }
-
-  // ============= UPDATE ANSWER =============
 
   async updateAnswer(answerId: number, updateDto: UpdateAnswerProgressDTO, userId: number) {
     const answer = await this.progressRepository.findAnswer({ id: answerId })
@@ -151,8 +224,6 @@ export class AssessmentProgressService {
     return this.progressRepository.updateAnswer({ id: answerId }, updateData)
   }
 
-  // ============= AUTO SAVE PROGRESS =============
-
   async autoSave(autoSaveDto: AutoSaveProgressDTO, userId: number) {
     const { progressId, currentSection, currentQuestion, timeSpentSec } = autoSaveDto
 
@@ -174,8 +245,6 @@ export class AssessmentProgressService {
 
     return this.progressRepository.update({ id: progressId }, updateData)
   }
-
-  // ============= SUBMIT ASSESSMENT =============
 
   async submitAssessment(submitDto: SubmitAssessmentDTO, userId: number) {
     const { progressId } = submitDto
@@ -200,6 +269,16 @@ export class AssessmentProgressService {
       },
     )
 
+    // Update assignment status if this progress is linked to an assignment
+    if (updated.assignmentId) {
+      try {
+        await this.assignmentRepository.updateStatus(updated.assignmentId, 'SUBMITTED')
+      } catch (error: any) {
+        // Log warning but don't fail the submission if assignment update fails
+        console.warn(`Failed to update assignment ${updated.assignmentId} status:`, error.message)
+      }
+    }
+
     return {
       message: 'Assessment submitted successfully',
       progress: updated,
@@ -219,7 +298,7 @@ export class AssessmentProgressService {
 
     return {
       hasStarted: true,
-      progress,
+      progress: this.enrichProgressWithTimeSpent(progress),
     }
   }
 
@@ -232,27 +311,30 @@ export class AssessmentProgressService {
       throw new ForbiddenException('You do not have access to this progress')
     }
 
-    return progress
+    return this.enrichProgressWithTimeSpent(progress)
   }
 
-  async getAllMyProgresses(userId: number, queryDto: QueryAssessmentProgressDTO) {
-    const { page, limit, assessmentId, assignmentId, isSubmitted, sortBy, sortOrder } = queryDto
-
-    const where: any = { userId }
-    if (assessmentId) where.assessmentId = assessmentId
-    if (assignmentId) where.assignmentId = assignmentId
-    if (isSubmitted !== undefined) where.isSubmitted = isSubmitted
-
-    const orderBy: any = {}
-    if (sortBy && sortOrder) {
-      orderBy[sortBy] = sortOrder
+  async getAllMyProgresses(userId: number) {
+    const whereCondition = {
+      userId,
+      assignmentId: null,
+      isSubmitted: false,
     }
 
-    return this.progressRepository.findManyWithPagination({
-      page,
-      limit,
-      where,
-      orderBy,
+    return await this.progressRepository.findManyWithPagination({
+      where: whereCondition,
+    })
+  }
+
+  async getAllMyProgressesAssignment(userId: number) {
+    const whereCondition = {
+      userId,
+      assignmentId: { not: null },
+      isSubmitted: false,
+    }
+
+    return await this.progressRepository.findManyWithPaginationAssignment({
+      where: whereCondition,
     })
   }
 
@@ -332,10 +414,7 @@ export class AssessmentProgressService {
     }
 
     return this.progressRepository.findManyWithPagination({
-      page,
-      limit,
       where,
-      orderBy,
     })
   }
 }

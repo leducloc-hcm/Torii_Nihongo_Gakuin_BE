@@ -5,6 +5,7 @@ import {
   QueryCourseSchema,
   CourseResponseSchema,
   CourseListItemSchema,
+  UpdateCourseStatusSchemaForAdmin,
 } from './course.model'
 import { z } from 'zod'
 
@@ -40,3 +41,5 @@ export const CreateSessionSchema = z.object({
 export class CreateClassDTO extends createZodDto(CreateClassSchema) {}
 export class UpdateClassDTO extends createZodDto(UpdateClassSchema) {}
 export class CreateSessionDTO extends createZodDto(CreateSessionSchema) {}
+
+export class UpdateCourseStatusDTOForAdmin extends createZodDto(UpdateCourseStatusSchemaForAdmin) {}

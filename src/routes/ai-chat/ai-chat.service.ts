@@ -48,23 +48,263 @@ export class AIChatService {
     return `ai_user_threads:${userId}`
   }
 
+  private detectLanguage(query: string): 'vi' | 'en' | 'ja' {
+    const lowerQuery = query.toLowerCase()
+
+    if (/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(query)) {
+      return 'ja'
+    }
+
+    if (/[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i.test(query)) {
+      return 'vi'
+    }
+
+    const viWords = ['tôi', 'bạn', 'của', 'và', 'với', 'cho', 'là', 'có', 'trong', 'về', 'như', 'khi', 'được']
+    if (viWords.some((word) => lowerQuery.includes(word))) {
+      return 'vi'
+    }
+
+    return 'en'
+  }
+
+  private getRejectionMessage(language: 'vi' | 'en' | 'ja'): string {
+    if (language === 'ja') {
+      return `申し訳ございません。私はTorii Nihongo Gakuinの日本語学習アシスタントですので、以下のことについてのみお手伝いできます：
+
+📚 **日本語学習：**
+- 文法、語彙、漢字の説明
+- 学習方法とJLPT試験対策
+- 学習資料とフラッシュカード
+
+🏫 **プラットフォーム情報：**
+- コース（自習とライブ）
+- 模擬試験と練習問題
+- 日本語に関するブログ記事
+- プラットフォームの機能
+
+日本語学習や私たちのコースについて何かご質問はありますか？😊`
+    }
+
+    if (language === 'en') {
+      return `I'm sorry, I'm a Japanese learning assistant for Torii Nihongo Gakuin, so I can only help you with:
+
+📚 **Japanese Learning:**
+- Explaining grammar, vocabulary, and Kanji
+- Study methods and JLPT exam preparation
+- Study materials and flashcards
+
+🏫 **Platform Information:**
+- Courses (self-paced and live)
+- Practice tests and mock exams
+- Blog posts about Japanese
+- Platform features
+
+Do you have any questions about learning Japanese or our courses? 😊`
+    }
+
+    // Default: Vietnamese
+    return `Xin lỗi, tôi là trợ lý học tiếng Nhật của Torii Nihongo Gakuin, nên tôi chỉ có thể giúp bạn với:
+
+📚 **Học tiếng Nhật:**
+- Giải thích ngữ pháp, từ vựng, Kanji
+- Phương pháp học và luyện thi JLPT
+- Tài liệu học tập và flashcard
+
+🏫 **Thông tin về nền tảng:**
+- Khóa học (tự học và live)
+- Bài kiểm tra và luyện đề
+- Bài viết blog về tiếng Nhật
+- Tính năng nền tảng
+
+Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của chúng tôi không? 😊`
+  }
+
+  private isOffTopicQuery(query: string): boolean {
+    const lower = query.toLowerCase().trim()
+
+    const japaneseContext =
+      /jlpt|n[1-5]|tiếng nhật|japanese|日本語|nihongo|kanji|漢字|hiragana|ひらがな|katakana|カタカナ|ngữ pháp|grammar|từ vựng|vocabulary|học|learn|勉強|khóa học|course|bài học|lesson|luyện thi|practice|flashcard/i
+    if (japaneseContext.test(lower)) return false
+
+    if (
+      /\d+\s*[+\-*/×÷]\s*\d+/.test(lower) ||
+      /[a-z]\s*[+\-*/×÷=]\s*[a-z0-9]/i.test(lower) ||
+      /^([\d\s+\-*/×÷=]+)$/i.test(lower) ||
+      /^(what is|bao nhiêu|bằng bao nhiêu|tính|calculate|solve|phép tính|giản)/i.test(lower)
+    ) {
+      return true
+    }
+
+    const techKeywords =
+      /(docker|nodejs|react|nextjs|nestjs|python|java|c\+\+|typescript|git|github|code|coding|debug|terminal|command|server|api|backend|frontend|vscode|agp|gradle|android studio|aws|ec2|s3|devops|ci\/cd|nginx|ssl|certbot|redis|database|sql|prisma)/i
+    if (techKeywords.test(lower)) return true
+
+    const aiKeywords =
+      /(chatgpt|gemini|claude|deepseek|openai|prompt|midjourney|image generation|ai model|人工知能|deep learning|machine learning|人工智慧)/i
+    if (aiKeywords.test(lower)) return true
+
+    const generalTopics =
+      /(weather|thời tiết|tin tức|news|thể thao|bóng đá|football|tennis|movie|phim|music|nhạc|song|anime|netflix|game|trò chơi|mua sắm|fashion|thời trang|makeup|shopping|idol|ca sĩ|diễn viên|celebrity|tiktok|facebook|instagram|youtube|genshin|valorant|lol|pubg|minecraft|roblox|mlbb|pokemon)/i
+    if (generalTopics.test(lower)) return true
+
+    if (/(du lịch|travel|khách sạn|hotel|cooking|nấu ăn|料理|recipe|vacation|nghỉ dưỡng)/i.test(lower)) return true
+
+    const nonJPSubjects =
+      /(math|toán|physics|vật lý|chemistry|hóa|biology|sinh|history|địa lý|geography|english|tiếng anh|korean|tiếng hàn|chinese|tiếng trung|spanish|french|pháp)/i
+    if (nonJPSubjects.test(lower)) return true
+
+    if (
+      /(lawyer|luật sư|legal advice|pháp lý|politics|chính trị|president|election|government|financial advice|tài chính|đầu tư|loan|vay|stock|chứng khoán|bitcoin|crypto|forex|investment|trading)/i.test(
+        lower,
+      )
+    )
+      return true
+
+    if (
+      /(bệnh|pain|đau|triệu chứng|diagnose|chẩn đoán|medical advice|tư vấn y tế|stress|trầm cảm|anxiety|mental health|psychology|tâm lý)/i.test(
+        lower,
+      )
+    )
+      return true
+
+    if (
+      /(dating|hẹn hò|love|yêu|relationship|mối quan hệ|crush|girlfriend|boyfriend|tỏ tình|chia tay|tan vỡ|彼氏|彼女)/i.test(
+        lower,
+      )
+    )
+      return true
+
+    if (
+      /(write|viết|tạo|compose|kể).*(story|truyện|poem|bài thơ|fanfic|roleplay|song|lyrics|chế|parody|novel|tiểu thuyết)/i.test(
+        lower,
+      )
+    )
+      return true
+
+    if (/(translate|dịch|翻訳).*(english|vietnamese|chinese|korean|thai|spanish|french)/i.test(lower)) return true
+
+    if (
+      /(who are you|what are you|bạn là ai|あなたは誰|tell me about yourself|giới thiệu về bạn)/i.test(lower) &&
+      !/(help|assist|support|hỗ trợ|feature|tính năng|platform|nền tảng)/i.test(lower)
+    ) {
+      return true
+    }
+
+    if (/(joke|冗談|chuyện cười|đùa|funny|vui|おもしろい)/i.test(lower)) return true
+
+    if (/(homework|bài tập|giải bài|đáp án)/i.test(lower) && nonJPSubjects.test(lower)) return true
+
+    return false
+  }
+
+  private checkEmptyJsonResponse(response: string | null | undefined, queryType: string): boolean {
+    if (!response) return false
+
+    try {
+      // Extract JSON from markdown code block
+      const jsonMatch = response.match(/```json\s*([\s\S]*?)\s*```/)
+      if (!jsonMatch) return false
+
+      const jsonStr = jsonMatch[1].trim()
+      const parsed = JSON.parse(jsonStr)
+
+      // Check for different empty patterns based on queryType
+      const type = queryType.toUpperCase()
+
+      switch (type) {
+        case 'FLASHCARD':
+          return (
+            (Array.isArray(parsed.decks) && parsed.decks.length === 0) ||
+            (Array.isArray(parsed.flashcards) && parsed.flashcards.length === 0) ||
+            parsed.count === 0
+          )
+
+        case 'COURSE':
+          return (
+            (Array.isArray(parsed.courses) && parsed.courses.length === 0) ||
+            parsed.course === null ||
+            parsed.count === 0
+          )
+
+        case 'BLOG':
+          return (
+            (Array.isArray(parsed.blogs) && parsed.blogs.length === 0) ||
+            (Array.isArray(parsed.results) && parsed.results.length === 0) ||
+            parsed.count === 0
+          )
+
+        case 'ENROLLMENT':
+          return (Array.isArray(parsed.enrollments) && parsed.enrollments.length === 0) || parsed.count === 0
+
+        case 'ASSESSMENT':
+          return (
+            (Array.isArray(parsed.results) && parsed.results.length === 0) ||
+            (Array.isArray(parsed.assessments) && parsed.assessments.length === 0) ||
+            parsed.count === 0
+          )
+
+        case 'ASSESSMENT_HISTORY':
+          return (Array.isArray(parsed.history) && parsed.history.length === 0) || parsed.count === 0
+        default:
+          return false
+      }
+    } catch (error) {
+      return false
+    }
+  }
+
+  private getEmptyDataMessage(queryType: string, query: string): string {
+    const language = this.detectLanguage(query)
+
+    const messages = {
+      FLASHCARD: {
+        vi: 'Xin lỗi, hiện tại không có flashcard nào phù hợp với yêu cầu của bạn. Bạn có thể thử:\n\n• Tìm kiếm flashcard deck khác\n• Yêu cầu tạo flashcard mới với topic khác\n• Hỏi về các deck flashcard công khai có sẵn',
+        en: "Sorry, I couldn't find any flashcards matching your request. You can try:\n\n• Search for other flashcard decks\n• Request to create new flashcards with a different topic\n• Ask about available public flashcard decks",
+        ja: '申し訳ございません。リクエストに一致するフラッシュカードが見つかりませんでした。次のことを試してください：\n\n• 他のフラッシュカードデッキを検索する\n• 別のトピックで新しいフラッシュカードの作成をリクエストする\n• 利用可能な公開フラッシュカードデッキについて質問する',
+      },
+      COURSE: {
+        vi: 'Xin lỗi, không tìm thấy khóa học phù hợp với yêu cầu của bạn. Bạn có thể:\n\n• Thử tìm kiếm với từ khóa khác\n• Xem tất cả khóa học có sẵn\n• Hỏi về khóa học cụ thể theo level (N5, N4, N3, N2, N1)',
+        en: 'Sorry, no courses found matching your request. You can:\n\n• Try searching with different keywords\n• View all available courses\n• Ask about specific courses by level (N5, N4, N3, N2, N1)',
+        ja: '申し訳ございません。リクエストに一致するコースが見つかりませんでした。次のことができます：\n\n• 異なるキーワードで検索してみる\n• 利用可能なすべてのコースを表示する\n• レベル別の特定のコースについて質問する（N5、N4、N3、N2、N1）',
+      },
+      BLOG: {
+        vi: 'Xin lỗi, không tìm thấy bài viết blog nào về chủ đề này. Bạn có thể:\n\n• Tìm kiếm với chủ đề khác về tiếng Nhật\n• Xem các bài viết blog mới nhất\n• Hỏi về các chủ đề blog có sẵn',
+        en: 'Sorry, no blog posts found on this topic. You can:\n\n• Search for other Japanese-related topics\n• View recent blog posts\n• Ask about available blog topics',
+        ja: '申し訳ございません。このトピックに関するブログ記事が見つかりませんでした。次のことができます：\n\n• 他の日本語関連のトピックを検索する\n• 最近のブログ記事を表示する\n• 利用可能なブログトピックについて質問する',
+      },
+      ENROLLMENT: {
+        vi: 'Bạn chưa đăng ký khóa học nào. Bạn có thể:\n\n• Xem danh sách khóa học có sẵn\n• Tìm hiểu về các khóa học theo level\n• Hỏi về chi tiết khóa học bạn quan tâm',
+        en: "You haven't enrolled in any courses yet. You can:\n\n• View available courses\n• Learn about courses by level\n• Ask about course details you're interested in",
+        ja: 'まだコースに登録していません。次のことができます：\n\n• 利用可能なコースを表示する\n• レベル別のコースについて学ぶ\n• 興味のあるコースの詳細について質問する',
+      },
+      ASSESSMENT: {
+        vi: 'Xin lỗi, không tìm thấy bài kiểm tra nào phù hợp. Bạn có thể:\n\n• Xem tất cả bài kiểm tra có sẵn\n• Tìm bài test theo level (N5, N4, N3, N2, N1)\n• Hỏi về đề thi thử JLPT',
+        en: 'Sorry, no assessments found. You can:\n\n• View all available assessments\n• Find tests by level (N5, N4, N3, N2, N1)\n• Ask about JLPT mock exams',
+        ja: '申し訳ございません。評価テストが見つかりませんでした。次のことができます：\n\n• 利用可能なすべての評価を表示する\n• レベル別のテストを見つける（N5、N4、N3、N2、N1）\n• JLPT模擬試験について質問する',
+      },
+      ASSESSMENT_HISTORY: {
+        vi: 'Bạn chưa làm bài kiểm tra nào. Bạn có thể:\n\n• Xem các bài test có sẵn\n• Bắt đầu làm bài test thử\n• Tìm hiểu về hệ thống đánh giá',
+        en: "You haven't taken any assessments yet. You can:\n\n• View available tests\n• Start taking a practice test\n• Learn about the assessment system",
+        ja: 'まだ評価テストを受けていません。次のことができます：\n\n• 利用可能なテストを表示する\n• 練習テストを開始する\n• 評価システムについて学ぶ',
+      },
+    }
+
+    const typeMessages = messages[queryType] || messages.COURSE
+    return typeMessages[language] || typeMessages.vi
+  }
+
   private async invalidateThreadCache(threadId: number, userId: number): Promise<void> {
-    // Get all possible message cache keys using Redis pattern matching
-    // Pattern matches: ai_thread_messages:${threadId}:${limit}:${page}
     const messagePattern = `ai_thread_messages:${threadId}:*`
 
-    // Use Redis client's keys method to find all matching keys
     const redisClient = this.redis.getClient()
     const messageKeys = await redisClient.keys(messagePattern)
 
-    // Delete thread, all message pages, and user threads cache
     const keysToDelete = [this.getThreadCacheKey(threadId), this.getUserThreadsCacheKey(userId), ...messageKeys]
 
     this.logger.warn(
       `[Cache INVALIDATE] Deleting ${keysToDelete.length} keys for thread ${threadId}: ${keysToDelete.join(', ')}`,
     )
 
-    // Delete all keys
     for (const key of keysToDelete) {
       await this.redis.del(key)
     }
@@ -73,9 +313,11 @@ export class AIChatService {
   }
 
   async handleQuery(userId: number, dto: SendQueryDto) {
+    const queryStartTime = Date.now()
     const { threadId, query } = dto
 
     this.logger.log(`[handleQuery] User ID: ${userId} | Thread ID: ${threadId}`)
+    this.logger.log(`⏱️  Query started at: ${new Date().toLocaleTimeString()}`)
 
     const cacheKey = this.getThreadCacheKey(threadId)
     let thread = await this.redis.get(cacheKey)
@@ -90,6 +332,57 @@ export class AIChatService {
       thread = typeof thread === 'string' ? JSON.parse(thread) : thread
       if (thread.userId !== userId) {
         throw new NotFoundException('Thread not found')
+      }
+    }
+
+    // Check if query is off-topic (not related to Japanese learning)
+    const isOffTopic = this.isOffTopicQuery(query)
+    if (isOffTopic) {
+      this.logger.warn(`🚫 Off-topic query detected: "${query}"`)
+
+      const detectedLanguage = this.detectLanguage(query)
+      const rejectionMessage = this.getRejectionMessage(detectedLanguage)
+      this.logger.log(`📢 Language detected: ${detectedLanguage}`)
+
+      const queryRecord = await this.queryRepo.create({
+        threadId,
+        userId,
+        query,
+        queryType: 'GENERAL' as any,
+        initialResponse: rejectionMessage,
+        requiresApproval: false,
+      })
+
+      // Save user message
+      await this.messageRepo.create({
+        threadId,
+        userId,
+        queryId: queryRecord.id,
+        role: ChatRole.USER,
+        content: query,
+      })
+
+      // Save rejection message
+      await this.messageRepo.create({
+        threadId,
+        userId,
+        queryId: queryRecord.id,
+        role: ChatRole.ASSISTANT,
+        content: rejectionMessage,
+      })
+
+      await this.queryRepo.update(queryRecord.id, {
+        status: QueryStatus.COMPLETED,
+      })
+
+      // Invalidate cache after new messages
+      await this.invalidateThreadCache(threadId, userId)
+
+      return {
+        queryId: queryRecord.id,
+        response: rejectionMessage,
+        requiresApproval: false,
+        toolCalls: [],
       }
     }
 
@@ -109,6 +402,9 @@ export class AIChatService {
     if (needsMultipleTools) {
       this.logger.log(`Multi-tool query detected. Suggested tools: [${suggestedTools.join(', ')}]`)
     }
+
+    const detectionTime = Date.now() - queryStartTime
+    this.logger.log(`⏱️  [+${detectionTime}ms] Query type detected`)
 
     // Build chat messages with language detection and multi-tool hint
     let systemPrompt = this.promptService.getSystemPrompt(queryType, undefined, query, userId)
@@ -139,8 +435,22 @@ export class AIChatService {
       content: query,
     })
 
+    // Determine if we should FORCE tool calling
+    // Force tools for queries that MUST fetch data (user-specific data)
+    const shouldForceTools =
+      queryType === QueryType.ASSESSMENT_HISTORY || // "Tôi đã làm bài test nào?"
+      queryType === QueryType.ENROLLMENT || // "Khóa học của tôi"
+      (queryType === QueryType.FLASHCARD && isFlashcardGeneration) // "Tạo flashcard"
+
+    if (shouldForceTools) {
+      this.logger.log(`🎯 FORCING tool calls for queryType: ${queryType}`)
+    }
+
     // Get response from Agent
-    const agentResponse = await this.agentService.getResponse(messages, true)
+    const aiCallStartTime = Date.now()
+    const agentResponse = await this.agentService.getResponse(messages, true, shouldForceTools, query)
+    const aiCallTime = Date.now() - aiCallStartTime
+    this.logger.log(`⏱️  [+${Date.now() - queryStartTime}ms] Initial AI call completed (took ${aiCallTime}ms)`)
 
     // DEBUG: Log tool calls
     if (agentResponse.toolCalls && agentResponse.toolCalls.length > 0) {
@@ -244,6 +554,7 @@ export class AIChatService {
 
     const executeElapsed = Date.now() - executeStartTime
     this.logger.log(`✅ executeApprovedTools completed in ${executeElapsed}ms`)
+    this.logger.log(`⏱️  [+${Date.now() - queryStartTime}ms] Tool execution completed`)
     this.logger.log(`   - Tool results count: ${executeResult.results?.length || 0}`)
     this.logger.log(`   - Has finalResponse: ${!!executeResult.finalResponse}`)
     this.logger.log(`   - FinalResponse preview: ${executeResult.finalResponse?.substring(0, 100)}...`)
@@ -257,8 +568,15 @@ export class AIChatService {
     // Prepare final response - ensure we always have something to show user
     let finalResponse = executeResult.finalResponse
 
+    // Check if response contains empty JSON (no data)
+    const isEmptyJsonResponse = this.checkEmptyJsonResponse(finalResponse, queryType)
+
+    if (isEmptyJsonResponse) {
+      this.logger.warn(`Empty JSON response detected for queryType: ${queryType}`)
+      finalResponse = this.getEmptyDataMessage(queryType, query)
+    }
     // If no final response from AI, create a fallback based on tool results
-    if (!finalResponse || finalResponse.trim().length === 0) {
+    else if (!finalResponse || finalResponse.trim().length === 0) {
       this.logger.warn(`No final response from AI, generating fallback message`)
 
       // Check if tools returned data
@@ -294,11 +612,19 @@ export class AIChatService {
       toolCalls: executeResult.results,
     })
 
+    this.logger.log(`⏱️  [+${Date.now() - queryStartTime}ms] Message saved to DB`)
+
     setTimeout(() => {
       void this.invalidateThreadCache(threadId, userId)
         .then(() => this.logger.debug(`Cache invalidated for thread ${threadId}`))
         .catch((error) => this.logger.error(`Failed to invalidate cache for thread ${threadId}:`, error))
     }, 100) // 100ms delay to ensure DB commit completes
+
+    const totalTime = Date.now() - queryStartTime
+    this.logger.log(`⏱️  ✅ TOTAL QUERY TIME: ${totalTime}ms (${(totalTime / 1000).toFixed(2)}s)`)
+    this.logger.log(
+      `⏱️  📊 Breakdown: Detection=${detectionTime}ms, AI=${aiCallTime}ms, Tools+Response=${executeElapsed}ms`,
+    )
 
     return {
       queryId: queryRecord.id,

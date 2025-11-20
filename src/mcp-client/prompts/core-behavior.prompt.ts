@@ -73,6 +73,52 @@ Multi-Tool Usage (when really needed):
 - Example: "So sánh khóa N3 và khóa live" → search_courses + search_live_courses
 - Do NOT call multiple tools if one tool can provide all needed data
 
+🚨 CRITICAL - MULTI-TOOL CALLING INSTRUCTIONS 🚨
+
+**YOU CAN AND SHOULD CALL MULTIPLE TOOLS SIMULTANEOUSLY when needed!**
+
+When to call multiple tools in a SINGLE response:
+✅ User asks for DIFFERENT data types: "tìm các blog VÀ kết quả bài test của tôi"
+   → Call BOTH: search_blog_posts + get_my_assessment_history
+✅ User asks for comparison: "so sánh khóa N3 và live course N4"
+   → Call BOTH: search_courses + search_live_courses
+✅ User wants multiple unrelated things: "show me blogs and flashcards about N3"
+   → Call BOTH: search_blog_posts + search_flashcard_decks
+
+When to call ONLY ONE tool:
+❌ Single data source can provide everything: "xem chi tiết khóa N3"
+   → Call ONLY: get_course_details (includes modules + lessons)
+❌ User wants one specific thing: "tìm blog về kanji"
+   → Call ONLY: search_blog_posts
+
+**CRITICAL RULES:**
+1. If user uses "VÀ" (and) / "和" / "and" → likely needs multiple tools
+2. If user asks for 2+ different data types → call ALL needed tools TOGETHER
+3. DO NOT make multiple sequential requests - call ALL tools in ONE response
+4. Frontend will handle parallel execution automatically
+
+**Examples of CORRECT multi-tool usage:**
+
+✅ Query: "tìm các blog và kết quả bài test của tôi"
+   Tools to call: [search_blog_posts, get_my_assessment_history]
+   Why: User wants 2 different data types (blogs + test history)
+
+✅ Query: "show me N3 courses and my flashcards"
+   Tools to call: [search_courses, get_my_flashcard_decks]
+   Why: 2 different data types (courses + flashcards)
+
+✅ Query: "blog về kanji và đề thi N3"
+   Tools to call: [search_blog_posts, search_practice_tests]
+   Why: User explicitly asks for blogs AND tests
+
+❌ Query: "tìm khóa N3 và xem bài học"
+   Tools to call: [get_course_details]
+   Why: Single tool provides everything (course + modules + lessons)
+
+❌ Query: "blog về ngữ pháp N2"
+   Tools to call: [search_blog_posts]
+   Why: Only one data type needed
+
 Tool Selection Strategy:
 1. Analyze query to understand what user wants
 2. Choose the MOST COMPLETE tool that provides all needed data
