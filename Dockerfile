@@ -12,7 +12,7 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 ENV HUSKY=0
 # Install production dependencies
-RUN npm pkg delete scripts.prepare && npm ci --only=production
+RUN npm pkg delete scripts.prepare && npm ci 
 
 # Copy Prisma schema for production deps
 COPY prisma ./prisma/
@@ -155,7 +155,7 @@ ENV SEPAY_WEBHOOK_URL=https://develop.torii-nihongo-gakuin.io.vn/payments/sepay/
 
 ENV OPENAI_API_KEY=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
 ENV OPENAI_MODEL=gpt-5-nano-2025-08-07
-ENV OPENAI_TEMPERATURE=1
+ENV OPENAI_TEMPERATURE=0.3
 ENV OPENAI_MAX_TOKENS=0
 
 ENV MCP_ENABLED=true
