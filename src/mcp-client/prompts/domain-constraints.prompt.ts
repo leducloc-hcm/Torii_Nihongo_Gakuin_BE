@@ -1,10 +1,4 @@
 /**
- * Domain Constraint Prompts - Japanese Learning Only
- * ===================================================
- *
- * This prompt ensures the MCP system only responds to queries related to Japanese language learning.
- * Queries about other topics (English learning, Chinese, Korean, programming, etc.) will be politely declined.
- *
  * CRITICAL RULES:
  * 1. ONLY respond to Japanese learning related queries
  * 2. Block all non-Japanese learning topics
