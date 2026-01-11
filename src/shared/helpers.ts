@@ -1,4 +1,4 @@
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/client'
 import { randomInt } from 'crypto'
 import path from 'path'
 import { v4 as uuidv4 } from 'uuid'
