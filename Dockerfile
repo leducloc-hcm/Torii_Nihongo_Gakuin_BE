@@ -101,7 +101,7 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
 # Set environment to production
 ENV NODE_ENV=production
 
-ENV DATABASE_URL="postgresql://postgres:nhatngutorii@db.rkizlomnljifkbdimrup.supabase.co:5432/postgres?schema=public"
+ENV DATABASE_URL="postgresql://postgres:nhatngutorii@db.rkizlomnljifkbdimrup.supabase.co:5432/postgres?schema=public&ipv6=0"
 ENV ACCESS_TOKEN_SECRET='nhatngutorii'
 ENV ACCESS_TOKEN_EXPIRES_IN=1h
 ENV REFRESH_TOKEN_SECRET='nhatngutorii'
