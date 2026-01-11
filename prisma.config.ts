@@ -4,6 +4,6 @@ export default defineConfig({
   datasource: {
     url:
       process.env.DATABASE_URL ||
-      'postgresql://postgres:nhatngutorii@torii-nihongo-db.cd48o48cgxzd.ap-southeast-1.rds.amazonaws.com:5432/postgres?schema=public',
+      'postgresql://postgres.rkizlomnljifkbdimrup:nhatngutorii@aws-1-ap-northeast-2.pooler.supabase.com:5432/postgres?schema=public',
   },
 })
