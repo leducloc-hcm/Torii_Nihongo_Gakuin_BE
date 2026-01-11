@@ -126,10 +126,10 @@ ENV GOOGLE_CLIENT_REDIRECT_URI='https://torii-nihongo-gakuin.io.vn/auth/google/c
 ENV APP_NAME='Torii Nihongo Gakuin'
 
 
-ENV AWS_ACCESS_KEY_ID='AKIAVVZPCSCK4ANYORUJ'
-ENV AWS_SECRET_ACCESS_KEY='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'
+ENV AWS_ACCESS_KEY_ID='AKIA3AAD56OYHIFM7AMW'
+ENV AWS_SECRET_ACCESS_KEY='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'
 ENV AWS_REGION='ap-southeast-1'
-ENV AWS_S3_BUCKET_NAME='torii-nihongo-gakuin-s3'
+ENV AWS_S3_BUCKET_NAME='torii-nihongo-storage'
 ENV REDIS_URL='redis://default:password@localhost:6379'
 
 ENV JANUS_HTTP_URL='https://janus.torii-nihongo-gakuin.io.vn/janus'
