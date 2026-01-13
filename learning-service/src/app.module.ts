@@ -1,0 +1,59 @@
+import { Module } from '@nestjs/common'
+import { ConfigModule } from '@nestjs/config'
+import { AppController } from './app.controller'
+import { AppService } from './app.service'
+import { SharedModule } from './shared/shared.module'
+import { AuthModule } from './routes/auth/auth.module'
+import { TagModule } from './routes/tag/tag.module'
+import { BlogModule } from './routes/blog/blog.module'
+import { ProfileModule } from './routes/profile/profile.module'
+import { CourseModule } from './routes/course/course.module'
+import { ModuleModule } from './routes/module/module.module'
+import { LessonModule } from './routes/lesson/lesson.module'
+import { EnrollmentModule } from './routes/enrollment/enrollment.module'
+import { LessonProgressModule } from './routes/lesson-progress/lesson-progress.module'
+import { FlashcardModule } from './routes/flashcard/flashcard.module'
+import { NotificationModule } from './routes/notification/notification.module'
+import { WebsocketsModule } from './websockets/websockets.module'
+import { OnlineClassModule } from './routes/online-class/online-class.module'
+import { CartModule } from './routes/cart/cart.module'
+import { PaymentModule } from './routes/payment/payment.module'
+import { AIChatModule } from './routes/ai-chat/ai-chat.module'
+import { CouponModule } from './routes/coupon/coupon.module'
+import { DashboardModule } from './routes/dashboard/dashboard.module'
+import { RedisModule } from './shared/redis/redis.module'
+import { RabbitMQModule } from './shared/rabbitmq/rabbitmq.module'
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: '.env',
+    }),
+    SharedModule,
+    RedisModule,
+    RabbitMQModule,
+    AuthModule,
+    TagModule,
+    BlogModule,
+    ProfileModule,
+    CourseModule,
+    ModuleModule,
+    LessonModule,
+    EnrollmentModule,
+    LessonProgressModule,
+    FlashcardModule,
+    NotificationModule,
+    WebsocketsModule,
+    OnlineClassModule,
+    CartModule,
+    PaymentModule,
+    AIChatModule,
+    CouponModule,
+    DashboardModule,
+  ],
+  controllers: [AppController],
+  providers: [AppService],
+})
+export class AppModule {}
+

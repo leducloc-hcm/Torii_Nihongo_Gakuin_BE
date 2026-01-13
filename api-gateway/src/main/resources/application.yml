@@ -1,0 +1,146 @@
+server:
+  port: 8080
+
+jwt:
+  secret: ${JWT_SECRET:your-secret-key}
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      routes:
+        # Auth routes
+        - id: auth-route
+          uri: ${GATEWAY_LEARNING_SERVICE_URL:http://localhost:4001}
+          predicates:
+            - Path=/auth/**
+          filters:
+            - StripPrefix=0
+
+        # User routes
+        - id: users-route
+          uri: ${GATEWAY_LEARNING_SERVICE_URL:http://localhost:4001}
+          predicates:
+            - Path=/users/**
+          filters:
+            - StripPrefix=0
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 10
+                redis-rate-limiter.burstCapacity: 20
+                key-resolver: "#{@userKeyResolver}"
+        # User routes
+        - id: profile-route
+          uri: ${GATEWAY_LEARNING_SERVICE_URL:http://localhost:4001}
+          predicates:
+            - Path=/profile/**
+          filters:
+            - StripPrefix=0
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 10
+                redis-rate-limiter.burstCapacity: 20
+                key-resolver: "#{@userKeyResolver}"
+
+        # Course routes
+        - id: courses-route
+          uri: ${GATEWAY_LEARNING_SERVICE_URL:http://localhost:4001}
+          predicates:
+            - Path=/courses/**
+          filters:
+            - StripPrefix=0
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 20
+                redis-rate-limiter.burstCapacity: 40
+
+        # Blog routes
+        - id: blogs-route
+          uri: ${GATEWAY_LEARNING_SERVICE_URL:http://localhost:4001}
+          predicates:
+            - Path=/blogs/**
+          filters:
+            - StripPrefix=0
+
+        # Flashcard routes
+        - id: flashcards-route
+          uri: ${GATEWAY_LEARNING_SERVICE_URL:http://localhost:4001}
+          predicates:
+            - Path=/flashcards/**
+          filters:
+            - StripPrefix=0
+
+        # Payment routes
+        - id: payment-route
+          uri: ${GATEWAY_LEARNING_SERVICE_URL:http://localhost:4001}
+          predicates:
+            - Path=/payment/**
+          filters:
+            - StripPrefix=0
+
+        # Online class routes
+        - id: online-class-route
+          uri: ${GATEWAY_LEARNING_SERVICE_URL:http://localhost:4001}
+          predicates:
+            - Path=/online-class/**
+          filters:
+            - StripPrefix=0
+
+        # Assessment routes
+        - id: assessment-route
+          uri: ${GATEWAY_ASSESSMENT_SERVICE_URL:http://localhost:4002}
+          predicates:
+            - Path=/assessment/**
+          filters:
+            - StripPrefix=0
+
+        # Score profile routes
+        - id: score-profile-route
+          uri: ${GATEWAY_ASSESSMENT_SERVICE_URL:http://localhost:4002}
+          predicates:
+            - Path=/score-profile/**
+          filters:
+            - StripPrefix=0
+
+        # Dashboard routes
+        - id: dashboard-route
+          uri: ${GATEWAY_LEARNING_SERVICE_URL:http://localhost:4001}
+          predicates:
+            - Path=/dashboard/**
+          filters:
+            - StripPrefix=0
+
+      globalcors:
+        cors-configurations:
+          "[/**]":
+            allowedOriginPatterns: "*"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - PATCH
+              - OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: true
+            maxAge: 3600
+
+  redis:
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
+    timeout: 2000ms
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,gateway
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    org.springframework.cloud.gateway: DEBUG
+    com.torii: DEBUG

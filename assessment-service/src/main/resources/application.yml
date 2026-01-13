@@ -1,0 +1,66 @@
+spring:
+  application:
+    name: assessment-service
+  
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://aws-1-ap-northeast-2.pooler.supabase.com:5432/postgres?currentSchema=assessment}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres.rkizlomnljifkbdimrup}
+    password: ${SPRING_DATASOURCE_PASSWORD:nhatngutorii}
+    driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:org.postgresql.Driver}
+  
+  jpa:
+    hibernate:
+      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:none}
+    show-sql: ${SPRING_JPA_SHOW_SQL:false}
+    properties:
+      hibernate:
+        dialect: ${SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT:org.hibernate.dialect.PostgreSQLDialect}
+        default_schema: ${SPRING_JPA_PROPERTIES_HIBERNATE_DEFAULT_SCHEMA:assessment}
+        format_sql: ${SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL:true}
+        # Disable strict type checking for DECIMAL/NUMERIC compatibility
+        physical_naming_strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+  
+  flyway:
+    enabled: ${SPRING_FLYWAY_ENABLED:true}
+    schemas: ${SPRING_FLYWAY_SCHEMAS:assessment}
+    locations: ${SPRING_FLYWAY_LOCATIONS:classpath:db/migration}
+    baseline-on-migrate: ${SPRING_FLYWAY_BASELINE_ON_MIGRATE:true}
+  
+  data:
+    redis:
+      host: ${SPRING_REDIS_HOST:localhost}
+      port: ${SPRING_REDIS_PORT:6379}
+      username: ${SPRING_REDIS_USERNAME:}
+      password: ${SPRING_REDIS_PASSWORD:}
+      database: ${SPRING_REDIS_DB:0}
+      timeout: ${SPRING_REDIS_TIMEOUT:2000ms}
+  
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST:localhost}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+    username: ${SPRING_RABBITMQ_USERNAME:admin}
+    password: ${SPRING_RABBITMQ_PASSWORD:admin}
+    virtual-host: ${SPRING_RABBITMQ_VIRTUAL_HOST:/}
+    listener:
+      simple:
+        acknowledge-mode: ${SPRING_RABBITMQ_LISTENER_SIMPLE_ACKNOWLEDGE_MODE:auto}
+        retry:
+          enabled: ${SPRING_RABBITMQ_LISTENER_SIMPLE_RETRY_ENABLED:true}
+          max-attempts: ${SPRING_RABBITMQ_LISTENER_SIMPLE_RETRY_MAX_ATTEMPTS:3}
+
+server:
+  port: ${SERVER_PORT:4002}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.torii: DEBUG
+    org.springframework: INFO
