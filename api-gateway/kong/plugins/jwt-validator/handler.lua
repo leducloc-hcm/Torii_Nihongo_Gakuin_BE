@@ -15,6 +15,7 @@ local public_paths = {
   ["/auth/reset-password"] = true,
   ["/auth/google"] = true,
   ["/auth/google/callback"] = true,
+  ["/blogs"] = true,
   ["/health"] = true,
   ["/actuator"] = true,
 }
@@ -30,6 +31,17 @@ end
 
 function JwtValidatorHandler:access(conf)
   local path = kong.request.get_path()
+  local method = kong.request.get_method()
+  
+  -- Skip validation for specific HTTP methods if configured
+  if conf.skip_on_methods then
+    for _, skip_method in ipairs(conf.skip_on_methods) do
+      if method == skip_method then
+        kong.log.info("Skipping JWT validation for method: ", method)
+        return
+      end
+    end
+  end
   
   -- Skip validation for public endpoints
   if is_public_endpoint(path) then

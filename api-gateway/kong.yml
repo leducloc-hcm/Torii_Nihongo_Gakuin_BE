@@ -267,9 +267,22 @@ services:
                 - "*"
               credentials: true
               max_age: 3600
+          - name: rate-limiting
+            config:
+              minute: 60
+              hour: 1000
+              policy: redis
+              redis:
+                host: redis
+                port: 6379
+                password: ""
+                database: 0
           - name: jwt-validator
             config:
               secret: "nhatngutorii"
+              skip_on_methods:
+                - GET
+                - OPTIONS
       - name: flashcards-route
         paths:
           - /flashcards
