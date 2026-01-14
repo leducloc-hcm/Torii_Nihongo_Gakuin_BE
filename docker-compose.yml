@@ -185,6 +185,13 @@ services:
       rabbitmq:
         condition: service_healthy
 
+  api-docs:
+    image: nginx:1.27-alpine
+    container_name: torii-api-docs
+    volumes:
+      - ./api-docs/index.html:/usr/share/nginx/html/index.html:ro
+      - ./api-docs/scalar.json:/usr/share/nginx/html/scalar.json:ro
+      - ./api-docs/default.conf:/etc/nginx/conf.d/default.conf:ro
   api-gateway:
     build:
       context: ./api-gateway
@@ -214,6 +221,7 @@ services:
     depends_on:
       - learning-service
       - assessment-service
+      - api-docs
       - redis
     healthcheck:
       test: ["CMD", "kong", "health"]

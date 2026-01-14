@@ -2,6 +2,67 @@ _format_version: "3.0"
 _transform: true
 
 services:
+  # API Docs UI (Scalar)
+  - name: api-docs-ui
+    url: http://api-docs:80
+    routes:
+      - name: docs-route
+        paths:
+          - /docs
+        strip_path: true
+        methods:
+          - GET
+          - OPTIONS
+
+  # OpenAPI specs (stable, gateway-friendly paths)
+  - name: learning-openapi
+    url: http://learning-service:4001/api-docs-json
+    routes:
+      - name: learning-openapi-route
+        paths:
+          - /openapi/learning
+        strip_path: true
+        methods:
+          - GET
+          - OPTIONS
+        plugins:
+          - name: cors
+            config:
+              origins:
+                - "*"
+              methods:
+                - GET
+                - OPTIONS
+              headers:
+                - Accept
+                - Content-Type
+              credentials: true
+              max_age: 3600
+
+  - name: assessment-openapi
+    url: http://assessment-service:4002/v3/api-docs
+    routes:
+      - name: assessment-openapi-route
+        paths:
+          - /openapi/assessment
+        strip_path: true
+        methods:
+          - GET
+          - OPTIONS
+        plugins:
+          - name: cors
+            config:
+              origins:
+                - "*"
+              methods:
+                - GET
+                - OPTIONS
+              headers:
+                - Accept
+                - Content-Type
+              credentials: true
+              max_age: 3600
+
   # Learning Service
   - name: learning-service
     url: http://learning-service:4001

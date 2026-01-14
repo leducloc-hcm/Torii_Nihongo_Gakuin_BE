@@ -35,8 +35,15 @@ async function bootstrap() {
     .setVersion("1.0")
     .addBearerAuth()
     .build();
-  const documentFactory = () => SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup("api-docs", app, documentFactory, {
+
+  // Create a single OpenAPI document (SwaggerModule's auto JSON endpoint must include `info`)
+  const document = SwaggerModule.createDocument(app, config);
+  // Defensive: some plugins can accidentally drop `info`; Scalar requires it.
+  if (!document.info) {
+    document.info = config.info;
+  }
+
+  SwaggerModule.setup("api-docs", app, document, {
     swaggerOptions: {
       persistAuthorization: true,
     },
