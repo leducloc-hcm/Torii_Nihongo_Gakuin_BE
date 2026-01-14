@@ -1,0 +1,27 @@
+{
+  "showDeveloperTools": "never",
+  "theme": "default",
+  "layout": "modern",
+  "authentication": {
+    "preferredSecurityScheme": "bearerAuth"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "API Gateway"
+    }
+  ],
+  "sources": [
+    {
+      "title": "Learning Service (NestJS)",
+      "slug": "learning",
+      "default": true,
+      "url": "http://localhost:8080/openapi/learning"
+    },
+    {
+      "title": "Assessment Service (Spring Boot)",
+      "slug": "assessment",
+      "url": "http://localhost:8080/openapi/assessment"
+    }
+  ]
+}
