@@ -194,22 +194,32 @@ services:
       - .env
       - ./api-gateway/.env
     ports:
-      - "${API_GATEWAY_PORT:-8080}:${API_GATEWAY_PORT:-8080}"
+      - "${API_GATEWAY_PORT:-8000}:8000"
+      - "${API_GATEWAY_ADMIN_PORT:-8001}:8001"
+      - "${API_GATEWAY_SSL_PORT:-8443}:8443"
     environment:
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
-      SERVER_PORT: ${API_GATEWAY_PORT:-8080}
-      GATEWAY_LEARNING_SERVICE_URL: http://learning-service:${LEARNING_SERVICE_PORT:-4001}
-      GATEWAY_ASSESSMENT_SERVICE_URL: http://assessment-service:${ASSESSMENT_SERVICE_PORT:-4002}
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /usr/local/kong/kong.yml
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+      KONG_PROXY_LISTEN: 0.0.0.0:8000
+      KONG_PLUGINS: bundled,jwt-validator
       JWT_SECRET: ${JWT_SECRET:-your-secret-key}
       REDIS_HOST: redis
       REDIS_PORT: ${REDIS_PORT:-6379}
-      REDIS_USERNAME: ${REDIS_USERNAME:-}
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
-      REDIS_DB: ${REDIS_DB:-0}
     depends_on:
       - learning-service
       - assessment-service
       - redis
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   redis_data:
