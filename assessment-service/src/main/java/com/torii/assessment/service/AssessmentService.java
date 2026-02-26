@@ -2,6 +2,7 @@ package com.torii.assessment.service;
 
 import com.torii.assessment.dto.AssessmentDTO;
 import com.torii.assessment.dto.CreateAssessmentDTO;
+import com.torii.assessment.dto.UpdateAssessmentDTO;
 import com.torii.assessment.entity.Assessment;
 import com.torii.assessment.repository.AssessmentRepository;
 import lombok.RequiredArgsConstructor;
@@ -60,14 +61,26 @@ public class AssessmentService {
     }
     
     @Transactional
-    public AssessmentDTO updateAssessment(Long id, CreateAssessmentDTO dto) {
+    public AssessmentDTO updateAssessment(Long id, UpdateAssessmentDTO dto) {
         Assessment assessment = assessmentRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Assessment not found: " + id));
         
-        assessment.setTitle(dto.getTitle());
-        assessment.setLevel(dto.getLevel());
-        assessment.setType(dto.getType());
-        assessment.setVisibility(dto.getVisibility());
+        // Only update non-null fields
+        if (dto.getTitle() != null) {
+            assessment.setTitle(dto.getTitle());
+        }
+        if (dto.getLevel() != null) {
+            assessment.setLevel(dto.getLevel());
+        }
+        if (dto.getType() != null) {
+            assessment.setType(dto.getType());
+        }
+        if (dto.getVisibility() != null) {
+            assessment.setVisibility(dto.getVisibility());
+        }
+        if (dto.getScoreProfileId() != null) {
+            assessment.setScoreProfileId(dto.getScoreProfileId());
+        }
         
         Assessment updated = assessmentRepository.save(assessment);
         log.info("Updated assessment: {}", updated.getId());

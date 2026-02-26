@@ -2,6 +2,7 @@ package com.torii.assessment.controller;
 
 import com.torii.assessment.dto.AssessmentDTO;
 import com.torii.assessment.dto.CreateAssessmentDTO;
+import com.torii.assessment.dto.UpdateAssessmentDTO;
 import com.torii.assessment.service.AssessmentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -17,7 +18,8 @@ import java.util.List;
 public class AssessmentController {
     
     private final AssessmentService assessmentService;
-    
+
+
     @PostMapping
     public ResponseEntity<AssessmentDTO> createAssessment(@Valid @RequestBody CreateAssessmentDTO dto) {
         AssessmentDTO assessment = assessmentService.createAssessment(dto);
@@ -41,7 +43,7 @@ public class AssessmentController {
     @PutMapping("/{id}")
     public ResponseEntity<AssessmentDTO> updateAssessment(
             @PathVariable Long id,
-            @Valid @RequestBody CreateAssessmentDTO dto) {
+            @RequestBody UpdateAssessmentDTO dto) {
         AssessmentDTO assessment = assessmentService.updateAssessment(id, dto);
         return ResponseEntity.ok(assessment);
     }
