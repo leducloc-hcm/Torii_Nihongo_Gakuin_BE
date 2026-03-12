@@ -26,6 +26,9 @@ public class Option {
     @Column(name = "media_id")
     private Long mediaId;
 
+    @Column(name = "media_url", length = 500)
+    private String mediaUrl;
+
     @Column(name = "is_correct")
     @Builder.Default
     private Boolean isCorrect = false;

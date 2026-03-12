@@ -15,7 +15,9 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -26,9 +28,28 @@ public class QuestionService {
 
     private final QuestionRepository questionRepository;
     private final OptionRepository optionRepository;
+    private final S3Service s3Service;
 
     @Transactional
-    public QuestionResponseDTO createQuestion(CreateQuestionDTO dto) {
+    public QuestionResponseDTO createQuestion(CreateQuestionDTO dto, MultipartFile image, MultipartFile audio) {
+        // Upload files to S3 if provided
+        String mediaUrl = null;
+        try {
+            if (image != null && !image.isEmpty()) {
+                mediaUrl = s3Service.uploadFile(image, "questions/images");
+                log.info("Uploaded image: {}", mediaUrl);
+            } else if (audio != null && !audio.isEmpty()) {
+                mediaUrl = s3Service.uploadFile(audio, "questions/audio");
+                log.info("Uploaded audio: {}", mediaUrl);
+            }
+        } catch (IOException e) {
+            log.error("Error uploading file: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to upload file", e);
+        }
+
+        // Use uploaded URL or provided mediaId
+        String finalMediaUrl = mediaUrl;
+
         // Validate options
         if (dto.getOptions() != null && !dto.getOptions().isEmpty()) {
             long correctCount = dto.getOptions().stream()
@@ -46,6 +67,7 @@ public class QuestionService {
             .stem(dto.getStem())
             .passage(dto.getPassage())
             .mediaId(dto.getMediaId())
+            .mediaUrl(finalMediaUrl)
             .explanation(dto.getExplanation())
             .readingLength(dto.getReadingLength())
             .build();
@@ -119,9 +141,40 @@ public class QuestionService {
     }
 
     @Transactional
-    public QuestionResponseDTO updateQuestion(Long id, UpdateQuestionDTO dto) {
+    public QuestionResponseDTO updateQuestion(Long id, UpdateQuestionDTO dto, MultipartFile image, MultipartFile audio) {
         Question question = questionRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Question not found: " + id));
+
+        // Upload new files if provided
+        String newMediaUrl = null;
+        try {
+            if (image != null && !image.isEmpty()) {
+                // Delete old media if exists
+                if (question.getMediaUrl() != null && !question.getMediaUrl().isEmpty()) {
+                    try {
+                        s3Service.deleteFile(question.getMediaUrl());
+                    } catch (Exception e) {
+                        log.warn("Failed to delete old media: {}", e.getMessage());
+                    }
+                }
+                newMediaUrl = s3Service.uploadFile(image, "questions/images");
+                log.info("Uploaded new image: {}", newMediaUrl);
+            } else if (audio != null && !audio.isEmpty()) {
+                // Delete old media if exists
+                if (question.getMediaUrl() != null && !question.getMediaUrl().isEmpty()) {
+                    try {
+                        s3Service.deleteFile(question.getMediaUrl());
+                    } catch (Exception e) {
+                        log.warn("Failed to delete old media: {}", e.getMessage());
+                    }
+                }
+                newMediaUrl = s3Service.uploadFile(audio, "questions/audio");
+                log.info("Uploaded new audio: {}", newMediaUrl);
+            }
+        } catch (IOException e) {
+            log.error("Error uploading file: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to upload file", e);
+        }
 
         // Update fields if provided
         if (dto.getType() != null) question.setType(dto.getType());
@@ -129,7 +182,12 @@ public class QuestionService {
         if (dto.getDifficulty() != null) question.setDifficulty(dto.getDifficulty());
         if (dto.getStem() != null) question.setStem(dto.getStem());
         if (dto.getPassage() != null) question.setPassage(dto.getPassage());
-        if (dto.getMediaId() != null) question.setMediaId(dto.getMediaId());
+        if (newMediaUrl != null) {
+            question.setMediaUrl(newMediaUrl);
+        }
+        if (dto.getMediaId() != null) {
+            question.setMediaId(dto.getMediaId());
+        }
         if (dto.getExplanation() != null) question.setExplanation(dto.getExplanation());
         if (dto.getReadingLength() != null) question.setReadingLength(dto.getReadingLength());
 
@@ -208,7 +266,7 @@ public class QuestionService {
     public List<QuestionResponseDTO> bulkCreateQuestions(BulkCreateQuestionsDTO dto) {
         List<QuestionResponseDTO> results = new ArrayList<>();
         for (CreateQuestionDTO questionDto : dto.getQuestions()) {
-            results.add(createQuestion(questionDto));
+            results.add(createQuestion(questionDto, null, null));
         }
         return results;
     }
@@ -266,6 +324,7 @@ public class QuestionService {
             .stem(modifications.getStem() != null ? modifications.getStem() : original.getStem())
             .passage(modifications.getPassage() != null ? modifications.getPassage() : original.getPassage())
             .mediaId(modifications.getMediaId() != null ? modifications.getMediaId() : original.getMediaId())
+            .mediaUrl(original.getMediaUrl())
             .explanation(modifications.getExplanation() != null ? modifications.getExplanation() : original.getExplanation())
             .readingLength(modifications.getReadingLength() != null ? modifications.getReadingLength() : original.getReadingLength())
             .build();
@@ -350,9 +409,15 @@ public class QuestionService {
             }
             if (queryDto.getHasMedia() != null) {
                 if (queryDto.getHasMedia()) {
-                    predicates.add(cb.isNotNull(root.get("mediaId")));
+                    predicates.add(cb.or(
+                        cb.isNotNull(root.get("mediaId")),
+                        cb.isNotNull(root.get("mediaUrl"))
+                    ));
                 } else {
-                    predicates.add(cb.isNull(root.get("mediaId")));
+                    predicates.add(cb.and(
+                        cb.isNull(root.get("mediaId")),
+                        cb.isNull(root.get("mediaUrl"))
+                    ));
                 }
             }
 
@@ -370,6 +435,7 @@ public class QuestionService {
                 .isCorrect(opt.getIsCorrect())
                 .order(opt.getOrder())
                 .mediaId(opt.getMediaId())
+                .mediaUrl(opt.getMediaUrl())
                 .build())
             .collect(Collectors.toList());
 
@@ -387,6 +453,7 @@ public class QuestionService {
             .stem(question.getStem())
             .passage(question.getPassage())
             .mediaId(question.getMediaId())
+            .mediaUrl(question.getMediaUrl())
             .explanation(question.getExplanation())
             .readingLength(question.getReadingLength())
             .createdAt(question.getCreatedAt())
@@ -394,7 +461,7 @@ public class QuestionService {
             .options(optionDTOs)
             .optionsCount(options.size())
             .correctOptionsCount((int) correctCount)
-            .hasMedia(question.getMediaId() != null)
+            .hasMedia(question.getMediaId() != null || question.getMediaUrl() != null)
             .build();
     }
 }

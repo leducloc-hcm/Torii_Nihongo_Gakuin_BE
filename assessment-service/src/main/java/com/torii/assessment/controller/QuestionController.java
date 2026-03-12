@@ -9,7 +9,9 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
@@ -22,10 +24,13 @@ public class QuestionController {
 
     private final QuestionService questionService;
 
-    @PostMapping
-    @Operation(summary = "Create a new question")
-    public ResponseEntity<QuestionResponseDTO> createQuestion(@Valid @RequestBody CreateQuestionDTO dto) {
-        QuestionResponseDTO question = questionService.createQuestion(dto);
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Create a new question with optional image and audio files")
+    public ResponseEntity<QuestionResponseDTO> createQuestion(
+            @ModelAttribute @Valid CreateQuestionDTO dto,
+            @RequestPart(value = "image", required = false) MultipartFile image,
+            @RequestPart(value = "audio", required = false) MultipartFile audio) {
+        QuestionResponseDTO question = questionService.createQuestion(dto, image, audio);
         return ResponseEntity.status(HttpStatus.CREATED).body(question);
     }
 
@@ -141,12 +146,14 @@ public class QuestionController {
         return ResponseEntity.ok(question);
     }
 
-    @PutMapping("/{id}")
-    @Operation(summary = "Update a question")
+    @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Update a question with optional image and audio files")
     public ResponseEntity<QuestionResponseDTO> updateQuestion(
             @PathVariable Long id,
-            @Valid @RequestBody UpdateQuestionDTO dto) {
-        QuestionResponseDTO question = questionService.updateQuestion(id, dto);
+            @ModelAttribute @Valid UpdateQuestionDTO dto,
+            @RequestPart(value = "image", required = false) MultipartFile image,
+            @RequestPart(value = "audio", required = false) MultipartFile audio) {
+        QuestionResponseDTO question = questionService.updateQuestion(id, dto, image, audio);
         return ResponseEntity.ok(question);
     }
 

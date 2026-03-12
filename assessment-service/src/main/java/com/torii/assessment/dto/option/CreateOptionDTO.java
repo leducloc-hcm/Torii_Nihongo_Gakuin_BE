@@ -25,5 +25,7 @@ public class CreateOptionDTO {
     private Integer order = 0;
 
     private Long mediaId;
+
+    private String mediaUrl;
 }
 

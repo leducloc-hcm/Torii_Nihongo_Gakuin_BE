@@ -13,7 +13,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -24,12 +26,25 @@ public class OptionService {
 
     private final OptionRepository optionRepository;
     private final QuestionRepository questionRepository;
+    private final S3Service s3Service;
 
     @Transactional
-    public OptionResponseDTO createOption(Long questionId, CreateOptionDTO dto) {
+    public OptionResponseDTO createOption(Long questionId, CreateOptionDTO dto, MultipartFile image) {
         // Validate question exists
         Question question = questionRepository.findById(questionId)
             .orElseThrow(() -> new RuntimeException("Question not found: " + questionId));
+
+        // Upload image to S3 if provided
+        String mediaUrl = null;
+        try {
+            if (image != null && !image.isEmpty()) {
+                mediaUrl = s3Service.uploadFile(image, "options/images");
+                log.info("Uploaded option image: {}", mediaUrl);
+            }
+        } catch (IOException e) {
+            log.error("Error uploading option image: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to upload option image", e);
+        }
 
         // Get next order if not provided
         int order = dto.getOrder() != null ? dto.getOrder() :
@@ -41,6 +56,7 @@ public class OptionService {
             .isCorrect(dto.getIsCorrect() != null ? dto.getIsCorrect() : false)
             .order(order)
             .mediaId(dto.getMediaId())
+            .mediaUrl(mediaUrl)
             .build();
 
         Option saved = optionRepository.save(option);
@@ -94,7 +110,7 @@ public class OptionService {
     }
 
     @Transactional
-    public OptionResponseDTO updateOption(Long id, UpdateOptionDTO dto) {
+    public OptionResponseDTO updateOption(Long id, UpdateOptionDTO dto, MultipartFile image) {
         Option option = optionRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Option not found: " + id));
 
@@ -103,6 +119,18 @@ public class OptionService {
             long correctCount = optionRepository.countByQuestionIdAndIsCorrectTrue(option.getQuestionId());
             if (correctCount <= 1) {
                 throw new IllegalArgumentException("Cannot set option to incorrect. At least one correct option must remain.");
+            }
+        }
+
+        // Upload new image if provided
+        if (image != null && !image.isEmpty()) {
+            try {
+                String mediaUrl = s3Service.uploadFile(image, "options/images");
+                option.setMediaUrl(mediaUrl);
+                log.info("Uploaded updated option image: {}", mediaUrl);
+            } catch (IOException e) {
+                log.error("Error uploading option image: {}", e.getMessage(), e);
+                throw new RuntimeException("Failed to upload option image", e);
             }
         }
 
@@ -265,6 +293,7 @@ public class OptionService {
             .isCorrect(option.getIsCorrect())
             .order(option.getOrder())
             .mediaId(option.getMediaId())
+            .mediaUrl(option.getMediaUrl())
             .question(questionDTO)
             .build();
     }

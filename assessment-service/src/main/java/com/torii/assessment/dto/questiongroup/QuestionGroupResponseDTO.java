@@ -22,6 +22,8 @@ public class QuestionGroupResponseDTO {
     private String title;
     private String passage;
     private Long mediaId;
+    private String mediaUrl;
+    private String audioUrl;
     private Integer order;
     private Map<String, Object> metadata;
     private LocalDateTime createdAt;

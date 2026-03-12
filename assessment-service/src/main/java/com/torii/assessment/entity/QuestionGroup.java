@@ -5,6 +5,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -41,9 +43,16 @@ public class QuestionGroup {
     @Column(name = "media_id")
     private Long mediaId;
 
+    @Column(name = "media_url", length = 500)
+    private String mediaUrl;
+
+    @Column(name = "audio_url", length = 500)
+    private String audioUrl;
+
     @Column(name = "\"order\"")
     private Integer order;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "metadata", columnDefinition = "jsonb")
     private String metadata;
 

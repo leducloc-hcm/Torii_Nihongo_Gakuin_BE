@@ -16,6 +16,7 @@ public class OptionResponseDTO {
     private Boolean isCorrect;
     private Integer order;
     private Long mediaId;
+    private String mediaUrl;
     private QuestionDTO question;
 
     @Data

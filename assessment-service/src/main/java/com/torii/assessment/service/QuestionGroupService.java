@@ -10,6 +10,8 @@ import com.torii.assessment.repository.QuestionRepository;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.web.multipart.MultipartFile;
+import java.io.IOException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -29,14 +31,27 @@ public class QuestionGroupService {
     private final QuestionGroupRepository questionGroupRepository;
     private final QuestionGroupQuestionRepository questionGroupQuestionRepository;
     private final QuestionRepository questionRepository;
+    private final S3Service s3Service;
 
     @Transactional
-    public QuestionGroupResponseDTO createQuestionGroup(CreateQuestionGroupDTO dto) {
+    public QuestionGroupResponseDTO createQuestionGroup(CreateQuestionGroupDTO dto, MultipartFile image, MultipartFile audio) throws IOException {
+        String mediaUrl = dto.getMediaUrl();
+        if (image != null && !image.isEmpty()) {
+            mediaUrl = s3Service.uploadFile(image, "question-groups/images");
+        }
+
+        String audioUrl = dto.getAudioUrl();
+        if (audio != null && !audio.isEmpty()) {
+            audioUrl = s3Service.uploadFile(audio, "question-groups/audio");
+        }
+
         QuestionGroup group = QuestionGroup.builder()
             .type(dto.getType())
             .title(dto.getTitle())
             .passage(dto.getPassage())
             .mediaId(dto.getMediaId())
+            .mediaUrl(mediaUrl)
+            .audioUrl(audioUrl)
             .order(dto.getOrder())
             .metadata(dto.getMetadata() != null ? dto.getMetadata().toString() : null)
             .build();
@@ -69,16 +84,16 @@ public class QuestionGroupService {
             .map(this::mapToResponseDTO)
             .collect(Collectors.toList());
 
-        Map<String, Object> result = new HashMap<>();
-        result.put("data", data);
-
-        Map<String, Object> pagination = new HashMap<>();
+        Map<String, Object> pagination = new LinkedHashMap<>();
         pagination.put("total", groupPage.getTotalElements());
         pagination.put("page", page);
         pagination.put("limit", limit);
         pagination.put("totalPages", groupPage.getTotalPages());
         pagination.put("hasNext", groupPage.hasNext());
         pagination.put("hasPrev", groupPage.hasPrevious());
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("data", data);
         result.put("pagination", pagination);
 
         return result;
@@ -91,9 +106,23 @@ public class QuestionGroupService {
     }
 
     @Transactional
-    public QuestionGroupResponseDTO updateQuestionGroup(Long id, UpdateQuestionGroupDTO dto) {
+    public QuestionGroupResponseDTO updateQuestionGroup(Long id, UpdateQuestionGroupDTO dto, MultipartFile image, MultipartFile audio) throws IOException {
         QuestionGroup group = questionGroupRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Question Group not found: " + id));
+
+        if (image != null && !image.isEmpty()) {
+            String uploadedUrl = s3Service.uploadFile(image, "question-groups/images");
+            group.setMediaUrl(uploadedUrl);
+        } else if (dto.getMediaUrl() != null) {
+            group.setMediaUrl(dto.getMediaUrl());
+        }
+
+        if (audio != null && !audio.isEmpty()) {
+            String uploadedAudioUrl = s3Service.uploadFile(audio, "question-groups/audio");
+            group.setAudioUrl(uploadedAudioUrl);
+        } else if (dto.getAudioUrl() != null) {
+            group.setAudioUrl(dto.getAudioUrl());
+        }
 
         if (dto.getType() != null) group.setType(dto.getType());
         if (dto.getTitle() != null) group.setTitle(dto.getTitle());
@@ -381,11 +410,13 @@ public class QuestionGroupService {
             .title(group.getTitle())
             .passage(group.getPassage())
             .mediaId(group.getMediaId())
+            .mediaUrl(group.getMediaUrl())
+            .audioUrl(group.getAudioUrl())
             .order(group.getOrder())
             .createdAt(group.getCreatedAt())
             .questions(questionDTOs)
             .questionsCount(questionDTOs.size())
-            .hasMedia(group.getMediaId() != null)
+            .hasMedia(group.getMediaId() != null || group.getMediaUrl() != null)
             .hasPassage(group.getPassage() != null && !group.getPassage().isEmpty())
             .build();
     }

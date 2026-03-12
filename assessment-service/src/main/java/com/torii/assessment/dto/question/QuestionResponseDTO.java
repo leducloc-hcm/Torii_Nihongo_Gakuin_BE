@@ -23,6 +23,7 @@ public class QuestionResponseDTO {
     private String stem;
     private String passage;
     private Long mediaId;
+    private String mediaUrl;
     private String explanation;
     private Question.ReadingLength readingLength;
     private LocalDateTime createdAt;
@@ -43,6 +44,7 @@ public class QuestionResponseDTO {
         private Boolean isCorrect;
         private Integer order;
         private Long mediaId;
+        private String mediaUrl;
     }
 
     @Data

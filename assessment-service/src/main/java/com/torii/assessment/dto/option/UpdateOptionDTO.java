@@ -21,5 +21,7 @@ public class UpdateOptionDTO {
     private Integer order;
 
     private Long mediaId;
+
+    private String mediaUrl;
 }
 

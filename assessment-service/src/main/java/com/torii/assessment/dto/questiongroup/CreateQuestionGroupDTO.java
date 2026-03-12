@@ -28,6 +28,10 @@ public class CreateQuestionGroupDTO {
 
     private Long mediaId;
 
+    private String mediaUrl;
+
+    private String audioUrl;
+
     @Min(value = 0, message = "Order must be non-negative")
     private Integer order;
 

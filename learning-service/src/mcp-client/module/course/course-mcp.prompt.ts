@@ -1,67 +1,74 @@
-import { Injectable, Logger } from '@nestjs/common'
-import { CORE_BEHAVIOR_PROMPT } from 'src/mcp-client/prompts/core-behavior.prompt'
-import { getLanguageDetectionPrompt } from 'src/mcp-client/prompts/language-detection.prompt'
-import { META_CONTEXT_PROMPT } from 'src/mcp-client/prompts/meta-context.prompt'
-import { detectLanguage, Language } from 'src/mcp-client/shared/language.utils'
-import { QueryType } from 'src/mcp-client/shared/query-detection.utils'
-import { getCoursePrompt } from './course-specific.prompt'
-import { getEnrollmentPrompt } from '../enrollment/enrollment-mcp.prompt'
-import { getFlashcardPrompt } from '../flashcard/flashcard-mcp.prompt'
-import { BLOG_MCP_SYSTEM_PROMPT } from '../blog/blog-mcp.prompt'
-import { getAssessmentHistoryPrompt } from '../assessment_history/history-mcp.prompt'
+import { Injectable, Logger } from "@nestjs/common";
+import { CORE_BEHAVIOR_PROMPT } from "src/mcp-client/prompts/core-behavior.prompt";
+import { getLanguageDetectionPrompt } from "src/mcp-client/prompts/language-detection.prompt";
+import { META_CONTEXT_PROMPT } from "src/mcp-client/prompts/meta-context.prompt";
+import { detectLanguage, Language } from "src/mcp-client/shared/language.utils";
+import { QueryType } from "src/mcp-client/shared/query-detection.utils";
+import { getCoursePrompt } from "./course-specific.prompt";
+import { getEnrollmentPrompt } from "../enrollment/enrollment-mcp.prompt";
+import { getFlashcardPrompt } from "../flashcard/flashcard-mcp.prompt";
+import { BLOG_MCP_SYSTEM_PROMPT } from "../blog/blog-mcp.prompt";
+import { getAssessmentHistoryPrompt } from "../assessment_history/history-mcp.prompt";
 
 @Injectable()
 export class PromptService {
-  private readonly logger = new Logger(PromptService.name)
+  private readonly logger = new Logger(PromptService.name);
 
-  getSystemPrompt(queryType: QueryType, userName?: string, userQuery?: string, userId?: number): string {
-    const greeting = userName ? `Hello ${userName}!` : 'Hello!'
+  getSystemPrompt(
+    queryType: QueryType,
+    userName?: string,
+    userQuery?: string,
+    userId?: number,
+  ): string {
+    const greeting = userName ? `Hello ${userName}!` : "Hello!";
 
     // Detect language from user query if provided
-    let detectedLang = Language.ENGLISH
+    let detectedLang = Language.ENGLISH;
     if (userQuery) {
-      detectedLang = detectLanguage(userQuery)
-      this.logger.debug(`Detected language: ${detectedLang} for query: ${userQuery.substring(0, 50)}...`)
+      detectedLang = detectLanguage(userQuery);
+      this.logger.debug(
+        `Detected language: ${detectedLang} for query: ${userQuery.substring(0, 50)}...`,
+      );
     }
 
     if (userId) {
-      this.logger.debug(`System prompt generated with userId: ${userId}`)
+      this.logger.debug(`System prompt generated with userId: ${userId}`);
     }
 
     // Compose system prompt from reusable templates
     const basePrompt =
       `${greeting}\n\n` +
       META_CONTEXT_PROMPT +
-      '\n\n' +
+      "\n\n" +
       getLanguageDetectionPrompt(detectedLang) +
-      '\n\n' +
+      "\n\n" +
       CORE_BEHAVIOR_PROMPT +
-      '\n\n'
+      "\n\n";
 
-    const typeSpecificPrompt = this.getTypeSpecificPrompt(queryType, userId)
+    const typeSpecificPrompt = this.getTypeSpecificPrompt(queryType, userId);
 
-    return basePrompt + typeSpecificPrompt
+    return basePrompt + typeSpecificPrompt;
   }
 
   private getTypeSpecificPrompt(queryType: QueryType, userId?: number): string {
     // Try to get prompt from specific modules first
-    const coursePrompt = getCoursePrompt(queryType)
-    if (coursePrompt) return coursePrompt
+    const coursePrompt = getCoursePrompt(queryType);
+    if (coursePrompt) return coursePrompt;
 
-    const enrollmentPrompt = getEnrollmentPrompt(queryType, userId)
-    if (enrollmentPrompt) return enrollmentPrompt
+    const enrollmentPrompt = getEnrollmentPrompt(queryType, userId);
+    if (enrollmentPrompt) return enrollmentPrompt;
 
-    const flashcardPrompt = getFlashcardPrompt(queryType, userId)
-    if (flashcardPrompt) return flashcardPrompt
+    const flashcardPrompt = getFlashcardPrompt(queryType, userId);
+    if (flashcardPrompt) return flashcardPrompt;
 
     // Check for assessment history query
     if (queryType === QueryType.ASSESSMENT_HISTORY) {
-      return getAssessmentHistoryPrompt(userId)
+      return getAssessmentHistoryPrompt(QueryType.ASSESSMENT_HISTORY, userId);
     }
 
     // Check for blog query
     if (queryType === QueryType.BLOG) {
-      return BLOG_MCP_SYSTEM_PROMPT
+      return BLOG_MCP_SYSTEM_PROMPT;
     }
 
     // Default to general assistance
@@ -70,26 +77,32 @@ export class PromptService {
 - Provide study tips and learning strategies
 - Explain JLPT structure and requirements
 - Guide students through platform features
-- Use appropriate tools based on the question context`
+- Use appropriate tools based on the question context`;
   }
 
   getUserMessagePrompt(query: string, queryType: QueryType): string {
-    return `User Query (Type: ${queryType}): ${query}`
+    return `User Query (Type: ${queryType}): ${query}`;
   }
 
   getToolApprovalPrompt(toolCalls: any[]): string {
-    const toolsList = toolCalls.map((tc, idx) => `${idx + 1}. ${tc.name}(${JSON.stringify(tc.arguments)})`).join('\n')
+    const toolsList = toolCalls
+      .map(
+        (tc, idx) => `${idx + 1}. ${tc.name}(${JSON.stringify(tc.arguments)})`,
+      )
+      .join("\n");
 
-    return `I need to use the following tools to answer your question:\n${toolsList}\n\nWould you like me to proceed?`
+    return `I need to use the following tools to answer your question:\n${toolsList}\n\nWould you like me to proceed?`;
   }
 
   getFinalResponsePrompt(toolResults: any[], queryType?: QueryType): string {
     const resultsText = toolResults
       .map((result) => {
-        const data = result.error ? `Error: ${result.error}` : JSON.stringify(result.result, null, 2)
-        return `Tool: ${result.toolName}\nResult: ${data}`
+        const data = result.error
+          ? `Error: ${result.error}`
+          : JSON.stringify(result.result, null, 2);
+        return `Tool: ${result.toolName}\nResult: ${data}`;
       })
-      .join('\n\n')
+      .join("\n\n");
 
     // Special handling for COURSE queries - use JSON format
     if (queryType === QueryType.COURSE) {
@@ -155,7 +168,7 @@ ${resultsText}
    
    Bạn muốn xem chi tiết khóa nào?"
 
-The frontend will automatically render beautiful course cards from this JSON data.`
+The frontend will automatically render beautiful course cards from this JSON data.`;
     }
 
     // Special handling for BLOG queries - use JSON format
@@ -177,7 +190,7 @@ ${resultsText}
 3. **Include Complete Data** for each blog:
    - id, title, slug, date, image, excerpt, tags
 
-The frontend will automatically render beautiful blog cards from this JSON data.`
+The frontend will automatically render beautiful blog cards from this JSON data.`;
     }
 
     // Default format for other query types
@@ -201,6 +214,6 @@ Instructions:
 6. If any tool returned an error, acknowledge it gracefully in the appropriate language
 7. When mentioning missing courses/data, use proper perspective
 8. End with helpful next steps or suggestions in the user's language
-9. Keep the tone friendly and encouraging`
+9. Keep the tone friendly and encouraging`;
   }
 }

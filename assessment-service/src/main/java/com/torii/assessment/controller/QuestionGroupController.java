@@ -8,9 +8,12 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
@@ -22,10 +25,13 @@ public class QuestionGroupController {
 
     private final QuestionGroupService questionGroupService;
 
-    @PostMapping
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Create a new question group")
-    public ResponseEntity<QuestionGroupResponseDTO> createQuestionGroup(@Valid @RequestBody CreateQuestionGroupDTO dto) {
-        QuestionGroupResponseDTO group = questionGroupService.createQuestionGroup(dto);
+    public ResponseEntity<QuestionGroupResponseDTO> createQuestionGroup(
+            @ModelAttribute @Valid CreateQuestionGroupDTO dto,
+            @RequestPart(value = "audio", required = false) MultipartFile audio,
+            @RequestPart(value = "image", required = false) MultipartFile image) throws IOException {
+        QuestionGroupResponseDTO group = questionGroupService.createQuestionGroup(dto, image, audio);
         return ResponseEntity.status(HttpStatus.CREATED).body(group);
     }
 
@@ -97,12 +103,14 @@ public class QuestionGroupController {
         return ResponseEntity.ok(result);
     }
 
-    @PutMapping("/{id}")
+    @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Update a question group")
     public ResponseEntity<QuestionGroupResponseDTO> updateQuestionGroup(
             @PathVariable Long id,
-            @Valid @RequestBody UpdateQuestionGroupDTO dto) {
-        QuestionGroupResponseDTO group = questionGroupService.updateQuestionGroup(id, dto);
+            @ModelAttribute @Valid UpdateQuestionGroupDTO dto,
+            @RequestPart(value = "audio", required = false) MultipartFile audio,
+            @RequestPart(value = "image", required = false) MultipartFile image) throws IOException {
+        QuestionGroupResponseDTO group = questionGroupService.updateQuestionGroup(id, dto, image, audio);
         return ResponseEntity.ok(group);
     }
 

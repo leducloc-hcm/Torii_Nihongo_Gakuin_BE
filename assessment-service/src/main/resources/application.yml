@@ -1,11 +1,11 @@
 spring:
   application:
     name: assessment-service
-  
+
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://aws-1-ap-northeast-2.pooler.supabase.com:6543/postgres?currentSchema=assessment&prepareThreshold=0}
-    username: ${SPRING_DATASOURCE_USERNAME:postgres.rkizlomnljifkbdimrup}
-    password: ${SPRING_DATASOURCE_PASSWORD:nhatngutorii}
+    url: jdbc:postgresql://torii-nihongo.cd48o48cgxzd.ap-southeast-1.rds.amazonaws.com:5432/postgres?currentSchema=assessment&ssl=true&sslmode=require
+    username: postgres
+    password: nhatngutorii
     driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:org.postgresql.Driver}
     hikari:
       maximum-pool-size: ${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE:2}
@@ -23,13 +23,14 @@ spring:
         format_sql: ${SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL:true}
         # Disable strict type checking for DECIMAL/NUMERIC compatibility
         physical_naming_strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
-  
+
   flyway:
-    enabled: ${SPRING_FLYWAY_ENABLED:false}
-    schemas: ${SPRING_FLYWAY_SCHEMAS:assessment}
-    locations: ${SPRING_FLYWAY_LOCATIONS:classpath:db/migration}
-    baseline-on-migrate: ${SPRING_FLYWAY_BASELINE_ON_MIGRATE:true}
-  
+    enabled: true
+    schemas: assessment
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    clean-disabled: false
+
   data:
     redis:
       host: ${SPRING_REDIS_HOST:localhost}
@@ -38,7 +39,7 @@ spring:
       password: ${SPRING_REDIS_PASSWORD:}
       database: ${SPRING_REDIS_DB:0}
       timeout: ${SPRING_REDIS_TIMEOUT:2000ms}
-  
+
   rabbitmq:
     host: ${SPRING_RABBITMQ_HOST:localhost}
     port: ${SPRING_RABBITMQ_PORT:5672}
@@ -52,8 +53,22 @@ spring:
           enabled: ${SPRING_RABBITMQ_LISTENER_SIMPLE_RETRY_ENABLED:true}
           max-attempts: ${SPRING_RABBITMQ_LISTENER_SIMPLE_RETRY_MAX_ATTEMPTS:3}
 
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: ${SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE:100MB}
+      max-request-size: ${SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE:100MB}
+
 server:
   port: ${SERVER_PORT:4002}
+
+# AWS S3 Configuration
+aws:
+  access-key-id: ${AWS_ACCESS_KEY_ID:}
+  secret-access-key: ${AWS_SECRET_ACCESS_KEY:}
+  region: ${AWS_REGION:ap-southeast-1}
+  s3:
+    bucket-name: ${AWS_S3_BUCKET_NAME:torii-assessment-bucket}
 
 springdoc:
   api-docs:

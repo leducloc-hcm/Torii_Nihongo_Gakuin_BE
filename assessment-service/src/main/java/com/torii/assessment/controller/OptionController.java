@@ -7,8 +7,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
@@ -20,12 +22,13 @@ public class OptionController {
 
     private final OptionService optionService;
 
-    @PostMapping("/questions/{questionId}/options")
-    @Operation(summary = "Create a new option for a question")
+    @PostMapping(value = "/questions/{questionId}/options", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Create a new option with optional image")
     public ResponseEntity<OptionResponseDTO> createOption(
             @PathVariable Long questionId,
-            @Valid @RequestBody CreateOptionDTO dto) {
-        OptionResponseDTO option = optionService.createOption(questionId, dto);
+            @ModelAttribute @Valid CreateOptionDTO dto,
+            @RequestPart(value = "image", required = false) MultipartFile image) {
+        OptionResponseDTO option = optionService.createOption(questionId, dto, image);
         return ResponseEntity.status(HttpStatus.CREATED).body(option);
     }
 
@@ -90,12 +93,13 @@ public class OptionController {
         return ResponseEntity.ok(option);
     }
 
-    @PutMapping("/options/{id}")
-    @Operation(summary = "Update an option")
+    @PutMapping(value = "/options/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Update an option with optional image")
     public ResponseEntity<OptionResponseDTO> updateOption(
             @PathVariable Long id,
-            @Valid @RequestBody UpdateOptionDTO dto) {
-        OptionResponseDTO option = optionService.updateOption(id, dto);
+            @ModelAttribute @Valid UpdateOptionDTO dto,
+            @RequestPart(value = "image", required = false) MultipartFile image) {
+        OptionResponseDTO option = optionService.updateOption(id, dto, image);
         return ResponseEntity.ok(option);
     }
 

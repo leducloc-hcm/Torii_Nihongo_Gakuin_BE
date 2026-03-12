@@ -1,0 +1,23 @@
+package com.torii.assessment.repository;
+
+import com.torii.assessment.entity.AssessmentItem;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+
+@Repository
+public interface AssessmentItemRepository extends JpaRepository<AssessmentItem, Long> {
+
+    List<AssessmentItem> findBySectionIdOrderByOrderAsc(Long sectionId);
+
+    @Query(value = "SELECT question_id FROM assessment.item_questions WHERE item_id = :itemId ORDER BY \"order\" ASC",
+            nativeQuery = true)
+    List<Long> findQuestionIdsByItemId(@Param("itemId") Long itemId);
+
+    @Query(value = "SELECT group_id FROM assessment.item_groups WHERE item_id = :itemId ORDER BY \"order\" ASC",
+            nativeQuery = true)
+    List<Long> findGroupIdsByItemId(@Param("itemId") Long itemId);
+}

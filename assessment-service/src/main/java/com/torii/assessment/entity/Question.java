@@ -50,6 +50,9 @@ public class Question {
     @Column(name = "media_id")
     private Long mediaId;
 
+    @Column(name = "media_url", length = 500)
+    private String mediaUrl;
+
     @Column(name = "explanation", length = 2000)
     private String explanation;
 
