@@ -1,0 +1,9 @@
+ALTER TABLE assessment.items
+ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+
+UPDATE assessment.items
+SET created_at = CURRENT_TIMESTAMP
+WHERE created_at IS NULL;
+
+ALTER TABLE assessment.items
+ALTER COLUMN created_at SET NOT NULL;

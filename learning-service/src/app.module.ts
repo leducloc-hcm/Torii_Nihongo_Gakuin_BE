@@ -25,7 +25,7 @@ import { AIChatModule } from "./routes/ai-chat/ai-chat.module";
 import { CouponModule } from "./routes/coupon/coupon.module";
 import { DashboardModule } from "./routes/dashboard/dashboard.module";
 import { RedisModule } from "./shared/redis/redis.module";
-// import { RabbitMQModule } from "./shared/rabbitmq/rabbitmq.module";
+import { RabbitMQModule } from "./shared/rabbitmq/rabbitmq.module";
 
 @Module({
   imports: [
@@ -49,7 +49,7 @@ import { RedisModule } from "./shared/redis/redis.module";
     }),
     SharedModule,
     RedisModule,
-    // RabbitMQModule,
+    RabbitMQModule,
     AuthModule,
     TagModule,
     BlogModule,

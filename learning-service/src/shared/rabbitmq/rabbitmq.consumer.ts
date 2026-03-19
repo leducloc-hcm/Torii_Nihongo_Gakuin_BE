@@ -1,11 +1,19 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { RabbitMQService } from "./rabbitmq.service";
+import { SepayService } from "src/routes/payment/sepay.service";
+import { EnrollmentService } from "src/routes/enrollment/enrollment.service";
+import { PrismaService } from "src/shared/services/prisma.service";
 
 @Injectable()
 export class RabbitMQConsumer implements OnModuleInit {
   private readonly logger = new Logger(RabbitMQConsumer.name);
 
-  constructor(private rabbitmqService: RabbitMQService) {}
+  constructor(
+    private rabbitmqService: RabbitMQService,
+    private sepayService: SepayService,
+    private enrollmentService: EnrollmentService,
+    private prisma: PrismaService,
+  ) {}
 
   async onModuleInit() {
     // Wait for RabbitMQ service to be ready
@@ -37,6 +45,13 @@ export class RabbitMQConsumer implements OnModuleInit {
 
     // Consume attempt.graded events from assessment-service
     await this.consumeAttemptGraded(channel, exchangeName);
+
+    // Consume payment.sepay.webhook events from assessment-service
+    await this.consumeSepayWebhook(channel, exchangeName);
+
+    // Consume enrollment/class commands (assessment-service orchestrates)
+    await this.consumeEnrollmentCreate(channel, exchangeName);
+    await this.consumeClassMemberCreate(channel, exchangeName);
   }
 
   private async consumeAttemptGraded(channel: any, exchangeName: string) {
@@ -73,5 +88,132 @@ export class RabbitMQConsumer implements OnModuleInit {
     // 3. Send notifications
     // 4. Update score profiles
     this.logger.debug("Handling attempt.graded event:", event);
+  }
+
+  private async consumeSepayWebhook(channel: any, exchangeName: string) {
+    const queueName = "learning.payment.sepay.webhook";
+    const routingKey = "payment.sepay.webhook";
+
+    await channel.assertQueue(queueName, { durable: true });
+    await channel.bindQueue(queueName, exchangeName, routingKey);
+
+    await channel.consume(queueName, async (msg: any) => {
+      if (msg) {
+        try {
+          const event = JSON.parse(msg.content.toString());
+          this.logger.log(`Received ${routingKey} event:`, event);
+
+          // We accept both shapes:
+          // - { type, payload: <webhookData>, timestamp }
+          // - <webhookData> (raw)
+          const webhookData = event?.payload ?? event;
+
+          await this.sepayService.handleWebhook(webhookData);
+
+          channel.ack(msg);
+        } catch (error) {
+          this.logger.error(`Error processing ${routingKey} event:`, error);
+          channel.nack(msg, false, true); // Requeue on error
+        }
+      }
+    });
+
+    this.logger.log(`✅ Consumer registered for ${routingKey}`);
+  }
+
+  private async consumeEnrollmentCreate(channel: any, exchangeName: string) {
+    const queueName = "learning.enrollment.create";
+    const routingKey = "enrollment.create";
+
+    await channel.assertQueue(queueName, { durable: true });
+    await channel.bindQueue(queueName, exchangeName, routingKey);
+
+    await channel.consume(queueName, async (msg: any) => {
+      if (msg) {
+        try {
+          const event = JSON.parse(msg.content.toString());
+          this.logger.log(`Received ${routingKey} event:`, event);
+
+          const payload = event?.payload ?? event;
+          const userId = Number(payload.userId);
+          const courseId = Number(payload.courseId);
+          const courseType = payload.courseType;
+          const expiresAt = payload.expiresAt;
+
+          if (!userId || !courseId || !courseType) {
+            throw new Error("Invalid enrollment.create payload (userId/courseId/courseType required)");
+          }
+
+          await this.enrollmentService.create(
+            {
+              courseId,
+              courseType,
+              expiresAt,
+            } as any,
+            userId,
+          );
+
+          channel.ack(msg);
+        } catch (error) {
+          this.logger.error(`Error processing ${routingKey} event:`, error);
+          channel.nack(msg, false, true);
+        }
+      }
+    });
+
+    this.logger.log(`✅ Consumer registered for ${routingKey}`);
+  }
+
+  private async consumeClassMemberCreate(channel: any, exchangeName: string) {
+    const queueName = "learning.classmember.create";
+    const routingKey = "classmember.create";
+
+    await channel.assertQueue(queueName, { durable: true });
+    await channel.bindQueue(queueName, exchangeName, routingKey);
+
+    await channel.consume(queueName, async (msg: any) => {
+      if (msg) {
+        try {
+          const event = JSON.parse(msg.content.toString());
+          this.logger.log(`Received ${routingKey} event:`, event);
+
+          const payload = event?.payload ?? event;
+          const userId = Number(payload.userId);
+          const classId = Number(payload.classId);
+          const role = payload.role || "CUSTOMER";
+
+          if (!userId || !classId) {
+            throw new Error("Invalid classmember.create payload (userId/classId required)");
+          }
+
+          // Idempotent create
+          const existing = await this.prisma.classMember.findUnique({
+            where: {
+              classId_userId: {
+                classId,
+                userId,
+              },
+            },
+          });
+
+          if (!existing) {
+            await this.prisma.classMember.create({
+              data: {
+                userId,
+                classId,
+                role,
+              },
+            });
+          }
+
+          channel.ack(msg);
+        } catch (error) {
+          this.logger.error(`Error processing ${routingKey} event:`, error);
+          channel.nack(msg, false, true);
+        }
+      }
+    });
+
+    this.logger.log(`✅ Consumer registered for ${routingKey}`);
   }
 }

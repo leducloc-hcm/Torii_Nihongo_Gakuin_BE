@@ -8,6 +8,7 @@ import { NotificationGateway } from 'src/websockets/notification.gateway'
 import { CartService } from '../cart/cart.service'
 import { ClassFolderService } from '../online-class/class-folder.service'
 import { PaymentTransactionService } from './payment-transaction.service'
+import { RabbitMQPublisher } from 'src/shared/rabbitmq/rabbitmq.publisher'
 
 interface SepayConfig {
   accountNumber: string
@@ -53,6 +54,7 @@ export class SepayService {
     private readonly cartService: CartService,
     private readonly classFolderService: ClassFolderService,
     private readonly paymentTransactionService: PaymentTransactionService,
+    private readonly rabbitmqPublisher: RabbitMQPublisher,
   ) {
     this.config = {
       accountNumber: this.configService.get<string>('SEPAY_ACCOUNT_NUMBER') || '',
@@ -354,6 +356,13 @@ export class SepayService {
       // Process external operations after transaction (these can fail without affecting payment)
       for (const enrollment of result) {
         if (enrollment.isNewEnrollment) {
+          // Publish enrollment event for assessment-service gating/unlock
+          try {
+            await this.rabbitmqPublisher.publishCourseEnrolled(order.userId, enrollment.courseId)
+          } catch (pubErr) {
+            this.logger.warn(`Failed to publish course.enrolled for course ${enrollment.courseId}:`, pubErr)
+          }
+
           // Send enrollment notification
           this.notificationGateway.notifyEnrollmentCreated(order.userId, {
             courseId: enrollment.courseId,
@@ -477,6 +486,18 @@ export class SepayService {
 
       // Notify staff and admin about successful payment
       await this.notifyStaffAndAdminAboutPayment('SUCCESS', order, String(webhookData.id))
+
+      // Publish payment.completed (include courseIds for downstream services)
+      try {
+        await this.rabbitmqPublisher.publishPaymentCompleted(
+          order.userId,
+          order.id,
+          receivedAmount,
+          result.map((e) => e.courseId),
+        )
+      } catch (pubErr) {
+        this.logger.warn('Failed to publish payment.completed:', pubErr)
+      }
 
       this.logger.log(
         `Payment successful for order ${order.id}, transaction ${String(webhookData.id)}, created ${result.length} enrollments`,

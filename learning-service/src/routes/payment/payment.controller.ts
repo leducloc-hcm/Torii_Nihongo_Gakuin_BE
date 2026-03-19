@@ -10,6 +10,8 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
+import axios from 'axios'
 import { AuthType } from 'src/shared/constants/auth.constant'
 import { RoleName } from 'src/shared/constants/role.constant'
 import { ActiveUser } from 'src/shared/decorators/active-user.decorator'
@@ -22,7 +24,10 @@ import { PaymentService } from './payment.service'
 @Controller('payments')
 @UseGuards(RolesGuard)
 export class PaymentController {
-  constructor(private readonly paymentService: PaymentService) {}
+  constructor(
+    private readonly paymentService: PaymentService,
+    private readonly configService: ConfigService,
+  ) {}
   @Get('orders/:orderId')
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Customer, RoleName.Admin, RoleName.Staff)
@@ -87,7 +92,22 @@ export class PaymentController {
   @IsPublic()
   @HttpCode(HttpStatus.OK)
   async sepayWebhook(@Body() webhookData: SepayWebhookDTO) {
-    return this.paymentService.handleSepayWebhook(webhookData)
+    // Backward compatibility: forward to assessment-service which now owns the webhook endpoint
+    const assessmentBaseUrl =
+      this.configService.get<string>('ASSESSMENT_SERVICE_URL') ||
+      this.configService.get<string>('ASSESSMENT_BASE_URL') ||
+      'http://localhost:4002'
+
+    try {
+      const res = await axios.post(`${assessmentBaseUrl}/payments/sepay/webhook`, webhookData, {
+        timeout: 5000,
+        headers: { 'Content-Type': 'application/json' },
+      })
+      return res.data
+    } catch (err: any) {
+      // If assessment-service is down, fall back to local processing to avoid losing provider callbacks
+      return this.paymentService.handleSepayWebhook(webhookData)
+    }
   }
 
   @Get('sepay/status/:paymentCode')

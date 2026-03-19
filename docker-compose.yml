@@ -135,9 +135,8 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
-    volumes:
-      - ./learning-service:/app
-      - /app/node_modules
+    # NOTE: No bind-mounts here. The image has all deps baked in.
+    # For local development with hot-reload, use docker-compose.dev.yml instead.
 
   assessment-service:
     build:
@@ -152,8 +151,8 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       SERVER_PORT: ${ASSESSMENT_SERVICE_PORT:-4002}
-      SPRING_DATASOURCE_URL: jdbc:postgresql://aws-1-ap-northeast-2.pooler.supabase.com:5432/postgres?currentSchema=assessment
-      SPRING_DATASOURCE_USERNAME: postgres.rkizlomnljifkbdimrup
+      SPRING_DATASOURCE_URL: jdbc:postgresql://torii-nihongo.cd48o48cgxzd.ap-southeast-1.rds.amazonaws.com:5432/postgres?currentSchema=assessment
+      SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: nhatngutorii
       SPRING_DATASOURCE_DRIVER_CLASS_NAME: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:-org.postgresql.Driver}
       SPRING_JPA_HIBERNATE_DDL_AUTO: ${SPRING_JPA_HIBERNATE_DDL_AUTO:-validate}

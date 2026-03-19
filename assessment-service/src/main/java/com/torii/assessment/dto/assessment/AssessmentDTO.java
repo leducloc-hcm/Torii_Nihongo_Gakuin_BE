@@ -20,6 +20,7 @@ public class AssessmentDTO {
     private String type;
     private String visibility;
     private String description;
+    private Integer courseId;
     private Integer createdBy;
     private Long scoreProfileId;
     private Integer version;

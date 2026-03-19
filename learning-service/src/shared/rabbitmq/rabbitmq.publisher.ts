@@ -60,10 +60,11 @@ export class RabbitMQPublisher {
     userId: number,
     orderId: number,
     amount: number,
+    courseIds?: number[],
   ): Promise<void> {
     await this.publishEvent("payment.completed", {
       type: "payment.completed",
-      payload: { userId, orderId, amount },
+      payload: { userId, orderId, amount, courseIds },
       timestamp: new Date(),
       userId,
     });

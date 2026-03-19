@@ -14,12 +14,14 @@ import {
   MyEnrollmentType,
 } from './enrollment.model'
 import { PrismaService } from 'src/shared/services/prisma.service'
+import { RabbitMQPublisher } from 'src/shared/rabbitmq/rabbitmq.publisher'
 
 @Injectable()
 export class EnrollmentService {
   constructor(
     private readonly enrollmentRepository: EnrollmentRepository,
     private readonly prisma: PrismaService,
+    private readonly rabbitmqPublisher: RabbitMQPublisher,
   ) {}
 
   async create(createEnrollmentDto: CreateEnrollmentDTO, userId: number): Promise<EnrollmentWithRelations> {
@@ -48,12 +50,17 @@ export class EnrollmentService {
       throw new ConflictException(`User is already enrolled in course with ID ${courseId}`)
     }
 
-    return this.enrollmentRepository.create({
+    const enrollment = await this.enrollmentRepository.create({
       userId,
       courseId,
       courseType,
       expiresAt: expiresAt ? new Date(expiresAt) : null,
     })
+
+    // Publish domain event for assessment-service gating/unlock
+    await this.rabbitmqPublisher.publishCourseEnrolled(userId, courseId)
+
+    return enrollment
   }
 
   async findAll(queryDto: QueryEnrollmentDTO) {

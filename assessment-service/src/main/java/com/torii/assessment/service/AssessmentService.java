@@ -39,6 +39,7 @@ public class AssessmentService {
         assessment.setCreatedBy(dto.getCreatedBy());
         assessment.setScoreProfileId(dto.getScoreProfileId());
         assessment.setDescription(dto.getDescription());
+        assessment.setCourseId(dto.getCourseId());
 
         Assessment saved = assessmentRepository.save(assessment);
         log.info("Created assessment: {}", saved.getId());
@@ -92,6 +93,7 @@ public class AssessmentService {
         if (dto.getVisibility() != null) assessment.setVisibility(dto.getVisibility());
         if (dto.getScoreProfileId() != null) assessment.setScoreProfileId(dto.getScoreProfileId());
         if (dto.getDescription() != null) assessment.setDescription(dto.getDescription());
+        if (dto.getCourseId() != null) assessment.setCourseId(dto.getCourseId());
 
         Assessment updated = assessmentRepository.save(assessment);
         log.info("Updated assessment: {}", updated.getId());
@@ -138,6 +140,7 @@ public class AssessmentService {
             .type(assessment.getType())
             .visibility(assessment.getVisibility())
             .description(assessment.getDescription())
+            .courseId(assessment.getCourseId())
             .createdBy(assessment.getCreatedBy())
             .scoreProfileId(assessment.getScoreProfileId())
             .version(assessment.getVersion())

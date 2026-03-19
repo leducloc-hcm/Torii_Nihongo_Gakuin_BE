@@ -3,8 +3,10 @@ package com.torii.assessment.service;
 import com.torii.assessment.dto.AttemptDTO;
 import com.torii.assessment.dto.CreateAttemptDTO;
 import com.torii.assessment.dto.SubmitAnswerDTO;
+import com.torii.assessment.entity.Assessment;
 import com.torii.assessment.entity.Attempt;
 import com.torii.assessment.messaging.EventPublisher;
+import com.torii.assessment.repository.AssessmentRepository;
 import com.torii.assessment.repository.AttemptRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,11 +23,27 @@ import java.util.stream.Collectors;
 public class AttemptService {
     
     private final AttemptRepository attemptRepository;
+    private final AssessmentRepository assessmentRepository;
+    private final UserCourseAccessService userCourseAccessService;
     private final GradingService gradingService;
     private final EventPublisher eventPublisher;
     
     @Transactional
     public AttemptDTO createAttempt(CreateAttemptDTO dto) {
+        Assessment assessment = assessmentRepository.findById(dto.getAssessmentId())
+            .orElseThrow(() -> new RuntimeException("Assessment not found: " + dto.getAssessmentId()));
+
+        // Gate attempt creation based on visibility + course enrollment access
+        if (!"PUBLIC".equalsIgnoreCase(assessment.getVisibility())) {
+            Integer courseId = assessment.getCourseId();
+            if (courseId == null) {
+                throw new RuntimeException("Assessment is not public and has no courseId configured for gating");
+            }
+            if (!userCourseAccessService.hasAccess(dto.getUserId(), courseId)) {
+                throw new RuntimeException("User is not eligible for this assessment (course access required)");
+            }
+        }
+
         Attempt attempt = new Attempt();
         attempt.setAssessmentId(dto.getAssessmentId());
         attempt.setUserId(dto.getUserId());

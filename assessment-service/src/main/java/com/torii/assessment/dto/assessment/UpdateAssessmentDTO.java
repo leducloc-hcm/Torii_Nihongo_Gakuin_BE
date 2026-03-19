@@ -31,6 +31,9 @@ public class UpdateAssessmentDTO {
 
     private String description;
 
+    // Optional: link this assessment to a learning-service course for gating/unlock
+    private Integer courseId;
+
     @Valid
     private List<SectionDTO> sections;
 }

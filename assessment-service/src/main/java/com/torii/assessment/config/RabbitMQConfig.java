@@ -16,6 +16,9 @@ public class RabbitMQConfig {
     public static final String ATTEMPT_GRADED_ROUTING_KEY = "attempt.graded";
     public static final String COURSE_ENROLLED_ROUTING_KEY = "course.enrolled";
     public static final String PAYMENT_COMPLETED_ROUTING_KEY = "payment.completed";
+    public static final String PAYMENT_SEPAY_WEBHOOK_ROUTING_KEY = "payment.sepay.webhook";
+    public static final String ENROLLMENT_CREATE_ROUTING_KEY = "enrollment.create";
+    public static final String CLASSMEMBER_CREATE_ROUTING_KEY = "classmember.create";
     
     // Queue names
     public static final String COURSE_ENROLLED_QUEUE = "assessment.course.enrolled";

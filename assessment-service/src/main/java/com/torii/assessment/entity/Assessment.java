@@ -18,6 +18,9 @@ public class Assessment {
     private String visibility; // PRIVATE, UNLISTED, PUBLIC
     private String description;
 
+    @Column(name = "course_id")
+    private Integer courseId;
+
     @Column(name = "created_by")
     private Integer createdBy;
 
