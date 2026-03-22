@@ -21,10 +21,16 @@ export class BlogService {
     private readonly s3Service: S3Service,
   ) {}
 
+  async generateImageUploadUrl(filename: string, contentType: string) {
+    return this.s3Service.generatePresignedBlogImageUploadUrl(
+      filename,
+      contentType,
+    );
+  }
+
   async create(
     createBlogDto: CreateBlogInput,
     authorId: number,
-    files?: { image?: Express.Multer.File[] },
   ): Promise<BlogWithRelations> {
     const { title, content, image, slug, tagIds } = createBlogDto;
 
@@ -33,11 +39,7 @@ export class BlogService {
     if (slugExists) {
       throw new ConflictException(`Blog with slug '${slug}' already exists`);
     }
-    let imageUrl = createBlogDto.image;
-    if (files?.image?.[0]) {
-      imageUrl = (await this.s3Service.uploadFileToS3(files.image[0], "blogs"))
-        .url;
-    }
+    const imageUrl = createBlogDto.image;
     // Validate that all tags exist
     if (tagIds && tagIds.length > 0) {
       const { exists, missingIds } =
@@ -143,7 +145,6 @@ export class BlogService {
     id: number,
     updateBlogDto: UpdateBlogInput,
     userId: number,
-    files?: { image?: Express.Multer.File[] },
   ): Promise<BlogWithRelations> {
     // Check if blog exists
     const existingBlog = await this.findOne(id);
@@ -172,11 +173,16 @@ export class BlogService {
       }
     }
 
-    const { tagIds, ...blogData } = updateBlogDto;
+    const imageUrl =
+      updateBlogDto.image !== undefined
+        ? updateBlogDto.image
+        : existingBlog.image;
+
+    const { tagIds, image, ...blogData } = updateBlogDto;
 
     return this.blogRepository.update({
       where: { id },
-      data: blogData,
+      data: { ...blogData, image: imageUrl },
       tagIds,
     });
   }

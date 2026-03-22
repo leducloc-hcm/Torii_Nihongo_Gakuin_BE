@@ -6,6 +6,8 @@ import {
   UpdateBlogInput,
   QueryBlogsInput,
   PaginatedBlogsResponse,
+  GenerateBlogImageUploadInput,
+  BlogImageUploadResponse,
 } from "./blog.dto";
 import { UseGuards } from "@nestjs/common";
 import { GqlAuthGuard } from "src/shared/guards/gql-auth.guard";
@@ -79,5 +81,16 @@ export class BlogResolver {
   ): Promise<Blog> {
     const userId = context.req.user.userId;
     return this.blogService.remove(id, userId);
+  }
+
+  @Mutation(() => BlogImageUploadResponse)
+  @UseGuards(GqlAuthGuard)
+  async generateBlogImageUploadUrl(
+    @Args("input") input: GenerateBlogImageUploadInput,
+  ): Promise<BlogImageUploadResponse> {
+    return this.blogService.generateImageUploadUrl(
+      input.filename,
+      input.contentType,
+    );
   }
 }

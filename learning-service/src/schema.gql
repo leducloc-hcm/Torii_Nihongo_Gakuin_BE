@@ -20,6 +20,13 @@ type Blog {
   title: String!
 }
 
+type BlogImageUploadResponse {
+  expiresIn: Int!
+  key: String!
+  publicUrl: String!
+  uploadUrl: String!
+}
+
 type BlogTag {
   tag: TagInBlog!
 }
@@ -37,8 +44,14 @@ A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date
 """
 scalar DateTime
 
+input GenerateBlogImageUploadInput {
+  contentType: String!
+  filename: String!
+}
+
 type Mutation {
   createBlog(createBlogInput: CreateBlogInput!): Blog!
+  generateBlogImageUploadUrl(input: GenerateBlogImageUploadInput!): BlogImageUploadResponse!
   removeBlog(id: Int!): Blog!
   updateBlog(id: Int!, updateBlogInput: UpdateBlogInput!): Blog!
 }

@@ -21,6 +21,34 @@ import {
   Max,
 } from "class-validator";
 
+// Generate Blog Image Upload Input
+@InputType()
+export class GenerateBlogImageUploadInput {
+  @Field()
+  @IsString()
+  filename: string;
+
+  @Field()
+  @IsString()
+  contentType: string;
+}
+
+// Blog Image Upload Response
+@ObjectType()
+export class BlogImageUploadResponse {
+  @Field()
+  uploadUrl: string;
+
+  @Field()
+  key: string;
+
+  @Field()
+  publicUrl: string;
+
+  @Field(() => Int)
+  expiresIn: number;
+}
+
 // Author Type (nested in Blog)
 @ObjectType()
 export class Author {

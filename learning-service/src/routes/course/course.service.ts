@@ -35,13 +35,13 @@ export class CourseService {
     private readonly enrollmentService: EnrollmentService,
     private readonly classFolderService: ClassFolderService,
     private readonly s3Service: S3Service,
-    private readonly prisma: PrismaService
+    private readonly prisma: PrismaService,
   ) {}
 
   async create(
     createCourseDto: CreateCourseDTO,
     userId: number,
-    files?: { thumbnail?: Express.Multer.File[] }
+    files?: { thumbnail?: Express.Multer.File[] },
   ): Promise<CourseWithRelations> {
     const { slug, lecturerIds, ...courseData } = createCourseDto;
 
@@ -60,12 +60,12 @@ export class CourseService {
     if (lecturerIds) {
       const lecturerExists = await Promise.all(
         lecturerIds.map((id) =>
-          this.courseRepository.checkLecturerExists(Number(id))
-        )
+          this.courseRepository.checkLecturerExists(Number(id)),
+        ),
       );
       if (lecturerExists.some((exists) => !exists)) {
         throw new BadRequestException(
-          `Lecturers with IDs ${lecturerIds.join(", ")} do not exist or are not authorized`
+          `Lecturers with IDs ${lecturerIds.join(", ")} do not exist or are not authorized`,
         );
       }
     }
@@ -140,13 +140,13 @@ export class CourseService {
     });
     const lecturerArray =
       await this.lecturerRepository.findLectureProfileByUserIds(
-        courses.map((course) => course.lecturerIds).flat()
+        courses.map((course) => course.lecturerIds).flat(),
       );
     return {
       data: courses.map((course) => ({
         ...course,
         lecturers: lecturerArray.filter((lecturer) =>
-          course.lecturerIds.includes(lecturer.userId)
+          course.lecturerIds.includes(lecturer.userId),
         ),
       })),
       meta: {
@@ -160,7 +160,7 @@ export class CourseService {
 
   async findOne(
     id: number,
-    includeReviews = false
+    includeReviews = false,
   ): Promise<CourseWithRelations> {
     const course = await this.courseRepository.findOne({ id }, includeReviews);
 
@@ -179,7 +179,7 @@ export class CourseService {
     }
     if (course.courseType === "LIVE_ONLY") {
       const classes = await this.onlineClassRepository.findByCourseSlug(
-        course.slug
+        course.slug,
       );
       course["classes"] = classes;
     }
@@ -190,7 +190,7 @@ export class CourseService {
   async update(
     id: number,
     updateCourseDto: UpdateCourseDTO,
-    files?: { thumbnail?: Express.Multer.File[] }
+    files?: { thumbnail?: Express.Multer.File[] },
   ): Promise<CourseWithRelations> {
     // Check if course exists
     const existingCourse = await this.findOne(id);
@@ -199,11 +199,11 @@ export class CourseService {
     if (updateCourseDto.slug && updateCourseDto.slug !== existingCourse.slug) {
       const slugExists = await this.courseRepository.checkSlugExists(
         updateCourseDto.slug,
-        id
+        id,
       );
       if (slugExists) {
         throw new ConflictException(
-          `Course with slug '${updateCourseDto.slug}' already exists`
+          `Course with slug '${updateCourseDto.slug}' already exists`,
         );
       }
     }
@@ -218,12 +218,12 @@ export class CourseService {
     if (updateCourseDto.lecturerIds) {
       const lecturerExists = await Promise.all(
         updateCourseDto.lecturerIds.map((id) =>
-          this.courseRepository.checkLecturerExists(Number(id))
-        )
+          this.courseRepository.checkLecturerExists(Number(id)),
+        ),
       );
       if (lecturerExists.some((exists) => !exists)) {
         throw new BadRequestException(
-          `Lecturers with IDs ${updateCourseDto.lecturerIds.join(", ")} do not exist or are not authorized`
+          `Lecturers with IDs ${updateCourseDto.lecturerIds.join(", ")} do not exist or are not authorized`,
         );
       }
     }
@@ -255,7 +255,7 @@ export class CourseService {
 
   async getPublishedCourses(
     queryDto: Omit<QueryCourseDTO, "status">,
-    userId: number
+    userId: number,
   ) {
     const { page, limit, search, level, courseType, sortBy, sortOrder } =
       queryDto;
@@ -299,21 +299,21 @@ export class CourseService {
     });
     const lecturerArray =
       await this.lecturerRepository.findLectureProfileByUserIds(
-        courses.map((course) => course.lecturerIds).flat()
+        courses.map((course) => course.lecturerIds).flat(),
       );
 
     // Check enrollment status for each course
     const courseIds = courses.map((course) => course.id);
     const userEnrollments = await this.enrollmentService.checkUserEnrollments(
       userId,
-      courseIds
+      courseIds,
     );
 
     return {
       data: courses.map((course) => ({
         ...course,
         lecturers: lecturerArray.filter((lecturer) =>
-          course.lecturerIds.includes(lecturer.userId)
+          course.lecturerIds.includes(lecturer.userId),
         ),
         isEnrolled: userEnrollments.includes(course.id),
       })),
@@ -336,17 +336,17 @@ export class CourseService {
       courseType?: "VIDEO_QUIZ" | "VIDEO_QUIZ_LIVE" | "LIVE_ONLY";
       sortBy?: "createdAt" | "expiresAt";
       sortOrder?: "asc" | "desc";
-    } = {}
+    } = {},
   ) {
     // Use the enrollment service to get user's enrolled courses
     const enrollmentsResult = await this.enrollmentService.findMyEnrollments(
       userId,
-      params
+      params,
     );
 
     // Extract course IDs from enrollments
     const courseIds = enrollmentsResult.data.map(
-      (enrollment) => enrollment.course.id
+      (enrollment) => enrollment.course.id,
     );
 
     if (courseIds.length === 0) {
@@ -365,7 +365,7 @@ export class CourseService {
 
     // Filter out null values and get lecturer information for all courses
     const validCourses = fullCourses.filter(
-      (course): course is CourseWithRelations => course !== null
+      (course): course is CourseWithRelations => course !== null,
     );
     const allLecturerIds = validCourses
       .map((course) => course.lecturerIds || [])
@@ -374,14 +374,14 @@ export class CourseService {
     const lecturerArray =
       allLecturerIds.length > 0
         ? await this.lecturerRepository.findLectureProfileByUserIds(
-            allLecturerIds
+            allLecturerIds,
           )
         : [];
 
     // Map enrollments to include full course info with lecturers
     const coursesWithLecturers = enrollmentsResult.data.map((enrollment) => {
       const fullCourse = validCourses.find(
-        (course) => course.id === enrollment.course.id
+        (course) => course.id === enrollment.course.id,
       );
 
       return {
@@ -390,7 +390,7 @@ export class CourseService {
           ...enrollment.course,
           lecturerIds: fullCourse?.lecturerIds || [],
           lecturers: lecturerArray.filter((lecturer) =>
-            (fullCourse?.lecturerIds || []).includes(lecturer.userId)
+            (fullCourse?.lecturerIds || []).includes(lecturer.userId),
           ),
         },
       };
@@ -419,18 +419,18 @@ export class CourseService {
   async createCourseClass(
     courseId: number,
     createClassDto: CreateClassDTO,
-    userId: number
+    userId: number,
   ) {
     // Check if course exists
     await this.findOne(courseId);
 
     // Validate lecturer exists
     const lecturerExists = await this.courseRepository.checkLecturerExists(
-      createClassDto.lecturerId
+      createClassDto.lecturerId,
     );
     if (!lecturerExists) {
       throw new BadRequestException(
-        `Lecturer with ID ${createClassDto.lecturerId} does not exist or is not authorized`
+        `Lecturer with ID ${createClassDto.lecturerId} does not exist or is not authorized`,
       );
     }
 
@@ -445,7 +445,7 @@ export class CourseService {
     // Auto-create folder for the class
     await this.classFolderService.createClassFolder(
       newClass.id,
-      createClassDto.lecturerId
+      createClassDto.lecturerId,
     );
 
     return newClass;
@@ -454,7 +454,7 @@ export class CourseService {
   async updateCourseClass(
     courseId: number,
     classId: number,
-    updateClassDto: UpdateClassDTO
+    updateClassDto: UpdateClassDTO,
   ) {
     // Check if course exists
     await this.findOne(courseId);
@@ -463,22 +463,22 @@ export class CourseService {
     const belongsToCourse =
       await this.onlineClassRepository.checkClassBelongsToCourse(
         classId,
-        courseId
+        courseId,
       );
     if (!belongsToCourse) {
       throw new NotFoundException(
-        `Class with ID ${classId} not found in course ${courseId}`
+        `Class with ID ${classId} not found in course ${courseId}`,
       );
     }
 
     // Validate lecturer exists if being updated
     if (updateClassDto.lecturerId) {
       const lecturerExists = await this.courseRepository.checkLecturerExists(
-        updateClassDto.lecturerId
+        updateClassDto.lecturerId,
       );
       if (!lecturerExists) {
         throw new BadRequestException(
-          `Lecturer with ID ${updateClassDto.lecturerId} does not exist or is not authorized`
+          `Lecturer with ID ${updateClassDto.lecturerId} does not exist or is not authorized`,
         );
       }
     }
@@ -500,11 +500,11 @@ export class CourseService {
     const belongsToCourse =
       await this.onlineClassRepository.checkClassBelongsToCourse(
         classId,
-        courseId
+        courseId,
       );
     if (!belongsToCourse) {
       throw new NotFoundException(
-        `Class with ID ${classId} not found in course ${courseId}`
+        `Class with ID ${classId} not found in course ${courseId}`,
       );
     }
 
@@ -514,7 +514,7 @@ export class CourseService {
   async createClassSession(
     courseId: number,
     classId: number,
-    createSessionDto: CreateSessionDTO
+    createSessionDto: CreateSessionDTO,
   ) {
     // Check if course exists
     await this.findOne(courseId);
@@ -523,11 +523,11 @@ export class CourseService {
     const belongsToCourse =
       await this.onlineClassRepository.checkClassBelongsToCourse(
         classId,
-        courseId
+        courseId,
       );
     if (!belongsToCourse) {
       throw new NotFoundException(
-        `Class with ID ${classId} not found in course ${courseId}`
+        `Class with ID ${classId} not found in course ${courseId}`,
       );
     }
 
@@ -547,11 +547,11 @@ export class CourseService {
     const belongsToCourse =
       await this.onlineClassRepository.checkClassBelongsToCourse(
         classId,
-        courseId
+        courseId,
       );
     if (!belongsToCourse) {
       throw new NotFoundException(
-        `Class with ID ${classId} not found in course ${courseId}`
+        `Class with ID ${classId} not found in course ${courseId}`,
       );
     }
 
@@ -561,11 +561,11 @@ export class CourseService {
     // Check if user is enrolled in the course
     const enrollment = await this.enrollmentService.findByUserAndCourse(
       userId,
-      courseId
+      courseId,
     );
     if (!enrollment) {
       throw new NotFoundException(
-        `You are not enrolled in course with ID ${courseId}`
+        `You are not enrolled in course with ID ${courseId}`,
       );
     }
 
@@ -575,7 +575,7 @@ export class CourseService {
     // Get lecturer profiles
     const lecturerArray =
       await this.lecturerRepository.findLectureProfileByUserIds(
-        course.lecturerIds
+        course.lecturerIds,
       );
 
     return {
@@ -589,7 +589,7 @@ export class CourseService {
 
     if (existingCourse.status === "PUBLISHED") {
       throw new BadRequestException(
-        `Course with ID ${id} is already published`
+        `Course with ID ${id} is already published`,
       );
     }
 
@@ -621,7 +621,7 @@ export class CourseService {
     const updatedCourse = await this.courseRepository.findOne({ id });
     if (!updatedCourse) {
       throw new NotFoundException(
-        `Course with ID ${id} not found after update`
+        `Course with ID ${id} not found after update`,
       );
     }
     return updatedCourse;
@@ -632,7 +632,7 @@ export class CourseService {
 
     if (existingCourse.status !== "DRAFT") {
       throw new BadRequestException(
-        `Only courses in DRAFT status can be submitted for review`
+        `Only courses in DRAFT status can be submitted for review`,
       );
     }
 
