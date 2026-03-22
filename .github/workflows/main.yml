@@ -1,0 +1,230 @@
+name: CI/CD Pipeline
+
+# ─── Triggers ──────────────────────────────────────────────────────────────────
+on:
+  push:
+    branches: [aws-microservice]
+  pull_request:
+    branches: [aws-microservice]
+  workflow_dispatch:
+    inputs:
+      force_deploy:
+        description: "Force rebuild and redeploy all services (ignores path filter)"
+        type: boolean
+        default: false
+
+# ─── Global env ────────────────────────────────────────────────────────────────
+env:
+  PROJECT_NAME: torii-nihongo-gakuin
+
+# ─── Jobs ──────────────────────────────────────────────────────────────────────
+jobs:
+  # ── 1. Detect which services have changed ─────────────────────────────────
+  detect-changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      learning-service: ${{ steps.resolve.outputs.learning-service }}
+      assessment-service: ${{ steps.resolve.outputs.assessment-service }}
+      api-gateway: ${{ steps.resolve.outputs.api-gateway }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Path filter
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            learning-service:
+              - 'learning-service/**'
+            assessment-service:
+              - 'assessment-service/**'
+            api-gateway:
+              - 'api-gateway/**'
+
+      # On workflow_dispatch with force_deploy=true, override all filters to true
+      - name: Resolve final change flags
+        id: resolve
+        run: |
+          FORCE="${{ github.event.inputs.force_deploy }}"
+          if [ "$FORCE" = "true" ]; then
+            echo "learning-service=true"   >> $GITHUB_OUTPUT
+            echo "assessment-service=true" >> $GITHUB_OUTPUT
+            echo "api-gateway=true"        >> $GITHUB_OUTPUT
+          else
+            echo "learning-service=${{ steps.filter.outputs['learning-service'] }}"   >> $GITHUB_OUTPUT
+            echo "assessment-service=${{ steps.filter.outputs['assessment-service'] }}" >> $GITHUB_OUTPUT
+            echo "api-gateway=${{ steps.filter.outputs['api-gateway'] }}"              >> $GITHUB_OUTPUT
+          fi
+
+  # ── 2a. CI – Learning Service (NestJS) ───────────────────────────────────
+  ci-learning-service:
+    name: "CI · learning-service"
+    needs: detect-changes
+    if: needs.detect-changes.outputs['learning-service'] == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: learning-service
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: learning-service/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint -- --max-warnings=0
+
+      - name: Unit tests
+        run: npm test -- --passWithNoTests --forceExit
+
+  # ── 2b. CI – Assessment Service (Spring Boot) ────────────────────────────
+  ci-assessment-service:
+    name: "CI · assessment-service"
+    needs: detect-changes
+    if: needs.detect-changes.outputs['assessment-service'] == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: assessment-service
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: temurin
+          cache: maven
+
+      - name: Unit tests
+        run: mvn test -q --no-transfer-progress
+
+  # ── 3a. Build & push – Learning Service ──────────────────────────────────
+  build-learning-service:
+    name: "Build · learning-service"
+    needs: [detect-changes, ci-learning-service]
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      needs.detect-changes.outputs['learning-service'] == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push
+        run: |
+          IMAGE=${{ secrets.DOCKER_USERNAME }}/${{ env.PROJECT_NAME }}-learning-service
+          docker build -t $IMAGE:latest -t $IMAGE:${{ github.sha }} ./learning-service
+          docker push $IMAGE:latest
+          docker push $IMAGE:${{ github.sha }}
+
+  # ── 3b. Build & push – Assessment Service ────────────────────────────────
+  build-assessment-service:
+    name: "Build · assessment-service"
+    needs: [detect-changes, ci-assessment-service]
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      needs.detect-changes.outputs['assessment-service'] == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push
+        run: |
+          IMAGE=${{ secrets.DOCKER_USERNAME }}/${{ env.PROJECT_NAME }}-assessment-service
+          docker build -t $IMAGE:latest -t $IMAGE:${{ github.sha }} ./assessment-service
+          docker push $IMAGE:latest
+          docker push $IMAGE:${{ github.sha }}
+
+  # ── 3c. Build & push – API Gateway (Kong) ────────────────────────────────
+  build-api-gateway:
+    name: "Build · api-gateway"
+    needs: detect-changes
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      needs.detect-changes.outputs['api-gateway'] == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push
+        run: |
+          IMAGE=${{ secrets.DOCKER_USERNAME }}/${{ env.PROJECT_NAME }}-api-gateway
+          docker build -t $IMAGE:latest -t $IMAGE:${{ github.sha }} ./api-gateway
+          docker push $IMAGE:latest
+          docker push $IMAGE:${{ github.sha }}
+
+  # ── 4. Deploy – EC2 via self-hosted runner ───────────────────────────────
+  deploy:
+    name: "Deploy · EC2"
+    needs:
+      - build-learning-service
+      - build-assessment-service
+      - build-api-gateway
+    # Run when at least one build succeeded; skipped builds are acceptable
+    if: |
+      always() &&
+      github.ref == 'refs/heads/main' &&
+      (
+        needs.build-learning-service.result == 'success' ||
+        needs.build-assessment-service.result == 'success' ||
+        needs.build-api-gateway.result == 'success'
+      )
+    runs-on: torii_microservice
+    steps:
+      - name: Checkout (for docker-compose files)
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Pull updated images
+        env:
+          HUB: ${{ secrets.DOCKER_USERNAME }}
+        run: |
+          # Only pull services whose build job succeeded
+          if [ "${{ needs.build-learning-service.result }}" = "success" ]; then
+            sudo docker pull $HUB/${{ env.PROJECT_NAME }}-learning-service:latest
+          fi
+          if [ "${{ needs.build-assessment-service.result }}" = "success" ]; then
+            sudo docker pull $HUB/${{ env.PROJECT_NAME }}-assessment-service:latest
+          fi
+          if [ "${{ needs.build-api-gateway.result }}" = "success" ]; then
+            sudo docker pull $HUB/${{ env.PROJECT_NAME }}-api-gateway:latest
+          fi
+
+      - name: Restart services with new images
+        env:
+          HUB: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+        run: |
+          sudo -E docker compose \
+            -f docker-compose.yml \
+            -f docker-compose.prod.yml \
+            up -d --no-build --remove-orphans
