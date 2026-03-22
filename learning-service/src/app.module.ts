@@ -24,6 +24,14 @@ import { PaymentModule } from "./routes/payment/payment.module";
 import { AIChatModule } from "./routes/ai-chat/ai-chat.module";
 import { CouponModule } from "./routes/coupon/coupon.module";
 import { DashboardModule } from "./routes/dashboard/dashboard.module";
+import { QuizModule } from "./routes/quiz/quiz.module";
+import { QuizItemModule } from "./routes/quiz-item/quiz-item.module";
+import { QuizAttemptModule } from "./routes/quiz-attempt/quiz-attempt.module";
+import { QuizAnswerModule } from "./routes/quiz-answer/quiz-answer.module";
+import { PlacementBlueprintModule } from "./routes/placement/placement-blueprint.module";
+import { QuestionModule } from "./routes/question/question.module";
+import { QuestionGroupModule } from "./routes/question-group/question-group.module";
+import { OptionModule } from "./routes/question-option/option.module";
 import { RedisModule } from "./shared/redis/redis.module";
 import { RabbitMQModule } from "./shared/rabbitmq/rabbitmq.module";
 
@@ -68,6 +76,14 @@ import { RabbitMQModule } from "./shared/rabbitmq/rabbitmq.module";
     AIChatModule,
     CouponModule,
     DashboardModule,
+    QuizModule,
+    QuizItemModule,
+    QuizAttemptModule,
+    QuizAnswerModule,
+    PlacementBlueprintModule,
+    QuestionModule,
+    QuestionGroupModule,
+    OptionModule,
   ],
   controllers: [AppController],
   providers: [AppService],

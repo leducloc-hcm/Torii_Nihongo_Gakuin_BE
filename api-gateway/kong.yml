@@ -1,478 +1,571 @@
-_format_version: "3.0"
+_format_version: '3.0'
 _transform: true
-
 services:
-  # API Docs UI (Scalar)
-  - name: api-docs-ui
-    url: http://api-docs:80
-    routes:
-      - name: docs-route
-        paths:
-          - /docs
-        strip_path: true
-        methods:
-          - GET
-          - OPTIONS
-
-  # OpenAPI specs (stable, gateway-friendly paths)
-  - name: learning-openapi
-    url: http://learning-service:4001/api-docs-json
-    routes:
-      - name: learning-openapi-route
-        paths:
-          - /openapi/learning
-        strip_path: true
-        methods:
-          - GET
-          - OPTIONS
-        plugins:
-          - name: cors
-            config:
-              origins:
-                - "*"
-              methods:
-                - GET
-                - OPTIONS
-              headers:
-                - Accept
-                - Content-Type
-              credentials: true
-              max_age: 3600
-
-  - name: assessment-openapi
-    url: http://assessment-service:4002/v3/api-docs
-    routes:
-      - name: assessment-openapi-route
-        paths:
-          - /openapi/assessment
-        strip_path: true
-        methods:
-          - GET
-          - OPTIONS
-        plugins:
-          - name: cors
-            config:
-              origins:
-                - "*"
-              methods:
-                - GET
-                - OPTIONS
-              headers:
-                - Accept
-                - Content-Type
-              credentials: true
-              max_age: 3600
-
-  # Learning Service
-  - name: learning-service
-    url: http://learning-service:4001
-    routes:
-      - name: auth-route
-        paths:
-          - /auth
-        strip_path: false
-        methods:
-          - GET
-          - POST
-          - PUT
-          - DELETE
-          - PATCH
-          - OPTIONS
-        plugins:
-          - name: cors
-            config:
-              origins:
-                - "*"
-              methods:
-                - GET
-                - POST
-                - PUT
-                - DELETE
-                - PATCH
-                - OPTIONS
-              headers:
-                - Accept
-                - Accept-Version
-                - Content-Length
-                - Content-MD5
-                - Content-Type
-                - Date
-                - Authorization
-                - X-User-Id
-                - X-User-Email
-                - X-User-Role
-              exposed_headers:
-                - X-Auth-Token
-              credentials: true
-              max_age: 3600
-          - name: rate-limiting
-            config:
-              minute: 100
-              hour: 1000
-              policy: redis
-              redis:
-                host: redis
-                port: 6379
-                password: ""
-                database: 0
-          - name: request-transformer
-            config:
-              add:
-                headers:
-                  - "X-Forwarded-Proto:https"
-      - name: users-route
-        paths:
-          - /users
-        strip_path: false
-        methods:
-          - GET
-          - POST
-          - PUT
-          - DELETE
-          - PATCH
-          - OPTIONS
-        plugins:
-          - name: cors
-            config:
-              origins:
-                - "*"
-              methods:
-                - GET
-                - POST
-                - PUT
-                - DELETE
-                - PATCH
-                - OPTIONS
-              headers:
-                - "*"
-              credentials: true
-              max_age: 3600
-          - name: rate-limiting
-            config:
-              minute: 10
-              hour: 200
-              policy: redis
-              redis:
-                host: redis
-                port: 6379
-                password: ""
-                database: 0
-          - name: jwt-validator
-            config:
-              secret: "nhatngutorii"
-      - name: profile-route
-        paths:
-          - /profile
-        strip_path: false
-        methods:
-          - GET
-          - POST
-          - PUT
-          - DELETE
-          - PATCH
-          - OPTIONS
-        plugins:
-          - name: cors
-            config:
-              origins:
-                - "*"
-              methods:
-                - GET
-                - POST
-                - PUT
-                - DELETE
-                - PATCH
-                - OPTIONS
-              headers:
-                - "*"
-              credentials: true
-              max_age: 3600
-          - name: rate-limiting
-            config:
-              minute: 10
-              hour: 200
-              policy: redis
-              redis:
-                host: redis
-                port: 6379
-                password: ""
-                database: 0
-          - name: jwt-validator
-            config:
-              secret: "nhatngutorii"
-      - name: courses-route
-        paths:
-          - /courses
-        strip_path: false
-        methods:
-          - GET
-          - POST
-          - PUT
-          - DELETE
-          - PATCH
-          - OPTIONS
-        plugins:
-          - name: cors
-            config:
-              origins:
-                - "*"
-              methods:
-                - GET
-                - POST
-                - PUT
-                - DELETE
-                - PATCH
-                - OPTIONS
-              headers:
-                - "*"
-              credentials: true
-              max_age: 3600
-          - name: rate-limiting
-            config:
-              minute: 20
-              hour: 400
-              policy: redis
-              redis:
-                host: redis
-                port: 6379
-                password: ""
-                database: 0
-          - name: jwt-validator
-            config:
-              secret: "nhatngutorii"
-      - name: blogs-route
-        paths:
-          - /blogs
-        strip_path: false
-        methods:
-          - GET
-          - POST
-          - PUT
-          - DELETE
-          - PATCH
-          - OPTIONS
-        plugins:
-          - name: cors
-            config:
-              origins:
-                - "*"
-              methods:
-                - GET
-                - POST
-                - PUT
-                - DELETE
-                - PATCH
-                - OPTIONS
-              headers:
-                - "*"
-              credentials: true
-              max_age: 3600
-          - name: rate-limiting
-            config:
-              minute: 60
-              hour: 1000
-              policy: redis
-              redis:
-                host: redis
-                port: 6379
-                password: ""
-                database: 0
-          - name: jwt-validator
-            config:
-              secret: "nhatngutorii"
-              skip_on_methods:
-                - GET
-                - OPTIONS
-      - name: flashcards-route
-        paths:
-          - /flashcards
-        strip_path: false
-        methods:
-          - GET
-          - POST
-          - PUT
-          - DELETE
-          - PATCH
-          - OPTIONS
-        plugins:
-          - name: cors
-            config:
-              origins:
-                - "*"
-              methods:
-                - GET
-                - POST
-                - PUT
-                - DELETE
-                - PATCH
-                - OPTIONS
-              headers:
-                - "*"
-              credentials: true
-              max_age: 3600
-          - name: jwt-validator
-            config:
-              secret: "nhatngutorii"
-      - name: payment-route
-        paths:
-          - /payment
-        strip_path: false
-        methods:
-          - GET
-          - POST
-          - PUT
-          - DELETE
-          - PATCH
-          - OPTIONS
-        plugins:
-          - name: cors
-            config:
-              origins:
-                - "*"
-              methods:
-                - GET
-                - POST
-                - PUT
-                - DELETE
-                - PATCH
-                - OPTIONS
-              headers:
-                - "*"
-              credentials: true
-              max_age: 3600
-          - name: jwt-validator
-            config:
-              secret: "nhatngutorii"
-      - name: online-class-route
-        paths:
-          - /online-class
-        strip_path: false
-        methods:
-          - GET
-          - POST
-          - PUT
-          - DELETE
-          - PATCH
-          - OPTIONS
-        plugins:
-          - name: cors
-            config:
-              origins:
-                - "*"
-              methods:
-                - GET
-                - POST
-                - PUT
-                - DELETE
-                - PATCH
-                - OPTIONS
-              headers:
-                - "*"
-              credentials: true
-              max_age: 3600
-          - name: jwt-validator
-            config:
-              secret: "nhatngutorii"
-      - name: dashboard-route
-        paths:
-          - /dashboard
-        strip_path: false
-        methods:
-          - GET
-          - POST
-          - PUT
-          - DELETE
-          - PATCH
-          - OPTIONS
-        plugins:
-          - name: cors
-            config:
-              origins:
-                - "*"
-              methods:
-                - GET
-                - POST
-                - PUT
-                - DELETE
-                - PATCH
-                - OPTIONS
-              headers:
-                - "*"
-              credentials: true
-              max_age: 3600
-          - name: jwt-validator
-            config:
-              secret: "nhatngutorii"
-
-  # Assessment Service
-  - name: assessment-service
-    url: http://assessment-service:4002
-    routes:
-      - name: assessment-route
-        paths:
-          - /assessment
-        strip_path: false
-        methods:
-          - GET
-          - POST
-          - PUT
-          - DELETE
-          - PATCH
-          - OPTIONS
-        plugins:
-          - name: cors
-            config:
-              origins:
-                - "*"
-              methods:
-                - GET
-                - POST
-                - PUT
-                - DELETE
-                - PATCH
-                - OPTIONS
-              headers:
-                - "*"
-              credentials: true
-              max_age: 3600
-          - name: jwt-validator
-            config:
-              secret: "nhatngutorii"
-      - name: score-profile-route
-        paths:
-          - /score-profile
-        strip_path: false
-        methods:
-          - GET
-          - POST
-          - PUT
-          - DELETE
-          - PATCH
-          - OPTIONS
-        plugins:
-          - name: cors
-            config:
-              origins:
-                - "*"
-              methods:
-                - GET
-                - POST
-                - PUT
-                - DELETE
-                - PATCH
-                - OPTIONS
-              headers:
-                - "*"
-              credentials: true
-              max_age: 3600
-          - name: jwt-validator
-            config:
-              secret: "nhatngutorii"
-
-# Global plugins
+- name: api-docs-ui
+  url: http://api-docs:80
+  routes:
+  - name: docs-route
+    paths:
+    - /docs
+    strip_path: true
+    methods:
+    - GET
+    - OPTIONS
+- name: learning-openapi
+  url: http://learning-service:4001/api-docs-json
+  routes:
+  - name: learning-openapi-route
+    paths:
+    - /openapi/learning
+    strip_path: true
+    methods:
+    - GET
+    - OPTIONS
+- name: assessment-openapi
+  url: http://assessment-service:4002/api-docs
+  routes:
+  - name: assessment-openapi-route
+    paths:
+    - /openapi/assessment
+    strip_path: true
+    methods:
+    - GET
+    - OPTIONS
+- name: learning-service
+  url: http://learning-service:4001
+  routes:
+  - name: graphql-route
+    paths:
+    - /graphql
+    strip_path: false
+    methods:
+    - GET
+    - POST
+    - OPTIONS
+    plugins:
+    - name: jwt-validator
+      config:
+        secret: nhatngutorii
+        skip_on_methods:
+        - GET
+        - OPTIONS
+  - name: auth-route
+    paths:
+    - /auth
+    strip_path: false
+    methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - PATCH
+    - OPTIONS
+    plugins:
+    - name: rate-limiting
+      config:
+        minute: 100
+        hour: 1000
+        policy: redis
+        redis:
+          host: redis
+          port: 6379
+          password: ''
+          database: 0
+    - name: request-transformer
+      config:
+        add:
+          headers:
+          - X-Forwarded-Proto:https
+  - name: folders-route
+    paths:
+    - /folders
+    strip_path: false
+    methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - PATCH
+    - OPTIONS
+    plugins:
+    - name: jwt-validator
+      config:
+        secret: nhatngutorii
+  - name: socketio-route
+    paths:
+    - /socket.io
+    strip_path: false
+  - name: users-route
+    paths:
+    - /users
+    strip_path: false
+    methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - PATCH
+    - OPTIONS
+    plugins:
+    - name: rate-limiting
+      config:
+        minute: 10
+        hour: 200
+        policy: redis
+        redis:
+          host: redis
+          port: 6379
+          password: ''
+          database: 0
+    - name: jwt-validator
+      config:
+        secret: nhatngutorii
+  - name: profile-route
+    paths:
+    - /profile
+    strip_path: false
+    methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - PATCH
+    - OPTIONS
+    plugins:
+    - name: rate-limiting
+      config:
+        minute: 10
+        hour: 200
+        policy: redis
+        redis:
+          host: redis
+          port: 6379
+          password: ''
+          database: 0
+    - name: jwt-validator
+      config:
+        secret: nhatngutorii
+  - name: courses-route
+    paths:
+    - /courses
+    strip_path: false
+    methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - PATCH
+    - OPTIONS
+    plugins:
+    - name: rate-limiting
+      config:
+        minute: 20
+        hour: 400
+        policy: redis
+        redis:
+          host: redis
+          port: 6379
+          password: ''
+          database: 0
+    - name: jwt-validator
+      config:
+        secret: nhatngutorii
+  - name: blogs-route
+    paths:
+    - /blogs
+    strip_path: false
+    methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - PATCH
+    - OPTIONS
+    plugins:
+    - name: rate-limiting
+      config:
+        minute: 60
+        hour: 1000
+        policy: redis
+        redis:
+          host: redis
+          port: 6379
+          password: ''
+          database: 0
+    - name: jwt-validator
+      config:
+        secret: nhatngutorii
+        skip_on_methods:
+        - GET
+        - OPTIONS
+  - name: flashcards-route
+    paths:
+    - /flashcards
+    strip_path: false
+    methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - PATCH
+    - OPTIONS
+    plugins:
+    - name: jwt-validator
+      config:
+        secret: nhatngutorii
+  - name: payment-route
+    paths:
+    - /payment
+    strip_path: false
+    methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - PATCH
+    - OPTIONS
+    plugins:
+    - name: jwt-validator
+      config:
+        secret: nhatngutorii
+  - name: online-class-route
+    paths:
+    - /online-class
+    strip_path: false
+    methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - PATCH
+    - OPTIONS
+    plugins:
+    - name: jwt-validator
+      config:
+        secret: nhatngutorii
+  - name: dashboard-route
+    paths:
+    - /dashboard
+    strip_path: false
+    methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - PATCH
+    - OPTIONS
+    plugins:
+    - name: jwt-validator
+      config:
+        secret: nhatngutorii
+  - name: cart-route
+    paths:
+    - /cart
+    strip_path: false
+    methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - PATCH
+    - OPTIONS
+    plugins:
+    - name: jwt-validator
+      config:
+        secret: nhatngutorii
+  - name: notification-route
+    paths:
+    - /notification
+    strip_path: false
+    methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - PATCH
+    - OPTIONS
+    plugins:
+    - name: jwt-validator
+      config:
+        secret: nhatngutorii
+  - name: coupons-route
+    paths:
+    - /coupons
+    strip_path: false
+    methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - PATCH
+    - OPTIONS
+    plugins:
+    - name: jwt-validator
+      config:
+        secret: nhatngutorii
+  - name: enrollments-route
+    paths:
+    - /enrollments
+    strip_path: false
+    methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - PATCH
+    - OPTIONS
+    plugins:
+    - name: jwt-validator
+      config:
+        secret: nhatngutorii
+  - name: lessons-route
+    paths:
+    - /lessons
+    strip_path: false
+    methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - PATCH
+    - OPTIONS
+    plugins:
+    - name: jwt-validator
+      config:
+        secret: nhatngutorii
+  - name: lesson-progress-route
+    paths:
+    - /lesson-progress
+    strip_path: false
+    methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - PATCH
+    - OPTIONS
+    plugins:
+    - name: jwt-validator
+      config:
+        secret: nhatngutorii
+  - name: modules-route
+    paths:
+    - /modules
+    strip_path: false
+    methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - PATCH
+    - OPTIONS
+    plugins:
+    - name: jwt-validator
+      config:
+        secret: nhatngutorii
+  - name: tags-route
+    paths:
+    - /tags
+    strip_path: false
+    methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - PATCH
+    - OPTIONS
+    plugins:
+    - name: jwt-validator
+      config:
+        secret: nhatngutorii
+        skip_on_methods:
+        - GET
+        - OPTIONS
+  - name: ai-chat-route
+    paths:
+    - /ai-chat
+    strip_path: false
+    methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - PATCH
+    - OPTIONS
+    plugins:
+    - name: jwt-validator
+      config:
+        secret: nhatngutorii
+  - name: placement-route
+    paths:
+    - /placement
+    strip_path: false
+    methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - PATCH
+    - OPTIONS
+    plugins:
+    - name: jwt-validator
+      config:
+        secret: nhatngutorii
+  - name: quiz-route
+    paths:
+    - /quiz
+    strip_path: false
+    methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - PATCH
+    - OPTIONS
+    plugins:
+    - name: jwt-validator
+      config:
+        secret: nhatngutorii
+  - name: quiz-items-route
+    paths:
+    - /quiz-items
+    strip_path: false
+    methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - PATCH
+    - OPTIONS
+    plugins:
+    - name: jwt-validator
+      config:
+        secret: nhatngutorii
+  - name: quiz-attempts-route
+    paths:
+    - /quiz-attempts
+    strip_path: false
+    methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - PATCH
+    - OPTIONS
+    plugins:
+    - name: jwt-validator
+      config:
+        secret: nhatngutorii
+  - name: quiz-answers-route
+    paths:
+    - /quiz-answers
+    strip_path: false
+    methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - PATCH
+    - OPTIONS
+    plugins:
+    - name: jwt-validator
+      config:
+        secret: nhatngutorii
+  - name: questions-route
+    paths:
+    - /questions
+    strip_path: false
+    methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - PATCH
+    - OPTIONS
+    plugins:
+    - name: jwt-validator
+      config:
+        secret: nhatngutorii
+  - name: question-groups-route
+    paths:
+    - /question-groups
+    strip_path: false
+    methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - PATCH
+    - OPTIONS
+    plugins:
+    - name: jwt-validator
+      config:
+        secret: nhatngutorii
+- name: assessment-service
+  url: http://assessment-service:4002
+  routes:
+  - name: assessment-route
+    paths:
+    - /assessment
+    strip_path: false
+    methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - PATCH
+    - OPTIONS
+    plugins:
+    - name: jwt-validator
+      config:
+        secret: nhatngutorii
+  - name: score-profile-route
+    paths:
+    - /score-profile
+    strip_path: false
+    methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - PATCH
+    - OPTIONS
+    plugins:
+    - name: jwt-validator
+      config:
+        secret: nhatngutorii
 plugins:
-  - name: correlation-id
-    config:
-      header_name: X-Correlation-ID
-      echo_downstream: true
-      generator: uuid
+- name: cors
+  config:
+    origins:
+    - '*'
+    methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - PATCH
+    - OPTIONS
+    headers:
+    - Accept
+    - Accept-Version
+    - Content-Length
+    - Content-MD5
+    - Content-Type
+    - Date
+    - Authorization
+    - X-User-Id
+    - X-User-Email
+    - X-User-Role
+    - X-Correlation-ID
+    exposed_headers:
+    - X-Auth-Token
+    - X-Correlation-ID
+    credentials: false
+    max_age: 3600
+    preflight_continue: false
+- name: correlation-id
+  config:
+    header_name: X-Correlation-ID
+    echo_downstream: true
+    generator: uuid

@@ -7,7 +7,7 @@
   },
   "servers": [
     {
-      "url": "http://localhost:8080",
+      "url": "http://localhost:8000",
       "description": "API Gateway"
     }
   ],
@@ -16,12 +16,12 @@
       "title": "Learning Service (NestJS)",
       "slug": "learning",
       "default": true,
-      "url": "http://localhost:8080/openapi/learning"
+      "url": "http://localhost:8000/openapi/learning"
     },
     {
       "title": "Assessment Service (Spring Boot)",
       "slug": "assessment",
-      "url": "http://localhost:8080/openapi/assessment"
+      "url": "http://localhost:8000/openapi/assessment"
     }
   ]
 }
