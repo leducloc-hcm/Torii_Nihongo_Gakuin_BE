@@ -1,0 +1,204 @@
+// Gamification Service — Prisma Schema
+// Stack: NestJS + Prisma + PostgreSQL
+// Schema: gamification (separate from learning & assessment)
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-1.1.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  schemas  = ["gamification"]
+}
+
+// ===== Activity Log =====
+model ActivityLog {
+  id        Int          @id @default(autoincrement())
+  userId    Int          @map("user_id")
+  type      ActivityType
+  points    Int
+  meta      Json?
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([userId, createdAt])
+  @@map("activity_logs")
+  @@schema("gamification")
+}
+
+enum ActivityType {
+  ATTENDANCE
+  HOMEWORK
+  MOCK_TEST
+  LESSON_COMPLETED
+  COURSE_ENROLLED
+  FLASHCARD_GENERATED
+  QUIZ_COMPLETED
+
+  @@schema("gamification")
+}
+
+// ===== Points Ledger =====
+model PointsLedger {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  delta     Int
+  reason    String
+  meta      Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([userId, createdAt])
+  @@map("points_ledger")
+  @@schema("gamification")
+}
+
+// ===== User Stats (denormalized for fast reads) =====
+model UserStats {
+  id         Int      @id @default(autoincrement())
+  userId     Int      @unique @map("user_id")
+  totalXp    Int      @default(0) @map("total_xp")
+  totalCoins Int      @default(0) @map("total_coins")
+  level      Int      @default(1)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("user_stats")
+  @@schema("gamification")
+}
+
+// ===== Streak =====
+model Streak {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique @map("user_id")
+  startDate DateTime @map("start_date")
+  lastDate  DateTime @map("last_date")
+  longest   Int      @default(0)
+  current   Int      @default(0)
+
+  @@map("streaks")
+  @@schema("gamification")
+}
+
+// ===== Achievement Definition =====
+model Achievement {
+  id             Int               @id @default(autoincrement())
+  name           String
+  description    String
+  icon           String?
+  symbol         String?
+  conditionType  AchievementConditionType @map("condition_type")
+  conditionValue Int               @map("condition_value")
+  rewardCoins    Int               @default(0) @map("reward_coins")
+  rewardXp       Int               @default(0) @map("reward_xp")
+  rarity         AchievementRarity @default(COMMON)
+  category       String?
+  createdAt      DateTime          @default(now()) @map("created_at")
+
+  userAchievements UserAchievement[]
+
+  @@map("achievements")
+  @@schema("gamification")
+}
+
+enum AchievementConditionType {
+  KANJI
+  STREAK
+  LISTENING
+  LESSONS_COMPLETED
+  COURSES_ENROLLED
+  QUIZZES_PASSED
+  TOTAL_XP
+  LOGIN_DAYS
+
+  @@schema("gamification")
+}
+
+enum AchievementRarity {
+  COMMON
+  UNCOMMON
+  RARE
+  LEGENDARY
+
+  @@schema("gamification")
+}
+
+// ===== User Achievement (unlocked achievements) =====
+model UserAchievement {
+  id            Int         @id @default(autoincrement())
+  userId        Int         @map("user_id")
+  achievementId Int         @map("achievement_id")
+  unlockedAt    DateTime    @default(now()) @map("unlocked_at")
+
+  achievement Achievement @relation(fields: [achievementId], references: [id])
+
+  @@unique([userId, achievementId])
+  @@index([userId])
+  @@map("user_achievements")
+  @@schema("gamification")
+}
+
+// ===== Reward =====
+model Reward {
+  id          Int        @id @default(autoincrement())
+  type        RewardType
+  name        String
+  description String?
+  cost        Int        @default(0)
+  stock       Int?
+  imageUrl    String?    @map("image_url")
+  isActive    Boolean    @default(true) @map("is_active")
+
+  redemptions RewardRedemption[]
+
+  @@map("rewards")
+  @@schema("gamification")
+}
+
+enum RewardType {
+  BADGE
+  AVATAR_FRAME
+  TITLE
+  DISCOUNT
+
+  @@schema("gamification")
+}
+
+// ===== Reward Redemption =====
+model RewardRedemption {
+  id         Int      @id @default(autoincrement())
+  userId     Int      @map("user_id")
+  rewardId   Int      @map("reward_id")
+  redeemedAt DateTime @default(now()) @map("redeemed_at")
+
+  reward Reward @relation(fields: [rewardId], references: [id])
+
+  @@index([userId])
+  @@map("reward_redemptions")
+  @@schema("gamification")
+}
+
+// ===== Leaderboard Snapshot (weekly/monthly snapshots) =====
+model LeaderboardEntry {
+  id        Int             @id @default(autoincrement())
+  userId    Int             @map("user_id")
+  period    LeaderboardPeriod
+  periodKey String          @map("period_key") // e.g., "2026-W12", "2026-03"
+  xp        Int             @default(0)
+  rank      Int?
+  createdAt DateTime        @default(now()) @map("created_at")
+  updatedAt DateTime        @updatedAt @map("updated_at")
+
+  @@unique([userId, period, periodKey])
+  @@index([period, periodKey, xp(sort: Desc)])
+  @@map("leaderboard_entries")
+  @@schema("gamification")
+}
+
+enum LeaderboardPeriod {
+  WEEKLY
+  MONTHLY
+
+  @@schema("gamification")
+}

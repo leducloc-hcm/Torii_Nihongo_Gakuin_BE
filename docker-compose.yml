@@ -62,8 +62,8 @@ services:
       RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER:-admin}
       RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS:-admin}
       JWT_SECRET: ${JWT_SECRET:-your-secret-key}
-      ACCESS_TOKEN_SECRET: ${ACCESS_TOKEN_SECRET:-${JWT_SECRET:-your-access-token-secret}}}
-      REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET:-${JWT_SECRET:-your-refresh-token-secret}}}
+      ACCESS_TOKEN_SECRET: ${ACCESS_TOKEN_SECRET:-${JWT_SECRET:-your-access-token-secret}}
+      REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET:-${JWT_SECRET:-your-refresh-token-secret}}
       ACCESS_TOKEN_EXPIRES_IN: ${ACCESS_TOKEN_EXPIRES_IN:-1h}
       REFRESH_TOKEN_EXPIRES_IN: ${REFRESH_TOKEN_EXPIRES_IN:-1d}
       SECRET_API_KEY: ${SECRET_API_KEY:-toriinihongogakuin}
@@ -184,6 +184,39 @@ services:
       rabbitmq:
         condition: service_healthy
 
+  gamification-service:
+    build:
+      context: ./gamification-service
+      dockerfile: Dockerfile
+    container_name: torii-gamification-service
+    env_file:
+      - .env
+    ports:
+      - "${GAMIFICATION_SERVICE_PORT:-4003}:${GAMIFICATION_SERVICE_PORT:-4003}"
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: ${GAMIFICATION_SERVICE_PORT:-4003}
+      DATABASE_URL: "postgresql://postgres:nhatngutorii@torii-nihongo.cd48o48cgxzd.ap-southeast-1.rds.amazonaws.com:5432/postgres?schema=gamification&sslmode=no-verify"
+      REDIS_URL: redis://${REDIS_USERNAME:-}${REDIS_PASSWORD:+:${REDIS_PASSWORD}}@redis:6379
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_USERNAME: ${REDIS_USERNAME:-}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_DB: ${REDIS_DB:-0}
+      REDIS_TLS: ${REDIS_TLS:-false}
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-admin}:${RABBITMQ_DEFAULT_PASS:-admin}@rabbitmq:5672
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER:-admin}
+      RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS:-admin}
+      ACCESS_TOKEN_SECRET: ${ACCESS_TOKEN_SECRET:-${JWT_SECRET:-your-access-token-secret}}
+      SECRET_API_KEY: ${SECRET_API_KEY:-toriinihongogakuin}
+    depends_on:
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
   api-docs:
     image: nginx:1.27-alpine
     container_name: torii-api-docs
@@ -223,6 +256,7 @@ services:
     depends_on:
       - learning-service
       - assessment-service
+      - gamification-service
       - api-docs
       - redis
     healthcheck:

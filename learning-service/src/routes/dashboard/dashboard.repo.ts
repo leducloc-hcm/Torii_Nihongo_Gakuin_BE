@@ -1,7 +1,7 @@
-import { Injectable } from '@nestjs/common'
-import { PrismaService } from 'src/shared/services/prisma.service'
-import { TimePeriod } from './dashboard.model'
-import { Prisma } from '@prisma/client'
+import { Injectable } from "@nestjs/common";
+import { PrismaService } from "src/shared/services/prisma.service";
+import { TimePeriod } from "./dashboard.model";
+import { Prisma } from "@prisma/client";
 
 @Injectable()
 export class DashboardRepository {
@@ -10,7 +10,7 @@ export class DashboardRepository {
   // Revenue related queries
   async getTotalRevenue(startDate?: Date, endDate?: Date) {
     const whereClause: Prisma.OrderWhereInput = {
-      status: 'COMPLETED',
+      status: "COMPLETED",
       ...(startDate &&
         endDate && {
           createdAt: {
@@ -18,7 +18,7 @@ export class DashboardRepository {
             lte: endDate,
           },
         }),
-    }
+    };
 
     const result = await this.prisma.order.aggregate({
       where: whereClause,
@@ -28,49 +28,49 @@ export class DashboardRepository {
       _count: {
         id: true,
       },
-    })
+    });
 
     return {
       totalRevenue: result._sum.totalAmount || 0,
       totalOrders: result._count.id || 0,
-    }
+    };
   }
 
   async getRevenueByPeriod(period: TimePeriod, startDate: Date, endDate: Date) {
-    let dateFormat: string
-    let groupByFormat: string
+    let dateFormat: string;
+    let groupByFormat: string;
 
     switch (period) {
-      case 'day':
-        dateFormat = 'YYYY-MM-DD'
-        groupByFormat = 'DATE("createdAt")'
-        break
-      case 'week':
-        dateFormat = 'YYYY-"W"WW'
-        groupByFormat = 'DATE_TRUNC(\'week\', "createdAt")'
-        break
-      case 'month':
-        dateFormat = 'YYYY-MM'
-        groupByFormat = 'DATE_TRUNC(\'month\', "createdAt")'
-        break
-      case 'quarter':
-        dateFormat = 'YYYY-"Q"Q'
-        groupByFormat = 'DATE_TRUNC(\'quarter\', "createdAt")'
-        break
-      case 'year':
-        dateFormat = 'YYYY'
-        groupByFormat = 'DATE_TRUNC(\'year\', "createdAt")'
-        break
+      case "day":
+        dateFormat = "YYYY-MM-DD";
+        groupByFormat = 'DATE("createdAt")';
+        break;
+      case "week":
+        dateFormat = 'YYYY-"W"WW';
+        groupByFormat = "DATE_TRUNC('week', \"createdAt\")";
+        break;
+      case "month":
+        dateFormat = "YYYY-MM";
+        groupByFormat = "DATE_TRUNC('month', \"createdAt\")";
+        break;
+      case "quarter":
+        dateFormat = 'YYYY-"Q"Q';
+        groupByFormat = "DATE_TRUNC('quarter', \"createdAt\")";
+        break;
+      case "year":
+        dateFormat = "YYYY";
+        groupByFormat = "DATE_TRUNC('year', \"createdAt\")";
+        break;
       default:
-        dateFormat = 'YYYY-MM-DD'
-        groupByFormat = 'DATE("createdAt")'
+        dateFormat = "YYYY-MM-DD";
+        groupByFormat = 'DATE("createdAt")';
     }
 
     const result = await this.prisma.$queryRaw<
       Array<{
-        period: Date
-        revenue: bigint
-        order_count: bigint
+        period: Date;
+        revenue: bigint;
+        order_count: bigint;
       }>
     >`
       SELECT 
@@ -83,13 +83,13 @@ export class DashboardRepository {
         AND "createdAt" <= ${endDate}
       GROUP BY ${Prisma.raw(groupByFormat)}
       ORDER BY period ASC
-    `
+    `;
 
     return result.map((row) => ({
       period: row.period,
       revenue: Number(row.revenue),
       orderCount: Number(row.order_count),
-    }))
+    }));
   }
 
   // User growth related queries
@@ -98,7 +98,7 @@ export class DashboardRepository {
       where: {
         deletedAt: null,
       },
-    })
+    });
   }
 
   async getNewUsersCount(startDate: Date, endDate: Date) {
@@ -110,36 +110,40 @@ export class DashboardRepository {
         },
         deletedAt: null,
       },
-    })
+    });
   }
 
-  async getUserGrowthByPeriod(period: TimePeriod, startDate: Date, endDate: Date) {
-    let groupByFormat: string
+  async getUserGrowthByPeriod(
+    period: TimePeriod,
+    startDate: Date,
+    endDate: Date,
+  ) {
+    let groupByFormat: string;
 
     switch (period) {
-      case 'day':
-        groupByFormat = 'DATE("createdAt")'
-        break
-      case 'week':
-        groupByFormat = 'DATE_TRUNC(\'week\', "createdAt")'
-        break
-      case 'month':
-        groupByFormat = 'DATE_TRUNC(\'month\', "createdAt")'
-        break
-      case 'quarter':
-        groupByFormat = 'DATE_TRUNC(\'quarter\', "createdAt")'
-        break
-      case 'year':
-        groupByFormat = 'DATE_TRUNC(\'year\', "createdAt")'
-        break
+      case "day":
+        groupByFormat = 'DATE("createdAt")';
+        break;
+      case "week":
+        groupByFormat = "DATE_TRUNC('week', \"createdAt\")";
+        break;
+      case "month":
+        groupByFormat = "DATE_TRUNC('month', \"createdAt\")";
+        break;
+      case "quarter":
+        groupByFormat = "DATE_TRUNC('quarter', \"createdAt\")";
+        break;
+      case "year":
+        groupByFormat = "DATE_TRUNC('year', \"createdAt\")";
+        break;
       default:
-        groupByFormat = 'DATE("createdAt")'
+        groupByFormat = 'DATE("createdAt")';
     }
 
     const result = await this.prisma.$queryRaw<
       Array<{
-        period: Date
-        new_users: bigint
+        period: Date;
+        new_users: bigint;
       }>
     >`
       SELECT 
@@ -151,12 +155,12 @@ export class DashboardRepository {
         AND "createdAt" <= ${endDate}
       GROUP BY ${Prisma.raw(groupByFormat)}
       ORDER BY period ASC
-    `
+    `;
 
     return result.map((row) => ({
       period: row.period,
       newUsers: Number(row.new_users),
-    }))
+    }));
   }
 
   async getTotalUsersByDate(date: Date) {
@@ -167,21 +171,21 @@ export class DashboardRepository {
         },
         deletedAt: null,
       },
-    })
+    });
   }
 
   // Course revenue related queries
   async getCourseRevenueBreakdown(limit: number = 10) {
     const result = await this.prisma.$queryRaw<
       Array<{
-        course_id: number
-        course_name: string
-        course_slug: string
-        thumbnail_url: string | null
-        level: string
-        total_revenue: bigint
-        total_enrollments: bigint
-        average_price: number
+        course_id: number;
+        course_name: string;
+        course_slug: string;
+        thumbnail_url: string | null;
+        level: string;
+        total_revenue: bigint;
+        total_enrollments: bigint;
+        average_price: number;
       }>
     >`
       SELECT 
@@ -204,7 +208,7 @@ export class DashboardRepository {
       GROUP BY c.id, c.title, c.slug, c."thumbnailUrl", c.level
       ORDER BY total_revenue DESC
       LIMIT ${limit}
-    `
+    `;
 
     return result.map((row) => ({
       courseId: row.course_id,
@@ -215,19 +219,19 @@ export class DashboardRepository {
       totalRevenue: Number(row.total_revenue),
       totalEnrollments: Number(row.total_enrollments),
       averagePrice: Number(row.average_price),
-    }))
+    }));
   }
 
   async getTopCoursesByRevenue(limit: number = 5) {
     const result = await this.prisma.$queryRaw<
       Array<{
-        course_id: number
-        course_name: string
-        course_slug: string
-        thumbnail_url: string | null
-        level: string
-        total_revenue: bigint
-        total_enrollments: bigint
+        course_id: number;
+        course_name: string;
+        course_slug: string;
+        thumbnail_url: string | null;
+        level: string;
+        total_revenue: bigint;
+        total_enrollments: bigint;
       }>
     >`
       SELECT 
@@ -246,7 +250,7 @@ export class DashboardRepository {
       GROUP BY c.id, c.title, c.slug, c."thumbnailUrl", c.level
       ORDER BY total_revenue DESC
       LIMIT ${limit}
-    `
+    `;
 
     return result.map((row) => ({
       courseId: row.course_id,
@@ -256,19 +260,19 @@ export class DashboardRepository {
       level: row.level,
       totalRevenue: Number(row.total_revenue),
       totalEnrollments: Number(row.total_enrollments),
-    }))
+    }));
   }
 
   async getTopCoursesByEnrollments(limit: number = 5) {
     const result = await this.prisma.$queryRaw<
       Array<{
-        course_id: number
-        course_name: string
-        course_slug: string
-        thumbnail_url: string | null
-        level: string
-        total_revenue: bigint
-        total_enrollments: bigint
+        course_id: number;
+        course_name: string;
+        course_slug: string;
+        thumbnail_url: string | null;
+        level: string;
+        total_revenue: bigint;
+        total_enrollments: bigint;
       }>
     >`
       SELECT 
@@ -287,7 +291,7 @@ export class DashboardRepository {
       GROUP BY c.id, c.title, c.slug, c."thumbnailUrl", c.level
       ORDER BY total_enrollments DESC
       LIMIT ${limit}
-    `
+    `;
 
     return result.map((row) => ({
       courseId: row.course_id,
@@ -297,14 +301,14 @@ export class DashboardRepository {
       level: row.level,
       totalRevenue: Number(row.total_revenue),
       totalEnrollments: Number(row.total_enrollments),
-    }))
+    }));
   }
 
   async getTotalCourseStats() {
     const [totalCourses, totalEnrollments, courseRevenue] = await Promise.all([
       this.prisma.course.count({
         where: {
-          status: 'PUBLISHED',
+          status: "PUBLISHED",
         },
       }),
       this.prisma.enrollment.count(),
@@ -314,21 +318,25 @@ export class DashboardRepository {
         JOIN "Order" o ON oi."orderId" = o.id
         WHERE o.status = 'COMPLETED' AND oi."courseId" IS NOT NULL
       `,
-    ])
+    ]);
 
     return {
       totalCourses,
       totalEnrollments,
       totalCourseRevenue: Number(courseRevenue[0]?.total_revenue || 0),
-    }
+    };
   }
 
   // Quick stats queries
   async getQuickStats() {
-    const now = new Date()
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+    const now = new Date();
+    const todayStart = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+    );
+    const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
     const [
       totalRevenue,
@@ -341,12 +349,12 @@ export class DashboardRepository {
     ] = await Promise.all([
       this.getTotalRevenue(),
       this.getTotalUsers(),
-      this.prisma.course.count({ where: { status: 'PUBLISHED' } }),
+      this.prisma.course.count({ where: { status: "PUBLISHED" } }),
       this.prisma.enrollment.count(),
       this.getNewUsersCount(todayStart, now),
       this.getNewUsersCount(weekStart, now),
       this.getTotalRevenue(monthStart, now),
-    ])
+    ]);
 
     return {
       totalRevenue: totalRevenue.totalRevenue,
@@ -356,7 +364,7 @@ export class DashboardRepository {
       newUsersToday,
       newUsersThisWeek,
       revenueThisMonth: revenueThisMonth.totalRevenue,
-    }
+    };
   }
 
   // === Customer Dashboard Queries ===
@@ -365,9 +373,9 @@ export class DashboardRepository {
   async getCustomerCourseStats(userId: number) {
     const result = await this.prisma.$queryRaw<
       Array<{
-        total_courses: bigint
-        completed_courses: bigint
-        in_progress_courses: bigint
+        total_courses: bigint;
+        completed_courses: bigint;
+        in_progress_courses: bigint;
       }>
     >`
       SELECT 
@@ -420,32 +428,40 @@ export class DashboardRepository {
         END) as in_progress_courses
       FROM "Enrollment" e
       WHERE e."userId" = ${userId}
-    `
+    `;
 
-    const stats = result[0] || { total_courses: 0n, completed_courses: 0n, in_progress_courses: 0n }
+    const stats = result[0] || {
+      total_courses: 0n,
+      completed_courses: 0n,
+      in_progress_courses: 0n,
+    };
 
     return {
       totalCourses: Number(stats.total_courses),
       completedCourses: Number(stats.completed_courses),
       inProgressCourses: Number(stats.in_progress_courses),
-    }
+    };
   }
 
   // Study time statistics for customer
   async getCustomerStudyTime(userId: number) {
-    const now = new Date()
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+    const now = new Date();
+    const todayStart = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+    );
+    const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
     // Get lesson study time
     const lessonTimeResult = await this.prisma.$queryRaw<
       Array<{
-        total_study_minutes: bigint
-        today_study_minutes: bigint
-        week_study_minutes: bigint
-        month_study_minutes: bigint
+        total_study_minutes: bigint;
+        today_study_minutes: bigint;
+        week_study_minutes: bigint;
+        month_study_minutes: bigint;
       }>
     >`
       SELECT 
@@ -473,15 +489,15 @@ export class DashboardRepository {
         ), 0) / 60 as month_study_minutes
       FROM lesson_progress lp
       WHERE lp."userId" = ${userId}
-    `
+    `;
 
     // Get assessment study time (time spent on assessments and quizzes)
     const assessmentTimeResult = await this.prisma.$queryRaw<
       Array<{
-        total_assessment_minutes: bigint
-        today_assessment_minutes: bigint
-        week_assessment_minutes: bigint
-        month_assessment_minutes: bigint
+        total_assessment_minutes: bigint;
+        today_assessment_minutes: bigint;
+        week_assessment_minutes: bigint;
+        month_assessment_minutes: bigint;
       }>
     >`
       SELECT 
@@ -546,18 +562,18 @@ export class DashboardRepository {
             ELSE 0
           END
         ), 0) as month_assessment_minutes
-      FROM (SELECT ${userId} as user_id) u
+      FROM (SELECT ${userId}::integer as user_id) u
       LEFT JOIN "AssessmentAttempt" aa ON aa."userId" = u.user_id
       LEFT JOIN "QuizAttempt" qa ON qa."userId" = u.user_id
-    `
+    `;
 
     // Get daily breakdown for the last 30 days
     const dailyBreakdownResult = await this.prisma.$queryRaw<
       Array<{
-        study_date: Date
-        lesson_minutes: bigint
-        assessment_minutes: bigint
-        total_minutes: bigint
+        study_date: Date;
+        lesson_minutes: bigint;
+        assessment_minutes: bigint;
+        total_minutes: bigint;
       }>
     >`
       WITH date_series AS (
@@ -592,7 +608,7 @@ export class DashboardRepository {
               ELSE 0
             END
           ), 0) as assessment_minutes
-        FROM (SELECT ${userId} as user_id) u
+        FROM (SELECT ${userId}::integer as user_id) u
         LEFT JOIN "AssessmentAttempt" aa ON aa."userId" = u.user_id 
           AND aa."submittedAt" >= ${thirtyDaysAgo}
         LEFT JOIN "QuizAttempt" qa ON qa."userId" = u.user_id 
@@ -609,24 +625,26 @@ export class DashboardRepository {
       LEFT JOIN lesson_daily ld ON ds.study_date = ld.study_date
       LEFT JOIN assessment_daily ad ON ds.study_date = ad.study_date
       ORDER BY ds.study_date ASC
-    `
+    `;
 
     const lessonStats = lessonTimeResult[0] || {
       total_study_minutes: 0n,
       today_study_minutes: 0n,
       week_study_minutes: 0n,
       month_study_minutes: 0n,
-    }
+    };
 
     const assessmentStats = assessmentTimeResult[0] || {
       total_assessment_minutes: 0n,
       today_assessment_minutes: 0n,
       week_assessment_minutes: 0n,
       month_assessment_minutes: 0n,
-    }
+    };
 
     // Calculate study streak based on both lesson progress and assessment completion
-    const streakResult = await this.prisma.$queryRaw<Array<{ streak_days: bigint }>>`
+    const streakResult = await this.prisma.$queryRaw<
+      Array<{ streak_days: bigint }>
+    >`
       WITH daily_study AS (
         SELECT DISTINCT study_date 
         FROM (
@@ -661,17 +679,21 @@ export class DashboardRepository {
         ORDER BY study_date DESC 
         LIMIT 1
       )
-    `
+    `;
 
-    const streak = streakResult[0]?.streak_days || 0n
+    const streak = streakResult[0]?.streak_days || 0n;
 
     // Calculate total study time
-    const totalLessonMinutes = Number(lessonStats.total_study_minutes)
-    const totalAssessmentMinutes = Number(assessmentStats.total_assessment_minutes)
-    const totalMinutes = totalLessonMinutes + totalAssessmentMinutes
+    const totalLessonMinutes = Number(lessonStats.total_study_minutes);
+    const totalAssessmentMinutes = Number(
+      assessmentStats.total_assessment_minutes,
+    );
+    const totalMinutes = totalLessonMinutes + totalAssessmentMinutes;
 
     // Calculate active days
-    const daysActive = await this.prisma.$queryRaw<Array<{ active_days: bigint }>>`
+    const daysActive = await this.prisma.$queryRaw<
+      Array<{ active_days: bigint }>
+    >`
       SELECT COUNT(DISTINCT study_date) as active_days
       FROM (
         SELECT lp."updatedAt"::date as study_date
@@ -686,24 +708,30 @@ export class DashboardRepository {
         FROM "QuizAttempt" qa
         WHERE qa."userId" = ${userId} AND qa."submittedAt" IS NOT NULL
       ) combined_study
-    `
+    `;
 
-    const activeDays = Number(daysActive[0]?.active_days || 1)
-    const averageDailyMinutes = totalMinutes / Math.max(activeDays, 1)
+    const activeDays = Number(daysActive[0]?.active_days || 1);
+    const averageDailyMinutes = totalMinutes / Math.max(activeDays, 1);
 
     // Format daily breakdown
     const dailyBreakdown = dailyBreakdownResult.map((day) => ({
-      date: day.study_date.toISOString().split('T')[0], // YYYY-MM-DD format
+      date: day.study_date.toISOString().split("T")[0], // YYYY-MM-DD format
       lessonMinutes: Number(day.lesson_minutes),
       assessmentMinutes: Number(day.assessment_minutes),
       totalMinutes: Number(day.total_minutes),
-    }))
+    }));
 
     return {
       totalStudyMinutes: totalMinutes,
-      todayStudyMinutes: Number(lessonStats.today_study_minutes) + Number(assessmentStats.today_assessment_minutes),
-      thisWeekStudyMinutes: Number(lessonStats.week_study_minutes) + Number(assessmentStats.week_assessment_minutes),
-      thisMonthStudyMinutes: Number(lessonStats.month_study_minutes) + Number(assessmentStats.month_assessment_minutes),
+      todayStudyMinutes:
+        Number(lessonStats.today_study_minutes) +
+        Number(assessmentStats.today_assessment_minutes),
+      thisWeekStudyMinutes:
+        Number(lessonStats.week_study_minutes) +
+        Number(assessmentStats.week_assessment_minutes),
+      thisMonthStudyMinutes:
+        Number(lessonStats.month_study_minutes) +
+        Number(assessmentStats.month_assessment_minutes),
       averageDailyMinutes: Math.round(averageDailyMinutes * 100) / 100,
       studyStreak: Number(streak),
       dailyBreakdown,
@@ -719,19 +747,19 @@ export class DashboardRepository {
         thisWeekMinutes: Number(assessmentStats.week_assessment_minutes),
         thisMonthMinutes: Number(assessmentStats.month_assessment_minutes),
       },
-    }
+    };
   }
 
   // Assessment statistics for customer
   async getCustomerAssessmentStats(userId: number) {
     const result = await this.prisma.$queryRaw<
       Array<{
-        total_attempts: bigint
-        completed_assessments: bigint
-        average_score: number
-        highest_score: number
-        passed_assessments: bigint
-        failed_assessments: bigint
+        total_attempts: bigint;
+        completed_assessments: bigint;
+        average_score: number;
+        highest_score: number;
+        passed_assessments: bigint;
+        failed_assessments: bigint;
       }>
     >`
       SELECT 
@@ -743,7 +771,7 @@ export class DashboardRepository {
         COUNT(CASE WHEN aa.score IS NOT NULL AND aa.score < 60 THEN 1 END) as failed_assessments
       FROM "AssessmentAttempt" aa
       WHERE aa."userId" = ${userId}
-    `
+    `;
 
     const stats = result[0] || {
       total_attempts: 0n,
@@ -752,10 +780,13 @@ export class DashboardRepository {
       highest_score: 0,
       passed_assessments: 0n,
       failed_assessments: 0n,
-    }
+    };
 
-    const totalCompleted = Number(stats.completed_assessments)
-    const passRate = totalCompleted > 0 ? (Number(stats.passed_assessments) / totalCompleted) * 100 : 0
+    const totalCompleted = Number(stats.completed_assessments);
+    const passRate =
+      totalCompleted > 0
+        ? (Number(stats.passed_assessments) / totalCompleted) * 100
+        : 0;
 
     return {
       totalAttempts: Number(stats.total_attempts),
@@ -765,18 +796,18 @@ export class DashboardRepository {
       passedAssessments: Number(stats.passed_assessments),
       failedAssessments: Number(stats.failed_assessments),
       passRate: Math.round(passRate * 100) / 100,
-    }
+    };
   }
 
   // Flashcard statistics for customer
   async getCustomerFlashcardStats(userId: number) {
     const result = await this.prisma.$queryRaw<
       Array<{
-        total_flashcards: bigint
-        mastered_flashcards: bigint
-        reviewing_flashcards: bigint
-        new_flashcards: bigint
-        daily_reviews_completed: bigint
+        total_flashcards: bigint;
+        mastered_flashcards: bigint;
+        reviewing_flashcards: bigint;
+        new_flashcards: bigint;
+        daily_reviews_completed: bigint;
       }>
     >`
       SELECT 
@@ -790,7 +821,7 @@ export class DashboardRepository {
         END) as daily_reviews_completed
       FROM "CardProgress" cp
       WHERE cp."userId" = ${userId}
-    `
+    `;
 
     const stats = result[0] || {
       total_flashcards: 0n,
@@ -798,10 +829,12 @@ export class DashboardRepository {
       reviewing_flashcards: 0n,
       new_flashcards: 0n,
       daily_reviews_completed: 0n,
-    }
+    };
 
     // Calculate accuracy rate from recent reviews
-    const accuracyResult = await this.prisma.$queryRaw<Array<{ accuracy_rate: number }>>`
+    const accuracyResult = await this.prisma.$queryRaw<
+      Array<{ accuracy_rate: number }>
+    >`
       SELECT 
         CASE 
           WHEN COUNT(*) > 0 
@@ -812,9 +845,9 @@ export class DashboardRepository {
       WHERE "userId" = ${userId} 
         AND "lastGrade" IS NOT NULL
         AND "dueAt" >= CURRENT_DATE - INTERVAL '30 days'
-    `
+    `;
 
-    const accuracyRate = accuracyResult[0]?.accuracy_rate || 0
+    const accuracyRate = accuracyResult[0]?.accuracy_rate || 0;
 
     return {
       totalFlashcards: Number(stats.total_flashcards),
@@ -823,19 +856,19 @@ export class DashboardRepository {
       newFlashcards: Number(stats.new_flashcards),
       dailyReviewsCompleted: Number(stats.daily_reviews_completed),
       accuracyRate: Math.round(accuracyRate * 100) / 100,
-    }
+    };
   }
 
   // Payment summary for customer
   async getCustomerPaymentSummary(userId: number) {
     const result = await this.prisma.$queryRaw<
       Array<{
-        total_spent: bigint
-        total_orders: bigint
-        successful_payments: bigint
-        pending_payments: bigint
-        failed_payments: bigint
-        last_payment_date: Date | null
+        total_spent: bigint;
+        total_orders: bigint;
+        successful_payments: bigint;
+        pending_payments: bigint;
+        failed_payments: bigint;
+        last_payment_date: Date | null;
       }>
     >`
       SELECT 
@@ -847,7 +880,7 @@ export class DashboardRepository {
         MAX(CASE WHEN o.status = 'COMPLETED' THEN o."createdAt" END) as last_payment_date
       FROM "Order" o
       WHERE o."userId" = ${userId}
-    `
+    `;
 
     const stats = result[0] || {
       total_spent: 0n,
@@ -856,10 +889,13 @@ export class DashboardRepository {
       pending_payments: 0n,
       failed_payments: 0n,
       last_payment_date: null,
-    }
+    };
 
-    const totalOrders = Number(stats.total_orders)
-    const averageOrderValue = totalOrders > 0 ? Number(stats.total_spent) / Number(stats.successful_payments || 1) : 0
+    const totalOrders = Number(stats.total_orders);
+    const averageOrderValue =
+      totalOrders > 0
+        ? Number(stats.total_spent) / Number(stats.successful_payments || 1)
+        : 0;
 
     return {
       totalSpent: Number(stats.total_spent),
@@ -869,22 +905,22 @@ export class DashboardRepository {
       failedPayments: Number(stats.failed_payments),
       averageOrderValue: Math.round(averageOrderValue * 100) / 100,
       lastPaymentDate: stats.last_payment_date,
-    }
+    };
   }
 
   // Customer progress items
   async getCustomerProgress(userId: number, limit: number = 10) {
     const result = await this.prisma.$queryRaw<
       Array<{
-        course_id: number
-        course_name: string
-        course_slug: string
-        thumbnail_url: string | null
-        enrollment_date: Date
-        completed_lessons: bigint
-        total_lessons: bigint
-        last_studied_at: Date | null
-        level: string
+        course_id: number;
+        course_name: string;
+        course_slug: string;
+        thumbnail_url: string | null;
+        enrollment_date: Date;
+        completed_lessons: bigint;
+        total_lessons: bigint;
+        last_studied_at: Date | null;
+        level: string;
       }>
     >`
       SELECT 
@@ -906,12 +942,13 @@ export class DashboardRepository {
       GROUP BY c.id, c.title, c.slug, c."thumbnailUrl", e."createdAt", c.level
       ORDER BY last_studied_at DESC NULLS LAST, enrollment_date DESC
       LIMIT ${limit}
-    `
+    `;
 
     return result.map((row) => {
-      const completedLessons = Number(row.completed_lessons)
-      const totalLessons = Number(row.total_lessons)
-      const progressPercentage = totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0
+      const completedLessons = Number(row.completed_lessons);
+      const totalLessons = Number(row.total_lessons);
+      const progressPercentage =
+        totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0;
 
       return {
         courseId: row.course_id,
@@ -924,23 +961,23 @@ export class DashboardRepository {
         totalLessons,
         lastStudiedAt: row.last_studied_at,
         level: row.level,
-      }
-    })
+      };
+    });
   }
 
   // Customer flashcard decks
   async getCustomerFlashcardDecks(userId: number, limit: number = 10) {
     const result = await this.prisma.$queryRaw<
       Array<{
-        deck_id: number
-        deck_name: string
-        total_cards: bigint
-        new_cards: bigint
-        review_cards: bigint
-        mastered_cards: bigint
-        last_reviewed_at: Date | null
-        course_id: number | null
-        course_name: string | null
+        deck_id: number;
+        deck_name: string;
+        total_cards: bigint;
+        new_cards: bigint;
+        review_cards: bigint;
+        mastered_cards: bigint;
+        last_reviewed_at: Date | null;
+        course_id: number | null;
+        course_name: string | null;
       }>
     >`
       SELECT 
@@ -960,12 +997,13 @@ export class DashboardRepository {
       GROUP BY fd.id, fd.title
       ORDER BY last_reviewed_at DESC NULLS LAST
       LIMIT ${limit}
-    `
+    `;
 
     return result.map((row) => {
-      const totalCards = Number(row.total_cards)
-      const masteredCards = Number(row.mastered_cards)
-      const accuracyRate = totalCards > 0 ? (masteredCards / totalCards) * 100 : 0
+      const totalCards = Number(row.total_cards);
+      const masteredCards = Number(row.mastered_cards);
+      const accuracyRate =
+        totalCards > 0 ? (masteredCards / totalCards) * 100 : 0;
 
       return {
         deckId: row.deck_id,
@@ -978,21 +1016,21 @@ export class DashboardRepository {
         accuracyRate: Math.round(accuracyRate * 100) / 100,
         courseId: row.course_id,
         courseName: row.course_name,
-      }
-    })
+      };
+    });
   }
 
   // Customer recent payments
   async getCustomerRecentPayments(userId: number, limit: number = 10) {
     const result = await this.prisma.$queryRaw<
       Array<{
-        order_id: number
-        course_id: number | null
-        course_name: string | null
-        amount: number
-        status: string
-        payment_date: Date
-        payment_method: string | null
+        order_id: number;
+        course_id: number | null;
+        course_name: string | null;
+        amount: number;
+        status: string;
+        payment_date: Date;
+        payment_method: string | null;
       }>
     >`
       SELECT 
@@ -1010,21 +1048,22 @@ export class DashboardRepository {
       WHERE o."userId" = ${userId}
       ORDER BY o."createdAt" DESC
       LIMIT ${limit}
-    `
+    `;
 
     return result.map((row) => ({
       orderId: row.order_id,
       courseId: row.course_id,
-      courseName: row.course_name || 'Unknown Course',
+      courseName: row.course_name || "Unknown Course",
       amount: row.amount,
       status:
-        row.status.toLowerCase() === 'completed'
-          ? 'success'
-          : row.status.toLowerCase() === 'pending' || row.status.toLowerCase() === 'processing'
-            ? 'pending'
-            : 'failed',
+        row.status.toLowerCase() === "completed"
+          ? "success"
+          : row.status.toLowerCase() === "pending" ||
+              row.status.toLowerCase() === "processing"
+            ? "pending"
+            : "failed",
       paymentDate: row.payment_date,
       paymentMethod: row.payment_method,
-    }))
+    }));
   }
 }
