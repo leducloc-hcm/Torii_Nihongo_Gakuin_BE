@@ -1,6 +1,6 @@
-import { TypeOfVerificationCode } from 'src/shared/constants/auth.constant'
-import { UserSchema } from 'src/shared/models/shared-user.model'
-import { z } from 'zod'
+import { TypeOfVerificationCode } from "src/shared/constants/auth.constant";
+import { UserSchema } from "src/shared/models/shared-user.model";
+import { z } from "zod";
 
 export const RegisterBodySchema = UserSchema.pick({
   email: true,
@@ -9,16 +9,22 @@ export const RegisterBodySchema = UserSchema.pick({
   .extend({
     password: z
       .string()
-      .min(8, 'Password must be at least 8 characters long')
+      .min(8, "Password must be at least 8 characters long")
       .max(100)
-      .refine((v) => /[A-Z]/.test(v), { message: 'Must include at least 1 uppercase letter (A–Z)' })
-      .refine((v) => /[a-z]/.test(v), { message: 'Must include at least 1 lowercase letter (a–z)' })
-      .refine((v) => /\d/.test(v), { message: 'Must include at least 1 digit (0–9)' })
+      .refine((v) => /[A-Z]/.test(v), {
+        message: "Must include at least 1 uppercase letter (A–Z)",
+      })
+      .refine((v) => /[a-z]/.test(v), {
+        message: "Must include at least 1 lowercase letter (a–z)",
+      })
+      .refine((v) => /\d/.test(v), {
+        message: "Must include at least 1 digit (0–9)",
+      })
       .refine((v) => /[!@#$%^&*()_\-+[\]{};:'",.<>/?\\|`~]/.test(v), {
-        message: 'Must include at least 1 special character',
+        message: "Must include at least 1 special character",
       })
       .refine((v) => !/(.)\1\1/.test(v), {
-        message: 'No character may repeat 3+ times in a row',
+        message: "No character may repeat 3+ times in a row",
       }),
     confirmPassword: z.string().min(6).max(100),
     code: z.string().length(6),
@@ -27,17 +33,17 @@ export const RegisterBodySchema = UserSchema.pick({
   .superRefine(({ confirmPassword, password }, ctx) => {
     if (confirmPassword !== password) {
       ctx.addIssue({
-        code: 'custom',
-        message: 'Password and confirm password must match',
-        path: ['confirmPassword'],
-      })
+        code: "custom",
+        message: "Password and confirm password must match",
+        path: ["confirmPassword"],
+      });
     }
-  })
+  });
 
 export const RegisterResSchema = UserSchema.omit({
   password: true,
   totpSecret: true,
-})
+});
 
 export const VerificationCodeSchema = z.object({
   id: z.number(),
@@ -51,12 +57,12 @@ export const VerificationCodeSchema = z.object({
   ]),
   expiresAt: z.date(),
   createdAt: z.date(),
-})
+});
 
 export const SendOTPBodySchema = VerificationCodeSchema.pick({
   email: true,
   type: true,
-}).strict()
+}).strict();
 
 export const LoginBodySchema = UserSchema.pick({
   email: true,
@@ -69,43 +75,48 @@ export const LoginBodySchema = UserSchema.pick({
   .strict()
   .superRefine(({ totpCode, code }, ctx) => {
     // Nếu mà truyền cùng lúc totpCode và code thì sẽ add issue
-    const message = 'Bạn chỉ nên truyền mã xác thực 2FA hoặc mã OTP. Không được truyền cả 2'
+    const message =
+      "Bạn chỉ nên truyền mã xác thực 2FA hoặc mã OTP. Không được truyền cả 2";
     if (totpCode !== undefined && code !== undefined) {
       ctx.addIssue({
-        path: ['totpCode'],
+        path: ["totpCode"],
         message,
-        code: 'custom',
-      })
+        code: "custom",
+      });
       ctx.addIssue({
-        path: ['code'],
+        path: ["code"],
         message,
-        code: 'custom',
-      })
+        code: "custom",
+      });
     }
-  })
+  });
 
 export const LoginResSchema = z.object({
   accessToken: z.string(),
   refreshToken: z.string(),
-})
+});
 
 export const RefreshTokenBodySchema = z
   .object({
     refreshToken: z.string(),
   })
-  .strict()
+  .strict();
 
-export const RefreshTokenResSchema = LoginResSchema
+export const RefreshTokenResSchema = LoginResSchema;
 
 export const DeviceSchema = z.object({
   id: z.number(),
   userId: z.number(),
   userAgent: z.string(),
   ip: z.string(),
+  deviceName: z.string().nullable(),
+  browserName: z.string().nullable(),
+  osName: z.string().nullable(),
+  location: z.string().nullable(),
   lastActive: z.date(),
   createdAt: z.date(),
   isActive: z.boolean(),
-})
+});
 
 export const RefreshTokenSchema = z.object({
   token: z.string(),
@@ -113,13 +124,13 @@ export const RefreshTokenSchema = z.object({
   deviceId: z.number(),
   expiresAt: z.date(),
   createdAt: z.date(),
-})
+});
 
 export const CreateStaffAccountSchema = z.object({
   email: z.string().email(),
-  role: z.enum(['STAFF', 'LECTURER']),
+  role: z.enum(["STAFF", "LECTURER"]),
   name: z.string().min(1).max(100),
-})
+});
 export const RoleSchema = z.object({
   id: z.number(),
   name: z.string(),
@@ -130,18 +141,18 @@ export const RoleSchema = z.object({
   deletedAt: z.date().nullable(),
   createdAt: z.date(),
   updatedAt: z.date(),
-})
+});
 
-export const LogoutBodySchema = RefreshTokenBodySchema
+export const LogoutBodySchema = RefreshTokenBodySchema;
 
 export const GoogleAuthStateSchema = DeviceSchema.pick({
   userAgent: true,
   ip: true,
-})
+});
 
 export const GetAuthorizationUrlResSchema = z.object({
   url: z.string().url(),
-})
+});
 
 export const ForgotPasswordBodySchema = z
   .object({
@@ -149,16 +160,22 @@ export const ForgotPasswordBodySchema = z
     code: z.string().length(6),
     newPassword: z
       .string()
-      .min(8, 'Password must be at least 8 characters long')
+      .min(8, "Password must be at least 8 characters long")
       .max(100)
-      .refine((v) => /[A-Z]/.test(v), { message: 'Must include at least 1 uppercase letter (A–Z)' })
-      .refine((v) => /[a-z]/.test(v), { message: 'Must include at least 1 lowercase letter (a–z)' })
-      .refine((v) => /\d/.test(v), { message: 'Must include at least 1 digit (0–9)' })
+      .refine((v) => /[A-Z]/.test(v), {
+        message: "Must include at least 1 uppercase letter (A–Z)",
+      })
+      .refine((v) => /[a-z]/.test(v), {
+        message: "Must include at least 1 lowercase letter (a–z)",
+      })
+      .refine((v) => /\d/.test(v), {
+        message: "Must include at least 1 digit (0–9)",
+      })
       .refine((v) => /[!@#$%^&*()_\-+[\]{};:'",.<>/?\\|`~]/.test(v), {
-        message: 'Must include at least 1 special character',
+        message: "Must include at least 1 special character",
       })
       .refine((v) => !/(.)\1\1/.test(v), {
-        message: 'No character may repeat 3+ times in a row',
+        message: "No character may repeat 3+ times in a row",
       }),
     confirmNewPassword: z.string().min(8).max(100),
   })
@@ -166,12 +183,12 @@ export const ForgotPasswordBodySchema = z
   .superRefine(({ confirmNewPassword, newPassword }, ctx) => {
     if (confirmNewPassword !== newPassword) {
       ctx.addIssue({
-        code: 'custom',
-        message: 'Mật khẩu và mật khẩu xác nhận phải giống nhau',
-        path: ['confirmNewPassword'],
-      })
+        code: "custom",
+        message: "Mật khẩu và mật khẩu xác nhận phải giống nhau",
+        path: ["confirmNewPassword"],
+      });
     }
-  })
+  });
 
 export const DisableTwoFactorBodySchema = z
   .object({
@@ -180,39 +197,44 @@ export const DisableTwoFactorBodySchema = z
   })
   .strict()
   .superRefine(({ totpCode, code }, ctx) => {
-    const message = 'Bạn phải cung cấp mã xác thực 2FA hoặc mã OTP. Không được cung cấp cả 2'
+    const message =
+      "Bạn phải cung cấp mã xác thực 2FA hoặc mã OTP. Không được cung cấp cả 2";
     // Nếu cả 2 đều có hoặc không có thì sẽ nhảy vào if
     if ((totpCode !== undefined) === (code !== undefined)) {
       ctx.addIssue({
-        path: ['totpCode'],
+        path: ["totpCode"],
         message,
-        code: 'custom',
-      })
+        code: "custom",
+      });
       ctx.addIssue({
-        path: ['code'],
+        path: ["code"],
         message,
-        code: 'custom',
-      })
+        code: "custom",
+      });
     }
-  })
+  });
 export const TwoFactorSetupResSchema = z.object({
   secret: z.string(),
   uri: z.string(),
-})
-export type RegisterBodyType = z.infer<typeof RegisterBodySchema>
-export type RegisterResType = z.infer<typeof RegisterResSchema>
-export type VerificationCodeType = z.infer<typeof VerificationCodeSchema>
-export type SendOTPBodyType = z.infer<typeof SendOTPBodySchema>
-export type LoginBodyType = z.infer<typeof LoginBodySchema>
-export type LoginResType = z.infer<typeof LoginResSchema>
-export type RefreshTokenType = z.infer<typeof RefreshTokenSchema>
-export type RefreshTokenBodyType = z.infer<typeof RefreshTokenBodySchema>
-export type RefreshTokenResType = LoginResType
-export type DeviceType = z.infer<typeof DeviceSchema>
-export type LogoutBodyType = RefreshTokenBodyType
-export type GoogleAuthStateType = z.infer<typeof GoogleAuthStateSchema>
-export type GetAuthorizationUrlResType = z.infer<typeof GetAuthorizationUrlResSchema>
-export type ForgotPasswordBodyType = z.infer<typeof ForgotPasswordBodySchema>
-export type DisableTwoFactorBodyType = z.infer<typeof DisableTwoFactorBodySchema>
-export type TwoFactorSetupResType = z.infer<typeof TwoFactorSetupResSchema>
-export type CreateStaffAccountType = z.infer<typeof CreateStaffAccountSchema>
+});
+export type RegisterBodyType = z.infer<typeof RegisterBodySchema>;
+export type RegisterResType = z.infer<typeof RegisterResSchema>;
+export type VerificationCodeType = z.infer<typeof VerificationCodeSchema>;
+export type SendOTPBodyType = z.infer<typeof SendOTPBodySchema>;
+export type LoginBodyType = z.infer<typeof LoginBodySchema>;
+export type LoginResType = z.infer<typeof LoginResSchema>;
+export type RefreshTokenType = z.infer<typeof RefreshTokenSchema>;
+export type RefreshTokenBodyType = z.infer<typeof RefreshTokenBodySchema>;
+export type RefreshTokenResType = LoginResType;
+export type DeviceType = z.infer<typeof DeviceSchema>;
+export type LogoutBodyType = RefreshTokenBodyType;
+export type GoogleAuthStateType = z.infer<typeof GoogleAuthStateSchema>;
+export type GetAuthorizationUrlResType = z.infer<
+  typeof GetAuthorizationUrlResSchema
+>;
+export type ForgotPasswordBodyType = z.infer<typeof ForgotPasswordBodySchema>;
+export type DisableTwoFactorBodyType = z.infer<
+  typeof DisableTwoFactorBodySchema
+>;
+export type TwoFactorSetupResType = z.infer<typeof TwoFactorSetupResSchema>;
+export type CreateStaffAccountType = z.infer<typeof CreateStaffAccountSchema>;

@@ -72,6 +72,7 @@
     "resend": "^6.0.0",
     "rxjs": "^7.8.1",
     "socket.io": "^4.8.1",
+    "ua-parser-js": "^2.0.9",
     "uuid": "^11.1.0",
     "zod": "^3.24.2"
   },
@@ -87,6 +88,7 @@
     "@types/multer": "^2.0.0",
     "@types/node": "^22.10.7",
     "@types/supertest": "^6.0.2",
+    "@types/ua-parser-js": "^0.7.39",
     "eslint": "^9.37.0",
     "eslint-config-prettier": "^10.0.1",
     "eslint-plugin-prettier": "^5.2.2",

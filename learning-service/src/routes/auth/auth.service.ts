@@ -46,6 +46,12 @@ import { RoleName } from "src/shared/constants/role.constant";
 import { CreateStaffAccountBodyDTO } from "./auth.dto";
 import { CartService } from "../cart/cart.service";
 import { RabbitMQPublisher } from "src/shared/rabbitmq/rabbitmq.publisher";
+import {
+  parseDeviceInfo,
+  getLocationFromIp,
+} from "src/shared/device-info.helper";
+
+const MAX_DEVICES_PER_USER = 2;
 
 @Injectable()
 export class AuthService {
@@ -222,14 +228,39 @@ export class AuthService {
       }
     }
 
-    // 3. Tạo mới device
+    // 3. Enforce device limit: max 2 active devices per user
+    const activeDevices = await this.authRepository.findActiveDevicesByUserId(
+      user.id,
+    );
+    if (activeDevices.length >= MAX_DEVICES_PER_USER) {
+      // Deactivate the oldest devices to make room for the new one
+      const devicesToRemove = activeDevices.slice(
+        0,
+        activeDevices.length - MAX_DEVICES_PER_USER + 1,
+      );
+      await Promise.all(
+        devicesToRemove.map((d) =>
+          this.authRepository.deactivateDeviceAndDeleteTokens(d.id),
+        ),
+      );
+    }
+
+    // 4. Parse device info and get location
+    const parsedDevice = parseDeviceInfo(body.userAgent);
+    const location = await getLocationFromIp(body.ip);
+
+    // 5. Tạo mới device
     const device = await this.authRepository.createDevice({
       userId: user.id,
       userAgent: body.userAgent,
       ip: body.ip,
+      deviceName: parsedDevice.deviceName,
+      browserName: parsedDevice.browserName,
+      osName: parsedDevice.osName,
+      location,
     });
 
-    // 4. Tạo mới accessToken và refreshToken
+    // 5. Tạo mới accessToken và refreshToken
     const tokens = await this.generateTokens({
       userId: user.id,
       email: user.email,
@@ -237,7 +268,7 @@ export class AuthService {
       role: user.role,
     });
 
-    // 5. Publish login event for gamification
+    // 6. Publish login event for gamification
     this.rabbitMQPublisher.publishUserLogin(user.id, user.name).catch((err) => {
       // Non-blocking: don't fail login if event publish fails
       console.error("Failed to publish user.login event:", err);
@@ -528,5 +559,28 @@ export class AuthService {
       status: VerifyStatus.VERIFIED,
     } as any);
     return { message: "Kích hoạt tài khoản thành công" };
+  }
+
+  async getDevices(userId: number) {
+    return this.authRepository.findDevicesByUserId(userId);
+  }
+
+  async removeDevice(
+    userId: number,
+    deviceId: number,
+    currentDeviceId: number,
+  ) {
+    const device = await this.authRepository.findDeviceById(deviceId);
+    if (!device || device.userId !== userId) {
+      throw UnauthorizedAccessException;
+    }
+    if (device.id === currentDeviceId) {
+      throw new HttpException(
+        "Cannot remove the current device. Use logout instead.",
+        400,
+      );
+    }
+    await this.authRepository.deactivateDeviceAndDeleteTokens(deviceId);
+    return { message: "Device removed successfully" };
   }
 }

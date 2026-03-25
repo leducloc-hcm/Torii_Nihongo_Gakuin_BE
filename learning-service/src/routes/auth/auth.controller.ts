@@ -1,10 +1,13 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
   Ip,
+  Param,
+  ParseIntPipe,
   Post,
   Put,
   Query,
@@ -204,5 +207,22 @@ export class AuthController {
   enableUserAccount(@Req() req) {
     const userId = parseInt(req.params.id, 10);
     return this.authService.enableUserAccount(userId);
+  }
+
+  @Get("devices")
+  @Auth([AuthType.Bearer])
+  getDevices(@ActiveUser("userId") userId: number) {
+    return this.authService.getDevices(userId);
+  }
+
+  @Delete("devices/:id")
+  @Auth([AuthType.Bearer])
+  @ZodSerializerDto(MessageResDTO)
+  removeDevice(
+    @ActiveUser("userId") userId: number,
+    @ActiveUser("deviceId") currentDeviceId: number,
+    @Param("id", ParseIntPipe) deviceId: number,
+  ) {
+    return this.authService.removeDevice(userId, deviceId, currentDeviceId);
   }
 }

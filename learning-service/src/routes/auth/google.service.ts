@@ -11,6 +11,12 @@ import { RoleName } from "src/shared/constants/role.constant";
 import { VerifyStatus } from "src/shared/constants/auth.constant";
 import { ProfileService } from "../profile/profile.service";
 import { CartService } from "../cart/cart.service";
+import {
+  parseDeviceInfo,
+  getLocationFromIp,
+} from "src/shared/device-info.helper";
+
+const MAX_DEVICES_PER_USER = 2;
 
 @Injectable()
 export class GoogleService {
@@ -20,12 +26,12 @@ export class GoogleService {
     private readonly hashingService: HashingService,
     private readonly authService: AuthService,
     private readonly profileService: ProfileService,
-    private readonly cartService: CartService
+    private readonly cartService: CartService,
   ) {
     this.oauth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET,
-      process.env.GOOGLE_REDIRECT_URI
+      process.env.GOOGLE_REDIRECT_URI,
     );
   }
   getAuthorizationUrl({ userAgent, ip }: GoogleAuthStateType) {
@@ -38,7 +44,7 @@ export class GoogleService {
       JSON.stringify({
         userAgent,
         ip,
-      })
+      }),
     ).toString("base64");
     const url = this.oauth2Client.generateAuthUrl({
       access_type: "offline",
@@ -56,7 +62,7 @@ export class GoogleService {
       try {
         if (state) {
           const clientInfo = JSON.parse(
-            Buffer.from(state, "base64").toString()
+            Buffer.from(state, "base64").toString(),
           ) as GoogleAuthStateType;
           userAgent = clientInfo.userAgent;
           ip = clientInfo.ip;
@@ -102,10 +108,33 @@ export class GoogleService {
           this.cartService.initCart(user.id),
         ]);
       }
+      // Enforce device limit: max 2 active devices per user
+      const activeDevices = await this.authRepository.findActiveDevicesByUserId(
+        user.id,
+      );
+      if (activeDevices.length >= MAX_DEVICES_PER_USER) {
+        const devicesToRemove = activeDevices.slice(
+          0,
+          activeDevices.length - MAX_DEVICES_PER_USER + 1,
+        );
+        await Promise.all(
+          devicesToRemove.map((d) =>
+            this.authRepository.deactivateDeviceAndDeleteTokens(d.id),
+          ),
+        );
+      }
+
+      const parsedDevice = parseDeviceInfo(userAgent);
+      const location = await getLocationFromIp(ip);
+
       const device = await this.authRepository.createDevice({
         userId: user.id,
         userAgent,
         ip,
+        deviceName: parsedDevice.deviceName,
+        browserName: parsedDevice.browserName,
+        osName: parsedDevice.osName,
+        location,
       });
       const authTokens = await this.authService.generateTokens({
         userId: user.id,
