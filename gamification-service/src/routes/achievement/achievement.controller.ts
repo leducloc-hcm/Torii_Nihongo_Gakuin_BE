@@ -1,9 +1,18 @@
-import { Body, Controller, Get, Post } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+} from "@nestjs/common";
 import { ApiTags, ApiBearerAuth, ApiOperation } from "@nestjs/swagger";
 import { AchievementService } from "./achievement.service";
 import { ActiveUser } from "src/shared/decorators/active-user.decorator";
 import { IsPublic } from "src/shared/decorators/auth.decorator";
-import { CreateAchievementDTO } from "./achievement.dto";
+import { CreateAchievementDTO, UpdateAchievementDTO } from "./achievement.dto";
 
 @ApiTags("Achievements")
 @ApiBearerAuth()
@@ -28,5 +37,20 @@ export class AchievementController {
   @ApiOperation({ summary: "Create a new achievement definition (admin)" })
   createAchievement(@Body() body: CreateAchievementDTO) {
     return this.achievementService.createAchievement(body);
+  }
+
+  @Patch(":id")
+  @ApiOperation({ summary: "Update an achievement definition (admin)" })
+  updateAchievement(
+    @Param("id", ParseIntPipe) id: number,
+    @Body() body: UpdateAchievementDTO,
+  ) {
+    return this.achievementService.updateAchievement(id, body);
+  }
+
+  @Delete(":id")
+  @ApiOperation({ summary: "Delete an achievement definition (admin)" })
+  deleteAchievement(@Param("id", ParseIntPipe) id: number) {
+    return this.achievementService.deleteAchievement(id);
   }
 }

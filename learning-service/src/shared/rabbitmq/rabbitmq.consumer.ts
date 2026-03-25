@@ -3,6 +3,7 @@ import { RabbitMQService } from "./rabbitmq.service";
 import { SepayService } from "src/routes/payment/sepay.service";
 import { EnrollmentService } from "src/routes/enrollment/enrollment.service";
 import { PrismaService } from "src/shared/services/prisma.service";
+import { NotificationService } from "src/routes/notification/notification.service";
 
 @Injectable()
 export class RabbitMQConsumer implements OnModuleInit {
@@ -13,6 +14,7 @@ export class RabbitMQConsumer implements OnModuleInit {
     private sepayService: SepayService,
     private enrollmentService: EnrollmentService,
     private prisma: PrismaService,
+    private notificationService: NotificationService,
   ) {}
 
   async onModuleInit() {
@@ -52,6 +54,9 @@ export class RabbitMQConsumer implements OnModuleInit {
     // Consume enrollment/class commands (assessment-service orchestrates)
     await this.consumeEnrollmentCreate(channel, exchangeName);
     await this.consumeClassMemberCreate(channel, exchangeName);
+
+    // Consume achievement unlocked events from gamification-service
+    await this.consumeAchievementUnlocked(channel, exchangeName);
   }
 
   private async consumeAttemptGraded(channel: any, exchangeName: string) {
@@ -141,7 +146,9 @@ export class RabbitMQConsumer implements OnModuleInit {
           const expiresAt = payload.expiresAt;
 
           if (!userId || !courseId || !courseType) {
-            throw new Error("Invalid enrollment.create payload (userId/courseId/courseType required)");
+            throw new Error(
+              "Invalid enrollment.create payload (userId/courseId/courseType required)",
+            );
           }
 
           await this.enrollmentService.create(
@@ -183,7 +190,9 @@ export class RabbitMQConsumer implements OnModuleInit {
           const role = payload.role || "CUSTOMER";
 
           if (!userId || !classId) {
-            throw new Error("Invalid classmember.create payload (userId/classId required)");
+            throw new Error(
+              "Invalid classmember.create payload (userId/classId required)",
+            );
           }
 
           // Idempotent create
@@ -205,6 +214,51 @@ export class RabbitMQConsumer implements OnModuleInit {
               },
             });
           }
+
+          channel.ack(msg);
+        } catch (error) {
+          this.logger.error(`Error processing ${routingKey} event:`, error);
+          channel.nack(msg, false, true);
+        }
+      }
+    });
+
+    this.logger.log(`✅ Consumer registered for ${routingKey}`);
+  }
+
+  private async consumeAchievementUnlocked(channel: any, exchangeName: string) {
+    const queueName = "learning.gamification.achievement.unlocked";
+    const routingKey = "gamification.achievement.unlocked";
+
+    await channel.assertQueue(queueName, { durable: true });
+    await channel.bindQueue(queueName, exchangeName, routingKey);
+
+    await channel.consume(queueName, async (msg: any) => {
+      if (msg) {
+        try {
+          const event = JSON.parse(msg.content.toString());
+          this.logger.log(`Received ${routingKey} event:`, event);
+
+          const payload = event?.payload ?? event;
+          const userId = Number(payload.userId);
+          const achievementName = payload.name;
+
+          if (!userId || !achievementName) {
+            throw new Error("Invalid achievement.unlocked payload");
+          }
+
+          await this.notificationService.create({
+            type: "ACHIEVEMENT",
+            title: "Achievement Unlocked! 🏆",
+            message: `Congratulations! You've unlocked the achievement: "${achievementName}"`,
+            userId,
+            priority: "HIGH",
+            data: {
+              achievementId: payload.achievementId,
+              achievementName,
+            },
+            actionUrl: "/customer/gamification/achievements",
+          });
 
           channel.ack(msg);
         } catch (error) {

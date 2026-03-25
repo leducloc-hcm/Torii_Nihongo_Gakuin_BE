@@ -65,4 +65,20 @@ export class PointsRepository {
     }
     return stats;
   }
+
+  async updateUserName(userId: number, name: string) {
+    return this.prisma.userStats.upsert({
+      where: { userId },
+      create: { userId, totalXp: 0, totalCoins: 0, level: 1, name },
+      update: { name },
+    });
+  }
+
+  async getUserNamesByIds(userIds: number[]) {
+    if (userIds.length === 0) return [];
+    return this.prisma.userStats.findMany({
+      where: { userId: { in: userIds } },
+      select: { userId: true, name: true },
+    });
+  }
 }

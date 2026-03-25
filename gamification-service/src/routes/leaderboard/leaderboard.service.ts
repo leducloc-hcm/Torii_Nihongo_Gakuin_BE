@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
 import { RedisService } from "src/shared/redis/redis.service";
 import { LeaderboardRepository } from "./leaderboard.repo";
+import { PointsRepository } from "../points/points.repo";
 import {
   getCurrentPeriodKey,
   getRedisLeaderboardKey,
@@ -14,6 +15,7 @@ export class LeaderboardService {
   constructor(
     private readonly leaderboardRepo: LeaderboardRepository,
     private readonly redisService: RedisService,
+    private readonly pointsRepo: PointsRepository,
   ) {}
 
   async addXp(userId: number, xp: number) {
@@ -41,11 +43,20 @@ export class LeaderboardService {
       0,
       limit - 1,
     );
-    return entries.map((entry, index) => ({
-      userId: parseInt(entry.member, 10),
-      xp: entry.score,
-      rank: index + 1,
-    }));
+
+    const userIds = entries.map((e) => parseInt(e.member, 10));
+    const userNames = await this.pointsRepo.getUserNamesByIds(userIds);
+    const nameMap = new Map(userNames.map((u) => [u.userId, u.name]));
+
+    return entries.map((entry, index) => {
+      const userId = parseInt(entry.member, 10);
+      return {
+        userId,
+        xp: entry.score,
+        rank: index + 1,
+        name: nameMap.get(userId) ?? null,
+      };
+    });
   }
 
   async getMyRank(userId: number, period: "WEEKLY" | "MONTHLY") {

@@ -36,6 +36,17 @@ export class AchievementRepository {
     return records.map((r) => r.achievementId);
   }
 
+  async update(
+    id: number,
+    data: Partial<import("./achievement.model").CreateAchievementType>,
+  ) {
+    return this.prisma.achievement.update({ where: { id }, data });
+  }
+
+  async delete(id: number) {
+    return this.prisma.achievement.delete({ where: { id } });
+  }
+
   async unlockAchievement(userId: number, achievementId: number) {
     return this.prisma.userAchievement.create({
       data: { userId, achievementId },
@@ -54,7 +65,21 @@ export class AchievementRepository {
 
   async getUserStreakCurrent(userId: number): Promise<number> {
     const streak = await this.prisma.streak.findUnique({ where: { userId } });
+    return streak?.current ?? 0;
+  }
+
+  async getUserStreakLongest(userId: number): Promise<number> {
+    const streak = await this.prisma.streak.findUnique({ where: { userId } });
     return streak?.longest ?? 0;
+  }
+
+  async getUserLoginDays(userId: number): Promise<number> {
+    const result = await this.prisma.$queryRaw<[{ count: bigint }]>`
+      SELECT COUNT(DISTINCT DATE(created_at)) as count
+      FROM gamification.activity_logs
+      WHERE user_id = ${userId}
+    `;
+    return Number(result[0]?.count ?? 0);
   }
 
   async getUserTotalXp(userId: number): Promise<number> {

@@ -14,19 +14,26 @@ export class PointsService {
     private readonly rabbitMQPublisher: RabbitMQPublisher,
   ) {}
 
-  async addPoints(userId: number, delta: number, reason: string, meta?: any) {
+  async addPoints(
+    userId: number,
+    delta: number,
+    reason: string,
+    meta?: any,
+    coinsDelta?: number,
+  ) {
     // Record ledger entry
     await this.pointsRepo.addLedgerEntry(userId, delta, reason, meta);
 
     // Get current stats
     const stats = await this.pointsRepo.getOrCreateUserStats(userId);
+    const coins = coinsDelta !== undefined ? coinsDelta : delta;
     const newTotalXp = stats.totalXp + delta;
-    const newTotalCoins = stats.totalCoins + delta;
+    const newTotalCoins = stats.totalCoins + coins;
     const oldLevel = stats.level;
     const newLevel = levelFromXp(newTotalXp);
 
     // Update user stats
-    await this.pointsRepo.upsertUserStats(userId, delta, delta, newLevel);
+    await this.pointsRepo.upsertUserStats(userId, delta, coins, newLevel);
 
     // Invalidate cache
     await this.redisService.del(`gamification:user-stats:${userId}`);
@@ -50,5 +57,9 @@ export class PointsService {
 
   async getHistory(userId: number, page: number, limit: number) {
     return this.pointsRepo.getHistory(userId, page, limit);
+  }
+
+  async updateUserName(userId: number, name: string) {
+    return this.pointsRepo.updateUserName(userId, name);
   }
 }

@@ -82,4 +82,13 @@ export class RabbitMQPublisher {
       userId,
     });
   }
+
+  async publishUserLogin(userId: number, userName?: string): Promise<void> {
+    await this.publishEvent("user.login", {
+      type: "user.login",
+      payload: { userId, userName },
+      timestamp: new Date(),
+      userId,
+    });
+  }
 }

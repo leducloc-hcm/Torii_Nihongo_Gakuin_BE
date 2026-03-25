@@ -49,3 +49,6 @@ export const CreateAchievementSchema = z.object({
 });
 
 export type CreateAchievementType = z.infer<typeof CreateAchievementSchema>;
+
+export const UpdateAchievementSchema = CreateAchievementSchema.partial();
+export type UpdateAchievementType = z.infer<typeof UpdateAchievementSchema>;

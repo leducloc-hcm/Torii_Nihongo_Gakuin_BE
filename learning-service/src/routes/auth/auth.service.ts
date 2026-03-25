@@ -45,6 +45,7 @@ import { ProfileService } from "../profile/profile.service";
 import { RoleName } from "src/shared/constants/role.constant";
 import { CreateStaffAccountBodyDTO } from "./auth.dto";
 import { CartService } from "../cart/cart.service";
+import { RabbitMQPublisher } from "src/shared/rabbitmq/rabbitmq.publisher";
 
 @Injectable()
 export class AuthService {
@@ -56,7 +57,8 @@ export class AuthService {
     private readonly tokenService: TokenService,
     private readonly twoFactorService: TwoFactorService,
     private readonly profileService: ProfileService,
-    private readonly cartService: CartService
+    private readonly cartService: CartService,
+    private readonly rabbitMQPublisher: RabbitMQPublisher,
   ) {}
 
   async validateVerificationCode({
@@ -140,7 +142,7 @@ export class AuthService {
       // 2. Tạo mã OTP
       const code = generateOTP();
       const expiresInMs = ms(
-        (process.env.OTP_EXPIRES_IN || "5m") as Parameters<typeof ms>[0]
+        (process.env.OTP_EXPIRES_IN || "5m") as Parameters<typeof ms>[0],
       );
       await this.authRepository.createVerificationCode({
         email: body.email,
@@ -148,7 +150,7 @@ export class AuthService {
         type: body.type,
         expiresAt: addMilliseconds(
           new Date(),
-          typeof expiresInMs === "number" ? expiresInMs : 300000
+          typeof expiresInMs === "number" ? expiresInMs : 300000,
         ),
       });
       // 3. Gửi mã OTP
@@ -188,7 +190,7 @@ export class AuthService {
 
     const isPasswordMatch = await this.hashingService.compare(
       body.password,
-      user.password
+      user.password,
     );
     if (!isPasswordMatch) {
       throw InvalidPasswordException;
@@ -234,10 +236,22 @@ export class AuthService {
       deviceId: device.id,
       role: user.role,
     });
+
+    // 5. Publish login event for gamification
+    this.rabbitMQPublisher.publishUserLogin(user.id, user.name).catch((err) => {
+      // Non-blocking: don't fail login if event publish fails
+      console.error("Failed to publish user.login event:", err);
+    });
+
     return tokens;
   }
 
-  async generateTokens({ userId, email, deviceId, role }: AccessTokenPayloadCreate) {
+  async generateTokens({
+    userId,
+    email,
+    deviceId,
+    role,
+  }: AccessTokenPayloadCreate) {
     const [accessToken, refreshToken] = await Promise.all([
       this.tokenService.signAccessToken({
         userId,
@@ -293,7 +307,12 @@ export class AuthService {
         token: refreshToken,
       });
       // 5. Tạo mới accessToken và refreshToken
-      const $tokens = this.generateTokens({ userId, email, role: roleName, deviceId });
+      const $tokens = this.generateTokens({
+        userId,
+        email,
+        role: roleName,
+        deviceId,
+      });
       const [, , tokens] = await Promise.all([
         $updateDevice,
         $deleteRefreshToken,
@@ -380,7 +399,7 @@ export class AuthService {
     }
     // 2. Tạo ra secret và uri
     const { secret, uri } = this.twoFactorService.generateTOTPSecret(
-      user.email
+      user.email,
     );
     // 3. Cập nhật secret vào user trong database
     await this.sharedUserRepository.update({ id: userId }, {
@@ -394,7 +413,7 @@ export class AuthService {
   }
 
   async disableTwoFactorAuth(
-    data: DisableTwoFactorBodyType & { userId: number }
+    data: DisableTwoFactorBodyType & { userId: number },
   ) {
     const { userId, totpCode, code } = data;
     // 1. Lấy thông tin user, kiểm tra xem user có tồn tại hay không, và xem họ đã bật 2FA chưa

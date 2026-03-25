@@ -140,6 +140,7 @@ export class RabbitMQConsumer implements OnModuleInit {
           { orderId, amount },
         );
         await this.leaderboardService.addXp(userId, 10);
+        await this.achievementService.checkAndUnlock(userId);
       },
     );
 
@@ -164,6 +165,53 @@ export class RabbitMQConsumer implements OnModuleInit {
           cardCount,
         });
         await this.leaderboardService.addXp(userId, 5);
+        await this.achievementService.checkAndUnlock(userId);
+      },
+    );
+
+    // Consume quiz completed events from learning-service
+    await this.consumeEvent(
+      channel,
+      exchangeName,
+      "quiz.completed",
+      "gamification.quiz.completed",
+      async (data) => {
+        const { userId, quizId, score } = data.payload;
+        this.logger.log(`Quiz completed: user=${userId}, quiz=${quizId}`);
+
+        const points = 15;
+        await this.activityLogService.logActivity(
+          userId,
+          "QUIZ_COMPLETED",
+          points,
+          { quizId, score },
+        );
+        await this.pointsService.addPoints(userId, points, "Quiz completed", {
+          quizId,
+          score,
+        });
+        await this.streakService.recordActivity(userId);
+        await this.leaderboardService.addXp(userId, points);
+        await this.achievementService.checkAndUnlock(userId);
+      },
+    );
+
+    // Consume user login events from learning-service
+    await this.consumeEvent(
+      channel,
+      exchangeName,
+      "user.login",
+      "gamification.user.login",
+      async (data) => {
+        const { userId, userName } = data.payload;
+        this.logger.log(`User login: user=${userId}`);
+
+        if (userName) {
+          await this.pointsService.updateUserName(userId, userName);
+        }
+        await this.activityLogService.logActivity(userId, "LOGIN", 0, {});
+        await this.streakService.recordActivity(userId);
+        await this.achievementService.checkAndUnlock(userId);
       },
     );
 

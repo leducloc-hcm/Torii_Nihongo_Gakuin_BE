@@ -1,8 +1,9 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { forwardRef, Inject, Injectable, Logger } from "@nestjs/common";
 import { AchievementRepository } from "./achievement.repo";
 import { RedisService } from "src/shared/redis/redis.service";
 import { RabbitMQPublisher } from "src/shared/rabbitmq/rabbitmq.publisher";
 import { CreateAchievementType } from "./achievement.model";
+import { PointsService } from "../points/points.service";
 
 @Injectable()
 export class AchievementService {
@@ -12,6 +13,8 @@ export class AchievementService {
     private readonly achievementRepo: AchievementRepository,
     private readonly redisService: RedisService,
     private readonly rabbitMQPublisher: RabbitMQPublisher,
+    @Inject(forwardRef(() => PointsService))
+    private readonly pointsService: PointsService,
   ) {}
 
   async getAllAchievements() {
@@ -26,6 +29,18 @@ export class AchievementService {
     const achievement = await this.achievementRepo.create(data);
     await this.redisService.del("gamification:achievements:all");
     return achievement;
+  }
+
+  async updateAchievement(id: number, data: Partial<CreateAchievementType>) {
+    const achievement = await this.achievementRepo.update(id, data);
+    await this.redisService.del("gamification:achievements:all");
+    return achievement;
+  }
+
+  async deleteAchievement(id: number) {
+    await this.achievementRepo.delete(id);
+    await this.redisService.del("gamification:achievements:all");
+    return { message: "Achievement deleted successfully" };
   }
 
   async getUserAchievements(userId: number) {
@@ -58,6 +73,17 @@ export class AchievementService {
         );
         newlyUnlocked.push(unlocked);
 
+        // Award achievement rewards (coins and XP)
+        if (achievement.rewardXp > 0 || achievement.rewardCoins > 0) {
+          await this.pointsService.addPoints(
+            userId,
+            achievement.rewardXp,
+            `Achievement unlocked: ${achievement.name}`,
+            { achievementId: achievement.id },
+            achievement.rewardCoins,
+          );
+        }
+
         this.logger.log(
           `User ${userId} unlocked achievement: ${achievement.name}`,
         );
@@ -83,11 +109,11 @@ export class AchievementService {
   ): Promise<boolean> {
     switch (conditionType) {
       case "STREAK": {
-        const longest = await this.achievementRepo.getUserStreakCurrent(userId);
-        return longest >= conditionValue;
+        const current = await this.achievementRepo.getUserStreakCurrent(userId);
+        return current >= conditionValue;
       }
       case "KANJI": {
-        // Kanji count tracked via activity logs or external event metadata
+        // Kanji mastery tracked via LESSON_COMPLETED activities (kanji lessons)
         const count = await this.achievementRepo.countUserActivitiesByType(
           userId,
           "LESSON_COMPLETED",
@@ -95,7 +121,7 @@ export class AchievementService {
         return count >= conditionValue;
       }
       case "LISTENING": {
-        // Listening score tracked via mock test activities with meta
+        // Listening practice tracked via MOCK_TEST activities (listening sections)
         const count = await this.achievementRepo.countUserActivitiesByType(
           userId,
           "MOCK_TEST",
@@ -128,8 +154,8 @@ export class AchievementService {
         return totalXp >= conditionValue;
       }
       case "LOGIN_DAYS": {
-        const longest = await this.achievementRepo.getUserStreakCurrent(userId);
-        return longest >= conditionValue;
+        const days = await this.achievementRepo.getUserLoginDays(userId);
+        return days >= conditionValue;
       }
       default:
         return false;
