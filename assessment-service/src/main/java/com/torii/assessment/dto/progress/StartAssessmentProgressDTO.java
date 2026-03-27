@@ -1,13 +1,17 @@
-package com.torii.assessment.dto;
+package com.torii.assessment.dto.progress;
 
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 @Data
-public class CreateAttemptDTO {
+public class StartAssessmentProgressDTO {
+
     @NotNull
     private Long assessmentId;
-    
+
     @NotNull
     private Integer userId;
+
+    private Long assignmentId;
+    private Integer remainingSec;
 }

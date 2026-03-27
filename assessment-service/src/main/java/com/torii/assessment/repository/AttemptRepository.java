@@ -10,4 +10,5 @@ import java.util.List;
 public interface AttemptRepository extends JpaRepository<Attempt, Long> {
     List<Attempt> findByUserId(Integer userId);
     List<Attempt> findByAssessmentId(Long assessmentId);
+    long countByAssessmentIdAndUserId(Long assessmentId, Integer userId);
 }

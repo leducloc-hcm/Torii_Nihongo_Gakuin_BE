@@ -1,6 +1,6 @@
 package com.torii.assessment.service;
 
-import com.torii.assessment.dto.ItemDTO;
+import com.torii.assessment.dto.section.ItemDTO;
 import com.torii.assessment.dto.section.*;
 import com.torii.assessment.entity.AssessmentItem;
 import com.torii.assessment.entity.AssessmentSection;
@@ -42,6 +42,7 @@ public class AssessmentSectionService {
         section.setTitle(dto.getTitle());
         section.setType(dto.getType());
         section.setTimeLimitSec(dto.getTimeLimitSec());
+        section.setOrder(dto.getOrder());
 
         AssessmentSection saved = assessmentSectionRepository.save(section);
         log.info("Created assessment section: {}", saved.getId());
@@ -78,6 +79,9 @@ public class AssessmentSectionService {
                 .title(section.getTitle())
                 .timeLimitSec(section.getTimeLimitSec())
                 .type(section.getType())
+            .order(section.getOrder())
+            .createdAt(section.getCreatedAt())
+            .updatedAt(section.getUpdatedAt())
                 .items(itemDTOs)
                 .build();
     }
@@ -99,6 +103,7 @@ public class AssessmentSectionService {
 
         if (dto.getType() != null) section.setType(dto.getType());
         if (dto.getTimeLimitSec() != null) section.setTimeLimitSec(dto.getTimeLimitSec());
+        if (dto.getOrder() != null) section.setOrder(dto.getOrder());
 
         AssessmentSection updated = assessmentSectionRepository.save(section);
         log.info("Updated assessment section: {}", updated.getId());
@@ -173,6 +178,9 @@ public class AssessmentSectionService {
                 .title(section.getTitle())
                 .timeLimitSec(section.getTimeLimitSec())
                 .type(section.getType())
+            .order(section.getOrder())
+            .createdAt(section.getCreatedAt())
+            .updatedAt(section.getUpdatedAt())
                 .itemCount(itemCount)
                 .build();
     }

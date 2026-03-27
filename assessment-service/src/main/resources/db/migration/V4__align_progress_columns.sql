@@ -1,0 +1,14 @@
+ALTER TABLE assessment.progress
+    ADD COLUMN IF NOT EXISTS assignment_id BIGINT;
+
+ALTER TABLE assessment.progress
+    ADD COLUMN IF NOT EXISTS current_attempt_id BIGINT;
+
+ALTER TABLE assessment.progress
+    ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'IN_PROGRESS';
+
+ALTER TABLE assessment.progress
+    ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+
+ALTER TABLE assessment.progress
+    ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;

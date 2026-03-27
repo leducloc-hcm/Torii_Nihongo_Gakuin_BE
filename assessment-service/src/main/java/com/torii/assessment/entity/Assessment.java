@@ -2,6 +2,7 @@ package com.torii.assessment.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+
 import java.time.LocalDateTime;
 
 @Entity
@@ -11,26 +12,68 @@ public class Assessment {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
+
     private String title;
-    private String level; // N5, N4, N3, N2, N1
-    private String type; // TEST, EXAM
-    private String visibility; // PRIVATE, UNLISTED, PUBLIC
     private String description;
 
-    @Column(name = "created_by")
+    // Matches assessment_type enum in the DB (QUIZ, TEST, EXAM, ASSIGNMENT)
+    private String type;
+
+    // Level code (e.g., N5, N4, N3, N2, N1)
+    private String level;
+
+    // Visibility enum: PRIVATE, UNLISTED, PUBLIC
+    private String visibility = "PRIVATE";
+
+    @Column(name = "created_by", nullable = false)
     private Integer createdBy;
 
+    @Column(name = "lesson_id")
+    private Integer lessonId;
+
+    @Column(name = "class_id")
+    private Long classId;
+
+    @Column(name = "assigned_to_id")
+    private Integer assignedToId;
+
+    @Column(name = "start_at")
+    private LocalDateTime startAt;
+
+    @Column(name = "due_at")
+    private LocalDateTime dueAt;
+
+    @Column(name = "lock_after_due")
+    private Boolean lockAfterDue = false;
+
+    @Column(name = "time_limit_sec")
+    private Integer timeLimitSec;
+
+    @Column(name = "max_attempts")
+    private Integer maxAttempts;
+
+    @Column(name = "shuffle_questions")
+    private Boolean shuffleQuestions = false;
+
+    @Column(name = "shuffle_options")
+    private Boolean shuffleOptions = false;
+
     @Column(name = "created_at")
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime createdAt;
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    @Column(name = "score_profile_id")
-    private Long scoreProfileId;
-
-    private Integer version = 1;
+    @PrePersist
+    protected void onCreate() {
+        LocalDateTime now = LocalDateTime.now();
+        if (createdAt == null) {
+            createdAt = now;
+        }
+        if (updatedAt == null) {
+            updatedAt = now;
+        }
+    }
 
     @PreUpdate
     protected void onUpdate() {

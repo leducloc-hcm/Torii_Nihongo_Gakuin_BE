@@ -1,0 +1,2 @@
+ALTER TABLE assessment.progress
+    ADD COLUMN IF NOT EXISTS is_submitted BOOLEAN DEFAULT FALSE;

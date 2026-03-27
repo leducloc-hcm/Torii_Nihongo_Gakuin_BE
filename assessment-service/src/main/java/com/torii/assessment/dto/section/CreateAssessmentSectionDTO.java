@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Min;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -28,4 +29,7 @@ public class CreateAssessmentSectionDTO {
     private String type;
 
     private Integer timeLimitSec;
+
+    @Min(value = 0, message = "Order must be >= 0")
+    private Integer order;
 }
