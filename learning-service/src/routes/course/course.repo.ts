@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common'
-import { PrismaService } from 'src/shared/services/prisma.service'
+import { Injectable } from "@nestjs/common";
+import { PrismaService } from "src/shared/services/prisma.service";
 import {
   Course,
   CourseWithRelations,
@@ -8,7 +8,7 @@ import {
   CourseWhereUniqueInput,
   CourseWhereInput,
   CourseOrderByInput,
-} from './course.model'
+} from "./course.model";
 
 @Injectable()
 export class CourseRepository {
@@ -27,7 +27,7 @@ export class CourseRepository {
         },
       },
       orderBy: {
-        order: 'asc' as const,
+        order: "asc" as const,
       },
     },
     _count: {
@@ -37,7 +37,7 @@ export class CourseRepository {
         reviews: true,
       },
     },
-  }
+  };
 
   private readonly includeRelationsWithReviews = {
     ...this.includeRelations,
@@ -55,11 +55,11 @@ export class CourseRepository {
         },
       },
       orderBy: {
-        createdAt: 'desc' as const,
+        createdAt: "desc" as const,
       },
       take: 10, // Limit reviews to 10 most recent
     },
-  }
+  };
 
   async create(data: CourseCreateInput): Promise<CourseWithRelations> {
     return (await this.prisma.course.create({
@@ -68,16 +68,16 @@ export class CourseRepository {
         price: Number(data.price ?? 0),
       },
       include: this.includeRelations,
-    })) as any
+    })) as any;
   }
 
   async findAll(params: {
-    skip?: number
-    take?: number
-    where?: CourseWhereInput
-    orderBy?: CourseOrderByInput
+    skip?: number;
+    take?: number;
+    where?: CourseWhereInput;
+    orderBy?: CourseOrderByInput;
   }): Promise<{ courses: CourseWithRelations[]; total: number }> {
-    const { skip, take, where, orderBy } = params
+    const { skip, take, where, orderBy } = params;
 
     const [courses, total] = await Promise.all([
       this.prisma.course.findMany({
@@ -86,27 +86,91 @@ export class CourseRepository {
         include: this.includeRelations,
       }) as unknown as Promise<CourseWithRelations[]>,
       this.prisma.course.count({ where: where as any }),
-    ])
+    ]);
 
-    return { courses, total }
+    return { courses, total };
   }
 
-  async findOne(where: CourseWhereUniqueInput, includeReviews = false): Promise<CourseWithRelations | null> {
+  async findOne(
+    where: CourseWhereUniqueInput,
+    includeReviews = false,
+  ): Promise<CourseWithRelations | null> {
     return this.prisma.course.findUnique({
       where: where as any,
       include: this.includeRelations,
-    }) as Promise<CourseWithRelations | null>
+    }) as Promise<CourseWithRelations | null>;
   }
 
-  async findBySlug(slug: string, includeReviews = false): Promise<CourseWithRelations | null> {
+  async findOneWithLessons(where: CourseWhereUniqueInput): Promise<any> {
+    return this.prisma.course.findUnique({
+      where: where as any,
+      include: {
+        modules: {
+          select: {
+            id: true,
+            title: true,
+            order: true,
+            lessons: {
+              select: {
+                id: true,
+                title: true,
+                kind: true,
+                content: true,
+                order: true,
+                status: true,
+                durationSec: true,
+                createdAt: true,
+                updatedAt: true,
+                quiz: {
+                  select: {
+                    id: true,
+                    createdAt: true,
+                    timeLimitSec: true,
+                    title: true,
+                  },
+                },
+                media: {
+                  select: {
+                    id: true,
+                    url: true,
+                    kind: true,
+                    createdAt: true,
+                  },
+                },
+              },
+              orderBy: { order: "asc" as const },
+            },
+          },
+          orderBy: { order: "asc" as const },
+        },
+        _count: {
+          select: {
+            modules: true,
+            enrollments: true,
+            reviews: true,
+          },
+        },
+      },
+    });
+  }
+
+  async findBySlug(
+    slug: string,
+    includeReviews = false,
+  ): Promise<CourseWithRelations | null> {
     return this.prisma.course.findUnique({
       where: { slug },
-      include: includeReviews ? this.includeRelationsWithReviews : this.includeRelations,
-    }) as Promise<CourseWithRelations | null>
+      include: includeReviews
+        ? this.includeRelationsWithReviews
+        : this.includeRelations,
+    }) as Promise<CourseWithRelations | null>;
   }
 
-  async update(params: { where: CourseWhereUniqueInput; data: CourseUpdateInput }): Promise<CourseWithRelations> {
-    const { where, data } = params
+  async update(params: {
+    where: CourseWhereUniqueInput;
+    data: CourseUpdateInput;
+  }): Promise<CourseWithRelations> {
+    const { where, data } = params;
 
     return (await this.prisma.course.update({
       where: where as any,
@@ -115,13 +179,13 @@ export class CourseRepository {
         price: data.price !== undefined ? Number(data.price) : undefined,
       },
       include: this.includeRelations,
-    })) as any
+    })) as any;
   }
 
   async delete(where: CourseWhereUniqueInput): Promise<Course> {
     return await this.prisma.course.delete({
       where: where as any,
-    })
+    });
   }
 
   async checkSlugExists(slug: string, excludeId?: number): Promise<boolean> {
@@ -130,8 +194,8 @@ export class CourseRepository {
         slug,
         ...(excludeId && { id: { not: excludeId } }),
       },
-    })
-    return count > 0
+    });
+    return count > 0;
   }
 
   async checkLecturerExists(lecturerId: number): Promise<boolean> {
@@ -139,40 +203,40 @@ export class CourseRepository {
       where: {
         id: lecturerId,
         role: {
-          in: ['LECTURER', 'ADMIN'],
+          in: ["LECTURER", "ADMIN"],
         },
       },
-    })
-    return count > 0
+    });
+    return count > 0;
   }
 
   async findByLecturer(
     lecturerId: number,
     params: {
-      skip?: number
-      take?: number
-      where?: Omit<CourseWhereInput, 'lecturerId'>
-      orderBy?: CourseOrderByInput
+      skip?: number;
+      take?: number;
+      where?: Omit<CourseWhereInput, "lecturerId">;
+      orderBy?: CourseOrderByInput;
     },
   ): Promise<{ courses: CourseWithRelations[]; total: number }> {
-    const { skip, take, where = {}, orderBy } = params
+    const { skip, take, where = {}, orderBy } = params;
 
-    const whereWithLecturer = { ...where, lecturerId }
+    const whereWithLecturer = { ...where, lecturerId };
 
-    return this.findAll({ skip, take, where: whereWithLecturer, orderBy })
+    return this.findAll({ skip, take, where: whereWithLecturer, orderBy });
   }
 
   async getPublishedCourses(params: {
-    skip?: number
-    take?: number
-    where?: Omit<CourseWhereInput, 'status'>
-    orderBy?: CourseOrderByInput
+    skip?: number;
+    take?: number;
+    where?: Omit<CourseWhereInput, "status">;
+    orderBy?: CourseOrderByInput;
   }): Promise<{ courses: CourseWithRelations[]; total: number }> {
-    const { skip, take, where = {}, orderBy } = params
+    const { skip, take, where = {}, orderBy } = params;
 
-    const whereWithStatus = { ...where, status: 'PUBLISHED' as const }
+    const whereWithStatus = { ...where, status: "PUBLISHED" as const };
 
-    return this.findAll({ skip, take, where: whereWithStatus, orderBy })
+    return this.findAll({ skip, take, where: whereWithStatus, orderBy });
   }
 
   async findByIds(ids: number[]): Promise<Course[]> {
@@ -191,14 +255,16 @@ export class CourseRepository {
         level: true,
         status: true,
       },
-    }) as Promise<Course[]>
+    }) as Promise<Course[]>;
   }
-  async findAllPendingReviewCourses(params: { where?: CourseWhereInput }): Promise<CourseWithRelations[]> {
-    const { where = {} } = params
+  async findAllPendingReviewCourses(params: {
+    where?: CourseWhereInput;
+  }): Promise<CourseWithRelations[]> {
+    const { where = {} } = params;
 
-    const whereWithStatus = { ...where, status: 'PENDING_REVIEW' as const }
+    const whereWithStatus = { ...where, status: "PENDING_REVIEW" as const };
 
-    const { courses } = await this.findAll({ where: whereWithStatus })
-    return courses
+    const { courses } = await this.findAll({ where: whereWithStatus });
+    return courses;
   }
 }

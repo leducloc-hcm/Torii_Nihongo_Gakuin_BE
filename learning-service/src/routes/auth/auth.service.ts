@@ -50,8 +50,12 @@ import {
   parseDeviceInfo,
   getLocationFromIp,
 } from "src/shared/device-info.helper";
+import { RedisContextService } from "src/shared/redis/redis-context.service";
+import { NotificationGateway } from "src/websockets/notification.gateway";
 
 const MAX_DEVICES_PER_USER = 2;
+const DEVICE_REVOKED_PREFIX = "device:revoked:";
+const DEVICE_REVOKED_TTL = 3600; // 1 hour (matches access token expiry)
 
 @Injectable()
 export class AuthService {
@@ -65,7 +69,19 @@ export class AuthService {
     private readonly profileService: ProfileService,
     private readonly cartService: CartService,
     private readonly rabbitMQPublisher: RabbitMQPublisher,
+    private readonly redisContextService: RedisContextService,
+    private readonly notificationGateway: NotificationGateway,
   ) {}
+
+  async evictDevice(deviceId: number, userId: number) {
+    await this.authRepository.deactivateDeviceAndDeleteTokens(deviceId);
+    await this.redisContextService.set(
+      `${DEVICE_REVOKED_PREFIX}${deviceId}`,
+      "1",
+      DEVICE_REVOKED_TTL,
+    );
+    this.notificationGateway.notifyDeviceRevoked(userId, deviceId);
+  }
 
   async validateVerificationCode({
     email,
@@ -239,9 +255,7 @@ export class AuthService {
         activeDevices.length - MAX_DEVICES_PER_USER + 1,
       );
       await Promise.all(
-        devicesToRemove.map((d) =>
-          this.authRepository.deactivateDeviceAndDeleteTokens(d.id),
-        ),
+        devicesToRemove.map((d) => this.evictDevice(d.id, user.id)),
       );
     }
 
@@ -580,7 +594,8 @@ export class AuthService {
         400,
       );
     }
-    await this.authRepository.deactivateDeviceAndDeleteTokens(deviceId);
+    await this.evictDevice(deviceId, userId);
+
     return { message: "Device removed successfully" };
   }
 }

@@ -119,7 +119,7 @@ export class GoogleService {
         );
         await Promise.all(
           devicesToRemove.map((d) =>
-            this.authRepository.deactivateDeviceAndDeleteTokens(d.id),
+            this.authService.evictDevice(d.id, user.id),
           ),
         );
       }

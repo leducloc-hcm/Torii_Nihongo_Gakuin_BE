@@ -7,10 +7,14 @@ import {
 import { GqlExecutionContext } from "@nestjs/graphql";
 import { REQUEST_USER_KEY } from "src/shared/constants/auth.constant";
 import { TokenService } from "src/shared/services/token.service";
+import { RedisContextService } from "src/shared/redis/redis-context.service";
 
 @Injectable()
 export class AccessTokenGuard implements CanActivate {
-  constructor(private readonly tokenService: TokenService) {}
+  constructor(
+    private readonly tokenService: TokenService,
+    private readonly redisContextService: RedisContextService,
+  ) {}
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request =
       context.getType<string>() === "graphql"
@@ -40,10 +44,23 @@ export class AccessTokenGuard implements CanActivate {
     try {
       const decodedAccessToken =
         await this.tokenService.verifyAccessToken(accessToken);
+
+      // Check if the device has been revoked
+      if (decodedAccessToken.deviceId) {
+        const isRevoked = await this.redisContextService.exists(
+          `device:revoked:${decodedAccessToken.deviceId}`,
+        );
+        if (isRevoked) {
+          throw new UnauthorizedException("Device has been revoked");
+        }
+      }
+
       request[REQUEST_USER_KEY] = decodedAccessToken;
       return true;
-    } catch {
-      throw new UnauthorizedException();
+    } catch (error) {
+      throw new UnauthorizedException(
+        error instanceof UnauthorizedException ? error.message : undefined,
+      );
     }
   }
 }

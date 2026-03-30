@@ -569,8 +569,13 @@ export class CourseService {
       );
     }
 
-    // Get full course details
-    const course = await this.findOne(courseId, true);
+    // Get full course details with lessons included
+    const course = await this.courseRepository.findOneWithLessons({
+      id: courseId,
+    });
+    if (!course) {
+      throw new NotFoundException(`Course with ID ${courseId} not found`);
+    }
 
     // Get lecturer profiles
     const lecturerArray =

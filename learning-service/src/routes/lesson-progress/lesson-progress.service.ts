@@ -1,20 +1,30 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common'
-import { LessonProgressRepository } from './lesson-progress.repo'
-import { UpdateProgressType, CourseProgressType, CourseProgressDetailsType } from './lesson-progress.model'
-import { EnrollmentService } from '../enrollment/enrollment.service'
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from "@nestjs/common";
+import { LessonProgressRepository } from "./lesson-progress.repo";
+import {
+  UpdateProgressType,
+  CourseProgressType,
+  CourseProgressDetailsType,
+} from "./lesson-progress.model";
+import { EnrollmentService } from "../enrollment/enrollment.service";
+import { RabbitMQPublisher } from "src/shared/rabbitmq/rabbitmq.publisher";
 
 @Injectable()
 export class LessonProgressService {
   constructor(
     private readonly progressRepository: LessonProgressRepository,
     private readonly enrollmentService: EnrollmentService,
+    private readonly rabbitMQPublisher: RabbitMQPublisher,
   ) {}
 
   async updateProgress(userId: number, data: UpdateProgressType) {
-    const { lessonId, watchedSec, lastPositionSec, completed } = data
+    const { lessonId, watchedSec, lastPositionSec, completed } = data;
 
     // Check if user is enrolled in the course containing this lesson
-    const lesson = await this.progressRepository['prisma'].lesson.findUnique({
+    const lesson = await this.progressRepository["prisma"].lesson.findUnique({
       where: { id: lessonId },
       include: {
         module: {
@@ -23,18 +33,23 @@ export class LessonProgressService {
           },
         },
       },
-    })
+    });
 
     if (!lesson) {
-      throw new NotFoundException('Lesson not found')
+      throw new NotFoundException("Lesson not found");
     }
 
-    const courseId = lesson.module.course.id
+    const courseId = lesson.module.course.id;
 
     // Check enrollment
-    const isEnrolled = await this.enrollmentService.isUserEnrolled(userId, courseId)
+    const isEnrolled = await this.enrollmentService.isUserEnrolled(
+      userId,
+      courseId,
+    );
     if (!isEnrolled) {
-      throw new ForbiddenException('You must be enrolled in the course to track progress')
+      throw new ForbiddenException(
+        "You must be enrolled in the course to track progress",
+      );
     }
 
     // Upsert progress
@@ -57,37 +72,68 @@ export class LessonProgressService {
         lastPositionSec,
         completed,
       },
-    )
+    );
 
-    return progress
-  }
-
-  async getCourseProgress(userId: number, courseId: number): Promise<CourseProgressType> {
-    // Check enrollment
-    const isEnrolled = await this.enrollmentService.isUserEnrolled(userId, courseId)
-    if (!isEnrolled) {
-      throw new ForbiddenException('You must be enrolled in the course to view progress')
+    // Publish lesson.progressed event for gamification when lesson is completed
+    if (completed) {
+      this.rabbitMQPublisher
+        .publishLessonProgressed(userId, lessonId, {
+          watchedSec,
+          lastPositionSec,
+          completed,
+        })
+        .catch((err) => {
+          // Non-blocking: don't fail progress update if event publish fails
+          console.error("Failed to publish lesson.progressed event:", err);
+        });
     }
 
-    const result = await this.progressRepository.getCourseProgress(userId, courseId)
+    return progress;
+  }
+
+  async getCourseProgress(
+    userId: number,
+    courseId: number,
+  ): Promise<CourseProgressType> {
+    // Check enrollment
+    const isEnrolled = await this.enrollmentService.isUserEnrolled(
+      userId,
+      courseId,
+    );
+    if (!isEnrolled) {
+      throw new ForbiddenException(
+        "You must be enrolled in the course to view progress",
+      );
+    }
+
+    const result = await this.progressRepository.getCourseProgress(
+      userId,
+      courseId,
+    );
 
     if (!result || !result.course) {
-      throw new NotFoundException('Course not found')
+      throw new NotFoundException("Course not found");
     }
 
     if (!result.enrollment) {
-      throw new ForbiddenException('You are not enrolled in this course')
+      throw new ForbiddenException("You are not enrolled in this course");
     }
 
-    const { course, progresses, enrollment } = result
+    const { course, progresses, enrollment } = result;
 
     // Create a map for quick lookup
-    const progressMap = new Map(progresses.map((p) => [p.lessonId, p]))
+    const progressMap = new Map(progresses.map((p) => [p.lessonId, p]));
 
     // Calculate overall progress
-    const totalLessons = course.modules.reduce((total, module) => total + module.lessons.length, 0)
-    const completedLessons = progresses.filter((p) => p.completed).length
-    const progressPercentage = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0
+    const totalLessons = course.modules.reduce(
+      (total, module) => total + module.lessons.length,
+      0,
+    );
+    const completedLessons = progresses.filter((p) => p.completed).length;
+    const progressPercentage =
+      totalLessons > 0
+        ? Math.round((completedLessons / totalLessons) * 100)
+        : 0;
 
     // Add progress data to modules and lessons
     const modulesWithProgress = course.modules.map((module) => ({
@@ -95,7 +141,7 @@ export class LessonProgressService {
       title: module.title,
       order: module.order,
       lessons: module.lessons.map((lesson) => {
-        const progress = progressMap.get(lesson.id)
+        const progress = progressMap.get(lesson.id);
         return {
           id: lesson.id,
           title: lesson.title,
@@ -113,9 +159,9 @@ export class LessonProgressService {
                 lastPositionSec: 0,
                 completed: false,
               },
-        }
+        };
       }),
-    }))
+    }));
 
     return {
       course: {
@@ -132,49 +178,87 @@ export class LessonProgressService {
       progressPercentage,
       totalLessons,
       completedLessons,
-    }
+    };
   }
 
-  async getCourseProgressDetails(userId: number, courseId: number): Promise<CourseProgressDetailsType> {
+  async getCourseProgressDetails(
+    userId: number,
+    courseId: number,
+  ): Promise<CourseProgressDetailsType> {
     // Check enrollment
-    const isEnrolled = await this.enrollmentService.isUserEnrolled(userId, courseId)
+    const isEnrolled = await this.enrollmentService.isUserEnrolled(
+      userId,
+      courseId,
+    );
     if (!isEnrolled) {
-      throw new ForbiddenException('You must be enrolled in the course to view progress')
+      throw new ForbiddenException(
+        "You must be enrolled in the course to view progress",
+      );
     }
 
-    const result = await this.progressRepository.getCourseProgressDetails(userId, courseId)
+    const result = await this.progressRepository.getCourseProgressDetails(
+      userId,
+      courseId,
+    );
 
     if (!result || !result.enrollment) {
-      throw new ForbiddenException('You are not enrolled in this course')
+      throw new ForbiddenException("You are not enrolled in this course");
     }
 
-    const { enrollment, modules } = result
+    const { enrollment, modules } = result;
 
     // Calculate progress statistics
-    const totalLessons = modules.reduce((total, module) => total + module.lessons.length, 0)
-    const completedLessons = modules.reduce(
-      (total, module) => total + module.lessons.filter((lesson) => lesson.progress.some((p) => p.completed)).length,
+    const totalLessons = modules.reduce(
+      (total, module) => total + module.lessons.length,
       0,
-    )
+    );
+    const completedLessons = modules.reduce(
+      (total, module) =>
+        total +
+        module.lessons.filter((lesson) =>
+          lesson.progress.some((p) => p.completed),
+        ).length,
+      0,
+    );
     const totalWatchedTime = modules.reduce(
       (total, module) =>
-        total + module.lessons.reduce((moduleTotal, lesson) => moduleTotal + (lesson.progress[0]?.watchedSec || 0), 0),
+        total +
+        module.lessons.reduce(
+          (moduleTotal, lesson) =>
+            moduleTotal + (lesson.progress[0]?.watchedSec || 0),
+          0,
+        ),
       0,
-    )
+    );
     const totalDuration = modules.reduce(
       (total, module) =>
-        total + module.lessons.reduce((moduleTotal, lesson) => moduleTotal + (lesson.durationSec || 0), 0),
+        total +
+        module.lessons.reduce(
+          (moduleTotal, lesson) => moduleTotal + (lesson.durationSec || 0),
+          0,
+        ),
       0,
-    )
+    );
 
-    const progressPercentage = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0
-    const watchTimePercentage = totalDuration > 0 ? Math.round((totalWatchedTime / totalDuration) * 100) : 0
+    const progressPercentage =
+      totalLessons > 0
+        ? Math.round((completedLessons / totalLessons) * 100)
+        : 0;
+    const watchTimePercentage =
+      totalDuration > 0
+        ? Math.round((totalWatchedTime / totalDuration) * 100)
+        : 0;
 
     // Transform modules data
     const modulesWithProgress = modules.map((module) => {
-      const moduleLessons = module.lessons.length
-      const moduleCompleted = module.lessons.filter((lesson) => lesson.progress.some((p) => p.completed)).length
-      const moduleProgressPercentage = moduleLessons > 0 ? Math.round((moduleCompleted / moduleLessons) * 100) : 0
+      const moduleLessons = module.lessons.length;
+      const moduleCompleted = module.lessons.filter((lesson) =>
+        lesson.progress.some((p) => p.completed),
+      ).length;
+      const moduleProgressPercentage =
+        moduleLessons > 0
+          ? Math.round((moduleCompleted / moduleLessons) * 100)
+          : 0;
 
       return {
         id: module.id,
@@ -200,8 +284,8 @@ export class LessonProgressService {
                 completed: false,
               },
         })),
-      }
-    })
+      };
+    });
 
     return {
       enrollment: {
@@ -217,7 +301,7 @@ export class LessonProgressService {
       totalWatchedTime,
       totalDuration,
       modules: modulesWithProgress,
-    }
+    };
   }
 
   async getMyProgress(userId: number, lessonId: number) {
@@ -226,7 +310,7 @@ export class LessonProgressService {
         userId,
         lessonId,
       },
-    })
+    });
 
     return (
       progress || {
@@ -234,10 +318,10 @@ export class LessonProgressService {
         lastPositionSec: 0,
         completed: false,
       }
-    )
+    );
   }
   async getProgressSummary(userId: number) {
-    const summary = await this.progressRepository.getProgressSummary(userId)
-    return summary
+    const summary = await this.progressRepository.getProgressSummary(userId);
+    return summary;
   }
 }
