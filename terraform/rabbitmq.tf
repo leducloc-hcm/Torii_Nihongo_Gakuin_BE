@@ -5,8 +5,8 @@ resource "aws_security_group" "rabbitmq" {
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    from_port       = 5672
-    to_port         = 5672
+    from_port       = 5671
+    to_port         = 5671
     protocol        = "tcp"
     security_groups = [aws_security_group.ecs.id]
   }
@@ -34,11 +34,13 @@ resource "aws_security_group" "rabbitmq" {
 resource "aws_mq_broker" "main" {
   broker_name        = "${var.project_name}-rabbitmq"
   engine_type        = "RabbitMQ"
-  engine_version     = "3.11.20"
-  host_instance_type = "mq.t3.micro" # Adjust based on needs
-  
+  engine_version     = "3.13"
+  host_instance_type         = "mq.t3.micro" # Adjust based on needs
+  auto_minor_version_upgrade = true
+
   security_groups = [aws_security_group.rabbitmq.id]
-  subnet_ids      = aws_subnet.private[*].id
+  deployment_mode = "SINGLE_INSTANCE"
+  subnet_ids      = [aws_subnet.private[0].id]
 
   user {
     username = "admin"
@@ -56,8 +58,9 @@ resource "aws_mq_broker" "main" {
 
 # Random password for RabbitMQ
 resource "random_password" "rabbitmq_password" {
-  length  = 16
-  special = true
+  length           = 16
+  special          = true
+  override_special = "!@#$%^&*()-_+."
 }
 
 # Store RabbitMQ password in Secrets Manager

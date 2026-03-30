@@ -3,26 +3,14 @@ output "vpc_id" {
   value       = aws_vpc.main.id
 }
 
-output "database_endpoint" {
-  description = "RDS endpoint"
-  value       = aws_db_instance.main.endpoint
-  sensitive   = true
-}
-
-output "database_url" {
-  description = "Database connection URL"
-  value       = "postgresql://${var.database_username}:${var.database_password}@${aws_db_instance.main.endpoint}/${aws_db_instance.main.db_name}"
-  sensitive   = true
-}
-
 output "redis_endpoint" {
   description = "ElastiCache Redis endpoint"
-  value       = aws_elasticache_replication_group.main.configuration_endpoint_address
+  value       = aws_elasticache_replication_group.main.primary_endpoint_address
 }
 
 output "rabbitmq_endpoint" {
   description = "RabbitMQ broker endpoint"
-  value       = aws_mq_broker.main.instances[0].endpoint
+  value       = aws_mq_broker.main.instances[0].endpoints[0]
 }
 
 output "rabbitmq_amqp_endpoint" {
@@ -56,6 +44,11 @@ output "ecr_assessment_service_url" {
   value       = aws_ecr_repository.assessment_service.repository_url
 }
 
+output "ecr_gamification_service_url" {
+  description = "ECR repository URL for Gamification Service"
+  value       = aws_ecr_repository.gamification_service.repository_url
+}
+
 # Service URLs
 output "application_url" {
   description = "Application URL (via ALB)"
@@ -80,11 +73,11 @@ output "connection_info" {
   description = "Quick reference for connection information"
   value = {
     alb_url              = "http://${aws_lb.main.dns_name}"
-    database_host        = split(":", aws_db_instance.main.endpoint)[0]
-    redis_host           = aws_elasticache_replication_group.main.configuration_endpoint_address
+    database_host        = split(":", local.rds_endpoint)[0]
+    database_name        = local.rds_db_name
+    redis_host           = aws_elasticache_replication_group.main.primary_endpoint_address
     rabbitmq_host        = split(":", aws_mq_broker.main.instances[0].endpoints[0])[0]
     ecs_cluster          = aws_ecs_cluster.main.name
     service_discovery_ns = "${var.project_name}.local"
   }
 }
-

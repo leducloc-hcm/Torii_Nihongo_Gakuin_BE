@@ -42,25 +42,25 @@ resource "aws_elasticache_parameter_group" "main" {
 
 # ElastiCache Redis Cluster
 resource "aws_elasticache_replication_group" "main" {
-  replication_group_id       = "${var.project_name}-redis"
-  description                = "Redis cluster for Torii Nihongo Gakuin"
-  
-  engine                     = "redis"
-  engine_version             = "7.0"
-  node_type                  = var.redis_node_type
-  num_cache_clusters         = var.redis_num_cache_nodes
-  
-  port                       = 6379
-  parameter_group_name       = aws_elasticache_parameter_group.main.name
-  subnet_group_name          = aws_elasticache_subnet_group.main.name
-  security_group_ids         = [aws_security_group.redis.id]
-  
+  replication_group_id = "${var.project_name}-redis"
+  description          = "Redis cluster for Torii Nihongo Gakuin"
+
+  engine             = "redis"
+  engine_version     = "7.0"
+  node_type          = var.redis_node_type
+  num_cache_clusters = var.redis_num_cache_nodes
+
+  port                 = 6379
+  parameter_group_name = aws_elasticache_parameter_group.main.name
+  subnet_group_name    = aws_elasticache_subnet_group.main.name
+  security_group_ids   = [aws_security_group.redis.id]
+
   at_rest_encryption_enabled = true
-  transit_encryption_enabled  = false # Set to true if using auth_token
-  
+  transit_encryption_enabled = false # Set to true if using auth_token
+
   automatic_failover_enabled = var.redis_num_cache_nodes > 1
   multi_az_enabled           = var.redis_num_cache_nodes > 1
-  
+
   snapshot_retention_limit = 5
   snapshot_window          = "03:00-05:00"
 

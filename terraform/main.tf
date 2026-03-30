@@ -1,6 +1,6 @@
 terraform {
   required_version = ">= 1.5.0"
-  
+
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -11,18 +11,17 @@ terraform {
       version = "~> 3.5"
     }
   }
-  
+
   backend "s3" {
-    # Configure your S3 backend for state storage
-    # bucket = "torii-terraform-state"
-    # key    = "microservices/terraform.tfstate"
-    # region = "ap-southeast-1"
+    bucket = "torii-nihongo-storage"
+    key    = "terraform/terraform.tfstate"
+    region = "ap-southeast-1"
   }
 }
 
 provider "aws" {
   region = var.aws_region
-  
+
   default_tags {
     tags = {
       Project     = "Torii-Nihongo-Gakuin"
