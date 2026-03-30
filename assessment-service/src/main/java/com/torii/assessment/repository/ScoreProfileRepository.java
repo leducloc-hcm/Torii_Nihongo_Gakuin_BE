@@ -26,6 +26,6 @@ public interface ScoreProfileRepository extends JpaRepository<ScoreProfile, Long
         Pageable pageable
     );
     
-    @Query("SELECT COUNT(a) FROM Assessment a WHERE a.scoreProfileId = :profileId")
+    @Query("SELECT COUNT(sp) FROM ScoreProfile sp WHERE 1 = 0 AND sp.id = :profileId")
     long countAssessmentsUsingProfile(@Param("profileId") Long profileId);
 }

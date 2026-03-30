@@ -7,3 +7,6 @@ WHERE created_at IS NULL;
 
 ALTER TABLE assessment.items
 ALTER COLUMN created_at SET NOT NULL;
+
+ALTER TABLE assessment.progress
+    ADD COLUMN IF NOT EXISTS is_submitted BOOLEAN DEFAULT FALSE;

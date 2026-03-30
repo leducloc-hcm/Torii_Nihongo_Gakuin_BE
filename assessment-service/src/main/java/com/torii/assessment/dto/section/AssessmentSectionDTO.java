@@ -15,5 +15,8 @@ public class AssessmentSectionDTO {
     private String title;
     private Integer timeLimitSec;
     private String type;
+    private Integer order;
+    private java.time.LocalDateTime createdAt;
+    private java.time.LocalDateTime updatedAt;
     private Long itemCount;
 }

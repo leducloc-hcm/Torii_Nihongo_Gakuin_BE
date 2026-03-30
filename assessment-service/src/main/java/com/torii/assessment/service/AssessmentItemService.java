@@ -35,7 +35,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class AssessmentItemService {
 
-    private static final List<String> ALLOWED_SORT_FIELDS = List.of("id", "order", "name", "createdAt");
+    private static final List<String> ALLOWED_SORT_FIELDS = List.of("id", "order", "name", "createdAt", "updatedAt");
 
     private final AssessmentItemRepository assessmentItemRepository;
     private final AssessmentSectionRepository assessmentSectionRepository;
@@ -228,6 +228,8 @@ public class AssessmentItemService {
                 .name(item.getName())
                 .order(item.getOrder())
                 .scorePerQuestion(item.getScorePerQuestion())
+                .createdAt(item.getCreatedAt())
+                .updatedAt(item.getUpdatedAt())
                 .questions(questionResponses)
                 .questionGroups(groupResponses)
                 .build();

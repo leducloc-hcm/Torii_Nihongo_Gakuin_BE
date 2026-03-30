@@ -1,11 +1,9 @@
-package com.torii.assessment.dto;
+package com.torii.assessment.dto.answer;
 
 import lombok.Data;
 
 @Data
-public class AnswerDTO {
-    private Long id;
-    private Long questionId;
+public class UpdateAssessmentAnswerDTO {
     private Long selectedOptionId;
     private Boolean isCorrect;
     private Integer timeSpentSec;

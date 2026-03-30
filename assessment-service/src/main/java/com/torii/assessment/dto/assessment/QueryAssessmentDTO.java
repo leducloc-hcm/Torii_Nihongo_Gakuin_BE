@@ -19,14 +19,20 @@ public class QueryAssessmentDTO {
 
     private String level;   // N1, N2, N3, N4, N5
 
-    private String type;    // TEST, EXAM
+    private String type;    // TEST, EXAM, QUIZ, ASSIGNMENT
 
     private String visibility; // PRIVATE, UNLISTED, PUBLIC
+
+    private Long classId;
+
+    private Integer assignedToId;
+
+    private Integer lessonId;
 
     private String keyword; // search in title
 
     @Builder.Default
-    private String sortBy = "createdAt";
+    private String sortBy = "createdAt"; // createdAt | startAt | dueAt | id
 
     @Builder.Default
     private String sortOrder = "desc";

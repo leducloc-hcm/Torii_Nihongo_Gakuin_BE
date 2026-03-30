@@ -1,4 +1,4 @@
-package com.torii.assessment.dto;
+package com.torii.assessment.dto.section;
 
 import lombok.Data;
 import java.math.BigDecimal;

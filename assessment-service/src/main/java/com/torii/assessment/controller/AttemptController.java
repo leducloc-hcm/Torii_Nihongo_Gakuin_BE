@@ -1,8 +1,8 @@
 package com.torii.assessment.controller;
 
-import com.torii.assessment.dto.AttemptDTO;
-import com.torii.assessment.dto.CreateAttemptDTO;
-import com.torii.assessment.dto.SubmitAnswerDTO;
+import com.torii.assessment.dto.attempt.AttemptDTO;
+import com.torii.assessment.dto.attempt.CreateAttemptDTO;
+import com.torii.assessment.dto.attempt.SubmitAnswerDTO;
 import com.torii.assessment.service.AttemptService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;

@@ -7,6 +7,8 @@ import com.torii.assessment.dto.assessment.QueryAssessmentDTO;
 import com.torii.assessment.dto.assessment.UpdateAssessmentDTO;
 import com.torii.assessment.entity.Assessment;
 import com.torii.assessment.repository.AssessmentRepository;
+import com.torii.assessment.repository.AssessmentLogRepository;
+import com.torii.assessment.entity.AssessmentLog;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +30,7 @@ import java.util.stream.Collectors;
 public class AssessmentService {
 
     private final AssessmentRepository assessmentRepository;
+    private final AssessmentLogRepository assessmentLogRepository;
 
     @Transactional
     public AssessmentDTO createAssessment(CreateAssessmentDTO dto) {
@@ -37,12 +40,22 @@ public class AssessmentService {
         assessment.setType(dto.getType());
         assessment.setVisibility(dto.getVisibility());
         assessment.setCreatedBy(dto.getCreatedBy());
-        assessment.setScoreProfileId(dto.getScoreProfileId());
         assessment.setDescription(dto.getDescription());
-        assessment.setCourseId(dto.getCourseId());
+        assessment.setLessonId(dto.getLessonId());
+        assessment.setClassId(dto.getClassId());
+        assessment.setAssignedToId(dto.getAssignedToId());
+        assessment.setStartAt(dto.getStartAt());
+        assessment.setDueAt(dto.getDueAt());
+        assessment.setLockAfterDue(dto.getLockAfterDue());
+        assessment.setTimeLimitSec(dto.getTimeLimitSec());
+        assessment.setMaxAttempts(dto.getMaxAttempts());
+        assessment.setShuffleQuestions(dto.getShuffleQuestions());
+        assessment.setShuffleOptions(dto.getShuffleOptions());
 
         Assessment saved = assessmentRepository.save(assessment);
         log.info("Created assessment: {}", saved.getId());
+
+        saveLog(saved.getId(), "CREATE", null, null, null, dto.getCreatedBy(), "CREATE_ASSESSMENT");
 
         return mapToDTO(saved);
     }
@@ -87,13 +100,66 @@ public class AssessmentService {
         Assessment assessment = assessmentRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Assessment not found: " + id));
 
-        if (dto.getTitle() != null) assessment.setTitle(dto.getTitle());
-        if (dto.getLevel() != null) assessment.setLevel(dto.getLevel());
-        if (dto.getType() != null) assessment.setType(dto.getType());
-        if (dto.getVisibility() != null) assessment.setVisibility(dto.getVisibility());
-        if (dto.getScoreProfileId() != null) assessment.setScoreProfileId(dto.getScoreProfileId());
-        if (dto.getDescription() != null) assessment.setDescription(dto.getDescription());
-        if (dto.getCourseId() != null) assessment.setCourseId(dto.getCourseId());
+        if (dto.getTitle() != null) {
+            saveLog(id, "UPDATE", "title", assessment.getTitle(), dto.getTitle(), dto.getUpdatedBy(), "UPDATE_ASSESSMENT");
+            assessment.setTitle(dto.getTitle());
+        }
+        if (dto.getLevel() != null) {
+            saveLog(id, "UPDATE", "level", assessment.getLevel(), dto.getLevel(), dto.getUpdatedBy(), "UPDATE_ASSESSMENT");
+            assessment.setLevel(dto.getLevel());
+        }
+        if (dto.getType() != null) {
+            saveLog(id, "UPDATE", "type", assessment.getType(), dto.getType(), dto.getUpdatedBy(), "UPDATE_ASSESSMENT");
+            assessment.setType(dto.getType());
+        }
+        if (dto.getVisibility() != null) {
+            saveLog(id, "UPDATE", "visibility", assessment.getVisibility(), dto.getVisibility(), dto.getUpdatedBy(), "UPDATE_ASSESSMENT");
+            assessment.setVisibility(dto.getVisibility());
+        }
+        if (dto.getDescription() != null) {
+            saveLog(id, "UPDATE", "description", assessment.getDescription(), dto.getDescription(), dto.getUpdatedBy(), "UPDATE_ASSESSMENT");
+            assessment.setDescription(dto.getDescription());
+        }
+        if (dto.getLessonId() != null) {
+            saveLog(id, "UPDATE", "lessonId", assessment.getLessonId(), dto.getLessonId(), dto.getUpdatedBy(), "UPDATE_ASSESSMENT");
+            assessment.setLessonId(dto.getLessonId());
+        }
+        if (dto.getClassId() != null) {
+            saveLog(id, "UPDATE", "classId", assessment.getClassId(), dto.getClassId(), dto.getUpdatedBy(), "UPDATE_ASSESSMENT");
+            assessment.setClassId(dto.getClassId());
+        }
+        if (dto.getAssignedToId() != null) {
+            saveLog(id, "UPDATE", "assignedToId", assessment.getAssignedToId(), dto.getAssignedToId(), dto.getUpdatedBy(), "UPDATE_ASSESSMENT");
+            assessment.setAssignedToId(dto.getAssignedToId());
+        }
+        if (dto.getStartAt() != null) {
+            saveLog(id, "UPDATE", "startAt", assessment.getStartAt(), dto.getStartAt(), dto.getUpdatedBy(), "UPDATE_ASSESSMENT");
+            assessment.setStartAt(dto.getStartAt());
+        }
+        if (dto.getDueAt() != null) {
+            saveLog(id, "UPDATE", "dueAt", assessment.getDueAt(), dto.getDueAt(), dto.getUpdatedBy(), "UPDATE_ASSESSMENT");
+            assessment.setDueAt(dto.getDueAt());
+        }
+        if (dto.getLockAfterDue() != null) {
+            saveLog(id, "UPDATE", "lockAfterDue", assessment.getLockAfterDue(), dto.getLockAfterDue(), dto.getUpdatedBy(), "UPDATE_ASSESSMENT");
+            assessment.setLockAfterDue(dto.getLockAfterDue());
+        }
+        if (dto.getTimeLimitSec() != null) {
+            saveLog(id, "UPDATE", "timeLimitSec", assessment.getTimeLimitSec(), dto.getTimeLimitSec(), dto.getUpdatedBy(), "UPDATE_ASSESSMENT");
+            assessment.setTimeLimitSec(dto.getTimeLimitSec());
+        }
+        if (dto.getMaxAttempts() != null) {
+            saveLog(id, "UPDATE", "maxAttempts", assessment.getMaxAttempts(), dto.getMaxAttempts(), dto.getUpdatedBy(), "UPDATE_ASSESSMENT");
+            assessment.setMaxAttempts(dto.getMaxAttempts());
+        }
+        if (dto.getShuffleQuestions() != null) {
+            saveLog(id, "UPDATE", "shuffleQuestions", assessment.getShuffleQuestions(), dto.getShuffleQuestions(), dto.getUpdatedBy(), "UPDATE_ASSESSMENT");
+            assessment.setShuffleQuestions(dto.getShuffleQuestions());
+        }
+        if (dto.getShuffleOptions() != null) {
+            saveLog(id, "UPDATE", "shuffleOptions", assessment.getShuffleOptions(), dto.getShuffleOptions(), dto.getUpdatedBy(), "UPDATE_ASSESSMENT");
+            assessment.setShuffleOptions(dto.getShuffleOptions());
+        }
 
         Assessment updated = assessmentRepository.save(assessment);
         log.info("Updated assessment: {}", updated.getId());
@@ -108,6 +174,8 @@ public class AssessmentService {
         }
         assessmentRepository.deleteById(id);
         log.info("Deleted assessment: {}", id);
+
+        saveLog(id, "DELETE", null, null, null, null, "DELETE_ASSESSMENT");
     }
 
     private Specification<Assessment> buildSpecification(QueryAssessmentDTO queryDto) {
@@ -122,6 +190,15 @@ public class AssessmentService {
             }
             if (queryDto.getVisibility() != null && !queryDto.getVisibility().isBlank()) {
                 predicates.add(cb.equal(root.get("visibility"), queryDto.getVisibility()));
+            }
+            if (queryDto.getClassId() != null) {
+                predicates.add(cb.equal(root.get("classId"), queryDto.getClassId()));
+            }
+            if (queryDto.getAssignedToId() != null) {
+                predicates.add(cb.equal(root.get("assignedToId"), queryDto.getAssignedToId()));
+            }
+            if (queryDto.getLessonId() != null) {
+                predicates.add(cb.equal(root.get("lessonId"), queryDto.getLessonId()));
             }
             if (queryDto.getKeyword() != null && !queryDto.getKeyword().isBlank()) {
                 String kw = "%" + queryDto.getKeyword().toLowerCase() + "%";
@@ -142,10 +219,32 @@ public class AssessmentService {
             .description(assessment.getDescription())
             .courseId(assessment.getCourseId())
             .createdBy(assessment.getCreatedBy())
-            .scoreProfileId(assessment.getScoreProfileId())
-            .version(assessment.getVersion())
+            .lessonId(assessment.getLessonId())
+            .classId(assessment.getClassId())
+            .assignedToId(assessment.getAssignedToId())
+            .lockAfterDue(assessment.getLockAfterDue())
+            .timeLimitSec(assessment.getTimeLimitSec())
+            .maxAttempts(assessment.getMaxAttempts())
+            .shuffleQuestions(assessment.getShuffleQuestions())
+            .shuffleOptions(assessment.getShuffleOptions())
+            .startAt(assessment.getStartAt())
+            .dueAt(assessment.getDueAt())
             .createdAt(assessment.getCreatedAt())
             .updatedAt(assessment.getUpdatedAt())
             .build();
+    }
+
+    private void saveLog(Long assessmentId, String action, String fieldName, Object oldValue, Object newValue, Integer updatedBy, String changeSummary) {
+        AssessmentLog logEntry = new AssessmentLog();
+        logEntry.setAssessmentId(assessmentId);
+        logEntry.setAction(action);
+        logEntry.setFieldName(fieldName);
+        logEntry.setOldValue(oldValue != null ? oldValue.toString() : null);
+        logEntry.setNewValue(newValue != null ? newValue.toString() : null);
+        logEntry.setMetadata(null);
+        logEntry.setUpdatedBy(updatedBy);
+        logEntry.setUpdatedByName(null);
+        logEntry.setChangeSummary(changeSummary);
+        assessmentLogRepository.save(logEntry);
     }
 }

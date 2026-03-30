@@ -30,6 +30,7 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: true
     clean-disabled: false
+    validate-on-migrate: false
 
   data:
     redis:

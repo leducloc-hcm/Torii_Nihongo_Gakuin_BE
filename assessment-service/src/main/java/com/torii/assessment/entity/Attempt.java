@@ -8,6 +8,13 @@ import java.time.LocalDateTime;
 @Table(name = "attempts", schema = "assessment")
 @Data
 public class Attempt {
+
+    public enum AttemptStatus {
+        IN_PROGRESS,
+        SUBMITTED,
+        EXPIRED
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -17,6 +24,16 @@ public class Attempt {
     
     @Column(name = "user_id")
     private Integer userId;
+
+    @Column(name = "progress_id")
+    private Long progressId;
+
+    @Column(name = "attempt_no")
+    private Integer attemptNo;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status")
+    private AttemptStatus status;
     
     @Column(name = "started_at")
     private LocalDateTime startedAt;
@@ -26,9 +43,37 @@ public class Attempt {
     
     private Double score;
     
-    @Column(name = "level_suggestion")
-    private String levelSuggestion;
-    
     @Column(name = "earned_score")
     private Double earnedScore;
+
+    @Column(name = "level_suggestion")
+    private String levelSuggestion;
+
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    @PrePersist
+    protected void onCreate() {
+        LocalDateTime now = LocalDateTime.now();
+        if (createdAt == null) {
+            createdAt = now;
+        }
+        if (updatedAt == null) {
+            updatedAt = now;
+        }
+        if (startedAt == null) {
+            startedAt = now;
+        }
+        if (status == null) {
+            status = AttemptStatus.IN_PROGRESS;
+        }
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
 }

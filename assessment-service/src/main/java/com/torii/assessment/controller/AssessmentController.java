@@ -39,6 +39,9 @@ public class AssessmentController {
             @RequestParam(required = false) String level,
             @RequestParam(required = false) String type,
             @RequestParam(required = false) String visibility,
+            @RequestParam(required = false) Long classId,
+            @RequestParam(required = false) Integer assignedToId,
+            @RequestParam(required = false) Integer lessonId,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false, defaultValue = "createdAt") String sortBy,
             @RequestParam(required = false, defaultValue = "desc") String sortOrder) {
@@ -49,6 +52,9 @@ public class AssessmentController {
             .level(level)
             .type(type)
             .visibility(visibility)
+            .classId(classId)
+            .assignedToId(assignedToId)
+            .lessonId(lessonId)
             .keyword(keyword)
             .sortBy(sortBy)
             .sortOrder(sortOrder)

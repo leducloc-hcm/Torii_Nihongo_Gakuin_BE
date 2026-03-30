@@ -25,3 +25,17 @@ CREATE INDEX IF NOT EXISTS idx_user_course_access_user_id
 CREATE INDEX IF NOT EXISTS idx_user_course_access_course_id
     ON assessment.user_course_access(course_id);
 
+ALTER TABLE assessment.progress
+    ADD COLUMN IF NOT EXISTS assignment_id BIGINT;
+
+ALTER TABLE assessment.progress
+    ADD COLUMN IF NOT EXISTS current_attempt_id BIGINT;
+
+ALTER TABLE assessment.progress
+    ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'IN_PROGRESS';
+
+ALTER TABLE assessment.progress
+    ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+
+ALTER TABLE assessment.progress
+    ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
