@@ -213,6 +213,13 @@ services:
           - name: jwt-validator
             config:
               secret: nhatngutorii
+      - name: payment-webhook-route
+        paths:
+          - /payments/sepay/webhook
+        strip_path: false
+        methods:
+          - POST
+          - OPTIONS
       - name: payment-route
         paths:
           - /payment
