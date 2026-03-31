@@ -15,24 +15,26 @@ export class S3Service {
   private readonly BUCKET_NAME: string;
 
   constructor() {
-    // Make AWS environment variables optional for development
-    // Only initialize S3 if all required variables are present
+    // If AWS_ACCESS_KEY_ID isn't set, it will automatically use ECS Task Role credentials
     const hasAwsConfig =
       process.env.AWS_REGION &&
-      process.env.AWS_ACCESS_KEY_ID &&
-      process.env.AWS_SECRET_ACCESS_KEY &&
       process.env.AWS_S3_BUCKET_NAME;
 
     if (hasAwsConfig) {
       this.BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME!;
-      this.s3 = new S3({
-        region: process.env.AWS_REGION,
-        credentials: {
-          accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
-        },
-      });
-      this.logger.log("S3 service initialized");
+      
+      const s3Config: any = { region: process.env.AWS_REGION };
+      
+      // Use explicit credentials if provided (e.g. for local development)
+      if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
+        s3Config.credentials = {
+          accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+        };
+      }
+
+      this.s3 = new S3(s3Config);
+      this.logger.log("S3 service initialized" + (s3Config.credentials ? " with explicit credentials" : " with IAM role credentials"));
     } else {
       this.BUCKET_NAME = "default-bucket";
       // Create a dummy S3 instance to avoid null errors

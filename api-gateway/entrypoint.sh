@@ -1,9 +1,33 @@
 #!/bin/sh
 set -e
 
-# Replace environment variables in kong.yml
+# Replace environment variables in kong.yml for ECS service discovery
 if [ -f /usr/local/kong/kong.yml ]; then
-  # Replace REDIS_PASSWORD in kong.yml if provided (new nested format)
+  # Replace service hostnames with ECS service discovery names
+  # In docker-compose, these are container names (e.g., learning-service)
+  # In ECS, these are service discovery DNS names (e.g., learning-service.torii-nihongo-gakuin.local)
+  if [ -n "$LEARNING_SERVICE_HOST" ]; then
+    sed -i "s|http://learning-service:|http://${LEARNING_SERVICE_HOST}:|g" /usr/local/kong/kong.yml
+  fi
+
+  if [ -n "$ASSESSMENT_SERVICE_HOST" ]; then
+    sed -i "s|http://assessment-service:|http://${ASSESSMENT_SERVICE_HOST}:|g" /usr/local/kong/kong.yml
+  fi
+
+  if [ -n "$GAMIFICATION_SERVICE_HOST" ]; then
+    sed -i "s|http://gamification-service:|http://${GAMIFICATION_SERVICE_HOST}:|g" /usr/local/kong/kong.yml
+  fi
+
+  if [ -n "$API_DOCS_HOST" ]; then
+    sed -i "s|http://api-docs:|http://${API_DOCS_HOST}:|g" /usr/local/kong/kong.yml
+  fi
+
+  # Replace Redis hostname for rate-limiting plugin
+  if [ -n "$REDIS_ECS_HOST" ]; then
+    sed -i "s|host: redis|host: ${REDIS_ECS_HOST}|g" /usr/local/kong/kong.yml
+  fi
+
+  # Replace REDIS_PASSWORD in kong.yml if provided
   if [ -n "$REDIS_PASSWORD" ]; then
     sed -i "s/password: \"\"/password: \"$REDIS_PASSWORD\"/g" /usr/local/kong/kong.yml
   fi

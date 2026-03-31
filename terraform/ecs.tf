@@ -287,6 +287,7 @@ resource "aws_ecs_task_definition" "api_gateway" {
       { name = "LEARNING_SERVICE_HOST", value = "learning-service.${var.project_name}.local" },
       { name = "ASSESSMENT_SERVICE_HOST", value = "assessment-service.${var.project_name}.local" },
       { name = "GAMIFICATION_SERVICE_HOST", value = "gamification-service.${var.project_name}.local" },
+      { name = "API_DOCS_HOST", value = "api-docs.${var.project_name}.local" },
       { name = "REDIS_ECS_HOST", value = aws_elasticache_replication_group.main.primary_endpoint_address }
     ]
 

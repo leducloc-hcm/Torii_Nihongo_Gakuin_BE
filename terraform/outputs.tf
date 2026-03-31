@@ -51,8 +51,13 @@ output "ecr_gamification_service_url" {
 
 # Service URLs
 output "application_url" {
-  description = "Application URL (via ALB)"
-  value       = "http://${aws_lb.main.dns_name}"
+  description = "Application URL (via ALB - HTTPS)"
+  value       = "https://develop.torii-nihongo-gakuin.io.vn"
+}
+
+output "acm_certificate_arn" {
+  description = "ACM Certificate ARN"
+  value       = aws_acm_certificate.main.arn
 }
 
 # Secrets Manager ARNs

@@ -39,6 +39,12 @@ input CreateBlogInput {
   title: String!
 }
 
+input CreateTagGraphQLInput {
+  description: String
+  name: String!
+  slug: String!
+}
+
 """
 A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
 """
@@ -51,14 +57,22 @@ input GenerateBlogImageUploadInput {
 
 type Mutation {
   createBlog(createBlogInput: CreateBlogInput!): Blog!
+  createTag(createTagInput: CreateTagGraphQLInput!): TagObject!
   generateBlogImageUploadUrl(input: GenerateBlogImageUploadInput!): BlogImageUploadResponse!
   removeBlog(id: Int!): Blog!
+  removeTag(id: Int!): TagObject!
   updateBlog(id: Int!, updateBlogInput: UpdateBlogInput!): Blog!
+  updateTag(id: Int!, updateTagInput: UpdateTagGraphQLInput!): TagObject!
 }
 
 type PaginatedBlogsResponse {
   data: [Blog!]!
   meta: PaginationMeta!
+}
+
+type PaginatedTagsResponse {
+  data: [TagObject!]!
+  meta: TagPaginationMeta!
 }
 
 type PaginationMeta {
@@ -74,6 +88,9 @@ type Query {
   blogs(query: QueryBlogsInput): PaginatedBlogsResponse!
   blogsByAuthor(authorId: Int!, query: QueryBlogsInput): PaginatedBlogsResponse!
   blogsByTag(query: QueryBlogsInput, tagId: Int!): PaginatedBlogsResponse!
+  tag(id: Int!): TagObject!
+  tagBySlug(slug: String!): TagObject!
+  tags(query: QueryTagsGraphQLInput): PaginatedTagsResponse!
 }
 
 input QueryBlogsInput {
@@ -86,11 +103,36 @@ input QueryBlogsInput {
   tagId: Int
 }
 
+input QueryTagsGraphQLInput {
+  limit: Int = 10
+  page: Int = 1
+  search: String
+}
+
+type TagBlogCount {
+  blogs: Int!
+}
+
 type TagInBlog {
   description: String
   id: Int!
   name: String!
   slug: String!
+}
+
+type TagObject {
+  _count: TagBlogCount
+  description: String
+  id: Int!
+  name: String!
+  slug: String!
+}
+
+type TagPaginationMeta {
+  limit: Int!
+  page: Int!
+  total: Int!
+  totalPages: Int!
 }
 
 input UpdateBlogInput {
@@ -99,4 +141,10 @@ input UpdateBlogInput {
   slug: String
   tagIds: [Int!] = []
   title: String
+}
+
+input UpdateTagGraphQLInput {
+  description: String
+  name: String
+  slug: String
 }
