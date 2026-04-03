@@ -10,6 +10,7 @@ import { AchievementModule } from "./routes/achievement/achievement.module";
 import { LeaderboardModule } from "./routes/leaderboard/leaderboard.module";
 import { RewardModule } from "./routes/reward/reward.module";
 import { ActivityLogModule } from "./routes/activity-log/activity-log.module";
+import { SeasonalEventModule } from "./routes/seasonal-event/seasonal-event.module";
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { ActivityLogModule } from "./routes/activity-log/activity-log.module";
     LeaderboardModule,
     RewardModule,
     ActivityLogModule,
+    SeasonalEventModule,
   ],
 })
 export class AppModule {}

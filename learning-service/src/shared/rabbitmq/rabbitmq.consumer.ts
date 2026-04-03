@@ -57,6 +57,9 @@ export class RabbitMQConsumer implements OnModuleInit {
 
     // Consume achievement unlocked events from gamification-service
     await this.consumeAchievementUnlocked(channel, exchangeName);
+
+    // Consume reward redeemed events from gamification-service (creates coupons for DISCOUNT rewards)
+    await this.consumeRewardRedeemed(channel, exchangeName);
   }
 
   private async consumeAttemptGraded(channel: any, exchangeName: string) {
@@ -269,5 +272,126 @@ export class RabbitMQConsumer implements OnModuleInit {
     });
 
     this.logger.log(`✅ Consumer registered for ${routingKey}`);
+  }
+
+  private async consumeRewardRedeemed(channel: any, exchangeName: string) {
+    const queueName = "learning.gamification.reward.redeemed";
+    const routingKey = "gamification.reward.redeemed";
+
+    await channel.assertQueue(queueName, { durable: true });
+    await channel.bindQueue(queueName, exchangeName, routingKey);
+
+    await channel.consume(queueName, async (msg: any) => {
+      if (msg) {
+        try {
+          const event = JSON.parse(msg.content.toString());
+          this.logger.log(`Received ${routingKey} event:`, event);
+
+          const payload = event?.payload ?? event;
+          await this.handleRewardRedeemed(payload);
+
+          channel.ack(msg);
+        } catch (error) {
+          this.logger.error(`Error processing ${routingKey} event:`, error);
+          channel.nack(msg, false, true);
+        }
+      }
+    });
+
+    this.logger.log(`✅ Consumer registered for ${routingKey}`);
+  }
+
+  private async handleRewardRedeemed(payload: any) {
+    const { userId, rewardType, rewardName, couponCode, discountMeta } =
+      payload;
+
+    // Only create a coupon for DISCOUNT rewards
+    if (rewardType !== "DISCOUNT" || !couponCode) {
+      this.logger.debug(
+        `Skipping coupon creation for non-DISCOUNT reward type: ${rewardType}`,
+      );
+
+      // Send notification for non-DISCOUNT rewards
+      await this.notificationService.create({
+        type: "REWARD",
+        title: "Reward Redeemed! 🎁",
+        message: `You've successfully redeemed: "${rewardName}"`,
+        userId: Number(userId),
+        priority: "NORMAL",
+        data: { rewardType, rewardName },
+        actionUrl: "/customer/gamification/shop",
+      });
+      return;
+    }
+
+    // Check idempotency: don't create duplicate coupon for same code
+    const existingCoupon = await this.prisma.coupon.findUnique({
+      where: { code: couponCode },
+    });
+    if (existingCoupon) {
+      this.logger.warn(
+        `Coupon ${couponCode} already exists, skipping creation`,
+      );
+      return;
+    }
+
+    const discountType = discountMeta?.discountType || "PERCENTAGE";
+    const discountValue = discountMeta?.discountValue || 10;
+    const maxDiscountAmount = discountMeta?.maxDiscountAmount || null;
+    const applicableCourseIds: number[] =
+      discountMeta?.applicableCourseIds || [];
+
+    // Set coupon expiry to 30 days from now
+    const endsAt = new Date();
+    endsAt.setDate(endsAt.getDate() + 30);
+
+    // Create the coupon directly in learning DB (auto-approved, auto-active)
+    const coupon = await this.prisma.coupon.create({
+      data: {
+        code: couponCode,
+        title: `Reward: ${rewardName}`,
+        description: `Auto-generated coupon from gamification reward redemption`,
+        type: "DISCOUNT_SINGLE",
+        discountType,
+        discountValue: Math.floor(discountValue),
+        maxDiscountAmount,
+        maxRedemptions: 1,
+        perUserLimit: 1,
+        startsAt: new Date(),
+        endsAt,
+        status: "ACTIVE",
+        createdBy: Number(userId),
+        ...(applicableCourseIds.length > 0
+          ? {
+              courses: {
+                create: applicableCourseIds.map((courseId: number) => ({
+                  courseId,
+                  required: false,
+                })),
+              },
+            }
+          : {}),
+      },
+    });
+
+    this.logger.log(
+      `Created coupon ${coupon.code} for user ${userId} from reward redemption`,
+    );
+
+    // Notify user about the coupon
+    await this.notificationService.create({
+      type: "REWARD",
+      title: "Discount Coupon Received! 🎉",
+      message: `You've redeemed "${rewardName}" and received coupon code: ${couponCode}. It's valid for 30 days.`,
+      userId: Number(userId),
+      priority: "HIGH",
+      data: {
+        couponCode,
+        discountType,
+        discountValue,
+        rewardName,
+      },
+      actionUrl: "/customer/gamification/shop",
+    });
   }
 }

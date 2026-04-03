@@ -105,20 +105,40 @@ export class RabbitMQConsumer implements OnModuleInit {
         const { userId, score, paperId, totalQuestions } = data.payload;
         this.logger.log(`Attempt graded: user=${userId}, score=${score}`);
 
-        const points = 20;
-        await this.activityLogService.logActivity(userId, "MOCK_TEST", points, {
-          score,
-          paperId,
-          totalQuestions,
-        });
+        // Base points + score-based bonus coins
+        const basePoints = 20;
+        const scorePercent =
+          totalQuestions > 0 ? (score / totalQuestions) * 100 : 0;
+        const bonusCoins =
+          scorePercent === 100
+            ? 20 // Perfect score — big bonus
+            : scorePercent >= 90
+              ? 10 // Excellent
+              : scorePercent >= 80
+                ? 5 // High score
+                : 0;
+
+        await this.activityLogService.logActivity(
+          userId,
+          "MOCK_TEST",
+          basePoints,
+          {
+            score,
+            paperId,
+            totalQuestions,
+            scorePercent: Math.round(scorePercent),
+            bonusCoins,
+          },
+        );
         await this.pointsService.addPoints(
           userId,
-          points,
-          "Mock test completed",
+          basePoints,
+          `Mock test completed (score: ${score}/${totalQuestions})`,
           { score, paperId },
+          basePoints + bonusCoins,
         );
         await this.streakService.recordActivity(userId);
-        await this.leaderboardService.addXp(userId, points);
+        await this.leaderboardService.addXp(userId, basePoints);
         await this.achievementService.checkAndUnlock(userId);
       },
     );
@@ -176,22 +196,40 @@ export class RabbitMQConsumer implements OnModuleInit {
       "quiz.completed",
       "gamification.quiz.completed",
       async (data) => {
-        const { userId, quizId, score } = data.payload;
+        const { userId, quizId, score, totalQuestions } = data.payload;
         this.logger.log(`Quiz completed: user=${userId}, quiz=${quizId}`);
 
-        const points = 15;
+        const basePoints = 15;
+        const scorePercent =
+          totalQuestions > 0 ? (score / totalQuestions) * 100 : 0;
+        const bonusCoins =
+          scorePercent === 100
+            ? 10 // Perfect
+            : scorePercent >= 90
+              ? 5 // Excellent
+              : 0;
+
         await this.activityLogService.logActivity(
           userId,
           "QUIZ_COMPLETED",
-          points,
-          { quizId, score },
+          basePoints,
+          {
+            quizId,
+            score,
+            totalQuestions,
+            scorePercent: Math.round(scorePercent),
+            bonusCoins,
+          },
         );
-        await this.pointsService.addPoints(userId, points, "Quiz completed", {
-          quizId,
-          score,
-        });
+        await this.pointsService.addPoints(
+          userId,
+          basePoints,
+          `Quiz completed (score: ${score}/${totalQuestions ?? "?"})`,
+          { quizId, score },
+          basePoints + bonusCoins,
+        );
         await this.streakService.recordActivity(userId);
-        await this.leaderboardService.addXp(userId, points);
+        await this.leaderboardService.addXp(userId, basePoints);
         await this.achievementService.checkAndUnlock(userId);
       },
     );

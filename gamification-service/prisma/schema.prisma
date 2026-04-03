@@ -143,14 +143,20 @@ model UserAchievement {
 
 // ===== Reward =====
 model Reward {
-  id          Int        @id @default(autoincrement())
-  type        RewardType
-  name        String
-  description String?
-  cost        Int        @default(0)
-  stock       Int?
-  imageUrl    String?    @map("image_url")
-  isActive    Boolean    @default(true) @map("is_active")
+  id               Int        @id @default(autoincrement())
+  type             RewardType
+  name             String
+  description      String?
+  cost             Int        @default(0)
+  stock            Int?
+  imageUrl         String?    @map("image_url")
+  isActive         Boolean    @default(true) @map("is_active")
+
+  // Discount-specific fields (only used when type = DISCOUNT)
+  discountType     String?    @map("discount_type")   // "PERCENTAGE" | "FIXED_AMOUNT"
+  discountValue    Int?       @map("discount_value")   // percentage (1-100) or fixed amount
+  maxDiscountAmount Int?      @map("max_discount_amount")
+  applicableCourseIds Int[]   @default([]) @map("applicable_course_ids")
 
   redemptions RewardRedemption[]
 
@@ -172,6 +178,7 @@ model RewardRedemption {
   id         Int      @id @default(autoincrement())
   userId     Int      @map("user_id")
   rewardId   Int      @map("reward_id")
+  couponCode String?  @map("coupon_code")
   redeemedAt DateTime @default(now()) @map("redeemed_at")
 
   reward Reward @relation(fields: [rewardId], references: [id])
@@ -202,5 +209,23 @@ enum LeaderboardPeriod {
   WEEKLY
   MONTHLY
 
+  @@schema("gamification")
+}
+
+// ===== Seasonal Event =====
+model SeasonalEvent {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  multiplier  Float    @default(1.0)
+  bonusCoins  Int      @default(0) @map("bonus_coins")
+  startDate   DateTime @map("start_date")
+  endDate     DateTime @map("end_date")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([startDate, endDate])
+  @@map("seasonal_events")
   @@schema("gamification")
 }

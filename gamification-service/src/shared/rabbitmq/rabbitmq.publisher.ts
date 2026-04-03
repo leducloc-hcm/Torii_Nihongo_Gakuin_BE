@@ -69,4 +69,32 @@ export class RabbitMQPublisher {
       userId,
     });
   }
+
+  async publishRewardRedeemed(
+    userId: number,
+    rewardId: number,
+    rewardType: string,
+    rewardName: string,
+    couponCode?: string,
+    discountMeta?: {
+      discountType: string | null;
+      discountValue: number | null;
+      maxDiscountAmount: number | null;
+      applicableCourseIds: number[];
+    },
+  ): Promise<void> {
+    await this.publishEvent("gamification.reward.redeemed", {
+      type: "gamification.reward.redeemed",
+      payload: {
+        userId,
+        rewardId,
+        rewardType,
+        rewardName,
+        couponCode,
+        ...(discountMeta ? { discountMeta } : {}),
+      },
+      timestamp: new Date(),
+      userId,
+    });
+  }
 }

@@ -3,6 +3,7 @@ import { PointsRepository } from "./points.repo";
 import { levelFromXp } from "./points.model";
 import { RedisService } from "src/shared/redis/redis.service";
 import { RabbitMQPublisher } from "src/shared/rabbitmq/rabbitmq.publisher";
+import { SeasonalEventService } from "../seasonal-event/seasonal-event.service";
 
 @Injectable()
 export class PointsService {
@@ -12,6 +13,7 @@ export class PointsService {
     private readonly pointsRepo: PointsRepository,
     private readonly redisService: RedisService,
     private readonly rabbitMQPublisher: RabbitMQPublisher,
+    private readonly seasonalEventService: SeasonalEventService,
   ) {}
 
   async addPoints(
@@ -21,19 +23,41 @@ export class PointsService {
     meta?: any,
     coinsDelta?: number,
   ) {
-    // Record ledger entry
-    await this.pointsRepo.addLedgerEntry(userId, delta, reason, meta);
+    // Apply active seasonal event multiplier
+    const { multiplier, bonusCoins, eventName } =
+      await this.seasonalEventService.getActiveMultiplier();
+
+    const effectiveDelta = Math.round(delta * multiplier);
+    const effectiveCoins =
+      (coinsDelta !== undefined ? coinsDelta : delta) + bonusCoins;
+
+    const augmentedMeta =
+      multiplier !== 1.0 || bonusCoins > 0
+        ? { ...meta, seasonalEvent: eventName, multiplier, bonusCoins }
+        : meta;
+
+    // Record ledger entry with effective values
+    await this.pointsRepo.addLedgerEntry(
+      userId,
+      effectiveDelta,
+      reason,
+      augmentedMeta,
+    );
 
     // Get current stats
     const stats = await this.pointsRepo.getOrCreateUserStats(userId);
-    const coins = coinsDelta !== undefined ? coinsDelta : delta;
-    const newTotalXp = stats.totalXp + delta;
-    const newTotalCoins = stats.totalCoins + coins;
+    const newTotalXp = stats.totalXp + effectiveDelta;
+    const newTotalCoins = stats.totalCoins + effectiveCoins;
     const oldLevel = stats.level;
     const newLevel = levelFromXp(newTotalXp);
 
     // Update user stats
-    await this.pointsRepo.upsertUserStats(userId, delta, coins, newLevel);
+    await this.pointsRepo.upsertUserStats(
+      userId,
+      effectiveDelta,
+      effectiveCoins,
+      newLevel,
+    );
 
     // Invalidate cache
     await this.redisService.del(`gamification:user-stats:${userId}`);
@@ -42,6 +66,12 @@ export class PointsService {
     if (newLevel > oldLevel) {
       this.logger.log(`User ${userId} leveled up: ${oldLevel} -> ${newLevel}`);
       await this.rabbitMQPublisher.publishLevelUp(userId, newLevel, newTotalXp);
+    }
+
+    if (multiplier !== 1.0 || bonusCoins > 0) {
+      this.logger.log(
+        `Seasonal event "${eventName}" applied: ${delta} -> ${effectiveDelta} XP, +${bonusCoins} bonus coins for user ${userId}`,
+      );
     }
 
     return { totalXp: newTotalXp, totalCoins: newTotalCoins, level: newLevel };

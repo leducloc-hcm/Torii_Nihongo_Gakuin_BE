@@ -58,7 +58,9 @@ input GenerateBlogImageUploadInput {
 type Mutation {
   createBlog(createBlogInput: CreateBlogInput!): Blog!
   createTag(createTagInput: CreateTagGraphQLInput!): TagObject!
-  generateBlogImageUploadUrl(input: GenerateBlogImageUploadInput!): BlogImageUploadResponse!
+  generateBlogImageUploadUrl(
+    input: GenerateBlogImageUploadInput!
+  ): BlogImageUploadResponse!
   removeBlog(id: Int!): Blog!
   removeTag(id: Int!): TagObject!
   updateBlog(id: Int!, updateBlogInput: UpdateBlogInput!): Blog!
