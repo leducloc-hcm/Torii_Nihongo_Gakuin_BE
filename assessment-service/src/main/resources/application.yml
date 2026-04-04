@@ -3,7 +3,7 @@ spring:
     name: assessment-service
 
   datasource:
-    url: jdbc:postgresql://torii-nihongo.cd48o48cgxzd.ap-southeast-1.rds.amazonaws.com:5432/postgres?currentSchema=assessment&ssl=true&sslmode=require
+    url: jdbc:postgresql://db.rkizlomnljifkbdimrup.supabase.co:5432/postgres?currentSchema=assessment&sslmode=disable
     username: postgres
     password: nhatngutorii
     driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:org.postgresql.Driver}

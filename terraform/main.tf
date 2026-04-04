@@ -13,7 +13,7 @@ terraform {
   }
 
   backend "s3" {
-    bucket = "torii-nihongo-storage"
+    bucket = "torii-nihongo-storage-v2"
     key    = "terraform/terraform.tfstate"
     region = "ap-southeast-1"
   }

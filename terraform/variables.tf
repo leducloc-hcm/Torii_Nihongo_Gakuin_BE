@@ -154,7 +154,7 @@ variable "admin_phone_number" {
 variable "s3_bucket_name" {
   description = "S3 bucket name for file storage"
   type        = string
-  default     = "torii-nihongo-storage"
+  default     = "torii-nihongo-storage-v2"
 }
 
 variable "aws_access_key_id" {
