@@ -264,8 +264,12 @@ export type CourseWithRelations = {
     lessons?: Array<{
       id: number;
       title: string;
-      content: string | null;
+      durationSec: number;
       order: number;
+      kind: string;
+      content: string | null;
+      createdAt: Date;
+      updatedAt: Date;
     }>;
   }>;
   _count: {

@@ -158,11 +158,41 @@ export class CourseRepository {
     slug: string,
     includeReviews = false,
   ): Promise<CourseWithRelations | null> {
+    const baseInclude = includeReviews
+      ? this.includeRelationsWithReviews
+      : this.includeRelations;
+
     return this.prisma.course.findUnique({
       where: { slug },
-      include: includeReviews
-        ? this.includeRelationsWithReviews
-        : this.includeRelations,
+      include: {
+        ...baseInclude,
+        modules: {
+          select: {
+            id: true,
+            title: true,
+            order: true,
+            _count: {
+              select: {
+                lessons: true,
+              },
+            },
+            lessons: {
+              select: {
+                id: true,
+                title: true,
+                durationSec: true,
+                order: true,
+                kind: true,
+                content: true,
+                createdAt: true,
+                updatedAt: true,
+              },
+              orderBy: { order: "asc" as const },
+            },
+          },
+          orderBy: { order: "asc" as const },
+        },
+      },
     }) as Promise<CourseWithRelations | null>;
   }
 
