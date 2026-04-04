@@ -1478,6 +1478,7 @@ enum NotificationType {
   SYSTEM
   REMINDER
   ACHIEVEMENT
+  REWARD
 }
 
 enum NotificationStatus {
