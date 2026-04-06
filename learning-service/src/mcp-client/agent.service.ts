@@ -29,19 +29,45 @@ import {
   getEnabledMCPServers,
   MCP_SERVERS,
 } from "src/shared/config/mcp-servers.config";
-import { OPENAI_CONFIG, MCP_CONFIG } from "src/shared/config/openai.config";
+import { OPENAI_CONFIG } from "src/shared/config/openai.config";
+import { AgentRole } from "src/mcp-client/shared/agent-routing.utils";
+import { getAgentRolePrompt } from "src/mcp-client/prompts/agent-role.prompt";
+
+interface ToolRegistryItem {
+  serverKey: string;
+  serverUrl: string;
+  tool: ChatCompletionTool;
+}
 
 @Injectable()
 export class AgentService {
   private readonly logger = new Logger(AgentService.name);
   private readonly openai: OpenAI;
   private allTools: ChatCompletionTool[] = [];
+  private toolRegistry: ToolRegistryItem[] = [];
   private toolsLoaded = false;
+  private readonly roleServerPolicies: Record<
+    AgentRole,
+    { allowedServers: string[]; fallbackServers: string[] }
+  > = {
+    [AgentRole.SENSEI]: {
+      allowedServers: ["course", "flashcard", "blog"],
+      fallbackServers: ["enrollment"],
+    },
+    [AgentRole.ASSESSMENT]: {
+      allowedServers: ["assessment", "assessmentHistory"],
+      fallbackServers: ["course"],
+    },
+    [AgentRole.ANALYTICS]: {
+      allowedServers: ["enrollment", "assessmentHistory"],
+      fallbackServers: ["course"],
+    },
+  };
 
   constructor(
     private readonly mcpBase: McpBaseService,
     private readonly courseMcp: CourseMcpClient,
-    private readonly enrollmentMcp: EnrollmentMcpClient
+    private readonly enrollmentMcp: EnrollmentMcpClient,
   ) {
     this.openai = new OpenAI({
       apiKey: OPENAI_CONFIG.apiKey,
@@ -56,15 +82,25 @@ export class AgentService {
 
     //this.logger.log('Loading tools from MCP servers...')
     const tools: ChatCompletionTool[] = [];
+    const registry: ToolRegistryItem[] = [];
 
     try {
-      const enabledServers = getEnabledMCPServers();
+      for (const [serverKey, server] of Object.entries(MCP_SERVERS)) {
+        if (!server.enabled) {
+          continue;
+        }
 
-      for (const server of enabledServers) {
         try {
           const mcpTools = await this.mcpBase.listTools(server.url);
           const openAITools = mcpTools.map(transformMCPToolToOpenAI);
           tools.push(...openAITools);
+          for (const tool of openAITools) {
+            registry.push({
+              serverKey,
+              serverUrl: server.url,
+              tool,
+            });
+          }
           //this.logger.log(`Loaded ${openAITools.length} tools from ${server.name}`)
         } catch (error) {
           //this.logger.error(`Failed to load tools from ${server.name}:`, error.message)
@@ -72,6 +108,7 @@ export class AgentService {
       }
 
       this.allTools = tools;
+      this.toolRegistry = registry;
       this.toolsLoaded = true;
       //this.logger.log(`Total tools loaded: ${tools.length}`)
     } catch (error) {
@@ -83,7 +120,9 @@ export class AgentService {
     messages: ChatCompletionMessageParam[],
     useTools = true,
     forceTools = false,
-    originalQuery?: string
+    originalQuery?: string,
+    agentRole?: AgentRole,
+    collaboratorRoles: AgentRole[] = [],
   ): Promise<AgentResponse> {
     if (!this.toolsLoaded) {
       await this.loadTools();
@@ -104,24 +143,38 @@ export class AgentService {
 
     // 🎯 INJECT VALIDATION PROMPTS: Add domain and JLPT validation prompts to messages
     const validationPrompts = getValidationPrompts();
+    const rolePrompt = getAgentRolePrompt(agentRole || AgentRole.SENSEI);
     const messagesWithValidation: ChatCompletionMessageParam[] = [
       {
         role: "system",
         content: validationPrompts,
       },
+      {
+        role: "system",
+        content: rolePrompt,
+      },
       ...messages,
     ];
 
+    if (collaboratorRoles.length > 0) {
+      messagesWithValidation.unshift({
+        role: "system",
+        content: `Collaborator roles available: ${collaboratorRoles.join(", ")}. Use tools and responses that stay consistent with the primary role while considering collaborator context when needed.`,
+      });
+    }
+
     try {
+      const routedTools = this.getToolsForRole(agentRole, collaboratorRoles);
+
       let toolChoice: "auto" | "required" | undefined = undefined;
-      if (useTools && this.allTools.length > 0) {
+      if (useTools && routedTools.length > 0) {
         toolChoice = forceTools ? "required" : "auto";
       }
 
       const completionOptions: any = {
         model: OPENAI_CONFIG.model,
         messages: messagesWithValidation, // Use messages with validation prompts
-        tools: useTools && this.allTools.length > 0 ? this.allTools : undefined,
+        tools: useTools && routedTools.length > 0 ? routedTools : undefined,
         tool_choice: toolChoice,
         temperature: OPENAI_CONFIG.temperature,
       };
@@ -154,7 +207,7 @@ export class AgentService {
               arguments: (tc as any).arguments || "{}",
             };
           }),
-          requiresApproval: MCP_CONFIG.toolApprovalRequired,
+          requiresApproval: false,
           finishReason: choice.finish_reason as
             | "stop"
             | "tool_calls"
@@ -174,12 +227,13 @@ export class AgentService {
       };
     } catch (error) {
       ////this.logger.error('OpenAI API error:', error)
-      throw new Error(`AI service error: ${error.message}`);
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`AI service error: ${message}`);
     }
   }
 
   async executeApprovedTools(
-    request: ExecuteToolsRequest
+    request: ExecuteToolsRequest,
   ): Promise<ExecuteToolsResponse> {
     const executeStartTime = Date.now();
     const results: MCPToolResult[] = [];
@@ -196,7 +250,7 @@ export class AgentService {
         const result = await this.executeToolCall(
           toolCall.name,
           toolCall.arguments,
-          request.userId
+          request.userId,
         );
         if (result.result) {
           //this.logger.log(`  Result preview: ${JSON.stringify(result.result).substring(0, 200)}...`)
@@ -216,7 +270,7 @@ export class AgentService {
           toolCallId: toolCall.id,
           toolName: toolCall.name,
           result: null,
-          error: error.message,
+          error: error instanceof Error ? error.message : String(error),
           executedAt: new Date(),
         };
       }
@@ -231,7 +285,7 @@ export class AgentService {
         role: "tool" as const,
         tool_call_id: result.toolCallId,
         content: result.error || JSON.stringify(result.result),
-      })
+      }),
     );
 
     const messages: ChatCompletionMessageParam[] = [
@@ -261,16 +315,28 @@ export class AgentService {
         role: "system",
         content: getAssessmentHistoryPrompt(
           QueryType.ASSESSMENT_HISTORY,
-          request.userId
+          request.userId,
         ),
       });
     }
 
     // 🔒 INJECT VALIDATION PROMPTS: Add domain and JLPT validation prompts to all final responses
     const validationPrompts = getValidationPrompts();
+    const resolvedRole =
+      request.agentRole === AgentRole.ASSESSMENT ||
+      request.agentRole === AgentRole.ANALYTICS ||
+      request.agentRole === AgentRole.SENSEI
+        ? request.agentRole
+        : AgentRole.SENSEI;
+
+    const rolePrompt = getAgentRolePrompt(resolvedRole);
     messages.unshift({
       role: "system",
       content: validationPrompts,
+    });
+    messages.unshift({
+      role: "system",
+      content: rolePrompt,
     });
 
     // Add user instructions for other types
@@ -344,7 +410,7 @@ Use EXACT data from tool result - do not modify.`,
 
       // Check if this is a generation request (generate_flashcard_suggestions tool was called)
       const isFlashcardGeneration = results.some(
-        (r) => r.toolName === "generate_flashcard_suggestions"
+        (r) => r.toolName === "generate_flashcard_suggestions",
       );
 
       if (isFlashcardGeneration) {
@@ -461,7 +527,7 @@ Use EXACT data from tool result - do not modify.`,
       const openaiStartTime = Date.now();
 
       const finalResponse = await this.openai.chat.completions.create(
-        finalCompletionOptions
+        finalCompletionOptions,
       );
 
       const openaiTime = Date.now() - openaiStartTime;
@@ -502,7 +568,7 @@ Use EXACT data from tool result - do not modify.`,
   private async executeToolCall(
     toolName: string,
     args: Record<string, any>,
-    userId?: number
+    userId?: number,
   ): Promise<MCPToolResult> {
     // Determine which MCP server to use based on tool name
     const serverUrl = this.getServerUrlForTool(toolName);
@@ -539,7 +605,7 @@ Use EXACT data from tool result - do not modify.`,
     const result: FastMCPResult = await this.mcpBase.executeTool(
       serverUrl,
       toolName,
-      args
+      args,
     );
 
     //this.logger.debug(`MCP Response:`)
@@ -557,6 +623,18 @@ Use EXACT data from tool result - do not modify.`,
   }
 
   private getServerUrlForTool(toolName: string): string | null {
+    const registryMatch = this.toolRegistry.find((item) => {
+      if (!("function" in item.tool)) {
+        return false;
+      }
+
+      return item.tool.function.name === toolName;
+    });
+
+    if (registryMatch) {
+      return registryMatch.serverUrl;
+    }
+
     const lowerToolName = toolName.toLowerCase();
 
     if (lowerToolName.includes("course")) {
@@ -614,5 +692,74 @@ Use EXACT data from tool result - do not modify.`,
 
   getAvailableTools(): ChatCompletionTool[] {
     return this.allTools;
+  }
+
+  private getToolsForRole(
+    primaryRole?: AgentRole,
+    collaboratorRoles: AgentRole[] = [],
+  ): ChatCompletionTool[] {
+    if (!primaryRole && collaboratorRoles.length === 0) {
+      return this.allTools;
+    }
+
+    const targetRoles = [primaryRole, ...collaboratorRoles].filter(
+      (role): role is AgentRole => !!role,
+    );
+
+    const allowedServers = new Set<string>();
+    const fallbackServers = new Set<string>();
+
+    for (const role of targetRoles) {
+      const policy = this.roleServerPolicies[role];
+      if (!policy) {
+        continue;
+      }
+
+      for (const server of policy.allowedServers) {
+        allowedServers.add(server);
+      }
+
+      for (const server of policy.fallbackServers) {
+        fallbackServers.add(server);
+      }
+    }
+
+    if (allowedServers.size === 0 && fallbackServers.size === 0) {
+      return this.allTools;
+    }
+
+    const allowedTools = this.toolRegistry
+      .filter((item) => allowedServers.has(item.serverKey))
+      .map((item) => item.tool);
+
+    const fallbackTools = this.toolRegistry
+      .filter((item) => fallbackServers.has(item.serverKey))
+      .map((item) => item.tool);
+
+    const seenToolNames = new Set<string>();
+    const filteredTools = [...allowedTools, ...fallbackTools].filter((tool) => {
+      if (!("function" in tool)) {
+        return false;
+      }
+
+      if (seenToolNames.has(tool.function.name)) {
+        return false;
+      }
+
+      seenToolNames.add(tool.function.name);
+      return true;
+    });
+
+    if (filteredTools.length === 0) {
+      this.logger.warn(
+        `No server-policy tools matched for roles [${targetRoles.join(", ")}]. Falling back to full toolset (${this.allTools.length} tools).`,
+      );
+      return this.allTools;
+    }
+
+    this.logger.log(
+      `Primary role ${primaryRole || "N/A"} with collaborators [${collaboratorRoles.join(", ") || "none"}] using ${filteredTools.length}/${this.allTools.length} tools.`,
+    );
+    return filteredTools;
   }
 }

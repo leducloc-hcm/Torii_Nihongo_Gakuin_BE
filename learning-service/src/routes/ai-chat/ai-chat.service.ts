@@ -1,24 +1,29 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common'
-import { ChatCompletionMessageParam } from 'openai/resources/chat/completions'
-import { AIThreadRepository, AIQueryRepository, AIMessageRepository } from './ai-chat.repo'
-import { ChatRole, QueryStatus } from '@prisma/client'
-import { SendQueryDto } from './ai-chat.dto'
-import { AgentService } from 'src/mcp-client/agent.service'
-import { PromptService } from 'src/mcp-client/module/course/course-mcp.prompt'
-import { RedisContextService } from 'src/shared/redis/redis-context.service'
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { ChatCompletionMessageParam } from "openai/resources/chat/completions";
+import {
+  AIThreadRepository,
+  AIQueryRepository,
+  AIMessageRepository,
+} from "./ai-chat.repo";
+import { ChatRole, QueryStatus } from "@prisma/client";
+import { SendQueryDto } from "./ai-chat.dto";
+import { AgentService } from "src/mcp-client/agent.service";
+import { PromptService } from "src/mcp-client/module/course/course-mcp.prompt";
+import { RedisContextService } from "src/shared/redis/redis-context.service";
 import {
   detectQueryType,
   requiresMultipleTools,
   generateMultiToolHint,
   suggestToolCombination,
   QueryType,
-} from 'src/mcp-client/shared/query-detection.utils'
+} from "src/mcp-client/shared/query-detection.utils";
+import { routeAgentForQuery } from "src/mcp-client/shared/agent-routing.utils";
 
 @Injectable()
 export class AIChatService {
-  private readonly logger = new Logger(AIChatService.name)
-  private readonly THREAD_CACHE_TTL = 120 // 10 minutes in seconds
-  private readonly MESSAGES_CACHE_TTL = 600 // 10 minutes in seconds
+  private readonly logger = new Logger(AIChatService.name);
+  private readonly THREAD_CACHE_TTL = 120; // 10 minutes in seconds
+  private readonly MESSAGES_CACHE_TTL = 600; // 10 minutes in seconds
 
   constructor(
     private readonly agentService: AgentService,
@@ -29,46 +34,68 @@ export class AIChatService {
     private readonly redis: RedisContextService,
   ) {
     this.agentService.loadTools().catch((err) => {
-      this.logger.error('Failed to load MCP tools on startup:', err)
-    })
+      this.logger.error("Failed to load MCP tools on startup:", err);
+    });
   }
 
   private getThreadCacheKey(threadId: number): string {
-    return `ai_thread:${threadId}`
+    return `ai_thread:${threadId}`;
   }
 
-  private getMessagesCacheKey(threadId: number, limit?: number, page?: number): string {
+  private getMessagesCacheKey(
+    threadId: number,
+    limit?: number,
+    page?: number,
+  ): string {
     if (limit !== undefined && page !== undefined) {
-      return `ai_thread_messages:${threadId}:${limit}:${page}`
+      return `ai_thread_messages:${threadId}:${limit}:${page}`;
     }
-    return `ai_thread_messages:${threadId}`
+    return `ai_thread_messages:${threadId}`;
   }
 
   private getUserThreadsCacheKey(userId: number): string {
-    return `ai_user_threads:${userId}`
+    return `ai_user_threads:${userId}`;
   }
 
-  private detectLanguage(query: string): 'vi' | 'en' | 'ja' {
-    const lowerQuery = query.toLowerCase()
+  private detectLanguage(query: string): "vi" | "en" | "ja" {
+    const lowerQuery = query.toLowerCase();
 
     if (/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(query)) {
-      return 'ja'
+      return "ja";
     }
 
-    if (/[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i.test(query)) {
-      return 'vi'
+    if (
+      /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i.test(
+        query,
+      )
+    ) {
+      return "vi";
     }
 
-    const viWords = ['tôi', 'bạn', 'của', 'và', 'với', 'cho', 'là', 'có', 'trong', 'về', 'như', 'khi', 'được']
+    const viWords = [
+      "tôi",
+      "bạn",
+      "của",
+      "và",
+      "với",
+      "cho",
+      "là",
+      "có",
+      "trong",
+      "về",
+      "như",
+      "khi",
+      "được",
+    ];
     if (viWords.some((word) => lowerQuery.includes(word))) {
-      return 'vi'
+      return "vi";
     }
 
-    return 'en'
+    return "en";
   }
 
-  private getRejectionMessage(language: 'vi' | 'en' | 'ja'): string {
-    if (language === 'ja') {
+  private getRejectionMessage(language: "vi" | "en" | "ja"): string {
+    if (language === "ja") {
       return `申し訳ございません。私はTorii Nihongo Gakuinの日本語学習アシスタントですので、以下のことについてのみお手伝いできます：
 
 📚 **日本語学習：**
@@ -82,10 +109,10 @@ export class AIChatService {
 - 日本語に関するブログ記事
 - プラットフォームの機能
 
-日本語学習や私たちのコースについて何かご質問はありますか？😊`
+日本語学習や私たちのコースについて何かご質問はありますか？😊`;
     }
 
-    if (language === 'en') {
+    if (language === "en") {
       return `I'm sorry, I'm a Japanese learning assistant for Torii Nihongo Gakuin, so I can only help you with:
 
 📚 **Japanese Learning:**
@@ -99,7 +126,7 @@ export class AIChatService {
 - Blog posts about Japanese
 - Platform features
 
-Do you have any questions about learning Japanese or our courses? 😊`
+Do you have any questions about learning Japanese or our courses? 😊`;
     }
 
     // Default: Vietnamese
@@ -116,242 +143,293 @@ Do you have any questions about learning Japanese or our courses? 😊`
 - Bài viết blog về tiếng Nhật
 - Tính năng nền tảng
 
-Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của chúng tôi không? 😊`
+Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của chúng tôi không? 😊`;
   }
 
   private isOffTopicQuery(query: string): boolean {
-    const lower = query.toLowerCase().trim()
+    const lower = query.toLowerCase().trim();
 
     const japaneseContext =
-      /jlpt|n[1-5]|tiếng nhật|japanese|日本語|nihongo|kanji|漢字|hiragana|ひらがな|katakana|カタカナ|ngữ pháp|grammar|từ vựng|vocabulary|học|learn|勉強|khóa học|course|bài học|lesson|luyện thi|practice|flashcard/i
-    if (japaneseContext.test(lower)) return false
+      /jlpt|n[1-5]|tiếng nhật|japanese|日本語|nihongo|kanji|漢字|hiragana|ひらがな|katakana|カタカナ|ngữ pháp|grammar|từ vựng|vocabulary|học|learn|勉強|khóa học|course|bài học|lesson|luyện thi|practice|flashcard/i;
+    if (japaneseContext.test(lower)) return false;
 
     if (
       /\d+\s*[+\-*/×÷]\s*\d+/.test(lower) ||
       /[a-z]\s*[+\-*/×÷=]\s*[a-z0-9]/i.test(lower) ||
       /^([\d\s+\-*/×÷=]+)$/i.test(lower) ||
-      /^(what is|bao nhiêu|bằng bao nhiêu|tính|calculate|solve|phép tính|giản)/i.test(lower)
+      /^(what is|bao nhiêu|bằng bao nhiêu|tính|calculate|solve|phép tính|giản)/i.test(
+        lower,
+      )
     ) {
-      return true
+      return true;
     }
 
     const techKeywords =
-      /(docker|nodejs|react|nextjs|nestjs|python|java|c\+\+|typescript|git|github|code|coding|debug|terminal|command|server|api|backend|frontend|vscode|agp|gradle|android studio|aws|ec2|s3|devops|ci\/cd|nginx|ssl|certbot|redis|database|sql|prisma)/i
-    if (techKeywords.test(lower)) return true
+      /(docker|nodejs|react|nextjs|nestjs|python|java|c\+\+|typescript|git|github|code|coding|debug|terminal|command|server|api|backend|frontend|vscode|agp|gradle|android studio|aws|ec2|s3|devops|ci\/cd|nginx|ssl|certbot|redis|database|sql|prisma)/i;
+    if (techKeywords.test(lower)) return true;
 
     const aiKeywords =
-      /(chatgpt|gemini|claude|deepseek|openai|prompt|midjourney|image generation|ai model|人工知能|deep learning|machine learning|人工智慧)/i
-    if (aiKeywords.test(lower)) return true
+      /(chatgpt|gemini|claude|deepseek|openai|prompt|midjourney|image generation|ai model|人工知能|deep learning|machine learning|人工智慧)/i;
+    if (aiKeywords.test(lower)) return true;
 
     const generalTopics =
-      /(weather|thời tiết|tin tức|news|thể thao|bóng đá|football|tennis|movie|phim|music|nhạc|song|anime|netflix|game|trò chơi|mua sắm|fashion|thời trang|makeup|shopping|idol|ca sĩ|diễn viên|celebrity|tiktok|facebook|instagram|youtube|genshin|valorant|lol|pubg|minecraft|roblox|mlbb|pokemon)/i
-    if (generalTopics.test(lower)) return true
+      /(weather|thời tiết|tin tức|news|thể thao|bóng đá|football|tennis|movie|phim|music|nhạc|song|anime|netflix|game|trò chơi|mua sắm|fashion|thời trang|makeup|shopping|idol|ca sĩ|diễn viên|celebrity|tiktok|facebook|instagram|youtube|genshin|valorant|lol|pubg|minecraft|roblox|mlbb|pokemon)/i;
+    if (generalTopics.test(lower)) return true;
 
-    if (/(du lịch|travel|khách sạn|hotel|cooking|nấu ăn|料理|recipe|vacation|nghỉ dưỡng)/i.test(lower)) return true
+    if (
+      /(du lịch|travel|khách sạn|hotel|cooking|nấu ăn|料理|recipe|vacation|nghỉ dưỡng)/i.test(
+        lower,
+      )
+    )
+      return true;
 
     const nonJPSubjects =
-      /(math|toán|physics|vật lý|chemistry|hóa|biology|sinh|history|địa lý|geography|english|tiếng anh|korean|tiếng hàn|chinese|tiếng trung|spanish|french|pháp)/i
-    if (nonJPSubjects.test(lower)) return true
+      /(math|toán|physics|vật lý|chemistry|hóa|biology|sinh|history|địa lý|geography|english|tiếng anh|korean|tiếng hàn|chinese|tiếng trung|spanish|french|pháp)/i;
+    if (nonJPSubjects.test(lower)) return true;
 
     if (
       /(lawyer|luật sư|legal advice|pháp lý|politics|chính trị|president|election|government|financial advice|tài chính|đầu tư|loan|vay|stock|chứng khoán|bitcoin|crypto|forex|investment|trading)/i.test(
         lower,
       )
     )
-      return true
+      return true;
 
     if (
       /(bệnh|pain|đau|triệu chứng|diagnose|chẩn đoán|medical advice|tư vấn y tế|stress|trầm cảm|anxiety|mental health|psychology|tâm lý)/i.test(
         lower,
       )
     )
-      return true
+      return true;
 
     if (
       /(dating|hẹn hò|love|yêu|relationship|mối quan hệ|crush|girlfriend|boyfriend|tỏ tình|chia tay|tan vỡ|彼氏|彼女)/i.test(
         lower,
       )
     )
-      return true
+      return true;
 
     if (
       /(write|viết|tạo|compose|kể).*(story|truyện|poem|bài thơ|fanfic|roleplay|song|lyrics|chế|parody|novel|tiểu thuyết)/i.test(
         lower,
       )
     )
-      return true
-
-    if (/(translate|dịch|翻訳).*(english|vietnamese|chinese|korean|thai|spanish|french)/i.test(lower)) return true
+      return true;
 
     if (
-      /(who are you|what are you|bạn là ai|あなたは誰|tell me about yourself|giới thiệu về bạn)/i.test(lower) &&
-      !/(help|assist|support|hỗ trợ|feature|tính năng|platform|nền tảng)/i.test(lower)
+      /(translate|dịch|翻訳).*(english|vietnamese|chinese|korean|thai|spanish|french)/i.test(
+        lower,
+      )
+    )
+      return true;
+
+    if (
+      /(who are you|what are you|bạn là ai|あなたは誰|tell me about yourself|giới thiệu về bạn)/i.test(
+        lower,
+      ) &&
+      !/(help|assist|support|hỗ trợ|feature|tính năng|platform|nền tảng)/i.test(
+        lower,
+      )
     ) {
-      return true
+      return true;
     }
 
-    if (/(joke|冗談|chuyện cười|đùa|funny|vui|おもしろい)/i.test(lower)) return true
+    if (/(joke|冗談|chuyện cười|đùa|funny|vui|おもしろい)/i.test(lower))
+      return true;
 
-    if (/(homework|bài tập|giải bài|đáp án)/i.test(lower) && nonJPSubjects.test(lower)) return true
+    if (
+      /(homework|bài tập|giải bài|đáp án)/i.test(lower) &&
+      nonJPSubjects.test(lower)
+    )
+      return true;
 
-    return false
+    return false;
   }
 
-  private checkEmptyJsonResponse(response: string | null | undefined, queryType: string): boolean {
-    if (!response) return false
+  private checkEmptyJsonResponse(
+    response: string | null | undefined,
+    queryType: string,
+  ): boolean {
+    if (!response) return false;
 
     try {
       // Extract JSON from markdown code block
-      const jsonMatch = response.match(/```json\s*([\s\S]*?)\s*```/)
-      if (!jsonMatch) return false
+      const jsonMatch = response.match(/```json\s*([\s\S]*?)\s*```/);
+      if (!jsonMatch) return false;
 
-      const jsonStr = jsonMatch[1].trim()
-      const parsed = JSON.parse(jsonStr)
+      const jsonStr = jsonMatch[1].trim();
+      const parsed = JSON.parse(jsonStr);
 
       // Check for different empty patterns based on queryType
-      const type = queryType.toUpperCase()
+      const type = queryType.toUpperCase();
 
       switch (type) {
-        case 'FLASHCARD':
+        case "FLASHCARD":
           return (
             (Array.isArray(parsed.decks) && parsed.decks.length === 0) ||
-            (Array.isArray(parsed.flashcards) && parsed.flashcards.length === 0) ||
+            (Array.isArray(parsed.flashcards) &&
+              parsed.flashcards.length === 0) ||
             parsed.count === 0
-          )
+          );
 
-        case 'COURSE':
+        case "COURSE":
           return (
             (Array.isArray(parsed.courses) && parsed.courses.length === 0) ||
             parsed.course === null ||
             parsed.count === 0
-          )
+          );
 
-        case 'BLOG':
+        case "BLOG":
           return (
             (Array.isArray(parsed.blogs) && parsed.blogs.length === 0) ||
             (Array.isArray(parsed.results) && parsed.results.length === 0) ||
             parsed.count === 0
-          )
+          );
 
-        case 'ENROLLMENT':
-          return (Array.isArray(parsed.enrollments) && parsed.enrollments.length === 0) || parsed.count === 0
+        case "ENROLLMENT":
+          return (
+            (Array.isArray(parsed.enrollments) &&
+              parsed.enrollments.length === 0) ||
+            parsed.count === 0
+          );
 
-        case 'ASSESSMENT':
+        case "ASSESSMENT":
           return (
             (Array.isArray(parsed.results) && parsed.results.length === 0) ||
-            (Array.isArray(parsed.assessments) && parsed.assessments.length === 0) ||
+            (Array.isArray(parsed.assessments) &&
+              parsed.assessments.length === 0) ||
             parsed.count === 0
-          )
+          );
 
-        case 'ASSESSMENT_HISTORY':
-          return (Array.isArray(parsed.history) && parsed.history.length === 0) || parsed.count === 0
+        case "ASSESSMENT_HISTORY":
+          return (
+            (Array.isArray(parsed.history) && parsed.history.length === 0) ||
+            parsed.count === 0
+          );
         default:
-          return false
+          return false;
       }
     } catch (error) {
-      return false
+      return false;
     }
   }
 
   private getEmptyDataMessage(queryType: string, query: string): string {
-    const language = this.detectLanguage(query)
+    const language = this.detectLanguage(query);
 
     const messages = {
       FLASHCARD: {
-        vi: 'Xin lỗi, hiện tại không có flashcard nào phù hợp với yêu cầu của bạn. Bạn có thể thử:\n\n• Tìm kiếm flashcard deck khác\n• Yêu cầu tạo flashcard mới với topic khác\n• Hỏi về các deck flashcard công khai có sẵn',
+        vi: "Xin lỗi, hiện tại không có flashcard nào phù hợp với yêu cầu của bạn. Bạn có thể thử:\n\n• Tìm kiếm flashcard deck khác\n• Yêu cầu tạo flashcard mới với topic khác\n• Hỏi về các deck flashcard công khai có sẵn",
         en: "Sorry, I couldn't find any flashcards matching your request. You can try:\n\n• Search for other flashcard decks\n• Request to create new flashcards with a different topic\n• Ask about available public flashcard decks",
-        ja: '申し訳ございません。リクエストに一致するフラッシュカードが見つかりませんでした。次のことを試してください：\n\n• 他のフラッシュカードデッキを検索する\n• 別のトピックで新しいフラッシュカードの作成をリクエストする\n• 利用可能な公開フラッシュカードデッキについて質問する',
+        ja: "申し訳ございません。リクエストに一致するフラッシュカードが見つかりませんでした。次のことを試してください：\n\n• 他のフラッシュカードデッキを検索する\n• 別のトピックで新しいフラッシュカードの作成をリクエストする\n• 利用可能な公開フラッシュカードデッキについて質問する",
       },
       COURSE: {
-        vi: 'Xin lỗi, không tìm thấy khóa học phù hợp với yêu cầu của bạn. Bạn có thể:\n\n• Thử tìm kiếm với từ khóa khác\n• Xem tất cả khóa học có sẵn\n• Hỏi về khóa học cụ thể theo level (N5, N4, N3, N2, N1)',
-        en: 'Sorry, no courses found matching your request. You can:\n\n• Try searching with different keywords\n• View all available courses\n• Ask about specific courses by level (N5, N4, N3, N2, N1)',
-        ja: '申し訳ございません。リクエストに一致するコースが見つかりませんでした。次のことができます：\n\n• 異なるキーワードで検索してみる\n• 利用可能なすべてのコースを表示する\n• レベル別の特定のコースについて質問する（N5、N4、N3、N2、N1）',
+        vi: "Xin lỗi, không tìm thấy khóa học phù hợp với yêu cầu của bạn. Bạn có thể:\n\n• Thử tìm kiếm với từ khóa khác\n• Xem tất cả khóa học có sẵn\n• Hỏi về khóa học cụ thể theo level (N5, N4, N3, N2, N1)",
+        en: "Sorry, no courses found matching your request. You can:\n\n• Try searching with different keywords\n• View all available courses\n• Ask about specific courses by level (N5, N4, N3, N2, N1)",
+        ja: "申し訳ございません。リクエストに一致するコースが見つかりませんでした。次のことができます：\n\n• 異なるキーワードで検索してみる\n• 利用可能なすべてのコースを表示する\n• レベル別の特定のコースについて質問する（N5、N4、N3、N2、N1）",
       },
       BLOG: {
-        vi: 'Xin lỗi, không tìm thấy bài viết blog nào về chủ đề này. Bạn có thể:\n\n• Tìm kiếm với chủ đề khác về tiếng Nhật\n• Xem các bài viết blog mới nhất\n• Hỏi về các chủ đề blog có sẵn',
-        en: 'Sorry, no blog posts found on this topic. You can:\n\n• Search for other Japanese-related topics\n• View recent blog posts\n• Ask about available blog topics',
-        ja: '申し訳ございません。このトピックに関するブログ記事が見つかりませんでした。次のことができます：\n\n• 他の日本語関連のトピックを検索する\n• 最近のブログ記事を表示する\n• 利用可能なブログトピックについて質問する',
+        vi: "Xin lỗi, không tìm thấy bài viết blog nào về chủ đề này. Bạn có thể:\n\n• Tìm kiếm với chủ đề khác về tiếng Nhật\n• Xem các bài viết blog mới nhất\n• Hỏi về các chủ đề blog có sẵn",
+        en: "Sorry, no blog posts found on this topic. You can:\n\n• Search for other Japanese-related topics\n• View recent blog posts\n• Ask about available blog topics",
+        ja: "申し訳ございません。このトピックに関するブログ記事が見つかりませんでした。次のことができます：\n\n• 他の日本語関連のトピックを検索する\n• 最近のブログ記事を表示する\n• 利用可能なブログトピックについて質問する",
       },
       ENROLLMENT: {
-        vi: 'Bạn chưa đăng ký khóa học nào. Bạn có thể:\n\n• Xem danh sách khóa học có sẵn\n• Tìm hiểu về các khóa học theo level\n• Hỏi về chi tiết khóa học bạn quan tâm',
+        vi: "Bạn chưa đăng ký khóa học nào. Bạn có thể:\n\n• Xem danh sách khóa học có sẵn\n• Tìm hiểu về các khóa học theo level\n• Hỏi về chi tiết khóa học bạn quan tâm",
         en: "You haven't enrolled in any courses yet. You can:\n\n• View available courses\n• Learn about courses by level\n• Ask about course details you're interested in",
-        ja: 'まだコースに登録していません。次のことができます：\n\n• 利用可能なコースを表示する\n• レベル別のコースについて学ぶ\n• 興味のあるコースの詳細について質問する',
+        ja: "まだコースに登録していません。次のことができます：\n\n• 利用可能なコースを表示する\n• レベル別のコースについて学ぶ\n• 興味のあるコースの詳細について質問する",
       },
       ASSESSMENT: {
-        vi: 'Xin lỗi, không tìm thấy bài kiểm tra nào phù hợp. Bạn có thể:\n\n• Xem tất cả bài kiểm tra có sẵn\n• Tìm bài test theo level (N5, N4, N3, N2, N1)\n• Hỏi về đề thi thử JLPT',
-        en: 'Sorry, no assessments found. You can:\n\n• View all available assessments\n• Find tests by level (N5, N4, N3, N2, N1)\n• Ask about JLPT mock exams',
-        ja: '申し訳ございません。評価テストが見つかりませんでした。次のことができます：\n\n• 利用可能なすべての評価を表示する\n• レベル別のテストを見つける（N5、N4、N3、N2、N1）\n• JLPT模擬試験について質問する',
+        vi: "Xin lỗi, không tìm thấy bài kiểm tra nào phù hợp. Bạn có thể:\n\n• Xem tất cả bài kiểm tra có sẵn\n• Tìm bài test theo level (N5, N4, N3, N2, N1)\n• Hỏi về đề thi thử JLPT",
+        en: "Sorry, no assessments found. You can:\n\n• View all available assessments\n• Find tests by level (N5, N4, N3, N2, N1)\n• Ask about JLPT mock exams",
+        ja: "申し訳ございません。評価テストが見つかりませんでした。次のことができます：\n\n• 利用可能なすべての評価を表示する\n• レベル別のテストを見つける（N5、N4、N3、N2、N1）\n• JLPT模擬試験について質問する",
       },
       ASSESSMENT_HISTORY: {
-        vi: 'Bạn chưa làm bài kiểm tra nào. Bạn có thể:\n\n• Xem các bài test có sẵn\n• Bắt đầu làm bài test thử\n• Tìm hiểu về hệ thống đánh giá',
+        vi: "Bạn chưa làm bài kiểm tra nào. Bạn có thể:\n\n• Xem các bài test có sẵn\n• Bắt đầu làm bài test thử\n• Tìm hiểu về hệ thống đánh giá",
         en: "You haven't taken any assessments yet. You can:\n\n• View available tests\n• Start taking a practice test\n• Learn about the assessment system",
-        ja: 'まだ評価テストを受けていません。次のことができます：\n\n• 利用可能なテストを表示する\n• 練習テストを開始する\n• 評価システムについて学ぶ',
+        ja: "まだ評価テストを受けていません。次のことができます：\n\n• 利用可能なテストを表示する\n• 練習テストを開始する\n• 評価システムについて学ぶ",
       },
-    }
+    };
 
-    const typeMessages = messages[queryType] || messages.COURSE
-    return typeMessages[language] || typeMessages.vi
+    const typeMessages = messages[queryType] || messages.COURSE;
+    return typeMessages[language] || typeMessages.vi;
   }
 
-  private async invalidateThreadCache(threadId: number, userId: number): Promise<void> {
-    const messagePattern = `ai_thread_messages:${threadId}:*`
+  private async invalidateThreadCache(
+    threadId: number,
+    userId: number,
+  ): Promise<void> {
+    const messagePattern = `ai_thread_messages:${threadId}:*`;
 
-    const redisClient = this.redis.getClient()
-    const messageKeys = await redisClient.keys(messagePattern)
+    const redisClient = this.redis.getClient();
+    const messageKeys = await redisClient.keys(messagePattern);
 
-    const keysToDelete = [this.getThreadCacheKey(threadId), this.getUserThreadsCacheKey(userId), ...messageKeys]
+    const keysToDelete = [
+      this.getThreadCacheKey(threadId),
+      this.getUserThreadsCacheKey(userId),
+      ...messageKeys,
+    ];
 
     this.logger.warn(
-      `[Cache INVALIDATE] Deleting ${keysToDelete.length} keys for thread ${threadId}: ${keysToDelete.join(', ')}`,
-    )
+      `[Cache INVALIDATE] Deleting ${keysToDelete.length} keys for thread ${threadId}: ${keysToDelete.join(", ")}`,
+    );
 
     for (const key of keysToDelete) {
-      await this.redis.del(key)
+      await this.redis.del(key);
     }
 
-    this.logger.warn(`[Cache INVALIDATE] Successfully deleted ${keysToDelete.length} keys`)
+    this.logger.warn(
+      `[Cache INVALIDATE] Successfully deleted ${keysToDelete.length} keys`,
+    );
   }
 
   async handleQuery(userId: number, dto: SendQueryDto) {
-    const queryStartTime = Date.now()
-    const { threadId, query } = dto
+    const queryStartTime = Date.now();
+    const { threadId, query } = dto;
 
-    this.logger.log(`[handleQuery] User ID: ${userId} | Thread ID: ${threadId}`)
-    this.logger.log(`⏱️  Query started at: ${new Date().toLocaleTimeString()}`)
+    this.logger.log(
+      `[handleQuery] User ID: ${userId} | Thread ID: ${threadId}`,
+    );
+    this.logger.log(`⏱️  Query started at: ${new Date().toLocaleTimeString()}`);
 
-    const cacheKey = this.getThreadCacheKey(threadId)
-    let thread = await this.redis.get(cacheKey)
+    const cacheKey = this.getThreadCacheKey(threadId);
+    let thread = await this.redis.get(cacheKey);
 
     if (!thread) {
-      thread = await this.threadRepo.findById(threadId)
+      thread = await this.threadRepo.findById(threadId);
       if (!thread || thread.userId !== userId) {
-        throw new NotFoundException('Thread not found')
+        throw new NotFoundException("Thread not found");
       }
-      await this.redis.set(cacheKey, JSON.stringify(thread), this.THREAD_CACHE_TTL)
+      await this.redis.set(
+        cacheKey,
+        JSON.stringify(thread),
+        this.THREAD_CACHE_TTL,
+      );
     } else {
-      thread = typeof thread === 'string' ? JSON.parse(thread) : thread
+      thread = typeof thread === "string" ? JSON.parse(thread) : thread;
       if (thread.userId !== userId) {
-        throw new NotFoundException('Thread not found')
+        throw new NotFoundException("Thread not found");
       }
     }
 
     // Check if query is off-topic (not related to Japanese learning)
-    const isOffTopic = this.isOffTopicQuery(query)
+    const isOffTopic = this.isOffTopicQuery(query);
     if (isOffTopic) {
-      this.logger.warn(`🚫 Off-topic query detected: "${query}"`)
+      this.logger.warn(`🚫 Off-topic query detected: "${query}"`);
 
-      const detectedLanguage = this.detectLanguage(query)
-      const rejectionMessage = this.getRejectionMessage(detectedLanguage)
-      this.logger.log(`📢 Language detected: ${detectedLanguage}`)
+      const detectedLanguage = this.detectLanguage(query);
+      const rejectionMessage = this.getRejectionMessage(detectedLanguage);
+      this.logger.log(`📢 Language detected: ${detectedLanguage}`);
 
       const queryRecord = await this.queryRepo.create({
         threadId,
         userId,
         query,
-        queryType: 'GENERAL' as any,
+        queryType: "GENERAL" as any,
+        agentRole: "SENSEI",
+        routingReason:
+          "Off-topic query rejected and handled by default Sensei policy.",
         initialResponse: rejectionMessage,
         requiresApproval: false,
-      })
+      });
 
       // Save user message
       await this.messageRepo.create({
@@ -360,7 +438,7 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
         queryId: queryRecord.id,
         role: ChatRole.USER,
         content: query,
-      })
+      });
 
       // Save rejection message
       await this.messageRepo.create({
@@ -369,121 +447,154 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
         queryId: queryRecord.id,
         role: ChatRole.ASSISTANT,
         content: rejectionMessage,
-      })
+      });
 
       await this.queryRepo.update(queryRecord.id, {
         status: QueryStatus.COMPLETED,
-      })
+      });
 
       // Invalidate cache after new messages
-      await this.invalidateThreadCache(threadId, userId)
+      await this.invalidateThreadCache(threadId, userId);
 
       return {
         queryId: queryRecord.id,
         response: rejectionMessage,
         requiresApproval: false,
         toolCalls: [],
-      }
+      };
     }
 
-    const queryType = detectQueryType(query)
-    const needsMultipleTools = requiresMultipleTools(query)
-    const suggestedTools = needsMultipleTools ? suggestToolCombination(query) : []
+    const queryType = detectQueryType(query);
+    const needsMultipleTools = requiresMultipleTools(query);
+    const suggestedTools = needsMultipleTools
+      ? suggestToolCombination(query)
+      : [];
+    const routingDecision = routeAgentForQuery(queryType, query);
+    const agentRole = routingDecision.primaryRole;
+    const routingReason = routingDecision.reason;
 
     // Detect flashcard generation request
     const isFlashcardGeneration =
       queryType === QueryType.FLASHCARD &&
-      (query.toLowerCase().includes('tạo') ||
-        query.toLowerCase().includes('create') ||
-        query.toLowerCase().includes('generate'))
+      (query.toLowerCase().includes("tạo") ||
+        query.toLowerCase().includes("create") ||
+        query.toLowerCase().includes("generate"));
 
-    this.logger.log(`Query type detected: ${queryType}`)
-    this.logger.log(`Is flashcard generation: ${isFlashcardGeneration}`)
+    this.logger.log(`Query type detected: ${queryType}`);
+    this.logger.log(`Agent role routed: ${agentRole}`);
+    if (routingDecision.collaboratorRoles.length > 0) {
+      this.logger.log(
+        `Collaborator roles: ${routingDecision.collaboratorRoles.join(", ")}`,
+      );
+    }
+    this.logger.debug(`Routing reason: ${routingReason}`);
+    this.logger.log(`Is flashcard generation: ${isFlashcardGeneration}`);
     if (needsMultipleTools) {
-      this.logger.log(`Multi-tool query detected. Suggested tools: [${suggestedTools.join(', ')}]`)
+      this.logger.log(
+        `Multi-tool query detected. Suggested tools: [${suggestedTools.join(", ")}]`,
+      );
     }
 
-    const detectionTime = Date.now() - queryStartTime
-    this.logger.log(`⏱️  [+${detectionTime}ms] Query type detected`)
+    const detectionTime = Date.now() - queryStartTime;
+    this.logger.log(`⏱️  [+${detectionTime}ms] Query type detected`);
 
     // Build chat messages with language detection and multi-tool hint
-    let systemPrompt = this.promptService.getSystemPrompt(queryType, undefined, query, userId)
-    this.logger.debug(`[System Prompt] Generated for userId: ${userId}, queryType: ${queryType}`)
+    let systemPrompt = this.promptService.getSystemPrompt(
+      queryType,
+      undefined,
+      query,
+      userId,
+    );
+    this.logger.debug(
+      `[System Prompt] Generated for userId: ${userId}, queryType: ${queryType}`,
+    );
 
     // Add multi-tool hint if needed
     if (needsMultipleTools) {
-      const multiToolHint = generateMultiToolHint(query)
-      systemPrompt = `${systemPrompt}\n\n${multiToolHint}`
+      const multiToolHint = generateMultiToolHint(query);
+      systemPrompt = `${systemPrompt}\n\n${multiToolHint}`;
     }
 
-    const messages: ChatCompletionMessageParam[] = [{ role: 'system', content: systemPrompt }]
+    const messages: ChatCompletionMessageParam[] = [
+      { role: "system", content: systemPrompt },
+    ];
 
     // Add recent thread messages for context (last 10)
-    const recentMessages = thread.messages.slice(-10)
+    const recentMessages = thread.messages.slice(-10);
     for (const msg of recentMessages) {
       if (msg.role === ChatRole.USER || msg.role === ChatRole.ASSISTANT) {
         messages.push({
-          role: msg.role.toLowerCase() as 'user' | 'assistant',
+          role: msg.role.toLowerCase() as "user" | "assistant",
           content: msg.content,
-        })
+        });
       }
     }
 
     // Add current query
     messages.push({
-      role: 'user',
+      role: "user",
       content: query,
-    })
+    });
 
     // Determine if we should FORCE tool calling
     // Force tools for queries that MUST fetch data (user-specific data)
-    const shouldForceTools =
-      queryType === QueryType.ASSESSMENT_HISTORY || // "Tôi đã làm bài test nào?"
-      queryType === QueryType.ENROLLMENT || // "Khóa học của tôi"
-      (queryType === QueryType.FLASHCARD && isFlashcardGeneration) // "Tạo flashcard"
+    const shouldForceTools = routingDecision.forceTools;
 
     if (shouldForceTools) {
-      this.logger.log(`🎯 FORCING tool calls for queryType: ${queryType}`)
+      this.logger.log(`🎯 FORCING tool calls for queryType: ${queryType}`);
     }
 
     // Get response from Agent
-    const aiCallStartTime = Date.now()
-    const agentResponse = await this.agentService.getResponse(messages, true, shouldForceTools, query)
-    const aiCallTime = Date.now() - aiCallStartTime
-    this.logger.log(`⏱️  [+${Date.now() - queryStartTime}ms] Initial AI call completed (took ${aiCallTime}ms)`)
+    const aiCallStartTime = Date.now();
+    const agentResponse = await this.agentService.getResponse(
+      messages,
+      true,
+      shouldForceTools,
+      query,
+      agentRole,
+      routingDecision.collaboratorRoles,
+    );
+    const aiCallTime = Date.now() - aiCallStartTime;
+    this.logger.log(
+      `⏱️  [+${Date.now() - queryStartTime}ms] Initial AI call completed (took ${aiCallTime}ms)`,
+    );
 
     // DEBUG: Log tool calls
     if (agentResponse.toolCalls && agentResponse.toolCalls.length > 0) {
-      this.logger.log(`✅ AI called ${agentResponse.toolCalls.length} tools:`)
+      this.logger.log(`✅ AI called ${agentResponse.toolCalls.length} tools:`);
       agentResponse.toolCalls.forEach((tc) => {
-        this.logger.log(`  - ${tc.name}(${tc.arguments})`)
-      })
+        this.logger.log(`  - ${tc.name}(${tc.arguments})`);
+      });
     } else {
-      this.logger.warn(`⚠️ AI did NOT call any tools (expected for flashcard generation: ${isFlashcardGeneration})`)
+      this.logger.warn(
+        `⚠️ AI did NOT call any tools (expected for flashcard generation: ${isFlashcardGeneration})`,
+      );
       if (isFlashcardGeneration) {
-        this.logger.error(`🚨 CRITICAL: AI should have called generate_flashcard_suggestions tool!`)
+        this.logger.error(
+          `🚨 CRITICAL: AI should have called generate_flashcard_suggestions tool!`,
+        );
       }
     }
 
     // Add assistant's response to messages (including tool_calls if any)
     const assistantMessage: any = {
-      role: 'assistant',
+      role: "assistant",
       content: agentResponse.content || null,
-    }
+    };
 
     // If there are tool calls, add them to the assistant message
     if (agentResponse.toolCalls && agentResponse.toolCalls.length > 0) {
       assistantMessage.tool_calls = agentResponse.toolCalls.map((tc) => ({
         id: tc.id,
-        type: 'function',
+        type: "function",
         function: {
           name: tc.name,
           arguments: tc.arguments,
         },
-      }))
+      }));
     }
 
-    messages.push(assistantMessage)
+    messages.push(assistantMessage);
 
     // Create query record
     const queryRecord = await this.queryRepo.create({
@@ -491,9 +602,11 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
       userId,
       query,
       queryType: queryType as any,
+      agentRole,
+      routingReason,
       initialResponse: agentResponse.content || undefined,
       requiresApproval: false, // Always false now (auto-execute)
-    })
+    });
 
     // Save user message
     await this.messageRepo.create({
@@ -502,7 +615,7 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
       queryId: queryRecord.id,
       role: ChatRole.USER,
       content: query,
-    })
+    });
 
     // If no tool calls, save assistant response and return
     if (!agentResponse.toolCalls || agentResponse.toolCalls.length === 0) {
@@ -513,32 +626,34 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
           queryId: queryRecord.id,
           role: ChatRole.ASSISTANT,
           content: agentResponse.content,
-        })
+        });
       }
 
       await this.queryRepo.update(queryRecord.id, {
         status: QueryStatus.COMPLETED,
-      })
+      });
 
       return {
         queryId: queryRecord.id,
         response: agentResponse.content,
         requiresApproval: false,
         toolCalls: [],
-      }
+      };
     }
 
     // AUTO-EXECUTE TOOLS immediately without waiting for approval
-    const toolNames = agentResponse.toolCalls.map((tc) => tc.name).join(', ')
-    this.logger.log(`🔧 Auto-executing ${agentResponse.toolCalls.length} tool(s): [${toolNames}]`)
+    const toolNames = agentResponse.toolCalls.map((tc) => tc.name).join(", ");
+    this.logger.log(
+      `🔧 Auto-executing ${agentResponse.toolCalls.length} tool(s): [${toolNames}]`,
+    );
 
     await this.queryRepo.update(queryRecord.id, {
       status: QueryStatus.PROCESSING,
-    })
+    });
 
-    this.logger.log('📞 Calling agentService.executeApprovedTools...')
-    this.logger.log(`📋 QueryType being passed: ${queryType}`)
-    const executeStartTime = Date.now()
+    this.logger.log("📞 Calling agentService.executeApprovedTools...");
+    this.logger.log(`📋 QueryType being passed: ${queryType}`);
+    const executeStartTime = Date.now();
 
     const executeResult = await this.agentService.executeApprovedTools({
       toolCalls: agentResponse.toolCalls.map((tc) => ({
@@ -550,59 +665,77 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
       userId,
       messages, // Pass conversation history with tool_calls
       queryType, // Pass queryType to format the final response correctly
-    })
+      agentRole,
+    });
 
-    const executeElapsed = Date.now() - executeStartTime
-    this.logger.log(`✅ executeApprovedTools completed in ${executeElapsed}ms`)
-    this.logger.log(`⏱️  [+${Date.now() - queryStartTime}ms] Tool execution completed`)
-    this.logger.log(`   - Tool results count: ${executeResult.results?.length || 0}`)
-    this.logger.log(`   - Has finalResponse: ${!!executeResult.finalResponse}`)
-    this.logger.log(`   - FinalResponse preview: ${executeResult.finalResponse?.substring(0, 100)}...`)
+    const executeElapsed = Date.now() - executeStartTime;
+    this.logger.log(`✅ executeApprovedTools completed in ${executeElapsed}ms`);
+    this.logger.log(
+      `⏱️  [+${Date.now() - queryStartTime}ms] Tool execution completed`,
+    );
+    this.logger.log(
+      `   - Tool results count: ${executeResult.results?.length || 0}`,
+    );
+    this.logger.log(`   - Has finalResponse: ${!!executeResult.finalResponse}`);
+    this.logger.log(
+      `   - FinalResponse preview: ${executeResult.finalResponse?.substring(0, 100)}...`,
+    );
 
     // Save tool results to query
     await this.queryRepo.update(queryRecord.id, {
       status: QueryStatus.COMPLETED,
       executedTools: executeResult.results,
-    })
+    });
 
     // Prepare final response - ensure we always have something to show user
-    let finalResponse = executeResult.finalResponse
+    let finalResponse = executeResult.finalResponse;
 
     // Check if response contains empty JSON (no data)
-    const isEmptyJsonResponse = this.checkEmptyJsonResponse(finalResponse, queryType)
+    const isEmptyJsonResponse = this.checkEmptyJsonResponse(
+      finalResponse,
+      queryType,
+    );
 
     if (isEmptyJsonResponse) {
-      this.logger.warn(`Empty JSON response detected for queryType: ${queryType}`)
-      finalResponse = this.getEmptyDataMessage(queryType, query)
+      this.logger.warn(
+        `Empty JSON response detected for queryType: ${queryType}`,
+      );
+      finalResponse = this.getEmptyDataMessage(queryType, query);
     }
     // If no final response from AI, create a fallback based on tool results
     else if (!finalResponse || finalResponse.trim().length === 0) {
-      this.logger.warn(`No final response from AI, generating fallback message`)
+      this.logger.warn(
+        `No final response from AI, generating fallback message`,
+      );
 
       // Check if tools returned data
       const hasData = executeResult.results.some(
-        (r) => r.result && typeof r.result === 'object' && 'data' in r.result && r.result.data !== null,
-      )
+        (r) =>
+          r.result &&
+          typeof r.result === "object" &&
+          "data" in r.result &&
+          r.result.data !== null,
+      );
 
       if (hasData) {
         finalResponse =
-          'Xin lỗi, tôi đã tìm thấy thông tin nhưng gặp lỗi khi định dạng câu trả lời. Bạn có thể hỏi lại câu hỏi này không?'
+          "Xin lỗi, tôi đã tìm thấy thông tin nhưng gặp lỗi khi định dạng câu trả lời. Bạn có thể hỏi lại câu hỏi này không?";
       } else {
-        const toolName = executeResult.results[0]?.toolName || 'tool'
-        if (toolName.includes('enrollment') || toolName.includes('progress')) {
+        const toolName = executeResult.results[0]?.toolName || "tool";
+        if (toolName.includes("enrollment") || toolName.includes("progress")) {
           finalResponse =
-            'Hiện tại tôi chưa tìm thấy thông tin enrollment hoặc progress của bạn. Có thể bạn chưa đăng ký khóa học nào hoặc chưa có tiến độ học tập.'
-        } else if (toolName.includes('course')) {
+            "Hiện tại tôi chưa tìm thấy thông tin enrollment hoặc progress của bạn. Có thể bạn chưa đăng ký khóa học nào hoặc chưa có tiến độ học tập.";
+        } else if (toolName.includes("course")) {
           finalResponse =
-            'Xin lỗi, tôi không tìm thấy khóa học phù hợp với yêu cầu của bạn. Bạn có thể thử tìm kiếm với từ khóa khác không?'
+            "Xin lỗi, tôi không tìm thấy khóa học phù hợp với yêu cầu của bạn. Bạn có thể thử tìm kiếm với từ khóa khác không?";
         } else {
           finalResponse =
-            'Xin lỗi, tôi không tìm thấy thông tin bạn yêu cầu. Bạn có thể thử hỏi lại với cách khác không?'
+            "Xin lỗi, tôi không tìm thấy thông tin bạn yêu cầu. Bạn có thể thử hỏi lại với cách khác không?";
         }
       }
     }
 
-    this.logger.debug(`Saving assistant message to database...`)
+    this.logger.debug(`Saving assistant message to database...`);
     await this.messageRepo.create({
       threadId,
       userId,
@@ -610,133 +743,162 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
       role: ChatRole.ASSISTANT,
       content: finalResponse,
       toolCalls: executeResult.results,
-    })
+    });
 
-    this.logger.log(`⏱️  [+${Date.now() - queryStartTime}ms] Message saved to DB`)
+    this.logger.log(
+      `⏱️  [+${Date.now() - queryStartTime}ms] Message saved to DB`,
+    );
 
     setTimeout(() => {
       void this.invalidateThreadCache(threadId, userId)
-        .then(() => this.logger.debug(`Cache invalidated for thread ${threadId}`))
-        .catch((error) => this.logger.error(`Failed to invalidate cache for thread ${threadId}:`, error))
-    }, 100) // 100ms delay to ensure DB commit completes
+        .then(() =>
+          this.logger.debug(`Cache invalidated for thread ${threadId}`),
+        )
+        .catch((error) =>
+          this.logger.error(
+            `Failed to invalidate cache for thread ${threadId}:`,
+            error,
+          ),
+        );
+    }, 100); // 100ms delay to ensure DB commit completes
 
-    const totalTime = Date.now() - queryStartTime
-    this.logger.log(`⏱️  ✅ TOTAL QUERY TIME: ${totalTime}ms (${(totalTime / 1000).toFixed(2)}s)`)
+    const totalTime = Date.now() - queryStartTime;
+    this.logger.log(
+      `⏱️  ✅ TOTAL QUERY TIME: ${totalTime}ms (${(totalTime / 1000).toFixed(2)}s)`,
+    );
     this.logger.log(
       `⏱️  📊 Breakdown: Detection=${detectionTime}ms, AI=${aiCallTime}ms, Tools+Response=${executeElapsed}ms`,
-    )
+    );
 
     return {
       queryId: queryRecord.id,
       response: finalResponse,
       requiresApproval: false,
       toolCalls: [],
-    }
+    };
   }
 
   async createThread(userId: number, title?: string) {
-    const thread = await this.threadRepo.create(userId, title)
+    const thread = await this.threadRepo.create(userId, title);
 
-    await this.redis.del(this.getUserThreadsCacheKey(userId))
+    await this.redis.del(this.getUserThreadsCacheKey(userId));
 
-    await this.redis.set(this.getThreadCacheKey(thread.id), JSON.stringify(thread), this.THREAD_CACHE_TTL)
+    await this.redis.set(
+      this.getThreadCacheKey(thread.id),
+      JSON.stringify(thread),
+      this.THREAD_CACHE_TTL,
+    );
 
-    return thread
+    return thread;
   }
 
   async getUserThreads(userId: number, limit = 20, page = 1) {
     // Only cache first page (page = 1)
     if (page === 1) {
-      const cacheKey = this.getUserThreadsCacheKey(userId)
-      const cached = await this.redis.get(cacheKey)
+      const cacheKey = this.getUserThreadsCacheKey(userId);
+      const cached = await this.redis.get(cacheKey);
 
       if (cached) {
-        const result = typeof cached === 'string' ? JSON.parse(cached) : cached
-        this.logger.debug(`Cache hit for user threads: ${userId}`)
-        return result
+        const result = typeof cached === "string" ? JSON.parse(cached) : cached;
+        this.logger.debug(`Cache hit for user threads: ${userId}`);
+        return result;
       }
     }
 
-    const result = await this.threadRepo.findByUserId(userId, limit, page)
+    const result = await this.threadRepo.findByUserId(userId, limit, page);
 
     if (page === 1) {
-      await this.redis.set(this.getUserThreadsCacheKey(userId), JSON.stringify(result), this.THREAD_CACHE_TTL)
+      await this.redis.set(
+        this.getUserThreadsCacheKey(userId),
+        JSON.stringify(result),
+        this.THREAD_CACHE_TTL,
+      );
     }
 
-    return result
+    return result;
   }
 
-  async getThreadMessages(userId: number, threadId: number, limit = 20, page = 1) {
-    const thread = await this.threadRepo.findById(threadId)
+  async getThreadMessages(
+    userId: number,
+    threadId: number,
+    limit = 20,
+    page = 1,
+  ) {
+    const thread = await this.threadRepo.findById(threadId);
     if (!thread || thread.userId !== userId) {
-      throw new NotFoundException('Thread not found')
+      throw new NotFoundException("Thread not found");
     }
 
-    const messagesCacheKey = this.getMessagesCacheKey(threadId, limit, page)
+    const messagesCacheKey = this.getMessagesCacheKey(threadId, limit, page);
 
     if (page === 1) {
-      const cached = await this.redis.get(messagesCacheKey)
+      const cached = await this.redis.get(messagesCacheKey);
       if (cached) {
-        const result = typeof cached === 'string' ? JSON.parse(cached) : cached
-        const messageIds = result.data?.map((m: any) => m.id).join(',') || 'none'
-        return result
+        const result = typeof cached === "string" ? JSON.parse(cached) : cached;
+        const messageIds =
+          result.data?.map((m: any) => m.id).join(",") || "none";
+        return result;
       }
     }
 
-    const result = await this.messageRepo.findByThreadId(threadId, limit, page)
-    const messageIds = result.data.map((m) => m.id).join(',')
+    const result = await this.messageRepo.findByThreadId(threadId, limit, page);
+    const messageIds = result.data.map((m) => m.id).join(",");
     if (page === 1) {
-      await this.redis.set(messagesCacheKey, JSON.stringify(result), this.MESSAGES_CACHE_TTL)
+      await this.redis.set(
+        messagesCacheKey,
+        JSON.stringify(result),
+        this.MESSAGES_CACHE_TTL,
+      );
     }
 
-    return result
+    return result;
   }
 
   async deleteThread(userId: number, threadId: number) {
-    const thread = await this.threadRepo.findById(threadId)
+    const thread = await this.threadRepo.findById(threadId);
     if (!thread || thread.userId !== userId) {
-      throw new NotFoundException('Thread not found')
+      throw new NotFoundException("Thread not found");
     }
 
-    const result = await this.threadRepo.delete(threadId)
+    const result = await this.threadRepo.delete(threadId);
 
-    await this.invalidateThreadCache(threadId, userId)
+    await this.invalidateThreadCache(threadId, userId);
 
-    return result
+    return result;
   }
 
   async clearUserCache(userId: number) {
-    const threads = await this.threadRepo.findByUserId(userId, 1000, 1)
+    const threads = await this.threadRepo.findByUserId(userId, 1000, 1);
 
-    const redisClient = this.redis.getClient()
-    let totalKeysCleared = 0
+    const redisClient = this.redis.getClient();
+    let totalKeysCleared = 0;
 
     for (const thread of threads.data) {
-      const messagePattern = `ai_thread_messages:${thread.id}:*`
-      const messageKeys = await redisClient.keys(messagePattern)
+      const messagePattern = `ai_thread_messages:${thread.id}:*`;
+      const messageKeys = await redisClient.keys(messagePattern);
 
       for (const key of messageKeys) {
-        await this.redis.del(key)
-        totalKeysCleared++
+        await this.redis.del(key);
+        totalKeysCleared++;
       }
 
-      await this.redis.del(this.getThreadCacheKey(thread.id))
-      totalKeysCleared++
+      await this.redis.del(this.getThreadCacheKey(thread.id));
+      totalKeysCleared++;
     }
 
-    await this.redis.del(this.getUserThreadsCacheKey(userId))
-    totalKeysCleared++
+    await this.redis.del(this.getUserThreadsCacheKey(userId));
+    totalKeysCleared++;
 
     return {
-      message: 'Cache cleared successfully',
+      message: "Cache cleared successfully",
       userId,
       threadsCleared: threads.data.length,
       keysCleared: totalKeysCleared,
-    }
+    };
   }
 
   async debugMessageCount(threadId: number) {
-    const allMessages = await this.messageRepo.getAllByThreadId(threadId)
+    const allMessages = await this.messageRepo.getAllByThreadId(threadId);
 
     return {
       threadId,
@@ -745,6 +907,6 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
       firstMessageId: allMessages[0]?.id,
       lastMessageId: allMessages[allMessages.length - 1]?.id,
       messages: allMessages,
-    }
+    };
   }
 }

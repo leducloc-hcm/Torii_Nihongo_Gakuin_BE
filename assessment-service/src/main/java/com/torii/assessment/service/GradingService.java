@@ -1,16 +1,16 @@
 package com.torii.assessment.service;
 
+import org.springframework.stereotype.Service;
+
 import com.torii.assessment.entity.Attempt;
 import com.torii.assessment.repository.AssessmentAnswerRepository;
 import com.torii.assessment.repository.AssessmentOptionRepository;
 import com.torii.assessment.repository.AttemptRepository;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-
-import java.util.ArrayList;
 
 @Service
 @RequiredArgsConstructor

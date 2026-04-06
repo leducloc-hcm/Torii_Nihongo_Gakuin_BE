@@ -259,21 +259,6 @@ CREATE TABLE IF NOT EXISTS progress (
     UNIQUE (assessment_id, user_id)
 );
 
-CREATE TABLE IF NOT EXISTS answers (
-    id BIGSERIAL PRIMARY KEY,
-
-    attempt_id BIGINT REFERENCES attempts(id) ON DELETE CASCADE,
-    question_id BIGINT REFERENCES assessment_questions(id),
-
-    selected_option_id BIGINT,
-    is_correct BOOLEAN,
-
-    time_spent_sec INTEGER,
-    explanation TEXT,
-
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
 -- ANSWER PROGRESS
 
 CREATE TABLE IF NOT EXISTS answer_progress (
@@ -311,6 +296,21 @@ CREATE TABLE IF NOT EXISTS attempts (
 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS answers (
+    id BIGSERIAL PRIMARY KEY,
+
+    attempt_id BIGINT REFERENCES attempts(id) ON DELETE CASCADE,
+    question_id BIGINT REFERENCES assessment_questions(id),
+
+    selected_option_id BIGINT,
+    is_correct BOOLEAN,
+
+    time_spent_sec INTEGER,
+    explanation TEXT,
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ANSWERS (USING COPY DATA)

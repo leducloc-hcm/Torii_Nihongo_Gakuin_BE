@@ -29,7 +29,6 @@ public class AttemptService {
     private final AssessmentRepository assessmentRepository;
     private final AssessmentAnswerRepository assessmentAnswerRepository;
     private final AssessmentAnswerService assessmentAnswerService;
-    private final UserCourseAccessService userCourseAccessService;
     private final GradingService gradingService;
     private final EventPublisher eventPublisher;
     
@@ -37,17 +36,6 @@ public class AttemptService {
     public AttemptDTO createAttempt(CreateAttemptDTO dto) {
         Assessment assessment = assessmentRepository.findById(dto.getAssessmentId())
             .orElseThrow(() -> new RuntimeException("Assessment not found: " + dto.getAssessmentId()));
-
-        // Gate attempt creation based on visibility + course enrollment access
-        if (!"PUBLIC".equalsIgnoreCase(assessment.getVisibility())) {
-            Integer courseId = assessment.getCourseId();
-            if (courseId == null) {
-                throw new RuntimeException("Assessment is not public and has no courseId configured for gating");
-            }
-            if (!userCourseAccessService.hasAccess(dto.getUserId(), courseId)) {
-                throw new RuntimeException("User is not eligible for this assessment (course access required)");
-            }
-        }
 
         Attempt attempt = new Attempt();
         attempt.setAssessmentId(dto.getAssessmentId());

@@ -16,9 +16,6 @@ public class Assessment {
     private String title;
     private String description;
 
-    @Column(name = "course_id")
-    private Integer courseId;
-
     // Matches assessment_type enum in the DB (QUIZ, TEST, EXAM, ASSIGNMENT)
     private String type;
 

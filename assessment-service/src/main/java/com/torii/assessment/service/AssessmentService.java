@@ -217,7 +217,6 @@ public class AssessmentService {
             .type(assessment.getType())
             .visibility(assessment.getVisibility())
             .description(assessment.getDescription())
-            .courseId(assessment.getCourseId())
             .createdBy(assessment.getCreatedBy())
             .lessonId(assessment.getLessonId())
             .classId(assessment.getClassId())
