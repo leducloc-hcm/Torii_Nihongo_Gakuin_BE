@@ -13,8 +13,10 @@ import com.torii.assessment.repository.AssessmentRepository;
 import com.torii.assessment.repository.AttemptRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -51,9 +53,8 @@ public class AttemptService {
         return mapToDTO(saved);
     }
     
-    public AttemptDTO getAttemptById(Long id) {
-        Attempt attempt = attemptRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Attempt not found: " + id));
+    public AttemptDTO getAttemptById(Long id, Integer requesterUserId, String requesterRole) {
+        Attempt attempt = getAttemptForAccess(id, requesterUserId, requesterRole);
         return mapToDTO(attempt);
     }
     
@@ -65,9 +66,8 @@ public class AttemptService {
     }
     
     @Transactional
-    public void submitAnswer(Long attemptId, SubmitAnswerDTO dto) {
-        Attempt attempt = attemptRepository.findById(attemptId)
-            .orElseThrow(() -> new RuntimeException("Attempt not found: " + attemptId));
+    public void submitAnswer(Long attemptId, SubmitAnswerDTO dto, Integer requesterUserId, String requesterRole) {
+        Attempt attempt = getAttemptForAccess(attemptId, requesterUserId, requesterRole);
 
         if (attempt.getStatus() == Attempt.AttemptStatus.SUBMITTED) {
             throw new RuntimeException("Attempt already submitted: " + attemptId);
@@ -84,9 +84,8 @@ public class AttemptService {
     }
     
     @Transactional
-    public AttemptDTO submitAttempt(Long attemptId) {
-        Attempt attempt = attemptRepository.findById(attemptId)
-            .orElseThrow(() -> new RuntimeException("Attempt not found: " + attemptId));
+    public AttemptDTO submitAttempt(Long attemptId, Integer requesterUserId, String requesterRole) {
+        Attempt attempt = getAttemptForAccess(attemptId, requesterUserId, requesterRole);
 
         if (attempt.getStatus() == Attempt.AttemptStatus.SUBMITTED) {
             throw new RuntimeException("Attempt already submitted: " + attemptId);
@@ -112,10 +111,25 @@ public class AttemptService {
         return mapToDTO(saved);
     }
     
-    public AttemptDTO getAttemptResults(Long id) {
-        Attempt attempt = attemptRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Attempt not found: " + id));
+    public AttemptDTO getAttemptResults(Long id, Integer requesterUserId, String requesterRole) {
+        Attempt attempt = getAttemptForAccess(id, requesterUserId, requesterRole);
         return mapToDTO(attempt);
+    }
+
+    private Attempt getAttemptForAccess(Long attemptId, Integer requesterUserId, String requesterRole) {
+        Attempt attempt = attemptRepository.findById(attemptId)
+            .orElseThrow(() -> new RuntimeException("Attempt not found: " + attemptId));
+
+        boolean privileged = "STAFF".equalsIgnoreCase(requesterRole)
+            || "LECTURER".equalsIgnoreCase(requesterRole)
+            || "ADMIN".equalsIgnoreCase(requesterRole);
+
+        if (!privileged && !attempt.getUserId().equals(requesterUserId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                "CUSTOMER can only access their own attempts");
+        }
+
+        return attempt;
     }
     
     private AttemptDTO mapToDTO(Attempt attempt) {

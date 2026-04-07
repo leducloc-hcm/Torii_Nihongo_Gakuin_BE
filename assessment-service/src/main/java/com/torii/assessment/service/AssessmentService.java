@@ -6,9 +6,11 @@ import com.torii.assessment.dto.assessment.CreateAssessmentDTO;
 import com.torii.assessment.dto.assessment.QueryAssessmentDTO;
 import com.torii.assessment.dto.assessment.UpdateAssessmentDTO;
 import com.torii.assessment.entity.Assessment;
+import com.torii.assessment.entity.ScoreProfile;
 import com.torii.assessment.repository.AssessmentRepository;
 import com.torii.assessment.repository.AssessmentLogRepository;
 import com.torii.assessment.entity.AssessmentLog;
+import com.torii.assessment.repository.ScoreProfileRepository;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,18 +33,22 @@ public class AssessmentService {
 
     private final AssessmentRepository assessmentRepository;
     private final AssessmentLogRepository assessmentLogRepository;
+    private final ScoreProfileRepository scoreProfileRepository;
 
     @Transactional
     public AssessmentDTO createAssessment(CreateAssessmentDTO dto) {
         Assessment assessment = new Assessment();
         assessment.setTitle(dto.getTitle());
-        assessment.setLevel(dto.getLevel());
-        assessment.setType(dto.getType());
-        assessment.setVisibility(dto.getVisibility());
+        assessment.setLevel(dto.getLevel() != null ? Assessment.JLPTLevel.valueOf(dto.getLevel()) : null);
+        assessment.setType(Assessment.AssessmentType.valueOf(dto.getType()));
+        assessment.setVisibility(dto.getVisibility() != null
+            ? Assessment.AssessmentVisibility.valueOf(dto.getVisibility())
+            : Assessment.AssessmentVisibility.PRIVATE);
         assessment.setCreatedBy(dto.getCreatedBy());
         assessment.setDescription(dto.getDescription());
         assessment.setLessonId(dto.getLessonId());
         assessment.setClassId(dto.getClassId());
+        assessment.setScoreProfile(resolveScoreProfile(dto.getScoreProfileId()));
         assessment.setAssignedToId(dto.getAssignedToId());
         assessment.setStartAt(dto.getStartAt());
         assessment.setDueAt(dto.getDueAt());
@@ -106,15 +112,15 @@ public class AssessmentService {
         }
         if (dto.getLevel() != null) {
             saveLog(id, "UPDATE", "level", assessment.getLevel(), dto.getLevel(), dto.getUpdatedBy(), "UPDATE_ASSESSMENT");
-            assessment.setLevel(dto.getLevel());
+            assessment.setLevel(Assessment.JLPTLevel.valueOf(dto.getLevel()));
         }
         if (dto.getType() != null) {
             saveLog(id, "UPDATE", "type", assessment.getType(), dto.getType(), dto.getUpdatedBy(), "UPDATE_ASSESSMENT");
-            assessment.setType(dto.getType());
+            assessment.setType(Assessment.AssessmentType.valueOf(dto.getType()));
         }
         if (dto.getVisibility() != null) {
             saveLog(id, "UPDATE", "visibility", assessment.getVisibility(), dto.getVisibility(), dto.getUpdatedBy(), "UPDATE_ASSESSMENT");
-            assessment.setVisibility(dto.getVisibility());
+            assessment.setVisibility(Assessment.AssessmentVisibility.valueOf(dto.getVisibility()));
         }
         if (dto.getDescription() != null) {
             saveLog(id, "UPDATE", "description", assessment.getDescription(), dto.getDescription(), dto.getUpdatedBy(), "UPDATE_ASSESSMENT");
@@ -127,6 +133,11 @@ public class AssessmentService {
         if (dto.getClassId() != null) {
             saveLog(id, "UPDATE", "classId", assessment.getClassId(), dto.getClassId(), dto.getUpdatedBy(), "UPDATE_ASSESSMENT");
             assessment.setClassId(dto.getClassId());
+        }
+        if (dto.getScoreProfileId() != null) {
+            Long oldProfileId = assessment.getScoreProfile() != null ? assessment.getScoreProfile().getId() : null;
+            saveLog(id, "UPDATE", "scoreProfileId", oldProfileId, dto.getScoreProfileId(), dto.getUpdatedBy(), "UPDATE_ASSESSMENT");
+            assessment.setScoreProfile(resolveScoreProfile(dto.getScoreProfileId()));
         }
         if (dto.getAssignedToId() != null) {
             saveLog(id, "UPDATE", "assignedToId", assessment.getAssignedToId(), dto.getAssignedToId(), dto.getUpdatedBy(), "UPDATE_ASSESSMENT");
@@ -168,14 +179,14 @@ public class AssessmentService {
     }
 
     @Transactional
-    public void deleteAssessment(Long id) {
+    public void deleteAssessment(Long id, Integer updatedBy) {
         if (!assessmentRepository.existsById(id)) {
             throw new RuntimeException("Assessment not found: " + id);
         }
         assessmentRepository.deleteById(id);
         log.info("Deleted assessment: {}", id);
 
-        saveLog(id, "DELETE", null, null, null, null, "DELETE_ASSESSMENT");
+        saveLog(id, "DELETE", null, null, null, updatedBy, "DELETE_ASSESSMENT");
     }
 
     private Specification<Assessment> buildSpecification(QueryAssessmentDTO queryDto) {
@@ -183,16 +194,19 @@ public class AssessmentService {
             List<Predicate> predicates = new ArrayList<>();
 
             if (queryDto.getLevel() != null && !queryDto.getLevel().isBlank()) {
-                predicates.add(cb.equal(root.get("level"), queryDto.getLevel()));
+                predicates.add(cb.equal(root.get("level"), Assessment.JLPTLevel.valueOf(queryDto.getLevel())));
             }
             if (queryDto.getType() != null && !queryDto.getType().isBlank()) {
-                predicates.add(cb.equal(root.get("type"), queryDto.getType()));
+                predicates.add(cb.equal(root.get("type"), Assessment.AssessmentType.valueOf(queryDto.getType())));
             }
             if (queryDto.getVisibility() != null && !queryDto.getVisibility().isBlank()) {
-                predicates.add(cb.equal(root.get("visibility"), queryDto.getVisibility()));
+                predicates.add(cb.equal(root.get("visibility"), Assessment.AssessmentVisibility.valueOf(queryDto.getVisibility())));
             }
             if (queryDto.getClassId() != null) {
                 predicates.add(cb.equal(root.get("classId"), queryDto.getClassId()));
+            }
+            if (queryDto.getScoreProfileId() != null) {
+                predicates.add(cb.equal(root.get("scoreProfile").get("id"), queryDto.getScoreProfileId()));
             }
             if (queryDto.getAssignedToId() != null) {
                 predicates.add(cb.equal(root.get("assignedToId"), queryDto.getAssignedToId()));
@@ -213,13 +227,14 @@ public class AssessmentService {
         return AssessmentDTO.builder()
             .id(assessment.getId())
             .title(assessment.getTitle())
-            .level(assessment.getLevel())
-            .type(assessment.getType())
-            .visibility(assessment.getVisibility())
+            .level(assessment.getLevel() != null ? assessment.getLevel().name() : null)
+            .type(assessment.getType() != null ? assessment.getType().name() : null)
+            .visibility(assessment.getVisibility() != null ? assessment.getVisibility().name() : null)
             .description(assessment.getDescription())
             .createdBy(assessment.getCreatedBy())
             .lessonId(assessment.getLessonId())
             .classId(assessment.getClassId())
+            .scoreProfileId(assessment.getScoreProfile() != null ? assessment.getScoreProfile().getId() : null)
             .assignedToId(assessment.getAssignedToId())
             .lockAfterDue(assessment.getLockAfterDue())
             .timeLimitSec(assessment.getTimeLimitSec())
@@ -231,6 +246,14 @@ public class AssessmentService {
             .createdAt(assessment.getCreatedAt())
             .updatedAt(assessment.getUpdatedAt())
             .build();
+    }
+
+    private ScoreProfile resolveScoreProfile(Long scoreProfileId) {
+        if (scoreProfileId == null) {
+            throw new RuntimeException("scoreProfileId is required");
+        }
+        return scoreProfileRepository.findById(scoreProfileId)
+            .orElseThrow(() -> new RuntimeException("Score profile not found: " + scoreProfileId));
     }
 
     private void saveLog(Long assessmentId, String action, String fieldName, Object oldValue, Object newValue, Integer updatedBy, String changeSummary) {

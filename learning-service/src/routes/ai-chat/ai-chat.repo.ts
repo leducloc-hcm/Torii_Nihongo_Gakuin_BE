@@ -15,7 +15,6 @@ export class AIThreadRepository {
       include: {
         messages: {
           orderBy: { createdAt: "asc" },
-          include: { citations: true },
         },
       },
     });
@@ -27,7 +26,6 @@ export class AIThreadRepository {
       include: {
         messages: {
           orderBy: { createdAt: "asc" },
-          include: { citations: true },
         },
         queries: true,
       },
@@ -114,9 +112,6 @@ export class AIMessageRepository {
   }) {
     return this.prisma.aIChatMessage.create({
       data,
-      include: {
-        citations: true,
-      },
     });
   }
 
@@ -129,9 +124,6 @@ export class AIMessageRepository {
         orderBy: { createdAt: "asc" },
         take: limit,
         skip,
-        include: {
-          citations: true,
-        },
       }),
       this.prisma.aIChatMessage.count({ where: { threadId } }),
     ]);
@@ -153,9 +145,6 @@ export class AIMessageRepository {
     return this.prisma.aIChatMessage.findMany({
       where: { queryId },
       orderBy: { createdAt: "asc" },
-      include: {
-        citations: true,
-      },
     });
   }
 
@@ -197,7 +186,6 @@ export class AIQueryRepository {
     routingReason?: string;
     initialResponse?: string;
     requiresApproval: boolean;
-    cacheKey?: string;
   }) {
     return this.prisma.aIQuery.create({
       data: {
@@ -209,7 +197,6 @@ export class AIQueryRepository {
       include: {
         messages: {
           orderBy: { createdAt: "asc" },
-          include: { citations: true },
         },
       },
     });
@@ -221,20 +208,11 @@ export class AIQueryRepository {
       include: {
         messages: {
           orderBy: { createdAt: "asc" },
-          include: { citations: true },
         },
         thread: true,
       },
     });
   }
-
-  async findByCacheKey(cacheKey: string) {
-    return this.prisma.aIQuery.findFirst({
-      where: { cacheKey },
-      orderBy: { createdAt: "desc" },
-    });
-  }
-
   async update(
     id: string,
     data: {

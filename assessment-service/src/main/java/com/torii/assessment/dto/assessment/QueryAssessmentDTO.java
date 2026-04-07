@@ -25,6 +25,8 @@ public class QueryAssessmentDTO {
 
     private Long classId;
 
+    private Long scoreProfileId;
+
     private Integer assignedToId;
 
     private Integer lessonId;

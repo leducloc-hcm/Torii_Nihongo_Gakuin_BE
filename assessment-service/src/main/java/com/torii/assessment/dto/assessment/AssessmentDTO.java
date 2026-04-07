@@ -22,6 +22,7 @@ public class AssessmentDTO {
     private Integer createdBy;
     private Integer lessonId;
     private Long classId;
+    private Long scoreProfileId;
     private Integer assignedToId;
     private Boolean lockAfterDue;
     private Integer timeLimitSec;
