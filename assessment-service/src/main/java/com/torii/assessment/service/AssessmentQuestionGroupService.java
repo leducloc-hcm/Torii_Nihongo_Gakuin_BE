@@ -45,9 +45,11 @@ public class AssessmentQuestionGroupService {
         AssessmentItem item = assessmentItemRepository.findById(dto.getItemId())
                 .orElseThrow(() -> new RuntimeException("Assessment item not found: " + dto.getItemId()));
 
+        Long sourceGroupId = dto.getAssessmentQuestionGroupId() != null ? dto.getAssessmentQuestionGroupId() : dto.getOriginalGroupId();
+
         AssessmentQuestionGroup group = AssessmentQuestionGroup.builder()
                 .assessmentId(null)
-                .originalGroupId(dto.getOriginalGroupId())
+            .originalGroupId(sourceGroupId)
                 .type(dto.getType())
                 .title(dto.getTitle())
                 .passage(dto.getPassage())
@@ -107,6 +109,9 @@ public class AssessmentQuestionGroupService {
     public AssessmentQuestionGroupResponseDTO update(Long id, UpdateAssessmentQuestionGroupDTO dto) {
         AssessmentQuestionGroup group = assessmentQuestionGroupRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Assessment question group not found: " + id));
+
+        Long sourceGroupId = dto.getAssessmentQuestionGroupId() != null ? dto.getAssessmentQuestionGroupId() : dto.getOriginalGroupId();
+        if (sourceGroupId != null) group.setOriginalGroupId(sourceGroupId);
 
         if (dto.getType() != null) group.setType(dto.getType());
         if (dto.getTitle() != null) group.setTitle(dto.getTitle());
@@ -203,6 +208,7 @@ public class AssessmentQuestionGroupService {
 
         return AssessmentQuestionGroupResponseDTO.builder()
                 .id(group.getId())
+                .assessmentQuestionGroupId(group.getOriginalGroupId())
                 .originalGroupId(group.getOriginalGroupId())
                 .type(group.getType())
                 .title(group.getTitle())

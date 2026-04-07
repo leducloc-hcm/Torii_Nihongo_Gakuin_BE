@@ -37,7 +37,8 @@ public class AssessmentQuestionGroup {
     private Long originalGroupId;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "type")
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "type", columnDefinition = "question_group_type")
     private QuestionGroup.QuestionGroupType type;
 
     @Column(name = "title", columnDefinition = "text")

@@ -23,15 +23,9 @@ public class QuestionGroup {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "uuid")
-    private String uuid;
-
-    @Column(name = "version")
-    @Builder.Default
-    private Integer version = 1;
-
     @Enumerated(EnumType.STRING)
-    @Column(name = "type", nullable = false)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "type", nullable = false, columnDefinition = "question_group_type")
     private QuestionGroupType type;
 
     @Column(name = "title", length = 500)
@@ -68,9 +62,6 @@ public class QuestionGroup {
     protected void onCreate() {
         if (createdAt == null) {
             createdAt = LocalDateTime.now();
-        }
-        if (uuid == null) {
-            uuid = java.util.UUID.randomUUID().toString();
         }
     }
 

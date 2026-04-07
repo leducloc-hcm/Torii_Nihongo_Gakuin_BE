@@ -13,6 +13,8 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class UpdateAssessmentQuestionGroupDTO {
+    private Long assessmentQuestionGroupId;
+    private Long originalGroupId;
     private QuestionGroup.QuestionGroupType type;
     private String title;
     private String passage;

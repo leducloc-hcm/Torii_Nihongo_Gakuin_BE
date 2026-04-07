@@ -16,8 +16,7 @@ import java.util.Map;
 @Builder
 public class QuestionGroupResponseDTO {
     private Long id;
-    private String uuid;
-    private Integer version;
+    private Long questionGroupId;
     private QuestionGroup.QuestionGroupType type;
     private String title;
     private String passage;

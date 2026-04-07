@@ -6,10 +6,22 @@ import com.torii.assessment.dto.assessment.CreateAssessmentDTO;
 import com.torii.assessment.dto.assessment.QueryAssessmentDTO;
 import com.torii.assessment.dto.assessment.UpdateAssessmentDTO;
 import com.torii.assessment.entity.Assessment;
+import com.torii.assessment.entity.AssessmentGroupQuestion;
+import com.torii.assessment.entity.AssessmentItem;
+import com.torii.assessment.entity.AssessmentOption;
+import com.torii.assessment.entity.AssessmentQuestion;
+import com.torii.assessment.entity.AssessmentQuestionGroup;
+import com.torii.assessment.entity.AssessmentSection;
 import com.torii.assessment.entity.ScoreProfile;
+import com.torii.assessment.repository.AssessmentGroupQuestionRepository;
+import com.torii.assessment.repository.AssessmentItemRepository;
+import com.torii.assessment.repository.AssessmentOptionRepository;
+import com.torii.assessment.repository.AssessmentQuestionGroupRepository;
+import com.torii.assessment.repository.AssessmentQuestionRepository;
 import com.torii.assessment.repository.AssessmentRepository;
 import com.torii.assessment.repository.AssessmentLogRepository;
 import com.torii.assessment.entity.AssessmentLog;
+import com.torii.assessment.repository.AssessmentSectionRepository;
 import com.torii.assessment.repository.ScoreProfileRepository;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
@@ -23,7 +35,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -34,6 +49,12 @@ public class AssessmentService {
     private final AssessmentRepository assessmentRepository;
     private final AssessmentLogRepository assessmentLogRepository;
     private final ScoreProfileRepository scoreProfileRepository;
+    private final AssessmentSectionRepository assessmentSectionRepository;
+    private final AssessmentItemRepository assessmentItemRepository;
+    private final AssessmentQuestionRepository assessmentQuestionRepository;
+    private final AssessmentQuestionGroupRepository assessmentQuestionGroupRepository;
+    private final AssessmentOptionRepository assessmentOptionRepository;
+    private final AssessmentGroupQuestionRepository assessmentGroupQuestionRepository;
 
     @Transactional
     public AssessmentDTO createAssessment(CreateAssessmentDTO dto) {
@@ -98,7 +119,7 @@ public class AssessmentService {
     public AssessmentDTO getAssessmentById(Long id) {
         Assessment assessment = assessmentRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Assessment not found: " + id));
-        return mapToDTO(assessment);
+        return mapToDetailedDTO(assessment);
     }
 
     @Transactional
@@ -246,6 +267,104 @@ public class AssessmentService {
             .createdAt(assessment.getCreatedAt())
             .updatedAt(assessment.getUpdatedAt())
             .build();
+    }
+
+    private AssessmentDTO mapToDetailedDTO(Assessment assessment) {
+        AssessmentDTO base = mapToDTO(assessment);
+
+        List<AssessmentSection> sections = assessmentSectionRepository.findByAssessmentId(assessment.getId());
+        sections.sort(Comparator.comparing(AssessmentSection::getOrder, Comparator.nullsLast(Integer::compareTo)));
+
+        List<AssessmentDTO.SectionDetailDTO> sectionDetails = sections.stream().map(section -> {
+            List<AssessmentItem> items = assessmentItemRepository.findBySectionIdOrderByOrderAsc(section.getId());
+
+            List<AssessmentDTO.ItemDetailDTO> itemDetails = items.stream().map(item -> {
+                List<Long> questionIds = assessmentItemRepository.findQuestionIdsByItemId(item.getId());
+                List<Long> groupIds = assessmentItemRepository.findGroupIdsByItemId(item.getId());
+
+                Map<Long, AssessmentQuestion> questionMap = assessmentQuestionRepository.findAllById(questionIds)
+                    .stream()
+                    .collect(Collectors.toMap(AssessmentQuestion::getId, q -> q, (a, b) -> a, HashMap::new));
+
+                List<AssessmentDTO.QuestionDetailDTO> questions = questionIds.stream()
+                    .map(questionMap::get)
+                    .filter(q -> q != null)
+                    .map(q -> {
+                        List<AssessmentOption> options = assessmentOptionRepository.findByQuestionIdOrderByOrderAsc(q.getId());
+                        List<AssessmentDTO.OptionDetailDTO> optionDetails = options.stream()
+                            .map(o -> AssessmentDTO.OptionDetailDTO.builder()
+                                .id(o.getId())
+                                .content(o.getContent())
+                                .isCorrect(o.getIsCorrect())
+                                .order(o.getOrder())
+                                .build())
+                            .collect(Collectors.toList());
+
+                        return AssessmentDTO.QuestionDetailDTO.builder()
+                            .id(q.getId())
+                            .originalQuestionId(q.getOriginalQuestionId())
+                            .type(q.getType() != null ? q.getType().name() : null)
+                            .level(q.getLevel() != null ? q.getLevel().name() : null)
+                            .difficulty(q.getDifficulty() != null ? q.getDifficulty().name() : null)
+                            .stem(q.getStem())
+                            .passage(q.getPassage())
+                            .explanation(q.getExplanation())
+                            .mediaUrl(q.getMediaUrl())
+                            .audioUrl(q.getAudioUrl())
+                            .options(optionDetails)
+                            .build();
+                    })
+                    .collect(Collectors.toList());
+
+                Map<Long, AssessmentQuestionGroup> groupMap = assessmentQuestionGroupRepository.findAllById(groupIds)
+                    .stream()
+                    .collect(Collectors.toMap(AssessmentQuestionGroup::getId, g -> g, (a, b) -> a, HashMap::new));
+
+                List<AssessmentDTO.QuestionGroupDetailDTO> groups = groupIds.stream()
+                    .map(groupMap::get)
+                    .filter(g -> g != null)
+                    .map(g -> {
+                        List<Long> groupQuestionIds = assessmentGroupQuestionRepository.findByGroupIdOrderByOrderAsc(g.getId())
+                            .stream()
+                            .map(AssessmentGroupQuestion::getQuestionId)
+                            .collect(Collectors.toList());
+
+                        return AssessmentDTO.QuestionGroupDetailDTO.builder()
+                            .id(g.getId())
+                            .originalGroupId(g.getOriginalGroupId())
+                            .type(g.getType() != null ? g.getType().name() : null)
+                            .title(g.getTitle())
+                            .passage(g.getPassage())
+                            .mediaUrl(g.getMediaUrl())
+                            .audioUrl(g.getAudioUrl())
+                            .metadata(g.getMetadata())
+                            .questionIds(groupQuestionIds)
+                            .build();
+                    })
+                    .collect(Collectors.toList());
+
+                return AssessmentDTO.ItemDetailDTO.builder()
+                    .id(item.getId())
+                    .name(item.getName())
+                    .order(item.getOrder())
+                    .scorePerQuestion(item.getScorePerQuestion())
+                    .questions(questions)
+                    .questionGroups(groups)
+                    .build();
+            }).collect(Collectors.toList());
+
+            return AssessmentDTO.SectionDetailDTO.builder()
+                .id(section.getId())
+                .title(section.getTitle())
+                .type(section.getType() != null ? section.getType().name() : null)
+                .order(section.getOrder())
+                .timeLimitSec(section.getTimeLimitSec())
+                .items(itemDetails)
+                .build();
+        }).collect(Collectors.toList());
+
+        base.setSections(sectionDetails);
+        return base;
     }
 
     private ScoreProfile resolveScoreProfile(Long scoreProfileId) {

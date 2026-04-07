@@ -15,6 +15,7 @@ import java.util.List;
 @AllArgsConstructor
 public class AssessmentQuestionGroupResponseDTO {
     private Long id;
+    private Long assessmentQuestionGroupId;
     private Long originalGroupId;
     private QuestionGroup.QuestionGroupType type;
     private String title;

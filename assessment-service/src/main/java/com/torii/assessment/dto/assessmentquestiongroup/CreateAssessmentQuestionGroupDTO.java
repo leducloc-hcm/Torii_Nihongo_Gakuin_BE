@@ -20,6 +20,7 @@ public class CreateAssessmentQuestionGroupDTO {
     @Positive(message = "Item ID must be positive")
     private Long itemId;
 
+    private Long assessmentQuestionGroupId;
     private Long originalGroupId;
 
     @NotNull(message = "Type is required")

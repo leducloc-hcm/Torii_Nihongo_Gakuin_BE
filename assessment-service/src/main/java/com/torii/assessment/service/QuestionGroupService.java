@@ -107,6 +107,10 @@ public class QuestionGroupService {
 
     @Transactional
     public QuestionGroupResponseDTO updateQuestionGroup(Long id, UpdateQuestionGroupDTO dto, MultipartFile image, MultipartFile audio) throws IOException {
+        if (dto.getQuestionGroupId() != null && !dto.getQuestionGroupId().equals(id)) {
+            throw new RuntimeException("questionGroupId in payload does not match path id");
+        }
+
         QuestionGroup group = questionGroupRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Question Group not found: " + id));
 
@@ -247,62 +251,6 @@ public class QuestionGroupService {
         return getAllQuestionGroups(queryDto);
     }
 
-    // Versioning methods
-    public List<QuestionGroupResponseDTO> getQuestionGroupVersions(String uuid) {
-        List<QuestionGroup> versions = questionGroupRepository.findByUuidOrderByVersionDesc(uuid);
-        if (versions.isEmpty()) {
-            throw new RuntimeException("No question groups found with UUID: " + uuid);
-        }
-        return versions.stream()
-            .map(this::mapToResponseDTO)
-            .collect(Collectors.toList());
-    }
-
-    public QuestionGroupResponseDTO getQuestionGroupByVersion(String uuid, Integer version) {
-        QuestionGroup group = questionGroupRepository.findByUuidAndVersion(uuid, version)
-            .orElseThrow(() -> new RuntimeException("Question Group not found with UUID " + uuid + " and version " + version));
-        return mapToResponseDTO(group);
-    }
-
-    @Transactional
-    public QuestionGroupResponseDTO cloneQuestionGroup(Long id, UpdateQuestionGroupDTO modifications) {
-        QuestionGroup original = questionGroupRepository.findByIdWithQuestions(id)
-            .orElseThrow(() -> new RuntimeException("Question Group not found: " + id));
-
-        Integer latestVersion = questionGroupRepository.findByUuidOrderByVersionDesc(original.getUuid())
-            .stream()
-            .findFirst()
-            .map(QuestionGroup::getVersion)
-            .orElse(0);
-
-        QuestionGroup clone = QuestionGroup.builder()
-            .uuid(original.getUuid())
-            .version(latestVersion + 1)
-            .type(modifications.getType() != null ? modifications.getType() : original.getType())
-            .title(modifications.getTitle() != null ? modifications.getTitle() : original.getTitle())
-            .passage(modifications.getPassage() != null ? modifications.getPassage() : original.getPassage())
-            .mediaId(modifications.getMediaId() != null ? modifications.getMediaId() : original.getMediaId())
-            .order(modifications.getOrder() != null ? modifications.getOrder() : original.getOrder())
-            .metadata(modifications.getMetadata() != null ? modifications.getMetadata().toString() : original.getMetadata())
-            .build();
-
-        QuestionGroup saved = questionGroupRepository.save(clone);
-
-        // Clone questions
-        List<Long> questionIds = modifications.getQuestions();
-        if (questionIds == null || questionIds.isEmpty()) {
-            questionIds = questionGroupQuestionRepository.findByGroupIdOrderByOrderAsc(id).stream()
-                .map(QuestionGroupQuestion::getQuestionId)
-                .collect(Collectors.toList());
-        }
-        if (!questionIds.isEmpty()) {
-            addQuestionsToGroupInternal(saved.getId(), questionIds);
-        }
-
-        log.info("Cloned question group {} to new version {}", id, saved.getId());
-        return getQuestionGroupById(saved.getId());
-    }
-
     public Map<String, Object> checkQuestionGroupUsage(Long id) {
         if (!questionGroupRepository.existsById(id)) {
             throw new RuntimeException("Question Group not found: " + id);
@@ -404,8 +352,7 @@ public class QuestionGroupService {
 
         return QuestionGroupResponseDTO.builder()
             .id(group.getId())
-            .uuid(group.getUuid())
-            .version(group.getVersion())
+            .questionGroupId(group.getId())
             .type(group.getType())
             .title(group.getTitle())
             .passage(group.getPassage())

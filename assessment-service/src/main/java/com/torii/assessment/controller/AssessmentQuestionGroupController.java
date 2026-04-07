@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,10 +26,10 @@ public class AssessmentQuestionGroupController {
 
     private final AssessmentQuestionGroupService assessmentQuestionGroupService;
 
-    @PostMapping
-    @Operation(summary = "Create an assessment question group")
-    public ResponseEntity<AssessmentQuestionGroupResponseDTO> create(
-            @Valid @RequestBody CreateAssessmentQuestionGroupDTO dto) {
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Create an assessment question group (multipart)")
+    public ResponseEntity<AssessmentQuestionGroupResponseDTO> createMultipart(
+            @Valid @ModelAttribute CreateAssessmentQuestionGroupDTO dto) {
         AssessmentQuestionGroupResponseDTO group = assessmentQuestionGroupService.create(dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(group);
     }
@@ -63,11 +64,11 @@ public class AssessmentQuestionGroupController {
         return ResponseEntity.ok(group);
     }
 
-    @PutMapping("/{id}")
-    @Operation(summary = "Update an assessment question group")
-    public ResponseEntity<AssessmentQuestionGroupResponseDTO> update(
+    @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Update an assessment question group (multipart)")
+    public ResponseEntity<AssessmentQuestionGroupResponseDTO> updateMultipart(
             @PathVariable Long id,
-            @Valid @RequestBody UpdateAssessmentQuestionGroupDTO dto) {
+            @Valid @ModelAttribute UpdateAssessmentQuestionGroupDTO dto) {
         AssessmentQuestionGroupResponseDTO group = assessmentQuestionGroupService.update(id, dto);
         return ResponseEntity.ok(group);
     }

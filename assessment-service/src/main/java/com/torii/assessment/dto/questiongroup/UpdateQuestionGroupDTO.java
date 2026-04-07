@@ -16,6 +16,8 @@ import java.util.Map;
 @Builder
 public class UpdateQuestionGroupDTO {
 
+    private Long questionGroupId;
+
     private QuestionGroup.QuestionGroupType type;
 
     @Size(max = 500, message = "Title must not exceed 500 characters")

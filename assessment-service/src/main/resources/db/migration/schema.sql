@@ -7,50 +7,23 @@ SET search_path TO assessment;
 
 -- ENUMS
 
-DO $$ BEGIN
-    CREATE TYPE assessment_type AS ENUM ('TEST', 'EXAM', 'QUIZ', 'ASSIGNMENT');
-EXCEPTION WHEN duplicate_object THEN null;
-END $$;
+CREATE TYPE assessment_type AS ENUM ('TEST', 'EXAM', 'QUIZ', 'ASSIGNMENT');
 
-DO $$ BEGIN
-    CREATE TYPE visibility AS ENUM ('PRIVATE', 'UNLISTED', 'PUBLIC');
-EXCEPTION WHEN duplicate_object THEN null;
-END $$;
+CREATE TYPE visibility AS ENUM ('PRIVATE', 'UNLISTED', 'PUBLIC');
 
-DO $$ BEGIN
-    CREATE TYPE jlpt_level AS ENUM ('N5', 'N4', 'N3', 'N2', 'N1');
-EXCEPTION WHEN duplicate_object THEN null;
-END $$;
+CREATE TYPE jlpt_level AS ENUM ('N5', 'N4', 'N3', 'N2', 'N1');
 
-DO $$ BEGIN
-    CREATE TYPE assessment_section_type AS ENUM ('VOCAB', 'GRAMMAR', 'READING', 'LISTENING');
-EXCEPTION WHEN duplicate_object THEN null;
-END $$;
+CREATE TYPE assessment_section_type AS ENUM ('VOCAB', 'GRAMMAR', 'READING', 'LISTENING');
 
-DO $$ BEGIN
-    CREATE TYPE question_type AS ENUM ('VOCAB', 'KANJI', 'GRAMMAR', 'READING', 'LISTENING');
-EXCEPTION WHEN duplicate_object THEN null;
-END $$;
+CREATE TYPE question_type AS ENUM ('VOCAB', 'KANJI', 'GRAMMAR', 'READING', 'LISTENING');
 
-DO $$ BEGIN
-    CREATE TYPE question_group_type AS ENUM ('READING_SHORT', 'READING_MEDIUM', 'READING_LONG', 'LISTENING');
-EXCEPTION WHEN duplicate_object THEN null;
-END $$;
+CREATE TYPE question_group_type AS ENUM ('READING_SHORT', 'READING_MEDIUM', 'READING_LONG', 'LISTENING');
 
-DO $$ BEGIN
-    CREATE TYPE difficulty AS ENUM ('EASY', 'MEDIUM', 'HARD');
-EXCEPTION WHEN duplicate_object THEN null;
-END $$;
+CREATE TYPE difficulty AS ENUM ('EASY', 'MEDIUM', 'HARD');
 
-DO $$ BEGIN
-    CREATE TYPE progress_status AS ENUM ('IN_PROGRESS', 'SUBMITTED', 'EXPIRED');
-EXCEPTION WHEN duplicate_object THEN null;
-END $$;
+CREATE TYPE progress_status AS ENUM ('IN_PROGRESS', 'SUBMITTED', 'EXPIRED');
 
-DO $$ BEGIN
-    CREATE TYPE attempt_status AS ENUM ('IN_PROGRESS', 'SUBMITTED', 'EXPIRED');
-EXCEPTION WHEN duplicate_object THEN null;
-END $$;
+CREATE TYPE attempt_status AS ENUM ('IN_PROGRESS', 'SUBMITTED', 'EXPIRED');
 
 -- ASSESSMENTS
 
@@ -334,8 +307,6 @@ CREATE INDEX IF NOT EXISTS idx_answer_progress_question ON answer_progress(quest
 
 CREATE TABLE IF NOT EXISTS questions (
     id BIGSERIAL PRIMARY KEY,
-    uuid VARCHAR(255),
-    version INTEGER DEFAULT 1,
 
     type question_type,
     level jlpt_level,
@@ -351,9 +322,7 @@ CREATE TABLE IF NOT EXISTS questions (
     reading_length VARCHAR(20),
 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP,
-
-    UNIQUE (uuid, version)
+    updated_at TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS options (
@@ -372,8 +341,6 @@ CREATE TABLE IF NOT EXISTS options (
 
 CREATE TABLE IF NOT EXISTS question_groups (
     id BIGSERIAL PRIMARY KEY,
-    uuid VARCHAR(255),
-    version INTEGER DEFAULT 1,
 
     type question_group_type,
     title TEXT,
@@ -386,9 +353,7 @@ CREATE TABLE IF NOT EXISTS question_groups (
 
     metadata JSONB,
 
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-    UNIQUE (uuid, version)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS question_group_questions (
@@ -402,24 +367,6 @@ CREATE TABLE IF NOT EXISTS question_group_questions (
     PRIMARY KEY (question_id, group_id)
 );
 
-CREATE TABLE IF NOT EXISTS user_course_access (
-    id BIGSERIAL PRIMARY KEY,
-    user_id INTEGER NOT NULL,
-    course_id INTEGER NOT NULL,
-    unlocked_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    reason TEXT,
-    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP
-);
-
-CREATE UNIQUE INDEX IF NOT EXISTS uq_user_course_access_user_course
-    ON user_course_access(user_id, course_id);
-
-CREATE INDEX IF NOT EXISTS idx_user_course_access_user_id
-    ON user_course_access(user_id);
-
-CREATE INDEX IF NOT EXISTS idx_user_course_access_course_id
-    ON user_course_access(course_id);
 
 CREATE TABLE IF NOT EXISTS score_profiles (
     id BIGSERIAL PRIMARY KEY,
@@ -443,22 +390,11 @@ CREATE TABLE IF NOT EXISTS score_profile_sections (
     default_time_sec INTEGER
 );
 
-DO $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1
-        FROM information_schema.table_constraints
-        WHERE constraint_schema = 'assessment'
-          AND table_name = 'assessments'
-          AND constraint_name = 'fk_assessments_score_profile'
-    ) THEN
-        ALTER TABLE assessments
-            ADD CONSTRAINT fk_assessments_score_profile
-                FOREIGN KEY (score_profile_id)
-                REFERENCES score_profiles(id)
-                ON DELETE RESTRICT;
-    END IF;
-END $$;
+ALTER TABLE assessments
+    ADD CONSTRAINT fk_assessments_score_profile
+        FOREIGN KEY (score_profile_id)
+        REFERENCES score_profiles(id)
+        ON DELETE RESTRICT;
 
 -- INDEXES
 

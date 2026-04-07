@@ -35,7 +35,7 @@ public class AssessmentOption {
     @Column(name = "is_correct")
     private Boolean isCorrect;
 
-    @Column(name = "order")
+    @Column(name = "\"order\"")
     private Integer order;
 
     @Column(name = "created_at")

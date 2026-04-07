@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,9 +25,9 @@ public class AssessmentQuestionController {
 
     private final AssessmentQuestionService assessmentQuestionService;
 
-    @PostMapping
-    @Operation(summary = "Create an assessment question copy")
-    public ResponseEntity<AssessmentQuestionResponseDTO> create(@Valid @RequestBody CreateAssessmentQuestionDTO dto) {
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Create an assessment question copy (multipart)")
+    public ResponseEntity<AssessmentQuestionResponseDTO> createMultipart(@Valid @ModelAttribute CreateAssessmentQuestionDTO dto) {
         AssessmentQuestionResponseDTO question = assessmentQuestionService.create(dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(question);
     }
@@ -65,11 +66,11 @@ public class AssessmentQuestionController {
         return ResponseEntity.ok(question);
     }
 
-    @PutMapping("/{id}")
-    @Operation(summary = "Update an assessment question copy")
-    public ResponseEntity<AssessmentQuestionResponseDTO> update(
+    @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Update an assessment question copy (multipart)")
+    public ResponseEntity<AssessmentQuestionResponseDTO> updateMultipart(
             @PathVariable Long id,
-            @Valid @RequestBody UpdateAssessmentQuestionDTO dto) {
+            @Valid @ModelAttribute UpdateAssessmentQuestionDTO dto) {
         AssessmentQuestionResponseDTO question = assessmentQuestionService.update(id, dto);
         return ResponseEntity.ok(question);
     }

@@ -17,6 +17,8 @@ import java.util.Map;
 @Builder
 public class CreateQuestionGroupDTO {
 
+    private Long questionGroupId;
+
     @NotNull(message = "Question group type is required")
     private QuestionGroup.QuestionGroupType type;
 

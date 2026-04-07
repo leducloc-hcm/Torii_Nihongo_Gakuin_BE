@@ -19,11 +19,6 @@ public interface QuestionGroupRepository extends JpaRepository<QuestionGroup, Lo
     List<QuestionGroup> findByType(QuestionGroup.QuestionGroupType type);
     Page<QuestionGroup> findByType(QuestionGroup.QuestionGroupType type, Pageable pageable);
 
-    // Find by uuid (for versioning)
-    List<QuestionGroup> findByUuidOrderByVersionDesc(String uuid);
-
-    Optional<QuestionGroup> findByUuidAndVersion(String uuid, Integer version);
-
     // Count by type
     long countByType(QuestionGroup.QuestionGroupType type);
 

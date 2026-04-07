@@ -25,12 +25,18 @@ spring:
         physical_naming_strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
 
   flyway:
-    enabled: ${SPRING_FLYWAY_ENABLED:true}
+    enabled: false
     schemas: ${SPRING_FLYWAY_SCHEMAS:assessment}
     locations: ${SPRING_FLYWAY_LOCATIONS:classpath:db/migration}
     baseline-on-migrate: ${SPRING_FLYWAY_BASELINE_ON_MIGRATE:true}
     clean-disabled: ${SPRING_FLYWAY_CLEAN_DISABLED:false}
     validate-on-migrate: ${SPRING_FLYWAY_VALIDATE_ON_MIGRATE:false}
+
+  sql:
+    init:
+      mode: ${SPRING_SQL_INIT_MODE:always}
+      schema-locations: ${SPRING_SQL_INIT_SCHEMA_LOCATIONS:classpath:db/migration/schema.sql}
+      continue-on-error: true
 
   data:
     redis:

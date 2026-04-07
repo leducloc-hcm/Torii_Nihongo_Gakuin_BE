@@ -5,6 +5,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -21,23 +23,19 @@ public class Question {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "uuid")
-    private String uuid;
-
-    @Column(name = "version")
-    @Builder.Default
-    private Integer version = 1;
-
     @Enumerated(EnumType.STRING)
-    @Column(name = "type", nullable = false)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "type", nullable = false, columnDefinition = "question_type")
     private QuestionType type;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "level", nullable = false)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "level", nullable = false, columnDefinition = "jlpt_level")
     private JLPTLevel level;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "difficulty")
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "difficulty", columnDefinition = "difficulty")
     @Builder.Default
     private Difficulty difficulty = Difficulty.MEDIUM;
 
@@ -75,9 +73,6 @@ public class Question {
     protected void onCreate() {
         if (createdAt == null) {
             createdAt = LocalDateTime.now();
-        }
-        if (uuid == null) {
-            uuid = java.util.UUID.randomUUID().toString();
         }
     }
 

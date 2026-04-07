@@ -30,15 +30,6 @@ public interface QuestionRepository extends JpaRepository<Question, Long>, JpaSp
     // Find by type and level
     List<Question> findByTypeAndLevel(Question.QuestionType type, Question.JLPTLevel level);
 
-    // Find by uuid (for versioning)
-    List<Question> findByUuidOrderByVersionDesc(String uuid);
-
-    Optional<Question> findByUuidAndVersion(String uuid, Integer version);
-
-    // Find latest version by uuid
-    @Query("SELECT q FROM Question q WHERE q.uuid = :uuid ORDER BY q.version DESC LIMIT 1")
-    Optional<Question> findLatestVersionByUuid(@Param("uuid") String uuid);
-
     // Count by type
     long countByType(Question.QuestionType type);
 

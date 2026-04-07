@@ -15,24 +15,24 @@ public interface AssessmentItemRepository extends JpaRepository<AssessmentItem, 
 
     List<AssessmentItem> findBySectionIdOrderByOrderAsc(Long sectionId);
 
-    @Query(value = "SELECT question_id FROM assessment.item_questions WHERE item_id = :itemId ORDER BY \"order\" ASC",
+    @Query(value = "SELECT question_id FROM assessment.item_assessment_questions WHERE item_id = :itemId ORDER BY \"order\" ASC",
             nativeQuery = true)
     List<Long> findQuestionIdsByItemId(@Param("itemId") Long itemId);
 
-    @Query(value = "SELECT group_id FROM assessment.item_groups WHERE item_id = :itemId ORDER BY \"order\" ASC",
+    @Query(value = "SELECT group_id FROM assessment.item_assessment_groups WHERE item_id = :itemId ORDER BY \"order\" ASC",
             nativeQuery = true)
     List<Long> findGroupIdsByItemId(@Param("itemId") Long itemId);
 
     @Modifying
-    @Query(value = "DELETE FROM assessment.item_questions WHERE item_id = :itemId", nativeQuery = true)
+    @Query(value = "DELETE FROM assessment.item_assessment_questions WHERE item_id = :itemId", nativeQuery = true)
     void deleteQuestionLinksByItemId(@Param("itemId") Long itemId);
 
     @Modifying
-    @Query(value = "DELETE FROM assessment.item_groups WHERE item_id = :itemId", nativeQuery = true)
+    @Query(value = "DELETE FROM assessment.item_assessment_groups WHERE item_id = :itemId", nativeQuery = true)
     void deleteGroupLinksByItemId(@Param("itemId") Long itemId);
 
     @Modifying
-    @Query(value = "INSERT INTO assessment.item_questions (item_id, question_id, \"order\") VALUES (:itemId, :questionId, :orderValue)",
+    @Query(value = "INSERT INTO assessment.item_assessment_questions (item_id, question_id, \"order\") VALUES (:itemId, :questionId, :orderValue)",
             nativeQuery = true)
     void insertQuestionLink(
             @Param("itemId") Long itemId,
@@ -41,7 +41,7 @@ public interface AssessmentItemRepository extends JpaRepository<AssessmentItem, 
     );
 
     @Modifying
-    @Query(value = "INSERT INTO assessment.item_groups (item_id, group_id, \"order\") VALUES (:itemId, :groupId, :orderValue)",
+    @Query(value = "INSERT INTO assessment.item_assessment_groups (item_id, group_id, \"order\") VALUES (:itemId, :groupId, :orderValue)",
             nativeQuery = true)
     void insertGroupLink(
             @Param("itemId") Long itemId,

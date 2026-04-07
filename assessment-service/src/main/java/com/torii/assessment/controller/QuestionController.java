@@ -164,32 +164,6 @@ public class QuestionController {
         return ResponseEntity.ok(Map.of("message", "Question deleted successfully"));
     }
 
-    @PostMapping("/{id}/clone")
-    @Operation(summary = "Clone a question to create a new version")
-    public ResponseEntity<QuestionResponseDTO> cloneQuestion(
-            @PathVariable Long id,
-            @RequestBody(required = false) UpdateQuestionDTO modifications) {
-        QuestionResponseDTO question = questionService.cloneQuestion(id,
-            modifications != null ? modifications : new UpdateQuestionDTO());
-        return ResponseEntity.status(HttpStatus.CREATED).body(question);
-    }
-
-    @GetMapping("/uuid/{uuid}/versions")
-    @Operation(summary = "Get all versions of a question by UUID")
-    public ResponseEntity<List<QuestionResponseDTO>> getQuestionVersions(@PathVariable String uuid) {
-        List<QuestionResponseDTO> versions = questionService.getQuestionVersions(uuid);
-        return ResponseEntity.ok(versions);
-    }
-
-    @GetMapping("/uuid/{uuid}/version/{version}")
-    @Operation(summary = "Get a specific version of a question")
-    public ResponseEntity<QuestionResponseDTO> getQuestionByVersion(
-            @PathVariable String uuid,
-            @PathVariable Integer version) {
-        QuestionResponseDTO question = questionService.getQuestionByVersion(uuid, version);
-        return ResponseEntity.ok(question);
-    }
-
     @GetMapping("/{id}/usage")
     @Operation(summary = "Check if question is used in assessments or quizzes")
     public ResponseEntity<Map<String, Object>> checkQuestionUsage(@PathVariable Long id) {
