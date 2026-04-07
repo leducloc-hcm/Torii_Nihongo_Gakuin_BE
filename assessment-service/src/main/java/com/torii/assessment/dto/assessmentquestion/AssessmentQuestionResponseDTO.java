@@ -15,7 +15,6 @@ import java.util.List;
 @AllArgsConstructor
 public class AssessmentQuestionResponseDTO {
     private Long id;
-    private Long assessmentId;
     private Long originalQuestionId;
     private Question.QuestionType type;
     private Question.JLPTLevel level;

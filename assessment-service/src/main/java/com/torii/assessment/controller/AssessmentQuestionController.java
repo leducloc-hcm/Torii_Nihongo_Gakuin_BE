@@ -36,7 +36,7 @@ public class AssessmentQuestionController {
     public ResponseEntity<Map<String, Object>> list(
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer limit,
-            @RequestParam(required = false) Long assessmentId,
+            @RequestParam(required = false) Long itemId,
             @RequestParam(required = false) Question.QuestionType type,
             @RequestParam(required = false) Question.JLPTLevel level,
             @RequestParam(required = false) Question.Difficulty difficulty,
@@ -46,7 +46,7 @@ public class AssessmentQuestionController {
         QueryAssessmentQuestionDTO queryDto = QueryAssessmentQuestionDTO.builder()
                 .page(page != null ? page : 1)
                 .limit(limit != null ? limit : 20)
-                .assessmentId(assessmentId)
+                .itemId(itemId)
                 .type(type)
                 .level(level)
                 .difficulty(difficulty)

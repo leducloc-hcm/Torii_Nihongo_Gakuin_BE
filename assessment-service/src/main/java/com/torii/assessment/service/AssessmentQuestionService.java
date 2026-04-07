@@ -5,9 +5,11 @@ import com.torii.assessment.dto.assessmentquestion.AssessmentQuestionResponseDTO
 import com.torii.assessment.dto.assessmentquestion.CreateAssessmentQuestionDTO;
 import com.torii.assessment.dto.assessmentquestion.QueryAssessmentQuestionDTO;
 import com.torii.assessment.dto.assessmentquestion.UpdateAssessmentQuestionDTO;
+import com.torii.assessment.entity.AssessmentItem;
 import com.torii.assessment.entity.AssessmentOption;
 import com.torii.assessment.entity.AssessmentQuestion;
 import com.torii.assessment.entity.Question;
+import com.torii.assessment.repository.AssessmentItemRepository;
 import com.torii.assessment.repository.AssessmentOptionRepository;
 import com.torii.assessment.repository.AssessmentQuestionRepository;
 import jakarta.persistence.criteria.Predicate;
@@ -34,11 +36,15 @@ public class AssessmentQuestionService {
 
     private final AssessmentQuestionRepository assessmentQuestionRepository;
     private final AssessmentOptionRepository assessmentOptionRepository;
+    private final AssessmentItemRepository assessmentItemRepository;
 
     @Transactional
     public AssessmentQuestionResponseDTO create(CreateAssessmentQuestionDTO dto) {
+        AssessmentItem item = assessmentItemRepository.findById(dto.getItemId())
+            .orElseThrow(() -> new RuntimeException("Assessment item not found: " + dto.getItemId()));
+
         AssessmentQuestion question = AssessmentQuestion.builder()
-                .assessmentId(dto.getAssessmentId())
+            .assessmentId(null)
                 .originalQuestionId(dto.getOriginalQuestionId())
                 .type(dto.getType())
                 .level(dto.getLevel())
@@ -65,6 +71,9 @@ public class AssessmentQuestionService {
             }
             assessmentOptionRepository.saveAll(options);
         }
+
+        int nextOrder = assessmentItemRepository.findQuestionIdsByItemId(item.getId()).size();
+        assessmentItemRepository.insertQuestionLink(item.getId(), saved.getId(), nextOrder);
 
         log.info("Created assessment question copy {}", saved.getId());
         return getById(saved.getId());
@@ -139,8 +148,12 @@ public class AssessmentQuestionService {
     private Specification<AssessmentQuestion> buildSpec(QueryAssessmentQuestionDTO queryDto) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
-            if (queryDto.getAssessmentId() != null) {
-                predicates.add(cb.equal(root.get("assessmentId"), queryDto.getAssessmentId()));
+            if (queryDto.getItemId() != null) {
+                List<Long> questionIds = assessmentItemRepository.findQuestionIdsByItemId(queryDto.getItemId());
+                if (questionIds.isEmpty()) {
+                    return cb.disjunction();
+                }
+                predicates.add(root.get("id").in(questionIds));
             }
             if (queryDto.getType() != null) {
                 predicates.add(cb.equal(root.get("type"), queryDto.getType()));
@@ -170,7 +183,6 @@ public class AssessmentQuestionService {
 
         return AssessmentQuestionResponseDTO.builder()
                 .id(question.getId())
-                .assessmentId(question.getAssessmentId())
                 .originalQuestionId(question.getOriginalQuestionId())
                 .type(question.getType())
                 .level(question.getLevel())

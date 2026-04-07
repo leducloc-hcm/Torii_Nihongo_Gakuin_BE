@@ -38,7 +38,7 @@ public class AssessmentQuestionGroupController {
     public ResponseEntity<Map<String, Object>> list(
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer limit,
-            @RequestParam(required = false) Long assessmentId,
+            @RequestParam(required = false) Long itemId,
             @RequestParam(required = false) QuestionGroup.QuestionGroupType type,
             @RequestParam(required = false, defaultValue = "createdAt") String sortBy,
             @RequestParam(required = false, defaultValue = "desc") String sortOrder) {
@@ -46,7 +46,7 @@ public class AssessmentQuestionGroupController {
         QueryAssessmentQuestionGroupDTO queryDto = QueryAssessmentQuestionGroupDTO.builder()
                 .page(page != null ? page : 1)
                 .limit(limit != null ? limit : 20)
-                .assessmentId(assessmentId)
+                .itemId(itemId)
                 .type(type)
                 .sortBy(sortBy)
                 .sortOrder(sortOrder)

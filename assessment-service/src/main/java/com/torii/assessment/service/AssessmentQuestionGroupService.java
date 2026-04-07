@@ -6,8 +6,10 @@ import com.torii.assessment.dto.assessmentquestiongroup.ModifyAssessmentGroupQue
 import com.torii.assessment.dto.assessmentquestiongroup.QueryAssessmentQuestionGroupDTO;
 import com.torii.assessment.dto.assessmentquestiongroup.UpdateAssessmentQuestionGroupDTO;
 import com.torii.assessment.entity.AssessmentGroupQuestion;
+import com.torii.assessment.entity.AssessmentItem;
 import com.torii.assessment.entity.AssessmentQuestion;
 import com.torii.assessment.entity.AssessmentQuestionGroup;
+import com.torii.assessment.repository.AssessmentItemRepository;
 import com.torii.assessment.repository.AssessmentGroupQuestionRepository;
 import com.torii.assessment.repository.AssessmentQuestionGroupRepository;
 import com.torii.assessment.repository.AssessmentQuestionRepository;
@@ -36,11 +38,15 @@ public class AssessmentQuestionGroupService {
     private final AssessmentQuestionGroupRepository assessmentQuestionGroupRepository;
     private final AssessmentGroupQuestionRepository assessmentGroupQuestionRepository;
     private final AssessmentQuestionRepository assessmentQuestionRepository;
+    private final AssessmentItemRepository assessmentItemRepository;
 
     @Transactional
     public AssessmentQuestionGroupResponseDTO create(CreateAssessmentQuestionGroupDTO dto) {
+        AssessmentItem item = assessmentItemRepository.findById(dto.getItemId())
+                .orElseThrow(() -> new RuntimeException("Assessment item not found: " + dto.getItemId()));
+
         AssessmentQuestionGroup group = AssessmentQuestionGroup.builder()
-                .assessmentId(dto.getAssessmentId())
+                .assessmentId(null)
                 .originalGroupId(dto.getOriginalGroupId())
                 .type(dto.getType())
                 .title(dto.getTitle())
@@ -54,6 +60,8 @@ public class AssessmentQuestionGroupService {
         if (dto.getQuestionIds() != null && !dto.getQuestionIds().isEmpty()) {
             addQuestionsInternal(saved.getId(), dto.getQuestionIds());
         }
+        int nextOrder = assessmentItemRepository.findGroupIdsByItemId(item.getId()).size();
+        assessmentItemRepository.insertGroupLink(item.getId(), saved.getId(), nextOrder);
         log.info("Created assessment question group copy {}", saved.getId());
         return getById(saved.getId());
     }
@@ -174,8 +182,12 @@ public class AssessmentQuestionGroupService {
     private Specification<AssessmentQuestionGroup> buildSpec(QueryAssessmentQuestionGroupDTO queryDto) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
-            if (queryDto.getAssessmentId() != null) {
-                predicates.add(cb.equal(root.get("assessmentId"), queryDto.getAssessmentId()));
+            if (queryDto.getItemId() != null) {
+                List<Long> groupIds = assessmentItemRepository.findGroupIdsByItemId(queryDto.getItemId());
+                if (groupIds.isEmpty()) {
+                    return cb.disjunction();
+                }
+                predicates.add(root.get("id").in(groupIds));
             }
             if (queryDto.getType() != null) {
                 predicates.add(cb.equal(root.get("type"), queryDto.getType()));
@@ -191,7 +203,6 @@ public class AssessmentQuestionGroupService {
 
         return AssessmentQuestionGroupResponseDTO.builder()
                 .id(group.getId())
-                .assessmentId(group.getAssessmentId())
                 .originalGroupId(group.getOriginalGroupId())
                 .type(group.getType())
                 .title(group.getTitle())

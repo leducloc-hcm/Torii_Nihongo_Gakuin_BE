@@ -69,6 +69,7 @@ CREATE TABLE IF NOT EXISTS assessments (
     lesson_id INTEGER,
     class_id BIGINT,
     assigned_to_id INTEGER,
+    course_id INTEGER,
 
     start_at TIMESTAMP,
     due_at TIMESTAMP,
@@ -80,12 +81,16 @@ CREATE TABLE IF NOT EXISTS assessments (
     shuffle_questions BOOLEAN DEFAULT FALSE,
     shuffle_options BOOLEAN DEFAULT FALSE,
 
+    score_profile_id BIGINT NOT NULL,
+
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_assessment_class ON assessments(class_id);
-CREATE INDEX idx_assessment_user ON assessments(assigned_to_id);
+CREATE INDEX IF NOT EXISTS idx_assessment_class ON assessments(class_id);
+CREATE INDEX IF NOT EXISTS idx_assessment_user ON assessments(assigned_to_id);
+CREATE INDEX IF NOT EXISTS idx_assessments_course_id ON assessments(course_id);
+CREATE INDEX IF NOT EXISTS idx_assessments_score_profile_id ON assessments(score_profile_id);
 
 -- AUDIT LOG
 
@@ -100,6 +105,7 @@ CREATE TABLE IF NOT EXISTS assessment_logs (
     new_value TEXT,
 
     metadata JSONB,
+    change_summary VARCHAR(255),
 
     updated_by INTEGER,
     updated_by_name VARCHAR(255),
@@ -130,7 +136,7 @@ CREATE TABLE IF NOT EXISTS items (
     score_per_question DECIMAL(10,2),
     "order" INTEGER DEFAULT 0,
 
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -141,7 +147,8 @@ CREATE TABLE IF NOT EXISTS items (
 CREATE TABLE IF NOT EXISTS assessment_questions (
     id BIGSERIAL PRIMARY KEY,
 
-    assessment_id BIGINT REFERENCES assessments(id) ON DELETE CASCADE,
+    -- Keep nullable legacy column for compatibility; no direct FK to assessments.
+    assessment_id BIGINT,
     original_question_id BIGINT,
 
     type question_type,
@@ -177,7 +184,8 @@ CREATE TABLE IF NOT EXISTS assessment_options (
 CREATE TABLE IF NOT EXISTS assessment_question_groups (
     id BIGSERIAL PRIMARY KEY,
 
-    assessment_id BIGINT REFERENCES assessments(id) ON DELETE CASCADE,
+    -- Keep nullable legacy column for compatibility; no direct FK to assessments.
+    assessment_id BIGINT,
     original_group_id BIGINT,
 
     type question_group_type,
@@ -293,6 +301,7 @@ CREATE TABLE IF NOT EXISTS attempts (
 
     score DOUBLE PRECISION,
     earned_score DOUBLE PRECISION,
+    level_suggestion VARCHAR(10),
 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -336,8 +345,10 @@ CREATE TABLE IF NOT EXISTS questions (
     passage TEXT,
     explanation TEXT,
 
+    media_id BIGINT,
     media_url VARCHAR(500),
     audio_url VARCHAR(500),
+    reading_length VARCHAR(20),
 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP,
@@ -348,6 +359,9 @@ CREATE TABLE IF NOT EXISTS questions (
 CREATE TABLE IF NOT EXISTS options (
     id BIGSERIAL PRIMARY KEY,
     question_id BIGINT REFERENCES questions(id) ON DELETE CASCADE,
+
+    media_id BIGINT,
+    media_url VARCHAR(500),
 
     content TEXT,
     is_correct BOOLEAN,
@@ -367,6 +381,8 @@ CREATE TABLE IF NOT EXISTS question_groups (
 
     media_url VARCHAR(500),
     audio_url VARCHAR(500),
+    media_id BIGINT,
+    "order" INTEGER,
 
     metadata JSONB,
 
@@ -380,15 +396,75 @@ CREATE TABLE IF NOT EXISTS question_group_questions (
     group_id BIGINT REFERENCES question_groups(id) ON DELETE CASCADE,
 
     "order" INTEGER,
+    score DOUBLE PRECISION,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     PRIMARY KEY (question_id, group_id)
 );
 
+CREATE TABLE IF NOT EXISTS user_course_access (
+    id BIGSERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    course_id INTEGER NOT NULL,
+    unlocked_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    reason TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_user_course_access_user_course
+    ON user_course_access(user_id, course_id);
+
+CREATE INDEX IF NOT EXISTS idx_user_course_access_user_id
+    ON user_course_access(user_id);
+
+CREATE INDEX IF NOT EXISTS idx_user_course_access_course_id
+    ON user_course_access(course_id);
+
+CREATE TABLE IF NOT EXISTS score_profiles (
+    id BIGSERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE,
+    level VARCHAR(10),
+    max_total INTEGER,
+    min_total_pass INTEGER,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS score_profile_sections (
+    id BIGSERIAL PRIMARY KEY,
+    profile_id BIGINT NOT NULL REFERENCES score_profiles(id) ON DELETE CASCADE,
+    type VARCHAR(20) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    max_score INTEGER NOT NULL,
+    weight DECIMAL(5,2),
+    min_pass INTEGER,
+    default_time_sec INTEGER
+);
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.table_constraints
+        WHERE constraint_schema = 'assessment'
+          AND table_name = 'assessments'
+          AND constraint_name = 'fk_assessments_score_profile'
+    ) THEN
+        ALTER TABLE assessments
+            ADD CONSTRAINT fk_assessments_score_profile
+                FOREIGN KEY (score_profile_id)
+                REFERENCES score_profiles(id)
+                ON DELETE RESTRICT;
+    END IF;
+END $$;
+
 -- INDEXES
 
-CREATE INDEX idx_progress_user ON progress(user_id);
-CREATE INDEX idx_attempt_user ON attempts(user_id);
+CREATE INDEX IF NOT EXISTS idx_progress_user ON progress(user_id);
+CREATE INDEX IF NOT EXISTS idx_attempt_user ON attempts(user_id);
 
-CREATE INDEX idx_questions_type ON questions(type);
-CREATE INDEX idx_questions_level ON questions(level);
-CREATE INDEX idx_options_question ON options(question_id);
+CREATE INDEX IF NOT EXISTS idx_questions_type ON questions(type);
+CREATE INDEX IF NOT EXISTS idx_questions_level ON questions(level);
+CREATE INDEX IF NOT EXISTS idx_options_question ON options(question_id);

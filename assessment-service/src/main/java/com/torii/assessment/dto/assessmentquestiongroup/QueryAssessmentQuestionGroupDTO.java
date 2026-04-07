@@ -17,7 +17,7 @@ public class QueryAssessmentQuestionGroupDTO {
     @Builder.Default
     private Integer limit = 20;
 
-    private Long assessmentId;
+    private Long itemId;
     private QuestionGroup.QuestionGroupType type;
 
     @Builder.Default
