@@ -3,6 +3,7 @@ package com.torii.assessment.controller;
 import com.torii.assessment.dto.attempt.AttemptDTO;
 import com.torii.assessment.dto.attempt.CreateAttemptDTO;
 import com.torii.assessment.dto.attempt.SubmitAnswerDTO;
+import com.torii.assessment.dto.attempt.SubmitAttemptRequestDTO;
 import com.torii.assessment.service.AttemptService;
 import com.torii.assessment.util.RequestAuthUtil;
 import jakarta.servlet.http.HttpServletRequest;
@@ -15,7 +16,7 @@ import jakarta.validation.Valid;
 import java.util.List;
 
 @RestController
-@RequestMapping("/assessment/attempts")
+@RequestMapping({"/assessment/attempts", "/assessment-attempts"})
 @RequiredArgsConstructor
 public class AttemptController {
     
@@ -63,9 +64,10 @@ public class AttemptController {
     @PostMapping("/{id}/submit")
     public ResponseEntity<AttemptDTO> submitAttempt(
             @PathVariable Long id,
+            @RequestBody(required = false) @Valid SubmitAttemptRequestDTO dto,
             HttpServletRequest request) {
         RequestAuthUtil.AuthUser authUser = RequestAuthUtil.getAuthUser(request);
-        AttemptDTO attempt = attemptService.submitAttempt(id, authUser.userId(), authUser.role());
+        AttemptDTO attempt = attemptService.submitAttempt(id, dto, authUser.userId(), authUser.role());
         return ResponseEntity.ok(attempt);
     }
     

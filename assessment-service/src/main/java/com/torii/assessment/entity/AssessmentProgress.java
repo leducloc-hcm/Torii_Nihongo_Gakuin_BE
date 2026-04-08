@@ -12,6 +12,8 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.Data;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
@@ -62,7 +64,8 @@ public class AssessmentProgress {
     private Boolean isSubmitted;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status")
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "status", columnDefinition = "progress_status")
     private ProgressStatus status;
 
     @Column(name = "completed_at")

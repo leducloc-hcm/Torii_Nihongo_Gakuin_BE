@@ -2,6 +2,8 @@ package com.torii.assessment.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.time.LocalDateTime;
 
 @Entity
@@ -32,7 +34,8 @@ public class Attempt {
     private Integer attemptNo;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status")
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "status", columnDefinition = "attempt_status")
     private AttemptStatus status;
     
     @Column(name = "started_at")

@@ -1,6 +1,7 @@
 package com.torii.assessment.controller;
 
 import com.torii.assessment.dto.progress.AssessmentAnswerProgressDTO;
+import com.torii.assessment.dto.assessment.AssessmentDTO;
 import com.torii.assessment.dto.progress.AssessmentProgressDTO;
 import com.torii.assessment.dto.progress.AutoSaveProgressDTO;
 import com.torii.assessment.dto.progress.SaveAnswerProgressDTO;
@@ -38,8 +39,8 @@ public class AssessmentProgressController {
             @Valid @RequestBody StartAssessmentProgressDTO dto,
             HttpServletRequest request) {
         RequestAuthUtil.AuthUser authUser = RequestAuthUtil.getAuthUser(request);
-        dto.setUserId(authUser.userId());
-        return ResponseEntity.status(HttpStatus.CREATED).body(assessmentProgressService.startAssessment(dto));
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(assessmentProgressService.startAssessment(dto, authUser.userId()));
     }
 
     @PostMapping("/answers")
@@ -78,20 +79,18 @@ public class AssessmentProgressController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<AssessmentProgressDTO> getProgressById(
+    public ResponseEntity<AssessmentDTO> getProgressById(
             @PathVariable Long id,
             HttpServletRequest request) {
         RequestAuthUtil.AuthUser authUser = RequestAuthUtil.getAuthUser(request);
-        return ResponseEntity.ok(assessmentProgressService.getProgressById(id, authUser.userId(), authUser.role()));
+        return ResponseEntity.ok(assessmentProgressService.getProgressDetailById(id, authUser.userId(), authUser.role()));
     }
 
-    @GetMapping("/user/{userId}")
+    @GetMapping("/user")
     public ResponseEntity<List<AssessmentProgressDTO>> getUserProgresses(
-            @PathVariable Integer userId,
             HttpServletRequest request) {
         RequestAuthUtil.AuthUser authUser = RequestAuthUtil.getAuthUser(request);
-        RequestAuthUtil.ensureSelfOrPrivileged(authUser, userId);
-        return ResponseEntity.ok(assessmentProgressService.getUserProgresses(userId));
+        return ResponseEntity.ok(assessmentProgressService.getUserProgresses(authUser.userId()));
     }
 
     @GetMapping("/assessment/{assessmentId}/user/{userId}")

@@ -78,6 +78,7 @@ public class AssessmentDTO {
         private String explanation;
         private String mediaUrl;
         private String audioUrl;
+        private Long selectedOptionId;
         private List<OptionDetailDTO> options;
     }
 

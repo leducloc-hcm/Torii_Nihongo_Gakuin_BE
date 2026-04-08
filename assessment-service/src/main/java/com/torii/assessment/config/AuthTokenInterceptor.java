@@ -69,6 +69,7 @@ public class AuthTokenInterceptor implements HandlerInterceptor {
 
     private boolean requiresWriteRole(String path) {
         if (path.startsWith("/assessment/attempts")
+                || path.startsWith("/assessment-attempts")
                 || path.startsWith("/assessment-progress")
                 || path.startsWith("/assessment-answers")) {
             return false;

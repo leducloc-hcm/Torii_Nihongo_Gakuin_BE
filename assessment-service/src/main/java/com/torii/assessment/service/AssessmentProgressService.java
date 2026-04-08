@@ -1,6 +1,7 @@
 package com.torii.assessment.service;
 
 import com.torii.assessment.dto.progress.AssessmentAnswerProgressDTO;
+import com.torii.assessment.dto.assessment.AssessmentDTO;
 import com.torii.assessment.dto.progress.AssessmentProgressDTO;
 import com.torii.assessment.dto.progress.AutoSaveProgressDTO;
 import com.torii.assessment.dto.progress.SaveAnswerProgressDTO;
@@ -22,6 +23,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -33,20 +35,21 @@ public class AssessmentProgressService {
     private final AssessmentRepository assessmentRepository;
     private final AssessmentQuestionRepository assessmentQuestionRepository;
     private final AssessmentOptionRepository assessmentOptionRepository;
+    private final AssessmentService assessmentService;
 
     @Transactional
-    public AssessmentProgressDTO startAssessment(StartAssessmentProgressDTO dto) {
+    public AssessmentProgressDTO startAssessment(StartAssessmentProgressDTO dto, Integer requesterUserId) {
         if (!assessmentRepository.existsById(dto.getAssessmentId())) {
             throw new RuntimeException("Assessment not found: " + dto.getAssessmentId());
         }
 
         AssessmentProgress progress = assessmentProgressRepository
-            .findByAssessmentIdAndUserId(dto.getAssessmentId(), dto.getUserId())
+            .findByAssessmentIdAndUserId(dto.getAssessmentId(), requesterUserId)
             .orElseGet(AssessmentProgress::new);
 
         if (progress.getId() == null) {
             progress.setAssessmentId(dto.getAssessmentId());
-            progress.setUserId(dto.getUserId());
+            progress.setUserId(requesterUserId);
             progress.setAssignmentId(dto.getAssignmentId());
             progress.setCurrentSection(0);
             progress.setCurrentQuestion(0);
@@ -158,6 +161,43 @@ public class AssessmentProgressService {
     public AssessmentProgressDTO getProgressById(Long progressId, Integer requesterUserId, String requesterRole) {
         AssessmentProgress progress = getProgressForAccess(progressId, requesterUserId, requesterRole);
         return mapToDTO(progress);
+    }
+
+    public AssessmentDTO getProgressDetailById(Long progressId, Integer requesterUserId, String requesterRole) {
+        AssessmentProgress progress = getProgressForAccess(progressId, requesterUserId, requesterRole);
+        AssessmentDTO assessmentDTO = assessmentService.getAssessmentById(progress.getAssessmentId());
+
+        Map<Long, Long> selectedOptionByQuestionId = assessmentAnswerProgressRepository
+            .findByProgressIdOrderByLastUpdatedAtDesc(progressId)
+            .stream()
+            .filter(answer -> answer.getSelectedOptionId() != null)
+            .collect(Collectors.toMap(
+                AssessmentAnswerProgress::getQuestionId,
+                AssessmentAnswerProgress::getSelectedOptionId,
+                (first, second) -> first
+            ));
+
+        if (assessmentDTO.getSections() == null) {
+            return assessmentDTO;
+        }
+
+        assessmentDTO.getSections().forEach(section -> {
+            if (section.getItems() == null) {
+                return;
+            }
+
+            section.getItems().forEach(item -> {
+                if (item.getQuestions() == null) {
+                    return;
+                }
+
+                item.getQuestions().forEach(question ->
+                    question.setSelectedOptionId(selectedOptionByQuestionId.get(question.getId()))
+                );
+            });
+        });
+
+        return assessmentDTO;
     }
 
     public List<AssessmentProgressDTO> getUserProgresses(Integer userId) {
