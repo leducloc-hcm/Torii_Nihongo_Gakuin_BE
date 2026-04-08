@@ -3,9 +3,9 @@ spring:
     name: assessment-service
 
   datasource:
-    url: jdbc:postgresql://db.rkizlomnljifkbdimrup.supabase.co:5432/postgres?currentSchema=assessment&sslmode=disable
-    username: postgres
-    password: nhatngutorii
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/postgres?currentSchema=assessment&sslmode=disable}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
     driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:org.postgresql.Driver}
     hikari:
       maximum-pool-size: ${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE:2}
@@ -25,12 +25,18 @@ spring:
         physical_naming_strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
 
   flyway:
-    enabled: true
-    schemas: assessment
-    locations: classpath:db/migration
-    baseline-on-migrate: true
-    clean-disabled: false
-    validate-on-migrate: false
+    enabled: false
+    schemas: ${SPRING_FLYWAY_SCHEMAS:assessment}
+    locations: ${SPRING_FLYWAY_LOCATIONS:classpath:db/migration}
+    baseline-on-migrate: ${SPRING_FLYWAY_BASELINE_ON_MIGRATE:true}
+    clean-disabled: ${SPRING_FLYWAY_CLEAN_DISABLED:false}
+    validate-on-migrate: ${SPRING_FLYWAY_VALIDATE_ON_MIGRATE:false}
+
+  sql:
+    init:
+      mode: ${SPRING_SQL_INIT_MODE:always}
+      schema-locations: ${SPRING_SQL_INIT_SCHEMA_LOCATIONS:classpath:db/migration/schema.sql}
+      continue-on-error: true
 
   data:
     redis:

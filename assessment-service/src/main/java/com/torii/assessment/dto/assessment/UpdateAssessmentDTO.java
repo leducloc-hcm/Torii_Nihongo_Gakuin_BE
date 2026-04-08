@@ -27,6 +27,8 @@ public class UpdateAssessmentDTO {
 
     private Long classId;
 
+    private Long scoreProfileId;
+
     private Integer assignedToId;
 
     private String description;

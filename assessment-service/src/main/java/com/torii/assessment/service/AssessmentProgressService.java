@@ -1,6 +1,7 @@
 package com.torii.assessment.service;
 
 import com.torii.assessment.dto.progress.AssessmentAnswerProgressDTO;
+import com.torii.assessment.dto.assessment.AssessmentDTO;
 import com.torii.assessment.dto.progress.AssessmentProgressDTO;
 import com.torii.assessment.dto.progress.AutoSaveProgressDTO;
 import com.torii.assessment.dto.progress.SaveAnswerProgressDTO;
@@ -15,11 +16,14 @@ import com.torii.assessment.repository.AssessmentProgressRepository;
 import com.torii.assessment.repository.AssessmentQuestionRepository;
 import com.torii.assessment.repository.AssessmentRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -31,20 +35,21 @@ public class AssessmentProgressService {
     private final AssessmentRepository assessmentRepository;
     private final AssessmentQuestionRepository assessmentQuestionRepository;
     private final AssessmentOptionRepository assessmentOptionRepository;
+    private final AssessmentService assessmentService;
 
     @Transactional
-    public AssessmentProgressDTO startAssessment(StartAssessmentProgressDTO dto) {
+    public AssessmentProgressDTO startAssessment(StartAssessmentProgressDTO dto, Integer requesterUserId) {
         if (!assessmentRepository.existsById(dto.getAssessmentId())) {
             throw new RuntimeException("Assessment not found: " + dto.getAssessmentId());
         }
 
         AssessmentProgress progress = assessmentProgressRepository
-            .findByAssessmentIdAndUserId(dto.getAssessmentId(), dto.getUserId())
+            .findByAssessmentIdAndUserId(dto.getAssessmentId(), requesterUserId)
             .orElseGet(AssessmentProgress::new);
 
         if (progress.getId() == null) {
             progress.setAssessmentId(dto.getAssessmentId());
-            progress.setUserId(dto.getUserId());
+            progress.setUserId(requesterUserId);
             progress.setAssignmentId(dto.getAssignmentId());
             progress.setCurrentSection(0);
             progress.setCurrentQuestion(0);
@@ -61,9 +66,8 @@ public class AssessmentProgressService {
     }
 
     @Transactional
-    public AssessmentAnswerProgressDTO saveAnswerProgress(SaveAnswerProgressDTO dto) {
-        AssessmentProgress progress = assessmentProgressRepository.findById(dto.getProgressId())
-            .orElseThrow(() -> new RuntimeException("Progress not found: " + dto.getProgressId()));
+    public AssessmentAnswerProgressDTO saveAnswerProgress(SaveAnswerProgressDTO dto, Integer requesterUserId, String requesterRole) {
+        AssessmentProgress progress = getProgressForAccess(dto.getProgressId(), requesterUserId, requesterRole);
 
         if (Boolean.TRUE.equals(progress.getIsSubmitted())) {
             throw new RuntimeException("Cannot modify answers for submitted progress");
@@ -90,9 +94,11 @@ public class AssessmentProgressService {
     }
 
     @Transactional
-    public AssessmentAnswerProgressDTO updateAnswerProgress(Long answerId, UpdateAnswerProgressDTO dto) {
+    public AssessmentAnswerProgressDTO updateAnswerProgress(Long answerId, UpdateAnswerProgressDTO dto, Integer requesterUserId, String requesterRole) {
         AssessmentAnswerProgress answerProgress = assessmentAnswerProgressRepository.findById(answerId)
             .orElseThrow(() -> new RuntimeException("Answer progress not found: " + answerId));
+
+        getProgressForAccess(answerProgress.getProgressId(), requesterUserId, requesterRole);
 
         if (dto.getSelectedOptionId() != null) {
             validateOption(dto.getSelectedOptionId(), answerProgress.getQuestionId());
@@ -109,9 +115,8 @@ public class AssessmentProgressService {
     }
 
     @Transactional
-    public AssessmentProgressDTO autoSave(AutoSaveProgressDTO dto) {
-        AssessmentProgress progress = assessmentProgressRepository.findById(dto.getProgressId())
-            .orElseThrow(() -> new RuntimeException("Progress not found: " + dto.getProgressId()));
+    public AssessmentProgressDTO autoSave(AutoSaveProgressDTO dto, Integer requesterUserId, String requesterRole) {
+        AssessmentProgress progress = getProgressForAccess(dto.getProgressId(), requesterUserId, requesterRole);
 
         if (Boolean.TRUE.equals(progress.getIsSubmitted())) {
             throw new RuntimeException("Cannot auto-save submitted progress");
@@ -138,9 +143,8 @@ public class AssessmentProgressService {
     }
 
     @Transactional
-    public AssessmentProgressDTO submitAssessment(SubmitAssessmentProgressDTO dto) {
-        AssessmentProgress progress = assessmentProgressRepository.findById(dto.getProgressId())
-            .orElseThrow(() -> new RuntimeException("Progress not found: " + dto.getProgressId()));
+    public AssessmentProgressDTO submitAssessment(SubmitAssessmentProgressDTO dto, Integer requesterUserId, String requesterRole) {
+        AssessmentProgress progress = getProgressForAccess(dto.getProgressId(), requesterUserId, requesterRole);
 
         if (Boolean.TRUE.equals(progress.getIsSubmitted())) {
             throw new RuntimeException("Assessment already submitted");
@@ -154,10 +158,46 @@ public class AssessmentProgressService {
         return mapToDTO(assessmentProgressRepository.save(progress));
     }
 
-    public AssessmentProgressDTO getProgressById(Long progressId) {
-        AssessmentProgress progress = assessmentProgressRepository.findById(progressId)
-            .orElseThrow(() -> new RuntimeException("Progress not found: " + progressId));
+    public AssessmentProgressDTO getProgressById(Long progressId, Integer requesterUserId, String requesterRole) {
+        AssessmentProgress progress = getProgressForAccess(progressId, requesterUserId, requesterRole);
         return mapToDTO(progress);
+    }
+
+    public AssessmentDTO getProgressDetailById(Long progressId, Integer requesterUserId, String requesterRole) {
+        AssessmentProgress progress = getProgressForAccess(progressId, requesterUserId, requesterRole);
+        AssessmentDTO assessmentDTO = assessmentService.getAssessmentById(progress.getAssessmentId());
+
+        Map<Long, Long> selectedOptionByQuestionId = assessmentAnswerProgressRepository
+            .findByProgressIdOrderByLastUpdatedAtDesc(progressId)
+            .stream()
+            .filter(answer -> answer.getSelectedOptionId() != null)
+            .collect(Collectors.toMap(
+                AssessmentAnswerProgress::getQuestionId,
+                AssessmentAnswerProgress::getSelectedOptionId,
+                (first, second) -> first
+            ));
+
+        if (assessmentDTO.getSections() == null) {
+            return assessmentDTO;
+        }
+
+        assessmentDTO.getSections().forEach(section -> {
+            if (section.getItems() == null) {
+                return;
+            }
+
+            section.getItems().forEach(item -> {
+                if (item.getQuestions() == null) {
+                    return;
+                }
+
+                item.getQuestions().forEach(question ->
+                    question.setSelectedOptionId(selectedOptionByQuestionId.get(question.getId()))
+                );
+            });
+        });
+
+        return assessmentDTO;
     }
 
     public List<AssessmentProgressDTO> getUserProgresses(Integer userId) {
@@ -173,10 +213,8 @@ public class AssessmentProgressService {
         return mapToDTO(progress);
     }
 
-    public List<AssessmentAnswerProgressDTO> getAnswersByProgress(Long progressId) {
-        if (!assessmentProgressRepository.existsById(progressId)) {
-            throw new RuntimeException("Progress not found: " + progressId);
-        }
+    public List<AssessmentAnswerProgressDTO> getAnswersByProgress(Long progressId, Integer requesterUserId, String requesterRole) {
+        getProgressForAccess(progressId, requesterUserId, requesterRole);
         return assessmentAnswerProgressRepository.findByProgressIdOrderByLastUpdatedAtDesc(progressId)
             .stream()
             .map(this::mapToDTO)
@@ -184,12 +222,26 @@ public class AssessmentProgressService {
     }
 
     @Transactional
-    public void deleteProgress(Long progressId) {
-        if (!assessmentProgressRepository.existsById(progressId)) {
-            throw new RuntimeException("Progress not found: " + progressId);
-        }
+    public void deleteProgress(Long progressId, Integer requesterUserId, String requesterRole) {
+        getProgressForAccess(progressId, requesterUserId, requesterRole);
         assessmentAnswerProgressRepository.deleteByProgressId(progressId);
         assessmentProgressRepository.deleteById(progressId);
+    }
+
+    private AssessmentProgress getProgressForAccess(Long progressId, Integer requesterUserId, String requesterRole) {
+        AssessmentProgress progress = assessmentProgressRepository.findById(progressId)
+            .orElseThrow(() -> new RuntimeException("Progress not found: " + progressId));
+
+        boolean privileged = "STAFF".equalsIgnoreCase(requesterRole)
+            || "LECTURER".equalsIgnoreCase(requesterRole)
+            || "ADMIN".equalsIgnoreCase(requesterRole);
+
+        if (!privileged && !progress.getUserId().equals(requesterUserId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                "CUSTOMER can only access their own progress");
+        }
+
+        return progress;
     }
 
     private void validateQuestion(Long questionId) {

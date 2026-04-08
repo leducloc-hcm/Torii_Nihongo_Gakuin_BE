@@ -29,7 +29,7 @@ public class AssessmentGroupQuestion {
     @Column(name = "question_id")
     private Long questionId;
 
-    @Column(name = "order")
+    @Column(name = "\"order\"")
     private Integer order;
 
     @Data

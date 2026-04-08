@@ -284,7 +284,6 @@ model Course {
   cartItems   CartItem[]
 
   Class Class[]
-  AICitation AICitation[]
   coupons CouponCourse[] @relation("CouponCourses")
 @@schema("learning")
 }
@@ -1219,11 +1218,11 @@ model AIQuery {
   userId           Int
   query            String      @db.Text
   queryType        QueryType
+  agentRole        AgentRole   @default(SENSEI)
+  routingReason    String?
   initialResponse  String?     @db.Text
   executedTools    Json?
-  requiresApproval Boolean     @default(false)
   status           QueryStatus @default(PENDING)
-  cacheKey         String?
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 
@@ -1233,7 +1232,7 @@ model AIQuery {
 
   @@index([threadId, createdAt])
   @@index([userId, status])
-  @@index([cacheKey])
+  @@index([agentRole, createdAt])
 @@schema("learning")
 }
 
@@ -1244,39 +1243,16 @@ model AIChatMessage {
   queryId   String?
   role      ChatRole
   content   String   @db.Text
-  audioUrl  String?
   toolCalls Json?
+  citations Json?
   createdAt DateTime @default(now())
 
   thread    AIThread     @relation(fields: [threadId], references: [id], onDelete: Cascade)
   user      User         @relation(fields: [userId], references: [id])
   query     AIQuery?     @relation(fields: [queryId], references: [id], onDelete: SetNull)
-  citations AICitation[]
 
   @@index([threadId, createdAt])
   @@index([queryId])
-@@schema("learning")
-}
-
-model AICitation {
-  id              Int                @id @default(autoincrement())
-  messageId       Int
-  sourceType      CitationSourceType
-  sourceUrl       String?
-  resourceId      Int?
-  courseId        Int?
-  lessonId        Int?
-  flashcardDeckId Int?
-  quizId          Int?
-  
-  content         String?            @db.Text
-  createdAt       DateTime           @default(now())
-
-  message AIChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
-  course  Course?       @relation(fields: [courseId], references: [id])
-
-  @@index([messageId])
-  @@index([sourceType])
 @@schema("learning")
 }
 
@@ -1510,7 +1486,18 @@ enum QueryType {
   BLOG
   LESSON
   FLASHCARD
+  ASSESSMENT
   ASSESSMENT_HISTORY
+  ENROLLMENT
+  PROGRESS
+  GENERAL
+}
+
+enum AgentRole {
+  @@schema("learning")
+  SENSEI
+  ASSESSMENT
+  ANALYTICS
 }
 
 enum QueryStatus {
@@ -1519,17 +1506,6 @@ enum QueryStatus {
   PROCESSING
   COMPLETED
   FAILED
-}
-
-enum CitationSourceType {
-  @@schema("learning")
-  COURSE
-  LESSON
-  FLASHCARD_DECK
-  QUIZ
-  RESOURCE
-  WEB_URL
-  GENERAL
 }
 
 enum FolderPermissionType {

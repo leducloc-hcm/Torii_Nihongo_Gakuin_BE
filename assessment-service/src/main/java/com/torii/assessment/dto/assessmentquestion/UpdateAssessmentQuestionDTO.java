@@ -1,7 +1,7 @@
 package com.torii.assessment.dto.assessmentquestion;
 
 import com.torii.assessment.entity.Question;
-import jakarta.validation.constraints.NotBlank;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

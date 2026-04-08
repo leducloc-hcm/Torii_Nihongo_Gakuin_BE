@@ -286,82 +286,6 @@ public class QuestionService {
         return getAllQuestions(queryDto);
     }
 
-    // Versioning methods
-    public List<QuestionResponseDTO> getQuestionVersions(String uuid) {
-        List<Question> versions = questionRepository.findByUuidOrderByVersionDesc(uuid);
-        if (versions.isEmpty()) {
-            throw new RuntimeException("No questions found with UUID: " + uuid);
-        }
-        return versions.stream()
-            .map(this::mapToResponseDTO)
-            .collect(Collectors.toList());
-    }
-
-    public QuestionResponseDTO getQuestionByVersion(String uuid, Integer version) {
-        Question question = questionRepository.findByUuidAndVersion(uuid, version)
-            .orElseThrow(() -> new RuntimeException("Question not found with UUID " + uuid + " and version " + version));
-        return mapToResponseDTO(question);
-    }
-
-    @Transactional
-    public QuestionResponseDTO cloneQuestion(Long id, UpdateQuestionDTO modifications) {
-        Question original = questionRepository.findByIdWithOptions(id)
-            .orElseThrow(() -> new RuntimeException("Question not found: " + id));
-
-        // Get latest version
-        Integer latestVersion = questionRepository.findByUuidOrderByVersionDesc(original.getUuid())
-            .stream()
-            .findFirst()
-            .map(Question::getVersion)
-            .orElse(0);
-
-        Question clone = Question.builder()
-            .uuid(original.getUuid())
-            .version(latestVersion + 1)
-            .type(modifications.getType() != null ? modifications.getType() : original.getType())
-            .level(modifications.getLevel() != null ? modifications.getLevel() : original.getLevel())
-            .difficulty(modifications.getDifficulty() != null ? modifications.getDifficulty() : original.getDifficulty())
-            .stem(modifications.getStem() != null ? modifications.getStem() : original.getStem())
-            .passage(modifications.getPassage() != null ? modifications.getPassage() : original.getPassage())
-            .mediaId(modifications.getMediaId() != null ? modifications.getMediaId() : original.getMediaId())
-            .mediaUrl(original.getMediaUrl())
-            .explanation(modifications.getExplanation() != null ? modifications.getExplanation() : original.getExplanation())
-            .readingLength(modifications.getReadingLength() != null ? modifications.getReadingLength() : original.getReadingLength())
-            .build();
-
-        Question saved = questionRepository.save(clone);
-
-        // Clone or create options
-        List<Option> originalOptions = optionRepository.findByQuestionIdOrderByOrderAsc(id);
-        if (modifications.getOptions() != null && !modifications.getOptions().isEmpty()) {
-            for (int i = 0; i < modifications.getOptions().size(); i++) {
-                UpdateQuestionDTO.UpdateOptionDTO optDto = modifications.getOptions().get(i);
-                Option option = Option.builder()
-                    .questionId(saved.getId())
-                    .content(optDto.getContent())
-                    .isCorrect(optDto.getIsCorrect() != null ? optDto.getIsCorrect() : false)
-                    .order(optDto.getOrder() != null ? optDto.getOrder() : i)
-                    .mediaId(optDto.getMediaId())
-                    .build();
-                optionRepository.save(option);
-            }
-        } else {
-            for (Option opt : originalOptions) {
-                Option clonedOpt = Option.builder()
-                    .questionId(saved.getId())
-                    .content(opt.getContent())
-                    .isCorrect(opt.getIsCorrect())
-                    .order(opt.getOrder())
-                    .mediaId(opt.getMediaId())
-                    .build();
-                optionRepository.save(clonedOpt);
-            }
-        }
-
-        log.info("Cloned question {} to new version {}", id, saved.getId());
-        return getQuestionById(saved.getId());
-    }
-
     public Map<String, Object> checkQuestionUsage(Long id) {
         if (!questionRepository.existsById(id)) {
             throw new RuntimeException("Question not found: " + id);
@@ -445,8 +369,6 @@ public class QuestionService {
 
         return QuestionResponseDTO.builder()
             .id(question.getId())
-            .uuid(question.getUuid())
-            .version(question.getVersion())
             .type(question.getType())
             .level(question.getLevel())
             .difficulty(question.getDifficulty())

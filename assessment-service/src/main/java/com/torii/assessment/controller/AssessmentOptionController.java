@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,11 +23,11 @@ public class AssessmentOptionController {
 
     private final AssessmentOptionService assessmentOptionService;
 
-    @PostMapping("/assessment-questions/{questionId}/options")
-    @Operation(summary = "Create an assessment option")
-    public ResponseEntity<AssessmentOptionResponseDTO> create(
+    @PostMapping(value = "/assessment-questions/{questionId}/options", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Create an assessment option (multipart)")
+    public ResponseEntity<AssessmentOptionResponseDTO> createMultipart(
             @PathVariable Long questionId,
-            @Valid @RequestBody CreateAssessmentOptionDTO dto) {
+            @Valid @ModelAttribute CreateAssessmentOptionDTO dto) {
         dto.setQuestionId(questionId);
         AssessmentOptionResponseDTO option = assessmentOptionService.create(dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(option);
@@ -68,11 +69,11 @@ public class AssessmentOptionController {
         return ResponseEntity.ok(option);
     }
 
-    @PutMapping("/assessment-options/{id}")
-    @Operation(summary = "Update an assessment option")
-    public ResponseEntity<AssessmentOptionResponseDTO> update(
+    @PutMapping(value = "/assessment-options/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Update an assessment option (multipart)")
+    public ResponseEntity<AssessmentOptionResponseDTO> updateMultipart(
             @PathVariable Long id,
-            @Valid @RequestBody UpdateAssessmentOptionDTO dto) {
+            @Valid @ModelAttribute UpdateAssessmentOptionDTO dto) {
         AssessmentOptionResponseDTO option = assessmentOptionService.update(id, dto);
         return ResponseEntity.ok(option);
     }

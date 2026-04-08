@@ -40,7 +40,7 @@ public class AssessmentSectionService {
         AssessmentSection section = new AssessmentSection();
         section.setAssessmentId(dto.getAssessmentId());
         section.setTitle(dto.getTitle());
-        section.setType(dto.getType());
+        section.setType(AssessmentSection.SectionType.valueOf(dto.getType()));
         section.setTimeLimitSec(dto.getTimeLimitSec());
         section.setOrder(dto.getOrder());
 
@@ -78,7 +78,7 @@ public class AssessmentSectionService {
                 .assessmentId(section.getAssessmentId())
                 .title(section.getTitle())
                 .timeLimitSec(section.getTimeLimitSec())
-                .type(section.getType())
+                .type(section.getType() != null ? section.getType().name() : null)
             .order(section.getOrder())
             .createdAt(section.getCreatedAt())
             .updatedAt(section.getUpdatedAt())
@@ -101,7 +101,7 @@ public class AssessmentSectionService {
             section.setTitle(dto.getTitle());
         }
 
-        if (dto.getType() != null) section.setType(dto.getType());
+        if (dto.getType() != null) section.setType(AssessmentSection.SectionType.valueOf(dto.getType()));
         if (dto.getTimeLimitSec() != null) section.setTimeLimitSec(dto.getTimeLimitSec());
         if (dto.getOrder() != null) section.setOrder(dto.getOrder());
 
@@ -159,7 +159,7 @@ public class AssessmentSectionService {
             }
 
             if (queryDto.getType() != null && !queryDto.getType().isBlank()) {
-                predicates.add(cb.equal(root.get("type"), queryDto.getType()));
+                predicates.add(cb.equal(root.get("type"), AssessmentSection.SectionType.valueOf(queryDto.getType())));
             }
 
             if (queryDto.getAssessmentId() != null) {
@@ -177,7 +177,7 @@ public class AssessmentSectionService {
                 .assessmentId(section.getAssessmentId())
                 .title(section.getTitle())
                 .timeLimitSec(section.getTimeLimitSec())
-                .type(section.getType())
+                .type(section.getType() != null ? section.getType().name() : null)
             .order(section.getOrder())
             .createdAt(section.getCreatedAt())
             .updatedAt(section.getUpdatedAt())

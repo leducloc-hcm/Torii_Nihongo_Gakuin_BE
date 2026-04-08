@@ -2,6 +2,8 @@ package com.torii.assessment.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
@@ -29,7 +31,8 @@ public class AssessmentLog {
     @Column(name = "new_value", columnDefinition = "TEXT")
     private String newValue;
 
-    @Column(columnDefinition = "JSONB")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb")
     private String metadata;
 
     @Column(name = "updated_by")

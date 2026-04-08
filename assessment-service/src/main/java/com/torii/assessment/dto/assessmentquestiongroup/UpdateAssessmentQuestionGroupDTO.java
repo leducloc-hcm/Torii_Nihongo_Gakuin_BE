@@ -1,6 +1,7 @@
 package com.torii.assessment.dto.assessmentquestiongroup;
 
 import com.torii.assessment.entity.QuestionGroup;
+import com.torii.assessment.entity.Question;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -13,12 +14,16 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class UpdateAssessmentQuestionGroupDTO {
+    private Long assessmentQuestionGroupId;
+    private Long originalGroupId;
     private QuestionGroup.QuestionGroupType type;
-    private String title;
+    private Question.JLPTLevel level;
+    private Question.Difficulty difficulty;
+    private String stem;
     private String passage;
+    private String explanation;
     private String mediaUrl;
     private String audioUrl;
-    private String metadata;
-    private Integer order;
     private List<Long> questionIds;
+    private List<Long> assessmentQuestionIds;
 }

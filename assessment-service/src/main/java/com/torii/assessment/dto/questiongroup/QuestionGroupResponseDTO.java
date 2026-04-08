@@ -16,19 +16,18 @@ import java.util.Map;
 @Builder
 public class QuestionGroupResponseDTO {
     private Long id;
-    private String uuid;
-    private Integer version;
+    private Long questionGroupId;
     private QuestionGroup.QuestionGroupType type;
-    private String title;
+    private String level;
+    private String difficulty;
+    private String stem;
     private String passage;
-    private Long mediaId;
+    private String explanation;
     private String mediaUrl;
     private String audioUrl;
-    private Integer order;
-    private Map<String, Object> metadata;
     private LocalDateTime createdAt;
+    private List<Long> questionIds;
     private List<QuestionDTO> questions;
-    private MediaDTO media;
     private Integer questionsCount;
     private Boolean hasMedia;
     private Boolean hasPassage;
@@ -47,15 +46,5 @@ public class QuestionGroupResponseDTO {
         private Double score;
     }
 
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @Builder
-    public static class MediaDTO {
-        private Long id;
-        private String url;
-        private String kind;
-        private String caption;
-    }
 }
 

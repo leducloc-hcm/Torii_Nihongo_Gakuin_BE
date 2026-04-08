@@ -47,21 +47,22 @@ public class QuestionGroupService {
 
         QuestionGroup group = QuestionGroup.builder()
             .type(dto.getType())
-            .title(dto.getTitle())
+            .level(dto.getLevel())
+            .difficulty(dto.getDifficulty())
+            .stem(dto.getStem())
             .passage(dto.getPassage())
-            .mediaId(dto.getMediaId())
+            .explanation(dto.getExplanation())
             .mediaUrl(mediaUrl)
             .audioUrl(audioUrl)
-            .order(dto.getOrder())
-            .metadata(dto.getMetadata() != null ? dto.getMetadata().toString() : null)
             .build();
 
         QuestionGroup saved = questionGroupRepository.save(group);
         log.info("Created question group: {}", saved.getId());
 
         // Add questions if provided
-        if (dto.getQuestions() != null && !dto.getQuestions().isEmpty()) {
-            addQuestionsToGroupInternal(saved.getId(), dto.getQuestions());
+        List<Long> questionIds = resolveQuestionIds(dto.getQuestions(), dto.getQuestionIds());
+        if (!questionIds.isEmpty()) {
+            addQuestionsToGroupInternal(saved.getId(), questionIds);
         }
 
         return getQuestionGroupById(saved.getId());
@@ -107,6 +108,10 @@ public class QuestionGroupService {
 
     @Transactional
     public QuestionGroupResponseDTO updateQuestionGroup(Long id, UpdateQuestionGroupDTO dto, MultipartFile image, MultipartFile audio) throws IOException {
+        if (dto.getQuestionGroupId() != null && !dto.getQuestionGroupId().equals(id)) {
+            throw new RuntimeException("questionGroupId in payload does not match path id");
+        }
+
         QuestionGroup group = questionGroupRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Question Group not found: " + id));
 
@@ -125,20 +130,21 @@ public class QuestionGroupService {
         }
 
         if (dto.getType() != null) group.setType(dto.getType());
-        if (dto.getTitle() != null) group.setTitle(dto.getTitle());
+        if (dto.getLevel() != null) group.setLevel(dto.getLevel());
+        if (dto.getDifficulty() != null) group.setDifficulty(dto.getDifficulty());
+        if (dto.getStem() != null) group.setStem(dto.getStem());
         if (dto.getPassage() != null) group.setPassage(dto.getPassage());
-        if (dto.getMediaId() != null) group.setMediaId(dto.getMediaId());
-        if (dto.getOrder() != null) group.setOrder(dto.getOrder());
-        if (dto.getMetadata() != null) group.setMetadata(dto.getMetadata().toString());
+        if (dto.getExplanation() != null) group.setExplanation(dto.getExplanation());
 
         questionGroupRepository.save(group);
         log.info("Updated question group: {}", id);
 
         // Update questions if provided
-        if (dto.getQuestions() != null) {
+        List<Long> questionIds = resolveQuestionIds(dto.getQuestions(), dto.getQuestionIds());
+        if (dto.getQuestions() != null || dto.getQuestionIds() != null) {
             questionGroupQuestionRepository.deleteAllByGroupId(id);
-            if (!dto.getQuestions().isEmpty()) {
-                addQuestionsToGroupInternal(id, dto.getQuestions());
+            if (!questionIds.isEmpty()) {
+                addQuestionsToGroupInternal(id, questionIds);
             }
         }
 
@@ -161,9 +167,10 @@ public class QuestionGroupService {
         }
 
         // Validate questions exist
-        validateQuestionsExist(dto.getQuestionIds());
+        List<Long> questionIds = resolveQuestionIds(dto.getQuestions(), dto.getQuestionIds());
+        validateQuestionsExist(questionIds);
 
-        addQuestionsToGroupInternal(groupId, dto.getQuestionIds());
+        addQuestionsToGroupInternal(groupId, questionIds);
         return getQuestionGroupById(groupId);
     }
 
@@ -173,8 +180,9 @@ public class QuestionGroupService {
             throw new RuntimeException("Question Group not found: " + groupId);
         }
 
-        questionGroupQuestionRepository.deleteByGroupIdAndQuestionIds(groupId, dto.getQuestionIds());
-        log.info("Removed {} questions from group {}", dto.getQuestionIds().size(), groupId);
+        List<Long> questionIds = resolveQuestionIds(dto.getQuestions(), dto.getQuestionIds());
+        questionGroupQuestionRepository.deleteByGroupIdAndQuestionIds(groupId, questionIds);
+        log.info("Removed {} questions from group {}", questionIds.size(), groupId);
 
         return getQuestionGroupById(groupId);
     }
@@ -204,7 +212,7 @@ public class QuestionGroupService {
         Map<String, Object> groupInfo = new HashMap<>();
         groupInfo.put("id", group.getId());
         groupInfo.put("type", group.getType());
-        groupInfo.put("title", group.getTitle());
+        groupInfo.put("stem", group.getStem());
         result.put("group", groupInfo);
         result.put("questions", questions);
         result.put("questionsCount", questions.size());
@@ -233,8 +241,8 @@ public class QuestionGroupService {
         Map<String, Object> result = new HashMap<>();
         result.put("totalGroups", total);
         result.put("byType", byType);
-        result.put("withMedia", questionGroupRepository.countByMediaIdIsNotNull());
-        result.put("withoutMedia", questionGroupRepository.countByMediaIdIsNull());
+        result.put("withMedia", questionGroupRepository.countByMediaUrlIsNotNull());
+        result.put("withoutMedia", questionGroupRepository.countByMediaUrlIsNull());
         result.put("withPassage", questionGroupRepository.countByPassageIsNotNull());
         result.put("withoutPassage", questionGroupRepository.countByPassageIsNull());
         result.put("averageQuestionsPerGroup", avgQuestionsPerGroup);
@@ -245,62 +253,6 @@ public class QuestionGroupService {
     public Map<String, Object> findByType(QuestionGroup.QuestionGroupType type, QueryQuestionGroupDTO queryDto) {
         queryDto.setType(type);
         return getAllQuestionGroups(queryDto);
-    }
-
-    // Versioning methods
-    public List<QuestionGroupResponseDTO> getQuestionGroupVersions(String uuid) {
-        List<QuestionGroup> versions = questionGroupRepository.findByUuidOrderByVersionDesc(uuid);
-        if (versions.isEmpty()) {
-            throw new RuntimeException("No question groups found with UUID: " + uuid);
-        }
-        return versions.stream()
-            .map(this::mapToResponseDTO)
-            .collect(Collectors.toList());
-    }
-
-    public QuestionGroupResponseDTO getQuestionGroupByVersion(String uuid, Integer version) {
-        QuestionGroup group = questionGroupRepository.findByUuidAndVersion(uuid, version)
-            .orElseThrow(() -> new RuntimeException("Question Group not found with UUID " + uuid + " and version " + version));
-        return mapToResponseDTO(group);
-    }
-
-    @Transactional
-    public QuestionGroupResponseDTO cloneQuestionGroup(Long id, UpdateQuestionGroupDTO modifications) {
-        QuestionGroup original = questionGroupRepository.findByIdWithQuestions(id)
-            .orElseThrow(() -> new RuntimeException("Question Group not found: " + id));
-
-        Integer latestVersion = questionGroupRepository.findByUuidOrderByVersionDesc(original.getUuid())
-            .stream()
-            .findFirst()
-            .map(QuestionGroup::getVersion)
-            .orElse(0);
-
-        QuestionGroup clone = QuestionGroup.builder()
-            .uuid(original.getUuid())
-            .version(latestVersion + 1)
-            .type(modifications.getType() != null ? modifications.getType() : original.getType())
-            .title(modifications.getTitle() != null ? modifications.getTitle() : original.getTitle())
-            .passage(modifications.getPassage() != null ? modifications.getPassage() : original.getPassage())
-            .mediaId(modifications.getMediaId() != null ? modifications.getMediaId() : original.getMediaId())
-            .order(modifications.getOrder() != null ? modifications.getOrder() : original.getOrder())
-            .metadata(modifications.getMetadata() != null ? modifications.getMetadata().toString() : original.getMetadata())
-            .build();
-
-        QuestionGroup saved = questionGroupRepository.save(clone);
-
-        // Clone questions
-        List<Long> questionIds = modifications.getQuestions();
-        if (questionIds == null || questionIds.isEmpty()) {
-            questionIds = questionGroupQuestionRepository.findByGroupIdOrderByOrderAsc(id).stream()
-                .map(QuestionGroupQuestion::getQuestionId)
-                .collect(Collectors.toList());
-        }
-        if (!questionIds.isEmpty()) {
-            addQuestionsToGroupInternal(saved.getId(), questionIds);
-        }
-
-        log.info("Cloned question group {} to new version {}", id, saved.getId());
-        return getQuestionGroupById(saved.getId());
     }
 
     public Map<String, Object> checkQuestionGroupUsage(Long id) {
@@ -343,11 +295,21 @@ public class QuestionGroupService {
     }
 
     private void validateQuestionsExist(List<Long> questionIds) {
+        if (questionIds == null || questionIds.isEmpty()) {
+            throw new RuntimeException("At least one question id is required");
+        }
         for (Long questionId : questionIds) {
             if (!questionRepository.existsById(questionId)) {
                 throw new RuntimeException("Question not found: " + questionId);
             }
         }
+    }
+
+    private List<Long> resolveQuestionIds(List<Long> questions, List<Long> questionIds) {
+        LinkedHashSet<Long> merged = new LinkedHashSet<>();
+        if (questions != null) merged.addAll(questions);
+        if (questionIds != null) merged.addAll(questionIds);
+        return new ArrayList<>(merged);
     }
 
     private Specification<QuestionGroup> buildSpecification(QueryQuestionGroupDTO queryDto) {
@@ -359,9 +321,9 @@ public class QuestionGroupService {
             }
             if (queryDto.getHasMedia() != null) {
                 if (queryDto.getHasMedia()) {
-                    predicates.add(cb.isNotNull(root.get("mediaId")));
+                    predicates.add(cb.isNotNull(root.get("mediaUrl")));
                 } else {
-                    predicates.add(cb.isNull(root.get("mediaId")));
+                    predicates.add(cb.isNull(root.get("mediaUrl")));
                 }
             }
             if (queryDto.getHasPassage() != null) {
@@ -373,9 +335,10 @@ public class QuestionGroupService {
             }
             if (queryDto.getKeyword() != null && !queryDto.getKeyword().isEmpty()) {
                 String keyword = "%" + queryDto.getKeyword().toLowerCase() + "%";
-                Predicate titlePred = cb.like(cb.lower(root.get("title")), keyword);
+                Predicate stemPred = cb.like(cb.lower(root.get("stem")), keyword);
                 Predicate passagePred = cb.like(cb.lower(root.get("passage")), keyword);
-                predicates.add(cb.or(titlePred, passagePred));
+                Predicate explanationPred = cb.like(cb.lower(root.get("explanation")), keyword);
+                predicates.add(cb.or(stemPred, passagePred, explanationPred));
             }
 
             return cb.and(predicates.toArray(new Predicate[0]));
@@ -404,19 +367,20 @@ public class QuestionGroupService {
 
         return QuestionGroupResponseDTO.builder()
             .id(group.getId())
-            .uuid(group.getUuid())
-            .version(group.getVersion())
+            .questionGroupId(group.getId())
             .type(group.getType())
-            .title(group.getTitle())
+            .level(group.getLevel() != null ? group.getLevel().name() : null)
+            .difficulty(group.getDifficulty() != null ? group.getDifficulty().name() : null)
+            .stem(group.getStem())
             .passage(group.getPassage())
-            .mediaId(group.getMediaId())
+            .explanation(group.getExplanation())
             .mediaUrl(group.getMediaUrl())
             .audioUrl(group.getAudioUrl())
-            .order(group.getOrder())
             .createdAt(group.getCreatedAt())
+            .questionIds(questionDTOs.stream().map(QuestionGroupResponseDTO.QuestionDTO::getId).collect(Collectors.toList()))
             .questions(questionDTOs)
             .questionsCount(questionDTOs.size())
-            .hasMedia(group.getMediaId() != null || group.getMediaUrl() != null)
+            .hasMedia(group.getMediaUrl() != null && !group.getMediaUrl().isEmpty())
             .hasPassage(group.getPassage() != null && !group.getPassage().isEmpty())
             .build();
     }

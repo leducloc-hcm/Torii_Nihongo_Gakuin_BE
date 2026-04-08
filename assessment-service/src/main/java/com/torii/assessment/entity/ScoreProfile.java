@@ -37,6 +37,9 @@ public class ScoreProfile {
     
     @OneToMany(mappedBy = "profile", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<ScoreProfileSection> sections = new ArrayList<>();
+
+    @OneToMany(mappedBy = "scoreProfile", fetch = FetchType.LAZY)
+    private List<Assessment> assessments = new ArrayList<>();
     
     @PreUpdate
     public void preUpdate() {

@@ -17,7 +17,7 @@ public class QueryAssessmentQuestionDTO {
     @Builder.Default
     private Integer limit = 20;
 
-    private Long assessmentId;
+    private Long itemId;
     private Question.QuestionType type;
     private Question.JLPTLevel level;
     private Question.Difficulty difficulty;

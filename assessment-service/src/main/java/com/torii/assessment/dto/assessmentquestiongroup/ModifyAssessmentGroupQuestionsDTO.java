@@ -15,4 +15,5 @@ import java.util.List;
 public class ModifyAssessmentGroupQuestionsDTO {
     @NotEmpty(message = "Question IDs are required")
     private List<Long> questionIds;
+    private List<Long> assessmentQuestionIds;
 }

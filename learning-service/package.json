@@ -40,7 +40,7 @@
     "@nestjs/swagger": "^11.2.0",
     "@nestjs/throttler": "^6.4.0",
     "@nestjs/websockets": "^11.1.6",
-    "@prisma/adapter-pg": "^7.2.0",
+    "@prisma/adapter-pg": "^7.6.0",
     "@prisma/extension-accelerate": "^3.0.1",
     "@react-email/components": "^0.5.5",
     "@react-email/render": "^2.0.2",

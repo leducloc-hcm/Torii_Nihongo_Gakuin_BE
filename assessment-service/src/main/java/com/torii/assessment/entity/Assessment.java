@@ -2,6 +2,8 @@ package com.torii.assessment.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
@@ -16,17 +18,23 @@ public class Assessment {
     private String title;
     private String description;
 
-    @Column(name = "course_id")
-    private Integer courseId;
-
     // Matches assessment_type enum in the DB (QUIZ, TEST, EXAM, ASSIGNMENT)
-    private String type;
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "type", nullable = false, columnDefinition = "assessment_type")
+    private AssessmentType type;
 
     // Level code (e.g., N5, N4, N3, N2, N1)
-    private String level;
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "level", columnDefinition = "jlpt_level")
+    private JLPTLevel level;
 
     // Visibility enum: PRIVATE, UNLISTED, PUBLIC
-    private String visibility = "PRIVATE";
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "visibility", nullable = false, columnDefinition = "visibility")
+    private AssessmentVisibility visibility = AssessmentVisibility.PRIVATE;
 
     @Column(name = "created_by", nullable = false)
     private Integer createdBy;
@@ -36,6 +44,10 @@ public class Assessment {
 
     @Column(name = "class_id")
     private Long classId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "score_profile_id", nullable = false)
+    private ScoreProfile scoreProfile;
 
     @Column(name = "assigned_to_id")
     private Integer assignedToId;
@@ -81,5 +93,26 @@ public class Assessment {
     @PreUpdate
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
+    }
+
+    public enum AssessmentType {
+        TEST,
+        EXAM,
+        QUIZ,
+        ASSIGNMENT
+    }
+
+    public enum JLPTLevel {
+        N5,
+        N4,
+        N3,
+        N2,
+        N1
+    }
+
+    public enum AssessmentVisibility {
+        PRIVATE,
+        UNLISTED,
+        PUBLIC
     }
 }

@@ -30,31 +30,38 @@ public class AssessmentQuestionGroup {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "assessment_id")
-    private Long assessmentId;
-
     @Column(name = "original_group_id")
     private Long originalGroupId;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "type")
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "type", columnDefinition = "question_group_type")
     private QuestionGroup.QuestionGroupType type;
 
-    @Column(name = "title", columnDefinition = "text")
-    private String title;
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "level", columnDefinition = "jlpt_level")
+    private Question.JLPTLevel level;
+
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "difficulty", columnDefinition = "difficulty")
+    private Question.Difficulty difficulty;
+
+    @Column(name = "stem", columnDefinition = "text")
+    private String stem;
 
     @Column(name = "passage", columnDefinition = "text")
     private String passage;
+
+    @Column(name = "explanation", columnDefinition = "text")
+    private String explanation;
 
     @Column(name = "media_url", length = 500)
     private String mediaUrl;
 
     @Column(name = "audio_url", length = 500)
     private String audioUrl;
-
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "metadata", columnDefinition = "jsonb")
-    private String metadata;
 
     @Column(name = "created_at")
     @Builder.Default
