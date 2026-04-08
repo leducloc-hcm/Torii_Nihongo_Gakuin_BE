@@ -30,9 +30,6 @@ public class AssessmentQuestion {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "assessment_id")
-    private Long assessmentId;
-
     @Column(name = "original_question_id")
     private Long originalQuestionId;
 

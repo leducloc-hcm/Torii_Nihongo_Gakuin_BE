@@ -18,11 +18,14 @@ public class AssessmentQuestionGroupResponseDTO {
     private Long assessmentQuestionGroupId;
     private Long originalGroupId;
     private QuestionGroup.QuestionGroupType type;
-    private String title;
+    private String level;
+    private String difficulty;
+    private String stem;
     private String passage;
+    private String explanation;
     private String mediaUrl;
     private String audioUrl;
-    private String metadata;
     private LocalDateTime createdAt;
     private List<Long> questionIds;
+    private List<Long> assessmentQuestionIds;
 }

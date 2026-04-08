@@ -100,11 +100,13 @@ public class AssessmentDTO {
         private Long id;
         private Long originalGroupId;
         private String type;
-        private String title;
+        private String level;
+        private String difficulty;
+        private String stem;
         private String passage;
+        private String explanation;
         private String mediaUrl;
         private String audioUrl;
-        private String metadata;
         private List<Long> questionIds;
     }
 }

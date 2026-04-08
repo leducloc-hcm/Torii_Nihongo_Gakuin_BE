@@ -18,5 +18,7 @@ public class AddQuestionsToGroupDTO {
     @NotEmpty(message = "At least 1 question required")
     @Size(max = 50, message = "Maximum 50 questions per operation")
     private List<Long> questionIds;
+
+    private List<Long> questions;
 }
 

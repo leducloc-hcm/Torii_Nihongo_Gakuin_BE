@@ -44,7 +44,6 @@ public class AssessmentQuestionService {
             .orElseThrow(() -> new RuntimeException("Assessment item not found: " + dto.getItemId()));
 
         AssessmentQuestion question = AssessmentQuestion.builder()
-            .assessmentId(null)
                 .originalQuestionId(dto.getOriginalQuestionId())
                 .type(dto.getType())
                 .level(dto.getLevel())

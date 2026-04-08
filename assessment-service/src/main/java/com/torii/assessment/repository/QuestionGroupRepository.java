@@ -23,10 +23,10 @@ public interface QuestionGroupRepository extends JpaRepository<QuestionGroup, Lo
     long countByType(QuestionGroup.QuestionGroupType type);
 
     // Count with media
-    long countByMediaIdIsNotNull();
+    long countByMediaUrlIsNotNull();
 
     // Count without media
-    long countByMediaIdIsNull();
+    long countByMediaUrlIsNull();
 
     // Count with passage
     long countByPassageIsNotNull();

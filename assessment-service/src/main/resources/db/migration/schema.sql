@@ -120,8 +120,6 @@ CREATE TABLE IF NOT EXISTS items (
 CREATE TABLE IF NOT EXISTS assessment_questions (
     id BIGSERIAL PRIMARY KEY,
 
-    -- Keep nullable legacy column for compatibility; no direct FK to assessments.
-    assessment_id BIGINT,
     original_question_id BIGINT,
 
     type question_type,
@@ -157,18 +155,18 @@ CREATE TABLE IF NOT EXISTS assessment_options (
 CREATE TABLE IF NOT EXISTS assessment_question_groups (
     id BIGSERIAL PRIMARY KEY,
 
-    -- Keep nullable legacy column for compatibility; no direct FK to assessments.
-    assessment_id BIGINT,
     original_group_id BIGINT,
 
     type question_group_type,
-    title TEXT,
+    level jlpt_level,
+    difficulty difficulty,
+
+    stem TEXT,
     passage TEXT,
+    explanation TEXT,
 
     media_url VARCHAR(500),
     audio_url VARCHAR(500),
-
-    metadata JSONB,
 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -343,15 +341,15 @@ CREATE TABLE IF NOT EXISTS question_groups (
     id BIGSERIAL PRIMARY KEY,
 
     type question_group_type,
-    title TEXT,
+    level jlpt_level,
+    difficulty difficulty,
+
+    stem TEXT,
     passage TEXT,
+    explanation TEXT,
 
     media_url VARCHAR(500),
     audio_url VARCHAR(500),
-    media_id BIGINT,
-    "order" INTEGER,
-
-    metadata JSONB,
 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
