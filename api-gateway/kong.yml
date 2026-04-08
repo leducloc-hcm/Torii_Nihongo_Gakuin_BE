@@ -471,36 +471,6 @@ services:
           - name: jwt-validator
             config:
               secret: nhatngutorii
-      - name: questions-route
-        paths:
-          - /questions
-        strip_path: false
-        methods:
-          - GET
-          - POST
-          - PUT
-          - DELETE
-          - PATCH
-          - OPTIONS
-        plugins:
-          - name: jwt-validator
-            config:
-              secret: nhatngutorii
-      - name: question-groups-route
-        paths:
-          - /question-groups
-        strip_path: false
-        methods:
-          - GET
-          - POST
-          - PUT
-          - DELETE
-          - PATCH
-          - OPTIONS
-        plugins:
-          - name: jwt-validator
-            config:
-              secret: nhatngutorii
   - name: assessment-service
     url: http://assessment-service:4002
     routes:
@@ -609,9 +579,54 @@ services:
           - name: jwt-validator
             config:
               secret: nhatngutorii
+      - name: options-route
+        paths:
+          - /options
+        strip_path: false
+        methods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - PATCH
+          - OPTIONS
+        plugins:
+          - name: jwt-validator
+            config:
+              secret: nhatngutorii
+      - name: questions-route
+        paths:
+          - /questions
+        strip_path: false
+        methods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - PATCH
+          - OPTIONS
+        plugins:
+          - name: jwt-validator
+            config:
+              secret: nhatngutorii
+      - name: question-groups-route
+        paths:
+          - /question-groups
+        strip_path: false
+        methods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - PATCH
+          - OPTIONS
+        plugins:
+          - name: jwt-validator
+            config:
+              secret: nhatngutorii
       - name: score-profile-route
         paths:
-          - /score-profile
+          - /score-profiles
         strip_path: false
         methods:
           - GET
