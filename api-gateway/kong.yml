@@ -519,6 +519,96 @@ services:
           - name: jwt-validator
             config:
               secret: nhatngutorii
+      - name: assessment-answers-route
+        paths:
+          - /assessment-answers
+        strip_path: false
+        methods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - PATCH
+          - OPTIONS
+        plugins:
+          - name: jwt-validator
+            config:
+              secret: nhatngutorii
+      - name: assessment-items-route
+        paths:
+          - /assessment-items
+        strip_path: false
+        methods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - PATCH
+          - OPTIONS
+        plugins:
+          - name: jwt-validator
+            config:
+              secret: nhatngutorii
+      - name: assessment-progress-route
+        paths:
+          - /assessment-progress
+        strip_path: false
+        methods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - PATCH
+          - OPTIONS
+        plugins:
+          - name: jwt-validator
+            config:
+              secret: nhatngutorii
+      - name: assessment-question-groups-route
+        paths:
+          - /assessment-question-groups
+        strip_path: false
+        methods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - PATCH
+          - OPTIONS
+        plugins:
+          - name: jwt-validator
+            config:
+              secret: nhatngutorii
+      - name: assessment-questions-route
+        paths:
+          - /assessment-questions
+        strip_path: false
+        methods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - PATCH
+          - OPTIONS
+        plugins:
+          - name: jwt-validator
+            config:
+              secret: nhatngutorii
+      - name: assessment-sections-route
+        paths:
+          - /assessment-sections
+        strip_path: false
+        methods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - PATCH
+          - OPTIONS
+        plugins:
+          - name: jwt-validator
+            config:
+              secret: nhatngutorii
       - name: score-profile-route
         paths:
           - /score-profile
