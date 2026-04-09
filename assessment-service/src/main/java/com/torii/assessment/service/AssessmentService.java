@@ -13,6 +13,7 @@ import com.torii.assessment.entity.AssessmentQuestion;
 import com.torii.assessment.entity.AssessmentQuestionGroup;
 import com.torii.assessment.entity.AssessmentSection;
 import com.torii.assessment.entity.ScoreProfile;
+import com.torii.assessment.entity.ScoreProfileSection;
 import com.torii.assessment.repository.AssessmentGroupQuestionRepository;
 import com.torii.assessment.repository.AssessmentItemRepository;
 import com.torii.assessment.repository.AssessmentOptionRepository;
@@ -22,7 +23,10 @@ import com.torii.assessment.repository.AssessmentRepository;
 import com.torii.assessment.repository.AssessmentLogRepository;
 import com.torii.assessment.entity.AssessmentLog;
 import com.torii.assessment.repository.AssessmentSectionRepository;
+import com.torii.assessment.repository.ItemAssessmentGroupRepository;
+import com.torii.assessment.repository.ItemAssessmentQuestionRepository;
 import com.torii.assessment.repository.ScoreProfileRepository;
+import com.torii.assessment.repository.ScoreProfileSectionRepository;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -55,6 +59,9 @@ public class AssessmentService {
     private final AssessmentQuestionGroupRepository assessmentQuestionGroupRepository;
     private final AssessmentOptionRepository assessmentOptionRepository;
     private final AssessmentGroupQuestionRepository assessmentGroupQuestionRepository;
+    private final ScoreProfileSectionRepository scoreProfileSectionRepository;
+    private final ItemAssessmentQuestionRepository itemAssessmentQuestionRepository;
+    private final ItemAssessmentGroupRepository itemAssessmentGroupRepository;
 
     @Transactional
     public AssessmentDTO createAssessment(CreateAssessmentDTO dto) {
@@ -80,6 +87,7 @@ public class AssessmentService {
         assessment.setShuffleOptions(dto.getShuffleOptions());
 
         Assessment saved = assessmentRepository.save(assessment);
+        autoGenerateSectionsFromScoreProfile(saved);
         log.info("Created assessment: {}", saved.getId());
 
         saveLog(saved.getId(), "CREATE", null, null, null, dto.getCreatedBy(), "CREATE_ASSESSMENT");
@@ -120,6 +128,100 @@ public class AssessmentService {
         Assessment assessment = assessmentRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Assessment not found: " + id));
         return mapToDetailedDTO(assessment);
+    }
+
+    @Transactional
+    public AssessmentDTO cloneAssessment(Long sourceAssessmentId, Integer createdBy) {
+        Assessment source = assessmentRepository.findById(sourceAssessmentId)
+            .orElseThrow(() -> new RuntimeException("Assessment not found: " + sourceAssessmentId));
+
+        Assessment cloned = new Assessment();
+        cloned.setTitle(source.getTitle() + " (Clone)");
+        cloned.setDescription(source.getDescription());
+        cloned.setType(source.getType());
+        cloned.setLevel(source.getLevel());
+        cloned.setVisibility(source.getVisibility());
+        cloned.setCreatedBy(createdBy);
+        cloned.setLessonId(source.getLessonId());
+        cloned.setClassId(source.getClassId());
+        cloned.setScoreProfile(source.getScoreProfile());
+        cloned.setAssignedToId(source.getAssignedToId());
+        cloned.setStartAt(source.getStartAt());
+        cloned.setDueAt(source.getDueAt());
+        cloned.setLockAfterDue(source.getLockAfterDue());
+        cloned.setTimeLimitSec(source.getTimeLimitSec());
+        cloned.setMaxAttempts(source.getMaxAttempts());
+        cloned.setShuffleQuestions(source.getShuffleQuestions());
+        cloned.setShuffleOptions(source.getShuffleOptions());
+
+        Assessment savedClone = assessmentRepository.save(cloned);
+
+        Map<Long, Long> questionIdMap = new HashMap<>();
+        Map<Long, Long> groupIdMap = new HashMap<>();
+
+        List<AssessmentSection> sourceSections = assessmentSectionRepository.findByAssessmentId(sourceAssessmentId);
+        sourceSections.sort(Comparator.comparing(AssessmentSection::getOrder, Comparator.nullsLast(Integer::compareTo)));
+
+        for (AssessmentSection sourceSection : sourceSections) {
+            AssessmentSection clonedSection = new AssessmentSection();
+            clonedSection.setAssessmentId(savedClone.getId());
+            clonedSection.setTitle(sourceSection.getTitle());
+            clonedSection.setTimeLimitSec(sourceSection.getTimeLimitSec());
+            clonedSection.setType(sourceSection.getType());
+            clonedSection.setOrder(sourceSection.getOrder());
+            AssessmentSection savedSection = assessmentSectionRepository.save(clonedSection);
+
+            List<AssessmentItem> sourceItems = assessmentItemRepository.findBySectionIdOrderByOrderAsc(sourceSection.getId());
+            for (AssessmentItem sourceItem : sourceItems) {
+                AssessmentItem clonedItem = new AssessmentItem();
+                clonedItem.setSectionId(savedSection.getId());
+                clonedItem.setName(sourceItem.getName());
+                clonedItem.setScorePerQuestion(sourceItem.getScorePerQuestion());
+                clonedItem.setOrder(sourceItem.getOrder());
+                AssessmentItem savedItem = assessmentItemRepository.save(clonedItem);
+
+                List<com.torii.assessment.entity.ItemAssessmentQuestion> questionLinks =
+                    itemAssessmentQuestionRepository.findByItemIdOrderByOrderAsc(sourceItem.getId());
+                for (com.torii.assessment.entity.ItemAssessmentQuestion questionLink : questionLinks) {
+                    Long clonedQuestionId = questionIdMap.computeIfAbsent(
+                        questionLink.getQuestionId(),
+                        this::cloneQuestionWithOptions
+                    );
+
+                    itemAssessmentQuestionRepository.save(
+                        com.torii.assessment.entity.ItemAssessmentQuestion.builder()
+                            .itemId(savedItem.getId())
+                            .questionId(clonedQuestionId)
+                            .order(questionLink.getOrder())
+                            .score(questionLink.getScore())
+                            .build()
+                    );
+                }
+
+                List<com.torii.assessment.entity.ItemAssessmentGroup> groupLinks =
+                    itemAssessmentGroupRepository.findByItemIdOrderByOrderAsc(sourceItem.getId());
+                for (com.torii.assessment.entity.ItemAssessmentGroup groupLink : groupLinks) {
+                    Long clonedGroupId = groupIdMap.computeIfAbsent(
+                        groupLink.getGroupId(),
+                        groupId -> cloneQuestionGroupWithQuestions(groupId, questionIdMap)
+                    );
+
+                    itemAssessmentGroupRepository.save(
+                        com.torii.assessment.entity.ItemAssessmentGroup.builder()
+                            .itemId(savedItem.getId())
+                            .groupId(clonedGroupId)
+                            .order(groupLink.getOrder())
+                            .score(groupLink.getScore())
+                            .build()
+                    );
+                }
+            }
+        }
+
+        saveLog(savedClone.getId(), "CLONE", "sourceAssessmentId", sourceAssessmentId, savedClone.getId(), createdBy, "CLONE_ASSESSMENT");
+        log.info("Cloned assessment {} -> {}", sourceAssessmentId, savedClone.getId());
+
+        return mapToDetailedDTO(savedClone);
     }
 
     @Transactional
@@ -375,6 +477,121 @@ public class AssessmentService {
         }
         return scoreProfileRepository.findById(scoreProfileId)
             .orElseThrow(() -> new RuntimeException("Score profile not found: " + scoreProfileId));
+    }
+
+    private void autoGenerateSectionsFromScoreProfile(Assessment assessment) {
+        ScoreProfile scoreProfile = assessment.getScoreProfile();
+        if (scoreProfile == null || scoreProfile.getId() == null) {
+            return;
+        }
+
+        List<ScoreProfileSection> profileSections = scoreProfileSectionRepository.findByProfileId(scoreProfile.getId());
+        if (profileSections.isEmpty()) {
+            return;
+        }
+
+        List<AssessmentSection> sectionsToCreate = new ArrayList<>();
+        for (int i = 0; i < profileSections.size(); i++) {
+            ScoreProfileSection profileSection = profileSections.get(i);
+
+            AssessmentSection section = new AssessmentSection();
+            section.setAssessmentId(assessment.getId());
+            section.setTitle(profileSection.getTitle());
+            section.setTimeLimitSec(profileSection.getDefaultTimeSec());
+            section.setOrder(i + 1);
+            section.setType(parseSectionType(profileSection.getType()));
+
+            sectionsToCreate.add(section);
+        }
+
+        assessmentSectionRepository.saveAll(sectionsToCreate);
+    }
+
+    private AssessmentSection.SectionType parseSectionType(String type) {
+        try {
+            return AssessmentSection.SectionType.valueOf(type);
+        } catch (Exception ex) {
+            throw new RuntimeException("Invalid score profile section type: " + type);
+        }
+    }
+
+    private Long cloneQuestionWithOptions(Long sourceQuestionId) {
+        AssessmentQuestion sourceQuestion = assessmentQuestionRepository.findById(sourceQuestionId)
+            .orElseThrow(() -> new RuntimeException("Assessment question not found: " + sourceQuestionId));
+
+        AssessmentQuestion clonedQuestion = AssessmentQuestion.builder()
+            .originalQuestionId(sourceQuestion.getOriginalQuestionId())
+            .type(sourceQuestion.getType())
+            .level(sourceQuestion.getLevel())
+            .difficulty(sourceQuestion.getDifficulty())
+            .stem(sourceQuestion.getStem())
+            .passage(sourceQuestion.getPassage())
+            .explanation(sourceQuestion.getExplanation())
+            .mediaUrl(sourceQuestion.getMediaUrl())
+            .audioUrl(sourceQuestion.getAudioUrl())
+            .build();
+
+        AssessmentQuestion savedQuestion = assessmentQuestionRepository.save(clonedQuestion);
+
+        List<AssessmentOption> options = assessmentOptionRepository.findByQuestionIdOrderByOrderAsc(sourceQuestionId);
+        List<AssessmentOption> clonedOptions = options.stream()
+            .map(option -> AssessmentOption.builder()
+                .questionId(savedQuestion.getId())
+                .content(option.getContent())
+                .isCorrect(option.getIsCorrect())
+                .order(option.getOrder())
+                .build())
+            .collect(Collectors.toList());
+
+        if (!clonedOptions.isEmpty()) {
+            assessmentOptionRepository.saveAll(clonedOptions);
+        }
+
+        return savedQuestion.getId();
+    }
+
+    private Long cloneQuestionGroupWithQuestions(Long sourceGroupId, Map<Long, Long> questionIdMap) {
+        AssessmentQuestionGroup sourceGroup = assessmentQuestionGroupRepository.findById(sourceGroupId)
+            .orElseThrow(() -> new RuntimeException("Assessment question group not found: " + sourceGroupId));
+
+        AssessmentQuestionGroup clonedGroup = AssessmentQuestionGroup.builder()
+            .originalGroupId(sourceGroup.getOriginalGroupId())
+            .type(sourceGroup.getType())
+            .level(sourceGroup.getLevel())
+            .difficulty(sourceGroup.getDifficulty())
+            .stem(sourceGroup.getStem())
+            .passage(sourceGroup.getPassage())
+            .explanation(sourceGroup.getExplanation())
+            .mediaUrl(sourceGroup.getMediaUrl())
+            .audioUrl(sourceGroup.getAudioUrl())
+            .build();
+
+        AssessmentQuestionGroup savedGroup = assessmentQuestionGroupRepository.save(clonedGroup);
+
+        List<AssessmentGroupQuestion> groupQuestions =
+            assessmentGroupQuestionRepository.findByGroupIdOrderByOrderAsc(sourceGroupId);
+        List<AssessmentGroupQuestion> clonedGroupQuestions = new ArrayList<>();
+
+        for (AssessmentGroupQuestion groupQuestion : groupQuestions) {
+            Long clonedQuestionId = questionIdMap.computeIfAbsent(
+                groupQuestion.getQuestionId(),
+                this::cloneQuestionWithOptions
+            );
+
+            clonedGroupQuestions.add(
+                AssessmentGroupQuestion.builder()
+                    .groupId(savedGroup.getId())
+                    .questionId(clonedQuestionId)
+                    .order(groupQuestion.getOrder())
+                    .build()
+            );
+        }
+
+        if (!clonedGroupQuestions.isEmpty()) {
+            assessmentGroupQuestionRepository.saveAll(clonedGroupQuestions);
+        }
+
+        return savedGroup.getId();
     }
 
     private void saveLog(Long assessmentId, String action, String fieldName, Object oldValue, Object newValue, Integer updatedBy, String changeSummary) {

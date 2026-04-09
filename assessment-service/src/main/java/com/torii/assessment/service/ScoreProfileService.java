@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 @Service
@@ -76,10 +77,13 @@ public class ScoreProfileService {
         int limit = query.getLimit() != null ? query.getLimit() : 20;
         Pageable pageable = PageRequest.of(page, limit, sort);
         
+        String levelFilter = normalizeFilter(query.getLevel());
+        String namePattern = buildLikePattern(query.getName());
+
         // Query
         Page<ScoreProfile> profilePage = scoreProfileRepository.findByFilters(
-            query.getLevel(),
-            query.getName(),
+            levelFilter,
+            namePattern,
             pageable
         );
         
@@ -207,6 +211,24 @@ public class ScoreProfileService {
             case "updatedAt" -> "updatedAt";
             default -> "createdAt";
         };
+    }
+
+    private String normalizeFilter(String value) {
+        if (value == null) {
+            return null;
+        }
+
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String buildLikePattern(String value) {
+        String normalized = normalizeFilter(value);
+        if (normalized == null) {
+            return null;
+        }
+
+        return "%" + normalized.toLowerCase(Locale.ROOT) + "%";
     }
     
     private ScoreProfileResponseDTO mapToResponseDTO(ScoreProfile profile) {

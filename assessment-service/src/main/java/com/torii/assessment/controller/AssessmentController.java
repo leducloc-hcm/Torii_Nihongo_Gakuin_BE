@@ -42,6 +42,18 @@ public class AssessmentController {
         return ResponseEntity.status(HttpStatus.CREATED).body(assessment);
     }
 
+    @PostMapping("/{id}/clone")
+    @Operation(summary = "Clone an assessment with full structure for editing")
+    public ResponseEntity<AssessmentDTO> cloneAssessment(
+            @PathVariable Long id,
+            HttpServletRequest request) {
+        RequestAuthUtil.AuthUser authUser = RequestAuthUtil.requireUser(request);
+        requireWriteRole(authUser.role());
+
+        AssessmentDTO cloned = assessmentService.cloneAssessment(id, authUser.userId());
+        return ResponseEntity.status(HttpStatus.CREATED).body(cloned);
+    }
+
     @GetMapping
     @Operation(summary = "Get all assessments with pagination and filters")
     public ResponseEntity<AssessmentListResponseDTO> getAllAssessments(
