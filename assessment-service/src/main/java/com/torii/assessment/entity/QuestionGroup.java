@@ -23,38 +23,35 @@ public class QuestionGroup {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "uuid")
-    private String uuid;
-
-    @Column(name = "version")
-    @Builder.Default
-    private Integer version = 1;
-
     @Enumerated(EnumType.STRING)
-    @Column(name = "type", nullable = false)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "type", nullable = false, columnDefinition = "question_group_type")
     private QuestionGroupType type;
 
-    @Column(name = "title", length = 500)
-    private String title;
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "level", columnDefinition = "jlpt_level")
+    private Question.JLPTLevel level;
+
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "difficulty", columnDefinition = "difficulty")
+    private Question.Difficulty difficulty;
+
+    @Column(name = "stem", columnDefinition = "text")
+    private String stem;
 
     @Column(name = "passage", length = 5000)
     private String passage;
 
-    @Column(name = "media_id")
-    private Long mediaId;
+    @Column(name = "explanation", columnDefinition = "text")
+    private String explanation;
 
     @Column(name = "media_url", length = 500)
     private String mediaUrl;
 
     @Column(name = "audio_url", length = 500)
     private String audioUrl;
-
-    @Column(name = "\"order\"")
-    private Integer order;
-
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "metadata", columnDefinition = "jsonb")
-    private String metadata;
 
     @Column(name = "created_at")
     @Builder.Default
@@ -68,9 +65,6 @@ public class QuestionGroup {
     protected void onCreate() {
         if (createdAt == null) {
             createdAt = LocalDateTime.now();
-        }
-        if (uuid == null) {
-            uuid = java.util.UUID.randomUUID().toString();
         }
     }
 

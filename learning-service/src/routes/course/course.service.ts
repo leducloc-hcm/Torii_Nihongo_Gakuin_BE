@@ -38,6 +38,219 @@ export class CourseService {
     private readonly prisma: PrismaService,
   ) {}
 
+  async searchPublishedForMcp(query?: string, level?: string, limit = 10) {
+    const where: CourseWhereInput = {
+      status: "PUBLISHED",
+    };
+
+    if (level) {
+      where.level = level as any;
+    }
+
+    if (query) {
+      where.OR = [
+        { title: { contains: query, mode: "insensitive" } },
+        { description: { contains: query, mode: "insensitive" } },
+      ];
+    }
+
+    const { courses } = await this.courseRepository.findAll({
+      where,
+      take: Number(limit),
+      orderBy: { createdAt: "desc" },
+    });
+
+    return courses.map((course) => ({
+      id: course.id,
+      slug: course.slug,
+      title: course.title,
+      subtitle: course.subtitle,
+      description: course.description,
+      level: course.level,
+      courseType: course.courseType,
+      thumbnailUrl: course.thumbnailUrl,
+      price: course.price,
+      status: course.status,
+      createdAt: course.createdAt,
+      updatedAt: course.updatedAt,
+      moduleCount: course._count?.modules ?? 0,
+      lessonCount:
+        course.modules?.reduce((sum: number, module: any) => {
+          return sum + (module._count?.lessons ?? 0);
+        }, 0) ?? 0,
+    }));
+  }
+
+  async getPublishedCourseDetailForMcp(params: {
+    query?: string;
+    courseId?: number;
+    level?: string;
+  }) {
+    const { query, courseId, level } = params;
+
+    let resolvedCourseId = courseId;
+    if (!resolvedCourseId && query) {
+      const [firstMatch] = await this.searchPublishedForMcp(query, level, 1);
+      resolvedCourseId = firstMatch?.id;
+    }
+
+    if (!resolvedCourseId) {
+      return null;
+    }
+
+    const course = await this.courseRepository.findOneWithLessons({
+      id: resolvedCourseId,
+    });
+
+    if (!course) {
+      return null;
+    }
+
+    if (course.status !== "PUBLISHED") {
+      return null;
+    }
+
+    if (level && course.level !== level) {
+      return null;
+    }
+
+    const lessonCount =
+      course.modules?.reduce((sum: number, module: any) => {
+        return sum + (module.lessons?.length ?? 0);
+      }, 0) ?? 0;
+
+    return {
+      ...course,
+      lesson_count: lessonCount,
+    };
+  }
+
+  async searchPublishedLiveCoursesForMcp(params: {
+    query?: string;
+    limit?: number;
+    level?: string;
+    daysOfWeek?: number[];
+    timeRange?: string;
+  }) {
+    const { query, limit = 10, level, daysOfWeek, timeRange } = params;
+
+    const where: CourseWhereInput = {
+      status: "PUBLISHED",
+      courseType: "LIVE_ONLY",
+    };
+
+    if (level) {
+      where.level = level as any;
+    }
+
+    if (query) {
+      where.OR = [
+        { title: { contains: query, mode: "insensitive" } },
+        { description: { contains: query, mode: "insensitive" } },
+      ];
+    }
+
+    const { courses } = await this.courseRepository.findAll({
+      where,
+      take: Number(limit),
+      orderBy: { createdAt: "desc" },
+    });
+
+    let hourStart: number | undefined;
+    let hourEnd: number | undefined;
+    if (timeRange) {
+      const normalized = timeRange.toLowerCase();
+      if (normalized === "morning" || normalized === "sang") {
+        hourStart = 6;
+        hourEnd = 12;
+      } else if (normalized === "afternoon" || normalized === "chieu") {
+        hourStart = 12;
+        hourEnd = 18;
+      } else if (normalized === "evening" || normalized === "toi") {
+        hourStart = 18;
+        hourEnd = 24;
+      } else if (normalized.includes("-")) {
+        const [startRaw, endRaw] = normalized.split("-");
+        const start = Number(startRaw?.split(":")[0]);
+        const end = Number(endRaw?.split(":")[0]);
+        if (!Number.isNaN(start) && !Number.isNaN(end)) {
+          hourStart = start;
+          hourEnd = end;
+        }
+      }
+    }
+
+    const response: any[] = [];
+    for (const course of courses) {
+      const classes = await this.onlineClassRepository.getPublicCourseClasses(
+        course.id,
+      );
+
+      const schedules: any[] = [];
+      for (const classItem of classes) {
+        for (const session of classItem.sessions ?? []) {
+          const start = session.scheduledAt
+            ? new Date(session.scheduledAt)
+            : undefined;
+
+          if (start && daysOfWeek && daysOfWeek.length > 0) {
+            const day = start.getDay();
+            const normalizedDay = day === 0 ? 7 : day;
+            if (!daysOfWeek.includes(normalizedDay)) {
+              continue;
+            }
+          }
+
+          if (
+            start &&
+            hourStart !== undefined &&
+            hourEnd !== undefined &&
+            (start.getHours() < hourStart || start.getHours() >= hourEnd)
+          ) {
+            continue;
+          }
+
+          schedules.push({
+            class_id: classItem.id,
+            class_title: classItem.title,
+            class_description: classItem.description,
+            capacity: classItem.capacity,
+            isActive: classItem.isActive,
+            session_id: session.id,
+            session_title: session.title,
+            start_time: session.scheduledAt,
+            end_time: session.endedAt,
+            mode: session.mode,
+            roomKey: session.roomKey,
+            member_count: classItem._count?.members ?? 0,
+          });
+        }
+      }
+
+      if ((daysOfWeek?.length || timeRange) && schedules.length === 0) {
+        continue;
+      }
+
+      response.push({
+        id: course.id,
+        slug: course.slug,
+        title: course.title,
+        subtitle: course.subtitle,
+        description: course.description,
+        level: course.level,
+        courseType: course.courseType,
+        thumbnailUrl: course.thumbnailUrl,
+        price: course.price,
+        status: course.status,
+        createdAt: course.createdAt,
+        updatedAt: course.updatedAt,
+        schedules,
+      });
+    }
+
+    return response;
+  }
+
   async create(
     createCourseDto: CreateCourseDTO,
     userId: number,

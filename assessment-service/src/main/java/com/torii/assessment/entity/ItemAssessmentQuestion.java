@@ -30,7 +30,7 @@ public class ItemAssessmentQuestion {
     @Column(name = "question_id")
     private Long questionId;
 
-    @Column(name = "order")
+    @Column(name = "\"order\"")
     private Integer order;
 
     @Column(name = "score", precision = 10, scale = 2)

@@ -15,8 +15,6 @@ import java.util.List;
 @Builder
 public class QuestionResponseDTO {
     private Long id;
-    private String uuid;
-    private Integer version;
     private Question.QuestionType type;
     private Question.JLPTLevel level;
     private Question.Difficulty difficulty;

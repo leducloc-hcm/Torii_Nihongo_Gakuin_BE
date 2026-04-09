@@ -9,9 +9,6 @@ public class StartAssessmentProgressDTO {
     @NotNull
     private Long assessmentId;
 
-    @NotNull
-    private Integer userId;
-
     private Long assignmentId;
     private Integer remainingSec;
 }

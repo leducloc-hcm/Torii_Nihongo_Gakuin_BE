@@ -13,6 +13,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
@@ -28,22 +30,22 @@ public class AssessmentQuestion {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "assessment_id")
-    private Long assessmentId;
-
     @Column(name = "original_question_id")
     private Long originalQuestionId;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "type")
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "type", columnDefinition = "question_type")
     private Question.QuestionType type;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "level")
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "level", columnDefinition = "jlpt_level")
     private Question.JLPTLevel level;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "difficulty")
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "difficulty", columnDefinition = "difficulty")
     private Question.Difficulty difficulty;
 
     @Column(name = "stem", columnDefinition = "text")

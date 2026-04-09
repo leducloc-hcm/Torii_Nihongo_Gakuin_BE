@@ -139,32 +139,6 @@ public class QuestionGroupController {
         return ResponseEntity.ok(Map.of("message", "Question group deleted successfully"));
     }
 
-    @PostMapping("/{id}/clone")
-    @Operation(summary = "Clone a question group to create a new version")
-    public ResponseEntity<QuestionGroupResponseDTO> cloneQuestionGroup(
-            @PathVariable Long id,
-            @RequestBody(required = false) UpdateQuestionGroupDTO modifications) {
-        QuestionGroupResponseDTO group = questionGroupService.cloneQuestionGroup(id,
-            modifications != null ? modifications : new UpdateQuestionGroupDTO());
-        return ResponseEntity.status(HttpStatus.CREATED).body(group);
-    }
-
-    @GetMapping("/uuid/{uuid}/versions")
-    @Operation(summary = "Get all versions of a question group by UUID")
-    public ResponseEntity<List<QuestionGroupResponseDTO>> getQuestionGroupVersions(@PathVariable String uuid) {
-        List<QuestionGroupResponseDTO> versions = questionGroupService.getQuestionGroupVersions(uuid);
-        return ResponseEntity.ok(versions);
-    }
-
-    @GetMapping("/uuid/{uuid}/version/{version}")
-    @Operation(summary = "Get a specific version of a question group")
-    public ResponseEntity<QuestionGroupResponseDTO> getQuestionGroupByVersion(
-            @PathVariable String uuid,
-            @PathVariable Integer version) {
-        QuestionGroupResponseDTO group = questionGroupService.getQuestionGroupByVersion(uuid, version);
-        return ResponseEntity.ok(group);
-    }
-
     @GetMapping("/{id}/usage")
     @Operation(summary = "Check if question group is used")
     public ResponseEntity<Map<String, Object>> checkQuestionGroupUsage(@PathVariable Long id) {

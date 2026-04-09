@@ -277,7 +277,7 @@ public class AssessmentItemService {
             }
             responses.add(AssessmentItemDTO.QuestionGroupResponseDTO.builder()
                     .id(group.getId())
-                    .title(group.getTitle())
+                    .title(group.getStem())
                     .type(group.getType() != null ? group.getType().name() : null)
                     .build());
         }

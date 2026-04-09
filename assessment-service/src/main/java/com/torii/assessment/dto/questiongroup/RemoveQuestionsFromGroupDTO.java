@@ -16,5 +16,7 @@ public class RemoveQuestionsFromGroupDTO {
 
     @NotEmpty(message = "At least 1 question required")
     private List<Long> questionIds;
+
+    private List<Long> questions;
 }
 

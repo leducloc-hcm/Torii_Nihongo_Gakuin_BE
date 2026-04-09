@@ -1,31 +1,25 @@
-import { AIThread, AIChatMessage, AIQuery, Prisma } from '@prisma/client'
+import { AIThread, AIChatMessage, AIQuery, Prisma } from "@prisma/client";
 
 export type AIThreadWithMessages = AIThread & {
-  messages: AIChatMessage[]
-}
+  messages: AIChatMessage[];
+};
 
 export type AIQueryWithMessages = AIQuery & {
-  messages: AIChatMessage[]
-}
+  messages: AIChatMessage[];
+};
 
 export type AIChatMessageWithCitations = AIChatMessage & {
-  citations: any[]
-}
+  citations: any[];
+};
 
 export const aiThreadInclude = {
   messages: {
-    orderBy: { createdAt: 'asc' as Prisma.SortOrder },
-    include: {
-      citations: true,
-    },
+    orderBy: { createdAt: "asc" as Prisma.SortOrder },
   },
-} satisfies Prisma.AIThreadInclude
+} satisfies Prisma.AIThreadInclude;
 
 export const aiQueryInclude = {
   messages: {
-    orderBy: { createdAt: 'asc' as Prisma.SortOrder },
-    include: {
-      citations: true,
-    },
+    orderBy: { createdAt: "asc" as Prisma.SortOrder },
   },
-} satisfies Prisma.AIQueryInclude
+} satisfies Prisma.AIQueryInclude;

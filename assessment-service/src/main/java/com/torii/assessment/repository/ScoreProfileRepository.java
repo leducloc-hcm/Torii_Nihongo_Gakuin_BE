@@ -19,13 +19,13 @@ public interface ScoreProfileRepository extends JpaRepository<ScoreProfile, Long
     
     @Query("SELECT sp FROM ScoreProfile sp WHERE " +
            "(:level IS NULL OR sp.level = :level) AND " +
-           "(:name IS NULL OR LOWER(sp.name) LIKE LOWER(CONCAT('%', :name, '%')))")
+           "(:namePattern IS NULL OR LOWER(sp.name) LIKE :namePattern)")
     Page<ScoreProfile> findByFilters(
         @Param("level") String level,
-        @Param("name") String name,
+        @Param("namePattern") String namePattern,
         Pageable pageable
     );
     
-    @Query("SELECT COUNT(sp) FROM ScoreProfile sp WHERE 1 = 0 AND sp.id = :profileId")
+    @Query("SELECT COUNT(a) FROM Assessment a WHERE a.scoreProfile.id = :profileId")
     long countAssessmentsUsingProfile(@Param("profileId") Long profileId);
 }

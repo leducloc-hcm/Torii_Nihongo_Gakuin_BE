@@ -9,6 +9,4 @@ import java.util.List;
 
 @Repository
 public interface AssessmentQuestionGroupRepository extends JpaRepository<AssessmentQuestionGroup, Long>, JpaSpecificationExecutor<AssessmentQuestionGroup> {
-
-    List<AssessmentQuestionGroup> findByAssessmentId(Long assessmentId);
 }

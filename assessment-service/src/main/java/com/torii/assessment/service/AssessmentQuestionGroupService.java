@@ -6,8 +6,10 @@ import com.torii.assessment.dto.assessmentquestiongroup.ModifyAssessmentGroupQue
 import com.torii.assessment.dto.assessmentquestiongroup.QueryAssessmentQuestionGroupDTO;
 import com.torii.assessment.dto.assessmentquestiongroup.UpdateAssessmentQuestionGroupDTO;
 import com.torii.assessment.entity.AssessmentGroupQuestion;
+import com.torii.assessment.entity.AssessmentItem;
 import com.torii.assessment.entity.AssessmentQuestion;
 import com.torii.assessment.entity.AssessmentQuestionGroup;
+import com.torii.assessment.repository.AssessmentItemRepository;
 import com.torii.assessment.repository.AssessmentGroupQuestionRepository;
 import com.torii.assessment.repository.AssessmentQuestionGroupRepository;
 import com.torii.assessment.repository.AssessmentQuestionRepository;
@@ -23,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,24 +39,34 @@ public class AssessmentQuestionGroupService {
     private final AssessmentQuestionGroupRepository assessmentQuestionGroupRepository;
     private final AssessmentGroupQuestionRepository assessmentGroupQuestionRepository;
     private final AssessmentQuestionRepository assessmentQuestionRepository;
+    private final AssessmentItemRepository assessmentItemRepository;
 
     @Transactional
     public AssessmentQuestionGroupResponseDTO create(CreateAssessmentQuestionGroupDTO dto) {
+        AssessmentItem item = assessmentItemRepository.findById(dto.getItemId())
+                .orElseThrow(() -> new RuntimeException("Assessment item not found: " + dto.getItemId()));
+
+        Long sourceGroupId = dto.getAssessmentQuestionGroupId() != null ? dto.getAssessmentQuestionGroupId() : dto.getOriginalGroupId();
+
         AssessmentQuestionGroup group = AssessmentQuestionGroup.builder()
-                .assessmentId(dto.getAssessmentId())
-                .originalGroupId(dto.getOriginalGroupId())
+                .originalGroupId(sourceGroupId)
                 .type(dto.getType())
-                .title(dto.getTitle())
+                .level(dto.getLevel())
+                .difficulty(dto.getDifficulty())
+                .stem(dto.getStem())
                 .passage(dto.getPassage())
+                .explanation(dto.getExplanation())
                 .mediaUrl(dto.getMediaUrl())
                 .audioUrl(dto.getAudioUrl())
-                .metadata(dto.getMetadata())
                 .build();
 
         AssessmentQuestionGroup saved = assessmentQuestionGroupRepository.save(group);
-        if (dto.getQuestionIds() != null && !dto.getQuestionIds().isEmpty()) {
-            addQuestionsInternal(saved.getId(), dto.getQuestionIds());
+        List<Long> questionIds = resolveAssessmentQuestionIds(dto.getQuestionIds(), dto.getAssessmentQuestionIds());
+        if (!questionIds.isEmpty()) {
+            addQuestionsInternal(saved.getId(), questionIds);
         }
+        int nextOrder = assessmentItemRepository.findGroupIdsByItemId(item.getId()).size();
+        assessmentItemRepository.insertGroupLink(item.getId(), saved.getId(), nextOrder);
         log.info("Created assessment question group copy {}", saved.getId());
         return getById(saved.getId());
     }
@@ -100,18 +113,24 @@ public class AssessmentQuestionGroupService {
         AssessmentQuestionGroup group = assessmentQuestionGroupRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Assessment question group not found: " + id));
 
+        Long sourceGroupId = dto.getAssessmentQuestionGroupId() != null ? dto.getAssessmentQuestionGroupId() : dto.getOriginalGroupId();
+        if (sourceGroupId != null) group.setOriginalGroupId(sourceGroupId);
+
         if (dto.getType() != null) group.setType(dto.getType());
-        if (dto.getTitle() != null) group.setTitle(dto.getTitle());
+        if (dto.getLevel() != null) group.setLevel(dto.getLevel());
+        if (dto.getDifficulty() != null) group.setDifficulty(dto.getDifficulty());
+        if (dto.getStem() != null) group.setStem(dto.getStem());
         if (dto.getPassage() != null) group.setPassage(dto.getPassage());
+        if (dto.getExplanation() != null) group.setExplanation(dto.getExplanation());
         if (dto.getMediaUrl() != null) group.setMediaUrl(dto.getMediaUrl());
         if (dto.getAudioUrl() != null) group.setAudioUrl(dto.getAudioUrl());
-        if (dto.getMetadata() != null) group.setMetadata(dto.getMetadata());
         assessmentQuestionGroupRepository.save(group);
 
-        if (dto.getQuestionIds() != null) {
+        List<Long> questionIds = resolveAssessmentQuestionIds(dto.getQuestionIds(), dto.getAssessmentQuestionIds());
+        if (dto.getQuestionIds() != null || dto.getAssessmentQuestionIds() != null) {
             assessmentGroupQuestionRepository.deleteAllByGroupId(id);
-            if (!dto.getQuestionIds().isEmpty()) {
-                addQuestionsInternal(id, dto.getQuestionIds());
+            if (!questionIds.isEmpty()) {
+                addQuestionsInternal(id, questionIds);
             }
         }
 
@@ -134,7 +153,7 @@ public class AssessmentQuestionGroupService {
         if (!assessmentQuestionGroupRepository.existsById(groupId)) {
             throw new RuntimeException("Assessment question group not found: " + groupId);
         }
-        addQuestionsInternal(groupId, dto.getQuestionIds());
+        addQuestionsInternal(groupId, resolveAssessmentQuestionIds(dto.getQuestionIds(), dto.getAssessmentQuestionIds()));
         return getById(groupId);
     }
 
@@ -143,13 +162,21 @@ public class AssessmentQuestionGroupService {
         if (!assessmentQuestionGroupRepository.existsById(groupId)) {
             throw new RuntimeException("Assessment question group not found: " + groupId);
         }
+        List<Long> removeIds = resolveAssessmentQuestionIds(dto.getQuestionIds(), dto.getAssessmentQuestionIds());
         List<AssessmentGroupQuestion> links = assessmentGroupQuestionRepository.findByGroupIdOrderByOrderAsc(groupId)
                 .stream()
-                .filter(link -> !dto.getQuestionIds().contains(link.getQuestionId()))
+                .filter(link -> !removeIds.contains(link.getQuestionId()))
                 .collect(Collectors.toList());
         assessmentGroupQuestionRepository.deleteAllByGroupId(groupId);
         assessmentGroupQuestionRepository.saveAll(links);
         return getById(groupId);
+    }
+
+    private List<Long> resolveAssessmentQuestionIds(List<Long> questionIds, List<Long> assessmentQuestionIds) {
+        LinkedHashSet<Long> merged = new LinkedHashSet<>();
+        if (questionIds != null) merged.addAll(questionIds);
+        if (assessmentQuestionIds != null) merged.addAll(assessmentQuestionIds);
+        return new ArrayList<>(merged);
     }
 
     private void addQuestionsInternal(Long groupId, List<Long> questionIds) {
@@ -174,8 +201,12 @@ public class AssessmentQuestionGroupService {
     private Specification<AssessmentQuestionGroup> buildSpec(QueryAssessmentQuestionGroupDTO queryDto) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
-            if (queryDto.getAssessmentId() != null) {
-                predicates.add(cb.equal(root.get("assessmentId"), queryDto.getAssessmentId()));
+            if (queryDto.getItemId() != null) {
+                List<Long> groupIds = assessmentItemRepository.findGroupIdsByItemId(queryDto.getItemId());
+                if (groupIds.isEmpty()) {
+                    return cb.disjunction();
+                }
+                predicates.add(root.get("id").in(groupIds));
             }
             if (queryDto.getType() != null) {
                 predicates.add(cb.equal(root.get("type"), queryDto.getType()));
@@ -191,16 +222,19 @@ public class AssessmentQuestionGroupService {
 
         return AssessmentQuestionGroupResponseDTO.builder()
                 .id(group.getId())
-                .assessmentId(group.getAssessmentId())
+                .assessmentQuestionGroupId(group.getOriginalGroupId())
                 .originalGroupId(group.getOriginalGroupId())
                 .type(group.getType())
-                .title(group.getTitle())
+                .level(group.getLevel() != null ? group.getLevel().name() : null)
+                .difficulty(group.getDifficulty() != null ? group.getDifficulty().name() : null)
+                .stem(group.getStem())
                 .passage(group.getPassage())
+                .explanation(group.getExplanation())
                 .mediaUrl(group.getMediaUrl())
                 .audioUrl(group.getAudioUrl())
-                .metadata(group.getMetadata())
                 .createdAt(group.getCreatedAt())
                 .questionIds(questionIds)
+                .assessmentQuestionIds(questionIds)
                 .build();
     }
 }

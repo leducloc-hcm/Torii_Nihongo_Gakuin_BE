@@ -28,12 +28,14 @@ public class CreateAssessmentDTO {
     @Pattern(regexp = "PRIVATE|UNLISTED|PUBLIC", message = "Visibility must be PRIVATE, UNLISTED or PUBLIC")
     private String visibility = "PRIVATE";
 
-    @NotNull(message = "createdBy is required")
     private Integer createdBy;
 
     private Integer lessonId;
 
     private Long classId;
+
+    @NotNull(message = "scoreProfileId is required")
+    private Long scoreProfileId;
 
     private Integer assignedToId;
 

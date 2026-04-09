@@ -17,9 +17,9 @@ import java.util.List;
 @AllArgsConstructor
 public class CreateAssessmentQuestionDTO {
 
-    @NotNull(message = "Assessment ID is required")
-    @Positive(message = "Assessment ID must be positive")
-    private Long assessmentId;
+    @NotNull(message = "Item ID is required")
+    @Positive(message = "Item ID must be positive")
+    private Long itemId;
 
     private Long originalQuestionId;
 

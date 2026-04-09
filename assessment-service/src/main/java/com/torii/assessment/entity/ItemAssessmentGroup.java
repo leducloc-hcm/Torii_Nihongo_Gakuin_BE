@@ -30,7 +30,7 @@ public class ItemAssessmentGroup {
     @Column(name = "group_id")
     private Long groupId;
 
-    @Column(name = "order")
+    @Column(name = "\"order\"")
     private Integer order;
 
     @Column(name = "score", precision = 10, scale = 2)
