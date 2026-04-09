@@ -113,6 +113,73 @@ services:
           - name: jwt-validator
             config:
               secret: nhatngutorii
+      - name: profile-specialty-delete-route
+        paths:
+          - ~/profile/specialties/\d+
+        strip_path: false
+        methods:
+          - DELETE
+          - OPTIONS
+        plugins:
+          - name: jwt-validator
+            config:
+              secret: nhatngutorii
+      - name: profile-my-specialty-delete-route
+        paths:
+          - ~/profile/my-specialties/\d+
+        strip_path: false
+        methods:
+          - DELETE
+          - OPTIONS
+        plugins:
+          - name: jwt-validator
+            config:
+              secret: nhatngutorii
+      - name: profile-my-specialties-route
+        paths:
+          - /profile/my-specialties
+        strip_path: false
+        methods:
+          - POST
+          - OPTIONS
+        plugins:
+          - name: jwt-validator
+            config:
+              secret: nhatngutorii
+      - name: profile-specialties-route
+        paths:
+          - /profile/specialties
+        strip_path: false
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        plugins:
+          - name: jwt-validator
+            config:
+              secret: nhatngutorii
+      - name: profile-lecturers-route
+        paths:
+          - /profile/lecturers
+        strip_path: false
+        methods:
+          - GET
+          - OPTIONS
+        plugins:
+          - name: jwt-validator
+            config:
+              secret: nhatngutorii
+      - name: profile-lecturer-specialties-route
+        paths:
+          - ~/profile/lecturer/\d+/specialties
+        strip_path: false
+        methods:
+          - PATCH
+          - OPTIONS
+        plugins:
+          - name: jwt-validator
+            config:
+              secret: nhatngutorii
       - name: profile-route
         paths:
           - /profile

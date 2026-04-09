@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common'
-import { PrismaService } from 'src/shared/services/prisma.service'
+import { Injectable } from "@nestjs/common";
+import { PrismaService } from "src/shared/services/prisma.service";
 import {
   CustomerProfileType,
   GetAdminProfileType,
@@ -9,23 +9,13 @@ import {
   UpdateCustomerProfileType,
   UpdateLectureProfileType,
   UpdateStaffProfileType,
-} from './profile.model'
+} from "./profile.model";
 
 @Injectable()
 export class LectureProfileRepository {
   constructor(private readonly prismaService: PrismaService) {}
 
-  async getLectureProfile(lecturerProfileId: number): Promise<GetLectureProfileType | null> {
-    const profile = await this.prismaService.lecturerProfile.findFirst({
-      where: {
-        id: lecturerProfileId,
-      },
-    })
-
-    if (!profile || !profile.name) {
-      return null
-    }
-
+  private mapLecturerProfile(profile: any): GetLectureProfileType {
     return {
       id: profile.id,
       name: profile.name,
@@ -34,19 +24,48 @@ export class LectureProfileRepository {
       location: profile.location,
       website: profile.website,
       socialLinks: Array.isArray(profile.socialLinks)
-        ? profile.socialLinks.map((link) => (typeof link === 'string' ? JSON.parse(link) : link))
+        ? profile.socialLinks.map((link: any) =>
+            typeof link === "string" ? JSON.parse(link) : link,
+          )
         : null,
       phoneNumber: profile.phoneNumber,
       dateOfBirth: profile.dateOfBirth?.toISOString() || null,
       coverPhoto: profile.coverPhoto,
+      specialties: profile.lecturerSpecialties
+        ? profile.lecturerSpecialties.map((ls: any) => ({
+            id: ls.specialty.id,
+            name: ls.specialty.name,
+          }))
+        : null,
+    };
+  }
+
+  async getLectureProfile(
+    lecturerProfileId: number,
+  ): Promise<GetLectureProfileType | null> {
+    const profile = await this.prismaService.lecturerProfile.findFirst({
+      where: {
+        id: lecturerProfileId,
+      },
+      include: {
+        lecturerSpecialties: {
+          include: { specialty: true },
+        },
+      },
+    });
+
+    if (!profile || !profile.name) {
+      return null;
     }
+
+    return this.mapLecturerProfile(profile);
   }
 
   async updateLectureProfile(
     lecturerProfileId: number,
-    data: Partial<Omit<UpdateLectureProfileType, 'id'>>,
+    data: Partial<Omit<UpdateLectureProfileType, "id">>,
   ): Promise<GetLectureProfileType | null> {
-    const { socialLinks, dateOfBirth, ...restData } = data
+    const { socialLinks, dateOfBirth, specialtyIds, ...restData } = data;
     const updateData: any = {
       ...restData,
       ...(socialLinks !== null &&
@@ -54,31 +73,28 @@ export class LectureProfileRepository {
           socialLinks: socialLinks.map((link) => JSON.stringify(link)),
         }),
       ...(dateOfBirth && { dateOfBirth: new Date(dateOfBirth) }),
-    }
+    };
 
-    const updatedProfile = await this.prismaService.lecturerProfile.update({
+    await this.prismaService.lecturerProfile.update({
       where: { id: lecturerProfileId },
       data: updateData,
-    })
+    });
 
-    if (!updatedProfile || !updatedProfile.name) {
-      return null
+    if (specialtyIds !== undefined) {
+      await this.prismaService.lecturerSpecialty.deleteMany({
+        where: { lecturerId: lecturerProfileId },
+      });
+      if (specialtyIds.length > 0) {
+        await this.prismaService.lecturerSpecialty.createMany({
+          data: specialtyIds.map((specialtyId) => ({
+            lecturerId: lecturerProfileId,
+            specialtyId,
+          })),
+        });
+      }
     }
 
-    return {
-      id: updatedProfile.id,
-      name: updatedProfile.name,
-      bio: updatedProfile.bio,
-      avatar: updatedProfile.avatar,
-      location: updatedProfile.location,
-      website: updatedProfile.website,
-      socialLinks: Array.isArray(updatedProfile.socialLinks)
-        ? updatedProfile.socialLinks.map((link) => (typeof link === 'string' ? JSON.parse(link) : link))
-        : null,
-      phoneNumber: updatedProfile.phoneNumber,
-      dateOfBirth: updatedProfile.dateOfBirth?.toISOString() || null,
-      coverPhoto: updatedProfile.coverPhoto,
-    }
+    return this.getLectureProfile(lecturerProfileId);
   }
   async createLectureProfile(userId: number, name: string) {
     const profile = await this.prismaService.lecturerProfile.create({
@@ -86,9 +102,9 @@ export class LectureProfileRepository {
         userId,
         name,
       },
-    })
+    });
 
-    return
+    return;
   }
 
   async findLectureProfileByUserIds(userId: number[]) {
@@ -102,7 +118,7 @@ export class LectureProfileRepository {
         name: true,
         avatar: true,
       },
-    })
+    });
   }
 }
 
@@ -110,15 +126,17 @@ export class LectureProfileRepository {
 export class StaffProfileRepository {
   constructor(private readonly prismaService: PrismaService) {}
 
-  async getStaffProfile(staffProfileId: number): Promise<GetStaffProfileType | null> {
+  async getStaffProfile(
+    staffProfileId: number,
+  ): Promise<GetStaffProfileType | null> {
     const profile = await this.prismaService.staffProfile.findFirst({
       where: {
         id: staffProfileId,
       },
-    })
+    });
 
     if (!profile || !profile.name) {
-      return null
+      return null;
     }
 
     return {
@@ -131,26 +149,26 @@ export class StaffProfileRepository {
       phoneNumber: profile.phoneNumber,
       dateOfBirth: profile.dateOfBirth?.toISOString() || null,
       coverPhoto: profile.coverPhoto,
-    }
+    };
   }
 
   async updateStaffProfile(
     staffProfileId: number,
-    data: Partial<Omit<UpdateStaffProfileType, 'id'>>,
+    data: Partial<Omit<UpdateStaffProfileType, "id">>,
   ): Promise<GetStaffProfileType | null> {
-    const { dateOfBirth, ...restData } = data
+    const { dateOfBirth, ...restData } = data;
     const updateData = {
       ...restData,
       ...(dateOfBirth && { dateOfBirth: new Date(dateOfBirth) }),
-    }
+    };
 
     const updatedProfile = await this.prismaService.staffProfile.update({
       where: { id: staffProfileId },
       data: updateData,
-    })
+    });
 
     if (!updatedProfile || !updatedProfile.name) {
-      return null
+      return null;
     }
 
     return {
@@ -163,7 +181,7 @@ export class StaffProfileRepository {
       phoneNumber: updatedProfile.phoneNumber,
       dateOfBirth: updatedProfile.dateOfBirth?.toISOString() || null,
       coverPhoto: updatedProfile.coverPhoto,
-    }
+    };
   }
   async createStaffProfile(userId: number, name: string) {
     const profile = await this.prismaService.staffProfile.create({
@@ -171,7 +189,7 @@ export class StaffProfileRepository {
         userId,
         name,
       },
-    })
+    });
     return {
       id: profile.id,
       name: profile.name,
@@ -182,7 +200,7 @@ export class StaffProfileRepository {
       phoneNumber: profile.phoneNumber,
       dateOfBirth: profile.dateOfBirth?.toISOString() || null,
       coverPhoto: profile.coverPhoto,
-    }
+    };
   }
 }
 
@@ -190,15 +208,17 @@ export class StaffProfileRepository {
 export class CustomerProfileRepository {
   constructor(private readonly prismaService: PrismaService) {}
 
-  async getCustomerProfile(customerProfileId: number): Promise<CustomerProfileType | null> {
+  async getCustomerProfile(
+    customerProfileId: number,
+  ): Promise<CustomerProfileType | null> {
     const profile = await this.prismaService.customerProfile.findFirst({
       where: {
         id: customerProfileId,
       },
-    })
+    });
 
     if (!profile || !profile.name) {
-      return null
+      return null;
     }
 
     return {
@@ -211,26 +231,26 @@ export class CustomerProfileRepository {
       phoneNumber: profile.phoneNumber,
       dateOfBirth: profile.dateOfBirth?.toISOString() || null,
       coverPhoto: profile.coverPhoto,
-    }
+    };
   }
 
   async updateCustomerProfile(
     customerProfileId: number,
-    data: Partial<Omit<UpdateCustomerProfileType, 'id'>>,
+    data: Partial<Omit<UpdateCustomerProfileType, "id">>,
   ): Promise<CustomerProfileType | null> {
-    const { dateOfBirth, ...restData } = data
+    const { dateOfBirth, ...restData } = data;
     const updateData = {
       ...restData,
       ...(dateOfBirth && { dateOfBirth: new Date(dateOfBirth) }),
-    }
+    };
 
     const updatedProfile = await this.prismaService.customerProfile.update({
       where: { id: customerProfileId },
       data: updateData,
-    })
+    });
 
     if (!updatedProfile || !updatedProfile.name) {
-      return null
+      return null;
     }
 
     return {
@@ -243,7 +263,7 @@ export class CustomerProfileRepository {
       phoneNumber: updatedProfile.phoneNumber,
       dateOfBirth: updatedProfile.dateOfBirth?.toISOString() || null,
       coverPhoto: updatedProfile.coverPhoto,
-    }
+    };
   }
   async createCustomerProfile(userId: number, name: string) {
     const profile = await this.prismaService.customerProfile.create({
@@ -251,9 +271,9 @@ export class CustomerProfileRepository {
         userId,
         name,
       },
-    })
+    });
 
-    return
+    return;
   }
 }
 
@@ -261,15 +281,17 @@ export class CustomerProfileRepository {
 export class AdminProfileRepository {
   constructor(private readonly prismaService: PrismaService) {}
 
-  async getAdminProfile(adminProfileId: number): Promise<GetAdminProfileType | null> {
+  async getAdminProfile(
+    adminProfileId: number,
+  ): Promise<GetAdminProfileType | null> {
     const profile = await this.prismaService.adminProfile.findFirst({
       where: {
         id: adminProfileId,
       },
-    })
+    });
 
     if (!profile || !profile.name) {
-      return null
+      return null;
     }
 
     return {
@@ -282,26 +304,26 @@ export class AdminProfileRepository {
       phoneNumber: profile.phoneNumber,
       dateOfBirth: profile.dateOfBirth?.toISOString() || null,
       coverPhoto: profile.coverPhoto,
-    }
+    };
   }
 
   async updateAdminProfile(
     adminProfileId: number,
-    data: Partial<Omit<UpdateAdminProfileType, 'id'>>,
+    data: Partial<Omit<UpdateAdminProfileType, "id">>,
   ): Promise<GetAdminProfileType | null> {
-    const { dateOfBirth, ...restData } = data
+    const { dateOfBirth, ...restData } = data;
     const updateData = {
       ...restData,
       ...(dateOfBirth && { dateOfBirth: new Date(dateOfBirth) }),
-    }
+    };
 
     const updatedProfile = await this.prismaService.adminProfile.update({
       where: { id: adminProfileId },
       data: updateData,
-    })
+    });
 
     if (!updatedProfile || !updatedProfile.name) {
-      return null
+      return null;
     }
 
     return {
@@ -314,7 +336,7 @@ export class AdminProfileRepository {
       phoneNumber: updatedProfile.phoneNumber,
       dateOfBirth: updatedProfile.dateOfBirth?.toISOString() || null,
       coverPhoto: updatedProfile.coverPhoto,
-    }
+    };
   }
   async createAdminProfile(userId: number, name: string) {
     const profile = await this.prismaService.adminProfile.create({
@@ -322,7 +344,7 @@ export class AdminProfileRepository {
         userId,
         name,
       },
-    })
+    });
 
     return {
       id: profile.id,
@@ -334,6 +356,6 @@ export class AdminProfileRepository {
       phoneNumber: profile.phoneNumber,
       dateOfBirth: profile.dateOfBirth?.toISOString() || null,
       coverPhoto: profile.coverPhoto,
-    }
+    };
   }
 }
