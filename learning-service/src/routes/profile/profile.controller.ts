@@ -53,6 +53,14 @@ export class ProfileController {
     return this.profileService.getAllLecturerProfiles();
   }
 
+  @Get("lecturers/:profileId/public")
+  @HttpCode(HttpStatus.OK)
+  async getPublicLectureProfile(
+    @Param("profileId", ParseIntPipe) profileId: number,
+  ) {
+    return this.profileService.getPublicLectureProfile(profileId);
+  }
+
   @Post("lecturer/:userId/specialties")
   @Auth([AuthType.Bearer])
   @UseGuards(RolesGuard)

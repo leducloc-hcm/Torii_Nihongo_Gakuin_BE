@@ -125,6 +125,30 @@ export class ProfileService {
     }
   }
 
+  /**
+   * Public lecturer profile by lecturerProfile id (no auth).
+   * Omits phone and date of birth.
+   */
+  async getPublicLectureProfile(profileId: number): Promise<
+    Omit<GetLectureProfileType, "phoneNumber" | "dateOfBirth">
+  > {
+    const profile = await this.lectureProfileRepo.getLectureProfile(profileId);
+    if (!profile) {
+      throw new NotFoundException("Lecturer profile not found");
+    }
+    return {
+      id: profile.id,
+      name: profile.name,
+      bio: profile.bio,
+      avatar: profile.avatar,
+      location: profile.location,
+      website: profile.website,
+      socialLinks: profile.socialLinks,
+      coverPhoto: profile.coverPhoto,
+      specialties: profile.specialties,
+    };
+  }
+
   async updateProfile(
     userId: number,
     data: Partial<

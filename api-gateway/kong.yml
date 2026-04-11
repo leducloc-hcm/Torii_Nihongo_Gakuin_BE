@@ -135,9 +135,27 @@ services:
           - name: jwt-validator
             config:
               secret: nhatngutorii
+      - name: profile-lecturers-public-route
+        paths:
+          - ~/profile/lecturers/\d+/public
+        strip_path: false
+        methods:
+          - GET
+          - OPTIONS
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 60
+              hour: 500
+              policy: redis
+              redis:
+                host: redis
+                port: 6379
+                password: ""
+                database: 0
       - name: profile-lecturers-route
         paths:
-          - /profile/lecturers
+          - ~/profile/lecturers$
         strip_path: false
         methods:
           - GET

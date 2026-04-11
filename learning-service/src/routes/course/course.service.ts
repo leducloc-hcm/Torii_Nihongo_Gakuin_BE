@@ -38,6 +38,19 @@ export class CourseService {
     private readonly prisma: PrismaService,
   ) {}
 
+  /** Guest-facing lecturer profile URL path (Next.js `/lecturers/[profileId]`). */
+  private attachLecturerPublicProfilePaths<L extends object>(
+    lecturers: L[],
+  ): (L & { publicProfilePath: string })[] {
+    return lecturers.map((lecturer) => {
+      const id = (lecturer as { id?: number }).id;
+      return {
+        ...lecturer,
+        publicProfilePath: typeof id === "number" ? `/lecturers/${id}` : "",
+      };
+    });
+  }
+
   async searchPublishedForMcp(query?: string, level?: string, limit = 10) {
     const where: CourseWhereInput = {
       status: "PUBLISHED",
@@ -406,10 +419,11 @@ export class CourseService {
           course.lecturerIds,
         );
 
-      responseCourse.lecturers = lecturerArray.filter((lecturer) =>
-        course.lecturerIds.includes(lecturer.userId),
+      responseCourse.lecturers = this.attachLecturerPublicProfilePaths(
+        lecturerArray.filter((lecturer) =>
+          course.lecturerIds.includes(lecturer.userId),
+        ),
       );
-      
     } else {
       responseCourse.lecturers = [];
     }
@@ -542,8 +556,10 @@ export class CourseService {
     return {
       data: courses.map((course) => ({
         ...course,
-        lecturers: lecturerArray.filter((lecturer) =>
-          course.lecturerIds.includes(lecturer.userId),
+        lecturers: this.attachLecturerPublicProfilePaths(
+          lecturerArray.filter((lecturer) =>
+            course.lecturerIds.includes(lecturer.userId),
+          ),
         ),
         isEnrolled: userEnrollments.includes(course.id),
       })),
