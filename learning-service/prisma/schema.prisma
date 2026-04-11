@@ -83,6 +83,7 @@ model User {
   purchasedCoupons   Coupon[] @relation("CouponPurchaser")
   couponRedemptions  CouponRedemption[] @relation("UserCouponRedemptions")
   couponAuditLogs    CouponAuditLog[] @relation("CouponAuditor")
+  reviewVotes        ReviewVote[]
   
   
   
@@ -1128,17 +1129,39 @@ model CouponAuditLog {
 
 // ===== Ratings & Reviews, Blog, Ads =====
 model Review {
-  id        Int      @id @default(autoincrement())
-  courseId  Int
-  userId    Int
-  rating    Int
-  comment   String?
-  createdAt DateTime @default(now())
+  id              Int          @id @default(autoincrement())
+  courseId        Int
+  userId          Int
+  rating          Int
+  comment         String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  helpfulCount    Int          @default(0)
+  notHelpfulCount Int          @default(0)
+  status          ReviewStatus @default(VISIBLE)
 
-  course Course @relation(fields: [courseId], references: [id])
-  user   User   @relation(fields: [userId], references: [id])
+  course Course       @relation(fields: [courseId], references: [id])
+  user   User         @relation(fields: [userId], references: [id])
+  votes  ReviewVote[]
 
   @@unique([courseId, userId])
+  @@index([courseId, status])
+  @@index([userId])
+@@schema("learning")
+}
+
+model ReviewVote {
+  id        Int      @id @default(autoincrement())
+  reviewId  Int
+  userId    Int
+  isHelpful Boolean
+  createdAt DateTime @default(now())
+
+  review Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([reviewId, userId])
+  @@index([reviewId])
 @@schema("learning")
 }
 
@@ -1565,4 +1588,11 @@ enum AssignmentStatus {
   IN_PROGRESS
   SUBMITTED
   EXPIRED
+}
+
+enum ReviewStatus {
+  @@schema("learning")
+  VISIBLE
+  HIDDEN
+  FLAGGED
 }

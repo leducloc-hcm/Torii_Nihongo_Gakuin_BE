@@ -26,6 +26,7 @@ import { CouponModule } from "./routes/coupon/coupon.module";
 import { DashboardModule } from "./routes/dashboard/dashboard.module";
 import { RedisModule } from "./shared/redis/redis.module";
 import { RabbitMQModule } from "./shared/rabbitmq/rabbitmq.module";
+import { ReviewModule } from "./routes/review/review.module";
 
 @Module({
   imports: [
@@ -68,6 +69,7 @@ import { RabbitMQModule } from "./shared/rabbitmq/rabbitmq.module";
     AIChatModule,
     CouponModule,
     DashboardModule,
+    ReviewModule,
   ],
   controllers: [AppController],
   providers: [AppService],
