@@ -390,14 +390,31 @@ export class CourseService {
     if (!course) {
       throw new NotFoundException(`Course with slug '${slug}' not found`);
     }
+
+    const responseCourse: any = { ...course };
+
     if (course.courseType === "LIVE_ONLY") {
       const classes = await this.onlineClassRepository.findByCourseSlug(
         course.slug,
       );
-      course["classes"] = classes;
+      responseCourse.classes = classes;
     }
 
-    return course;
+    if (course.lecturerIds && course.lecturerIds.length > 0) {
+      const lecturerArray =
+        await this.lecturerRepository.findLectureProfileByUserIds(
+          course.lecturerIds,
+        );
+
+      responseCourse.lecturers = lecturerArray.filter((lecturer) =>
+        course.lecturerIds.includes(lecturer.userId),
+      );
+      
+    } else {
+      responseCourse.lecturers = [];
+    }
+
+    return responseCourse;
   }
 
   async update(

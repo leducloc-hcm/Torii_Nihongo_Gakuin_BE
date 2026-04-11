@@ -108,16 +108,24 @@ export class LectureProfileRepository {
   }
 
   async findLectureProfileByUserIds(userId: number[]) {
-    return this.prismaService.lecturerProfile.findMany({
+    const profiles = await this.prismaService.lecturerProfile.findMany({
       where: {
         userId: { in: userId },
       },
-      select: {
-        userId: true,
-        username: true,
-        name: true,
-        avatar: true,
+      include: {
+        lecturerSpecialties: {
+          include: { specialty: true },
+        },
       },
+    });
+
+    return profiles.map((p) => {
+      const mapped = this.mapLecturerProfile(p);
+      return {
+        ...mapped,
+        userId: p.userId,
+        username: p.username,
+      };
     });
   }
 }

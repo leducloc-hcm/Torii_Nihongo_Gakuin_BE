@@ -164,6 +164,14 @@ export const PublishedCourseListItemSchema = CourseListItemSchema.extend({
       name: z.string().nullable(),
       username: z.string().nullable(),
       avatar: z.string().nullable(),
+      bio: z.string().nullable().optional(),
+      location: z.string().nullable().optional(),
+      website: z.string().nullable().optional(),
+      phoneNumber: z.string().nullable().optional(),
+      coverPhoto: z.string().nullable().optional(),
+      dateOfBirth: z.string().nullable().optional(),
+      socialLinks: z.any().optional(),
+      specialties: z.any().optional(),
     }),
   ),
 });
@@ -247,13 +255,7 @@ export type CourseWithRelations = {
   createdAt: Date;
   updatedAt: Date;
   lecturerIds: number[];
-  lecturers?: Array<{
-    id: number;
-    name: string;
-    email: string;
-    username: string | null;
-    avatar: string | null;
-  } | null>[];
+  lecturers?: any[];
   modules: Array<{
     id: number;
     title: string;
@@ -301,13 +303,7 @@ export type PublishedCourseListItem = {
   price: number;
   status: "DRAFT" | "PENDING_REVIEW" | "PUBLISHED" | "ARCHIVED";
   createdAt: Date;
-  lecturers: Array<{
-    id: number;
-    userId: number;
-    name: string | null;
-    username: string | null;
-    avatar: string | null;
-  }>;
+  lecturers: any[];
   _count: {
     modules: number;
     enrollments: number;
