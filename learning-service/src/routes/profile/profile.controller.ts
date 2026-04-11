@@ -4,6 +4,7 @@ import {
   Post,
   Delete,
   Patch,
+  Put,
   Body,
   HttpCode,
   HttpStatus,
@@ -43,13 +44,6 @@ export class ProfileController {
     return this.profileService.getProfile(userId);
   }
 
-  @Get("specialties")
-  @Auth([AuthType.Bearer])
-  @HttpCode(HttpStatus.OK)
-  async getSpecialties() {
-    return this.profileService.getSpecialties();
-  }
-
   @Get("lecturers")
   @Auth([AuthType.Bearer])
   @UseGuards(RolesGuard)
@@ -59,45 +53,57 @@ export class ProfileController {
     return this.profileService.getAllLecturerProfiles();
   }
 
-  @Patch("lecturer/:userId/specialties")
-  @Auth([AuthType.Bearer])
-  @UseGuards(RolesGuard)
-  @Roles(RoleName.Staff, RoleName.Admin)
-  @HttpCode(HttpStatus.OK)
-  async updateLecturerSpecialties(
-    @Param("userId", ParseIntPipe) targetUserId: number,
-    @Body() body: { specialtyIds: number[] },
-  ) {
-    return this.profileService.updateLecturerSpecialtiesByStaff(
-      targetUserId,
-      body.specialtyIds ?? [],
-    );
-  }
-
-  @Post("specialties")
+  @Post("lecturer/:userId/specialties")
   @Auth([AuthType.Bearer])
   @UseGuards(RolesGuard)
   @Roles(RoleName.Staff, RoleName.Admin)
   @HttpCode(HttpStatus.CREATED)
   @UseInterceptors(FileInterceptor("image", imageUploadOptions))
-  async createSpecialty(
-    @Body() body: { name: string; description?: string },
+  async addLecturerSpecialty(
+    @Param("userId", ParseIntPipe) targetUserId: number,
+    @Body() body: Record<string, string | string[] | undefined>,
     @UploadedFile() file?: Express.Multer.File,
   ) {
-    return this.profileService.createSpecialty(
-      body.name,
-      body.description,
+    return this.profileService.addLecturerSpecialtyByStaff(
+      targetUserId,
+      body,
       file,
     );
   }
 
-  @Delete("specialties/:id")
+  @Put("lecturer/:userId/specialties/:specialtyId")
   @Auth([AuthType.Bearer])
   @UseGuards(RolesGuard)
   @Roles(RoleName.Staff, RoleName.Admin)
   @HttpCode(HttpStatus.OK)
-  async deleteSpecialty(@Param("id", ParseIntPipe) id: number) {
-    return this.profileService.deleteSpecialty(id);
+  @UseInterceptors(FileInterceptor("image", imageUploadOptions))
+  async updateLecturerSpecialty(
+    @Param("userId", ParseIntPipe) targetUserId: number,
+    @Param("specialtyId", ParseIntPipe) specialtyId: number,
+    @Body() body: Record<string, string | string[] | undefined>,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    return this.profileService.updateLecturerSpecialtyByStaff(
+      targetUserId,
+      specialtyId,
+      body,
+      file,
+    );
+  }
+
+  @Delete("lecturer/:userId/specialties/:specialtyId")
+  @Auth([AuthType.Bearer])
+  @UseGuards(RolesGuard)
+  @Roles(RoleName.Staff, RoleName.Admin)
+  @HttpCode(HttpStatus.OK)
+  async deleteLecturerSpecialty(
+    @Param("userId", ParseIntPipe) targetUserId: number,
+    @Param("specialtyId", ParseIntPipe) specialtyId: number,
+  ) {
+    return this.profileService.deleteLecturerSpecialtyByStaff(
+      targetUserId,
+      specialtyId,
+    );
   }
 
   @Post("my-specialties")
@@ -108,15 +114,10 @@ export class ProfileController {
   @UseInterceptors(FileInterceptor("image", imageUploadOptions))
   async createMySpecialty(
     @ActiveUser("userId") userId: number,
-    @Body() body: { name: string; description?: string },
+    @Body() body: Record<string, string | string[] | undefined>,
     @UploadedFile() file?: Express.Multer.File,
   ) {
-    return this.profileService.createOwnSpecialty(
-      userId,
-      body.name,
-      body.description,
-      file,
-    );
+    return this.profileService.createOwnSpecialty(userId, body, file);
   }
 
   @Delete("my-specialties/:specialtyId")

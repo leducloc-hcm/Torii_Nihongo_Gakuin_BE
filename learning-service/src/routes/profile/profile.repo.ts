@@ -15,6 +15,21 @@ import {
 export class LectureProfileRepository {
   constructor(private readonly prismaService: PrismaService) {}
 
+  private mapSpecialty(s: any) {
+    return {
+      id: s.id,
+      name: s.name,
+      issuingOrganization: s.issuingOrganization ?? null,
+      issueDate: s.issueDate?.toISOString() ?? null,
+      expirationDate: s.expirationDate?.toISOString() ?? null,
+      credentialId: s.credentialId ?? null,
+      credentialUrl: s.credentialUrl ?? null,
+      logoUrl: s.logoUrl ?? null,
+      description: s.description ?? null,
+      skills: Array.isArray(s.skills) ? s.skills : [],
+    };
+  }
+
   private mapLecturerProfile(profile: any): GetLectureProfileType {
     return {
       id: profile.id,
@@ -31,11 +46,8 @@ export class LectureProfileRepository {
       phoneNumber: profile.phoneNumber,
       dateOfBirth: profile.dateOfBirth?.toISOString() || null,
       coverPhoto: profile.coverPhoto,
-      specialties: profile.lecturerSpecialties
-        ? profile.lecturerSpecialties.map((ls: any) => ({
-            id: ls.specialty.id,
-            name: ls.specialty.name,
-          }))
+      specialties: profile.specialties
+        ? profile.specialties.map((s: any) => this.mapSpecialty(s))
         : null,
     };
   }
@@ -48,9 +60,7 @@ export class LectureProfileRepository {
         id: lecturerProfileId,
       },
       include: {
-        lecturerSpecialties: {
-          include: { specialty: true },
-        },
+        specialties: { orderBy: { createdAt: "desc" } },
       },
     });
 
@@ -65,7 +75,7 @@ export class LectureProfileRepository {
     lecturerProfileId: number,
     data: Partial<Omit<UpdateLectureProfileType, "id">>,
   ): Promise<GetLectureProfileType | null> {
-    const { socialLinks, dateOfBirth, specialtyIds, ...restData } = data;
+    const { socialLinks, dateOfBirth, ...restData } = data;
     const updateData: any = {
       ...restData,
       ...(socialLinks !== null &&
@@ -79,20 +89,6 @@ export class LectureProfileRepository {
       where: { id: lecturerProfileId },
       data: updateData,
     });
-
-    if (specialtyIds !== undefined) {
-      await this.prismaService.lecturerSpecialty.deleteMany({
-        where: { lecturerId: lecturerProfileId },
-      });
-      if (specialtyIds.length > 0) {
-        await this.prismaService.lecturerSpecialty.createMany({
-          data: specialtyIds.map((specialtyId) => ({
-            lecturerId: lecturerProfileId,
-            specialtyId,
-          })),
-        });
-      }
-    }
 
     return this.getLectureProfile(lecturerProfileId);
   }
@@ -113,9 +109,7 @@ export class LectureProfileRepository {
         userId: { in: userId },
       },
       include: {
-        lecturerSpecialties: {
-          include: { specialty: true },
-        },
+        specialties: { orderBy: { createdAt: "desc" } },
       },
     });
 

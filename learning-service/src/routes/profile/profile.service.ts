@@ -23,6 +23,11 @@ import {
 } from "./profile.model";
 import { RoleName } from "src/shared/constants/role.constant";
 import { S3Service } from "src/shared/services/s3.service";
+import {
+  normalizeMultipartBody,
+  parseOptionalDate,
+  parseSkills,
+} from "./specialty-form";
 
 @Injectable()
 export class ProfileService {
@@ -239,19 +244,84 @@ export class ProfileService {
         throw new BadRequestException("Invalid user role");
     }
   }
-  async getSpecialties() {
-    return this.prismaService.specialty.findMany({
-      select: { id: true, name: true, description: true, url: true },
-      orderBy: { name: "asc" },
-    });
+  private specialtySelect() {
+    return {
+      id: true,
+      name: true,
+      issuingOrganization: true,
+      issueDate: true,
+      expirationDate: true,
+      credentialId: true,
+      credentialUrl: true,
+      logoUrl: true,
+      description: true,
+      skills: true,
+    } as const;
+  }
+
+  private mapSpecialtyRow(s: {
+    id: number;
+    name: string;
+    issuingOrganization: string | null;
+    issueDate: Date | null;
+    expirationDate: Date | null;
+    credentialId: string | null;
+    credentialUrl: string | null;
+    logoUrl: string | null;
+    description: string | null;
+    skills: string[];
+  }) {
+    return {
+      id: s.id,
+      name: s.name,
+      issuingOrganization: s.issuingOrganization,
+      issueDate: s.issueDate?.toISOString() ?? null,
+      expirationDate: s.expirationDate?.toISOString() ?? null,
+      credentialId: s.credentialId,
+      credentialUrl: s.credentialUrl,
+      logoUrl: s.logoUrl,
+      description: s.description,
+      skills: s.skills ?? [],
+    };
+  }
+
+  private emptyToNull(v: string | undefined): string | null {
+    const t = v?.trim();
+    return t ? t : null;
+  }
+
+  private async buildCreateSpecialtyData(
+    body: Record<string, string | string[] | undefined>,
+    lecturerProfileId: number,
+    file?: Express.Multer.File,
+  ) {
+    const b = normalizeMultipartBody(body);
+    const name = b.name?.trim();
+    if (!name) {
+      throw new BadRequestException("Name is required");
+    }
+    let logoUrl: string | undefined;
+    if (file) {
+      logoUrl = (await this.s3Service.uploadFileToS3(file, "specialties")).url;
+    }
+    return {
+      name,
+      issuingOrganization: this.emptyToNull(b.issuingOrganization),
+      issueDate: parseOptionalDate(b.issueDate) ?? null,
+      expirationDate: parseOptionalDate(b.expirationDate) ?? null,
+      credentialId: this.emptyToNull(b.credentialId),
+      credentialUrl: this.emptyToNull(b.credentialUrl),
+      description: this.emptyToNull(b.description),
+      skills: parseSkills(b.skills),
+      lecturerId: lecturerProfileId,
+      ...(logoUrl !== undefined ? { logoUrl } : {}),
+    };
   }
 
   async getAllLecturerProfiles() {
     const lecturerProfiles = await this.prismaService.lecturerProfile.findMany({
       include: {
-        lecturerSpecialties: {
-          include: { specialty: true },
-        },
+        specialties: { orderBy: { createdAt: "desc" } },
         user: {
           select: { id: true, email: true, status: true },
         },
@@ -264,121 +334,133 @@ export class ProfileService {
       avatar: p.avatar,
       email: p.user?.email ?? null,
       status: p.user?.status ?? null,
-      specialties: p.lecturerSpecialties.map((ls) => ({
-        id: ls.specialty.id,
-        name: ls.specialty.name,
-      })),
+      specialties: p.specialties.map((s) => this.mapSpecialtyRow(s)),
     }));
   }
 
-  async createSpecialty(
-    name: string,
-    description: string | undefined,
+  async addLecturerSpecialtyByStaff(
+    targetUserId: number,
+    body: Record<string, string | string[] | undefined>,
     file?: Express.Multer.File,
   ) {
-    let url: string | undefined;
-    if (file) {
-      const uploaded = await this.s3Service.uploadFileToS3(file, "specialties");
-      url = uploaded.url;
-    }
-    return this.prismaService.specialty.create({
-      data: { name, description, url },
-      select: { id: true, name: true, description: true, url: true },
+    const lecturerProfile = await this.prismaService.lecturerProfile.findUnique({
+      where: { userId: targetUserId },
     });
+    if (!lecturerProfile) {
+      throw new NotFoundException("Lecturer profile not found");
+    }
+    const data = await this.buildCreateSpecialtyData(
+      body,
+      lecturerProfile.id,
+      file,
+    );
+    const created = await this.prismaService.specialty.create({
+      data,
+      select: this.specialtySelect(),
+    });
+    return this.mapSpecialtyRow(created);
   }
 
-  async deleteSpecialty(id: number) {
-    const specialty = await this.prismaService.specialty.findUnique({
-      where: { id },
+  async updateLecturerSpecialtyByStaff(
+    targetUserId: number,
+    specialtyId: number,
+    body: Record<string, string | string[] | undefined>,
+    file?: Express.Multer.File,
+  ) {
+    const lecturerProfile = await this.prismaService.lecturerProfile.findUnique({
+      where: { userId: targetUserId },
     });
-    if (!specialty) {
-      throw new NotFoundException("Specialty not found");
+    if (!lecturerProfile) {
+      throw new NotFoundException("Lecturer profile not found");
     }
-    await this.prismaService.specialty.delete({ where: { id } });
+    const existing = await this.prismaService.specialty.findFirst({
+      where: { id: specialtyId, lecturerId: lecturerProfile.id },
+    });
+    if (!existing) {
+      throw new NotFoundException("Specialty not found for this lecturer");
+    }
+    const b = normalizeMultipartBody(body);
+    const name = b.name?.trim();
+    if (!name) {
+      throw new BadRequestException("Name is required");
+    }
+    let logoUrl = existing.logoUrl;
+    if (file) {
+      logoUrl = (await this.s3Service.uploadFileToS3(file, "specialties")).url;
+    }
+    const updated = await this.prismaService.specialty.update({
+      where: { id: specialtyId },
+      data: {
+        name,
+        issuingOrganization: this.emptyToNull(b.issuingOrganization),
+        issueDate: parseOptionalDate(b.issueDate) ?? null,
+        expirationDate: parseOptionalDate(b.expirationDate) ?? null,
+        credentialId: this.emptyToNull(b.credentialId),
+        credentialUrl: this.emptyToNull(b.credentialUrl),
+        description: this.emptyToNull(b.description),
+        skills: parseSkills(b.skills),
+        logoUrl,
+      },
+      select: this.specialtySelect(),
+    });
+    return this.mapSpecialtyRow(updated);
+  }
+
+  async deleteLecturerSpecialtyByStaff(targetUserId: number, specialtyId: number) {
+    const lecturerProfile = await this.prismaService.lecturerProfile.findUnique({
+      where: { userId: targetUserId },
+    });
+    if (!lecturerProfile) {
+      throw new NotFoundException("Lecturer profile not found");
+    }
+    const existing = await this.prismaService.specialty.findFirst({
+      where: { id: specialtyId, lecturerId: lecturerProfile.id },
+    });
+    if (!existing) {
+      throw new NotFoundException("Specialty not found for this lecturer");
+    }
+    await this.prismaService.specialty.delete({ where: { id: specialtyId } });
     return { message: "Specialty deleted successfully" };
   }
 
   async createOwnSpecialty(
     userId: number,
-    name: string,
-    description: string | undefined,
+    body: Record<string, string | string[] | undefined>,
     file?: Express.Multer.File,
   ) {
-    const lecturerProfile = await this.prismaService.lecturerProfile.findUnique(
-      { where: { userId } },
-    );
+    const lecturerProfile = await this.prismaService.lecturerProfile.findUnique({
+      where: { userId },
+    });
     if (!lecturerProfile) {
       throw new NotFoundException("Lecturer profile not found");
     }
-    let url: string | undefined;
-    if (file) {
-      const uploaded = await this.s3Service.uploadFileToS3(file, "specialties");
-      url = uploaded.url;
-    }
-    const specialty = await this.prismaService.specialty.create({
-      data: { name, description, url },
-      select: { id: true, name: true, description: true, url: true },
+    const data = await this.buildCreateSpecialtyData(
+      body,
+      lecturerProfile.id,
+      file,
+    );
+    const created = await this.prismaService.specialty.create({
+      data,
+      select: this.specialtySelect(),
     });
-    await this.prismaService.lecturerSpecialty.create({
-      data: { lecturerId: lecturerProfile.id, specialtyId: specialty.id },
-    });
-    return specialty;
+    return this.mapSpecialtyRow(created);
   }
 
   async deleteOwnSpecialty(userId: number, specialtyId: number) {
-    const lecturerProfile = await this.prismaService.lecturerProfile.findUnique(
-      { where: { userId } },
-    );
+    const lecturerProfile = await this.prismaService.lecturerProfile.findUnique({
+      where: { userId },
+    });
     if (!lecturerProfile) {
       throw new NotFoundException("Lecturer profile not found");
     }
-    const link = await this.prismaService.lecturerSpecialty.findUnique({
-      where: {
-        lecturerId_specialtyId: {
-          lecturerId: lecturerProfile.id,
-          specialtyId,
-        },
-      },
+    const existing = await this.prismaService.specialty.findFirst({
+      where: { id: specialtyId, lecturerId: lecturerProfile.id },
     });
-    if (!link) {
+    if (!existing) {
       throw new NotFoundException("Specialty not found on your profile");
     }
-    await this.prismaService.lecturerSpecialty.delete({
-      where: {
-        lecturerId_specialtyId: {
-          lecturerId: lecturerProfile.id,
-          specialtyId,
-        },
-      },
-    });
     await this.prismaService.specialty.delete({ where: { id: specialtyId } });
     return { message: "Specialty deleted successfully" };
-  }
-
-  async updateLecturerSpecialtiesByStaff(
-    targetUserId: number,
-    specialtyIds: number[],
-  ) {
-    const lecturerProfile = await this.prismaService.lecturerProfile.findUnique(
-      {
-        where: { userId: targetUserId },
-      },
-    );
-    if (!lecturerProfile) {
-      throw new NotFoundException("Lecturer profile not found");
-    }
-    await this.prismaService.lecturerSpecialty.deleteMany({
-      where: { lecturerId: lecturerProfile.id },
-    });
-    if (specialtyIds.length > 0) {
-      await this.prismaService.lecturerSpecialty.createMany({
-        data: specialtyIds.map((specialtyId) => ({
-          lecturerId: lecturerProfile.id,
-          specialtyId,
-        })),
-      });
-    }
-    return this.lectureProfileRepo.getLectureProfile(lecturerProfile.id);
   }
 
   async createProfile(data: { email: string; name: string; role: string }) {

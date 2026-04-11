@@ -3,8 +3,14 @@ import { z } from "zod";
 export const SpecialtySchema = z.object({
   id: z.number(),
   name: z.string(),
-  url: z.string().nullable(),
-  description: z.string().nullable(),
+  issuingOrganization: z.string().nullable().optional(),
+  issueDate: z.union([z.string(), z.date()]).nullable().optional(),
+  expirationDate: z.union([z.string(), z.date()]).nullable().optional(),
+  credentialId: z.string().nullable().optional(),
+  credentialUrl: z.string().nullable().optional(),
+  logoUrl: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  skills: z.array(z.string()).optional(),
 });
 
 export const LectureProfileSchema = z.object({
@@ -26,7 +32,7 @@ export const LectureProfileSchema = z.object({
   dateOfBirth: z.string().nullable(),
   coverPhoto: z.string().nullable(),
   specialties: z
-    .array(z.object({ id: z.number(), name: z.string() }))
+    .array(SpecialtySchema)
     .nullable(),
 });
 
@@ -63,8 +69,6 @@ export const UpdateLectureProfileSchema = LectureProfileSchema.pick({
   phoneNumber: true,
   dateOfBirth: true,
   coverPhoto: true,
-}).extend({
-  specialtyIds: z.array(z.number()).optional(),
 });
 
 export const UpdateStaffProfileSchema = StaffProfileSchema.pick({

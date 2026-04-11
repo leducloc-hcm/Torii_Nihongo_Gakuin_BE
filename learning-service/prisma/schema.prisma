@@ -170,18 +170,29 @@ model LecturerProfile {
   socialLinks String[]  @map("social_links")
   user        User      @relation(fields: [userId], references: [id])
 
-  lecturerSpecialties LecturerSpecialty[]
+  specialties         Specialty[]
 @@schema("learning")
 }
 
 model Specialty {
   id                  Int                 @id @default(autoincrement())
   name                String
-  url                 String?             @unique
+  issuingOrganization String?
+  issueDate           DateTime?
+  expirationDate      DateTime?
+  credentialId        String?
+  credentialUrl       String?
+  logoUrl             String?
   description         String?
+  skills              String[]            @default([])
+
+  lecturerId          Int
+  lecturer            LecturerProfile     @relation(fields: [lecturerId], references: [id], onDelete: Cascade)
+
+  @@index([lecturerId])
+
   createdAt           DateTime            @default(now()) @map("created_at")
   updatedAt           DateTime            @updatedAt @map("updated_at")
-  lecturerSpecialties LecturerSpecialty[]
 @@schema("learning")
 }
 
@@ -219,16 +230,7 @@ model Websocket {
 @@schema("learning")
 }
 
-model LecturerSpecialty {
-  lecturerId  Int
-  specialtyId Int
 
-  lecturer  LecturerProfile @relation(fields: [lecturerId], references: [id])
-  specialty Specialty       @relation(fields: [specialtyId], references: [id])
-
-  @@id([lecturerId, specialtyId])
-@@schema("learning")
-}
 
 model StaffProfile {
   id          Int       @id @default(autoincrement())
