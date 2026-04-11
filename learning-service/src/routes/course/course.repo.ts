@@ -25,6 +25,11 @@ export class CourseRepository {
             lessons: true,
           },
         },
+        lessons: {
+          select: {
+            durationSec: true,
+          },
+        },
       },
       orderBy: {
         order: "asc" as const,
@@ -95,10 +100,14 @@ export class CourseRepository {
     where: CourseWhereUniqueInput,
     includeReviews = false,
   ): Promise<CourseWithRelations | null> {
+    const includeQuery = includeReviews
+      ? this.includeRelationsWithReviews
+      : this.includeRelations;
+
     return this.prisma.course.findUnique({
       where: where as any,
-      include: this.includeRelations,
-    }) as Promise<CourseWithRelations | null>;
+      include: includeQuery,
+    }) as unknown as Promise<CourseWithRelations | null>;
   }
 
   async findOneWithLessons(where: CourseWhereUniqueInput): Promise<any> {
