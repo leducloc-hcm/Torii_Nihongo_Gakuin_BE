@@ -27,6 +27,7 @@ interface ParticipantInfo {
     canRecord: boolean;
     canControlParticipants: boolean;
     canModerateChat: boolean;
+    canDrawOnWhiteboard?: boolean;
   };
   isPublishing?: boolean;
   isSharingScreen?: boolean;
@@ -67,13 +68,27 @@ interface Poll {
 
 interface WhiteboardStroke {
   id: string;
-  tool: "pen" | "eraser" | "line" | "rectangle" | "circle" | "arrow" | "text";
+  tool:
+    | "pen"
+    | "eraser"
+    | "line"
+    | "rectangle"
+    | "circle"
+    | "arrow"
+    | "text"
+    | "image";
   points: number[];
   color: string;
   width: number;
   opacity: number;
   text?: string;
   fontSize?: number;
+  pathData?: string;
+  left?: number;
+  top?: number;
+  scaleX?: number;
+  scaleY?: number;
+  angle?: number;
   userId: string;
   displayName: string;
   timestamp: number;
@@ -104,6 +119,8 @@ export class WebRTCGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly activeSessions = new Map<string, string>();
   // Whiteboard state: classId -> strokes[]
   private readonly classWhiteboards = new Map<string, WhiteboardStroke[]>();
+  // Global whiteboard access mode: classId -> boolean (true = open to all)
+  private readonly classWhiteboardGlobalAccess = new Map<string, boolean>();
 
   handleConnection(client: Socket) {
     const query = client.handshake.query;
@@ -116,6 +133,9 @@ export class WebRTCGateway implements OnGatewayConnection, OnGatewayDisconnect {
       ? query.displayName[0]
       : query.displayName;
     const avatar = Array.isArray(query.avatar) ? query.avatar[0] : query.avatar;
+    const source =
+      (Array.isArray(query.source) ? query.source[0] : query.source) ||
+      "meeting";
 
     if (!classId || !userId || !role || !displayName) {
       this.logger.warn("Missing connection params", {
@@ -123,14 +143,15 @@ export class WebRTCGateway implements OnGatewayConnection, OnGatewayDisconnect {
         userId,
         role,
         displayName,
+        source,
       });
       client.emit("error", { message: "Invalid connection parameters" });
       client.disconnect();
       return;
     }
 
-    // Check for existing session (prevent multiple tabs)
-    const sessionKey = `${classId}_${userId}`;
+    // Check for existing session (prevent multiple tabs for the SAME source)
+    const sessionKey = `${classId}_${userId}_${source}`;
     const existingSocketId = this.activeSessions.get(sessionKey);
 
     if (existingSocketId && existingSocketId !== client.id) {
@@ -190,6 +211,7 @@ export class WebRTCGateway implements OnGatewayConnection, OnGatewayDisconnect {
         canRecord: roleSafe === "lecturer",
         canControlParticipants: roleSafe === "lecturer",
         canModerateChat: roleSafe === "lecturer",
+        canDrawOnWhiteboard: roleSafe === "lecturer",
       },
       isPublishing: false,
       isSharingScreen: false,
@@ -696,14 +718,39 @@ export class WebRTCGateway implements OnGatewayConnection, OnGatewayDisconnect {
         },
       });
 
-      if (activeSession?.janusRoomId) {
-        // Trigger recording processing (5 second delay to ensure Janus finishes writing files)
-        setTimeout(() => {
-          this.triggerRecordingCombine(activeSession.janusRoomId!, classId);
-        }, 5000);
+      if (activeSession) {
+        // Save whiteboard snapshot
+        const wbStrokes = this.classWhiteboards.get(classId);
+        if (wbStrokes && wbStrokes.length > 0) {
+          try {
+            await this.prisma.liveSession.update({
+              where: { id: activeSession.id },
+              data: { whiteboardSnapshot: wbStrokes as any },
+            });
+            this.logger.log(
+              `🎨 Saved ${wbStrokes.length} whiteboard strokes for class ${classId}`,
+            );
+          } catch (snapshotErr) {
+            this.logger.error(
+              `❌ Failed to save whiteboard snapshot for class ${classId}:`,
+              snapshotErr,
+            );
+          }
+        }
+
+        if (activeSession.janusRoomId) {
+          // Trigger recording processing (5 second delay to ensure Janus finishes writing files)
+          setTimeout(() => {
+            this.triggerRecordingCombine(activeSession.janusRoomId!, classId);
+          }, 5000);
+        } else {
+          this.logger.warn(
+            `⚠️ No Janus room ID found for class ${classId}. Skipping recording combine.`,
+          );
+        }
       } else {
         this.logger.warn(
-          `⚠️ No active session or Janus room ID found for class ${classId}. Skipping recording combine.`,
+          `⚠️ No active session found for class ${classId}. Skipping snapshot and recording combine.`,
         );
       }
     } catch (error) {
@@ -716,7 +763,73 @@ export class WebRTCGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return { success: true };
   }
 
+  // ─── Whiteboard Helpers ──────────────────────────────────────────────
+
+  private canDrawOnWhiteboard(
+    classId: string,
+    userId: string,
+    role: string,
+  ): boolean {
+    if (role === "lecturer") return true;
+    if (this.classWhiteboardGlobalAccess.get(classId)) return true;
+    const participant = this.classParticipants.get(classId)?.get(userId);
+    return participant?.capabilities.canDrawOnWhiteboard || false;
+  }
+
   // ─── Whiteboard Events ────────────────────────────────────────────────
+
+  @SubscribeMessage("toggle-whiteboard-global-access")
+  handleToggleWhiteboardGlobalAccess(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: { isOpen: boolean },
+  ) {
+    const meta = this.socketMeta.get(client.id);
+    if (!meta) return;
+    const { classId, role } = meta;
+
+    if (role !== "lecturer") {
+      client.emit("error", {
+        message: "Only lecturers can toggle global whiteboard access",
+      });
+      return;
+    }
+
+    this.classWhiteboardGlobalAccess.set(classId, payload.isOpen);
+    this.server.to(`class_${classId}`).emit("whiteboard-access-changed", {
+      isOpen: payload.isOpen,
+    });
+  }
+
+  @SubscribeMessage("toggle-whiteboard-access")
+  handleToggleWhiteboardAccess(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: { targetUserId: string; canDraw: boolean },
+  ) {
+    const meta = this.socketMeta.get(client.id);
+    if (!meta) return;
+    const { classId, role } = meta;
+
+    if (role !== "lecturer") {
+      client.emit("error", {
+        message: "Only lecturers can assign whiteboard access",
+      });
+      return;
+    }
+
+    const classMap = this.classParticipants.get(classId);
+    if (classMap && classMap.has(payload.targetUserId)) {
+      const p = classMap.get(payload.targetUserId)!;
+      p.capabilities.canDrawOnWhiteboard = payload.canDraw;
+      classMap.set(payload.targetUserId, p);
+
+      this.server
+        .to(`class_${classId}`)
+        .emit("participant-capabilities-updated", {
+          userId: payload.targetUserId,
+          capabilities: p.capabilities,
+        });
+    }
+  }
 
   @SubscribeMessage("whiteboard-draw")
   handleWhiteboardDraw(
@@ -728,10 +841,9 @@ export class WebRTCGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (!meta) return;
     const { classId, userId, displayName, role } = meta;
 
-    // Only lecturers can draw
-    if (role !== "lecturer") {
+    if (!this.canDrawOnWhiteboard(classId, userId, role)) {
       client.emit("error", {
-        message: "Only lecturers can draw on the whiteboard",
+        message: "You do not have permission to draw on the whiteboard",
       });
       return;
     }
@@ -743,36 +855,78 @@ export class WebRTCGateway implements OnGatewayConnection, OnGatewayDisconnect {
       timestamp: Date.now(),
     };
 
-    // Store stroke
+    // Store stroke (upsert logic for dragging/modifying)
     if (!this.classWhiteboards.has(classId)) {
       this.classWhiteboards.set(classId, []);
     }
-    this.classWhiteboards.get(classId)!.push(stroke);
+    const strokes = this.classWhiteboards.get(classId)!;
+    const existingIndex = strokes.findIndex((s) => s.id === stroke.id);
+    if (existingIndex !== -1) {
+      strokes[existingIndex] = stroke;
+    } else {
+      strokes.push(stroke);
+    }
 
     // Broadcast to all participants (including sender for confirmation)
     this.server.to(`class_${classId}`).emit("whiteboard-stroke", stroke);
+  }
+
+  @SubscribeMessage("whiteboard-drawing")
+  handleWhiteboardDrawing(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    payload: {
+      id: string;
+      tool: string;
+      points: number[];
+      color: string;
+      width: number;
+      opacity: number;
+    },
+  ) {
+    const meta = this.socketMeta.get(client.id);
+    if (!meta) return;
+    const { classId, userId, role } = meta;
+
+    if (!this.canDrawOnWhiteboard(classId, userId, role)) return;
+
+    // Relay live drawing points to all other participants (not back to sender)
+    client.to(`class_${classId}`).emit("whiteboard-drawing", {
+      ...payload,
+      userId,
+    });
   }
 
   @SubscribeMessage("whiteboard-undo")
   handleWhiteboardUndo(@ConnectedSocket() client: Socket) {
     const meta = this.socketMeta.get(client.id);
     if (!meta) return;
-    const { classId, role } = meta;
+    const { classId, userId, role } = meta;
 
-    if (role !== "lecturer") {
+    if (!this.canDrawOnWhiteboard(classId, userId, role)) {
       client.emit("error", {
-        message: "Only lecturers can undo on the whiteboard",
+        message: "You do not have permission to undo on the whiteboard",
       });
       return;
     }
 
     const strokes = this.classWhiteboards.get(classId);
-    if (strokes && strokes.length > 0) {
-      const removed = strokes.pop()!;
-      this.server
-        .to(`class_${classId}`)
-        .emit("whiteboard-undo", { strokeId: removed.id });
+    if (!strokes || strokes.length === 0) return;
+
+    // Find the last stroke owned by this user
+    let targetIdx = -1;
+    for (let i = strokes.length - 1; i >= 0; i--) {
+      if (strokes[i].userId === userId) {
+        targetIdx = i;
+        break;
+      }
     }
+    if (targetIdx === -1) return;
+
+    const [removed] = strokes.splice(targetIdx, 1);
+    this.server
+      .to(`class_${classId}`)
+      .emit("whiteboard-undo", { strokeId: removed.id });
   }
 
   @SubscribeMessage("whiteboard-redo")
@@ -787,9 +941,9 @@ export class WebRTCGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (!meta) return;
     const { classId, userId, displayName, role } = meta;
 
-    if (role !== "lecturer") {
+    if (!this.canDrawOnWhiteboard(classId, userId, role)) {
       client.emit("error", {
-        message: "Only lecturers can redo on the whiteboard",
+        message: "You do not have permission to redo on the whiteboard",
       });
       return;
     }
@@ -813,11 +967,11 @@ export class WebRTCGateway implements OnGatewayConnection, OnGatewayDisconnect {
   handleWhiteboardClear(@ConnectedSocket() client: Socket) {
     const meta = this.socketMeta.get(client.id);
     if (!meta) return;
-    const { classId, role, displayName } = meta;
+    const { classId, userId, role, displayName } = meta;
 
-    if (role !== "lecturer") {
+    if (!this.canDrawOnWhiteboard(classId, userId, role)) {
       client.emit("error", {
-        message: "Only lecturers can clear the whiteboard",
+        message: "You do not have permission to clear the whiteboard",
       });
       return;
     }
@@ -840,5 +994,52 @@ export class WebRTCGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     const strokes = this.classWhiteboards.get(classId) || [];
     client.emit("whiteboard-state", { strokes });
+  }
+
+  @SubscribeMessage("whiteboard-delete")
+  handleWhiteboardDelete(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: { strokeIds: string[] },
+  ) {
+    const meta = this.socketMeta.get(client.id);
+    if (!meta) return;
+    const { classId, userId, role } = meta;
+
+    if (!this.canDrawOnWhiteboard(classId, userId, role)) {
+      client.emit("error", {
+        message:
+          "You do not have permission to delete strokes on the whiteboard",
+      });
+      return;
+    }
+
+    const strokes = this.classWhiteboards.get(classId);
+    if (!strokes) return;
+
+    const ids = new Set(payload.strokeIds);
+    const remaining = strokes.filter((s) => !ids.has(s.id));
+    this.classWhiteboards.set(classId, remaining);
+
+    this.server
+      .to(`class_${classId}`)
+      .emit("whiteboard-delete", { strokeIds: payload.strokeIds });
+  }
+
+  @SubscribeMessage("cursor-move")
+  handleCursorMove(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: { x: number; y: number },
+  ) {
+    const meta = this.socketMeta.get(client.id);
+    if (!meta) return;
+    const { classId, userId, displayName } = meta;
+
+    // Relay cursor position to all OTHER participants (not back to sender)
+    client.to(`class_${classId}`).emit("cursor-move", {
+      userId,
+      displayName,
+      x: payload.x,
+      y: payload.y,
+    });
   }
 }
