@@ -227,14 +227,14 @@ export class CourseService {
             class_id: classItem.id,
             class_title: classItem.title,
             class_description: classItem.description,
+            class_start_date: classItem.startDate,
+            class_end_date: classItem.endDate,
             capacity: classItem.capacity,
             isActive: classItem.isActive,
             session_id: session.id,
             session_title: session.title,
             start_time: session.scheduledAt,
             end_time: session.endedAt,
-            mode: session.mode,
-            roomKey: session.roomKey,
             member_count: classItem._count?.members ?? 0,
           });
         }
@@ -683,6 +683,10 @@ export class CourseService {
     const newClass = await this.onlineClassRepository.create({
       title: createClassDto.title,
       description: createClassDto.description,
+      startDate: createClassDto.startDate
+        ? new Date(createClassDto.startDate)
+        : null,
+      endDate: createClassDto.endDate ? new Date(createClassDto.endDate) : null,
       capacity: createClassDto.capacity,
       course: { connect: { id: courseId } },
       lecturer: { connect: { id: createClassDto.lecturerId } },
@@ -730,6 +734,18 @@ export class CourseService {
     }
 
     const updateData: any = { ...updateClassDto };
+    if (updateClassDto.startDate !== undefined) {
+      delete updateData.startDate;
+      updateData.startDate = updateClassDto.startDate
+        ? new Date(updateClassDto.startDate)
+        : null;
+    }
+    if (updateClassDto.endDate !== undefined) {
+      delete updateData.endDate;
+      updateData.endDate = updateClassDto.endDate
+        ? new Date(updateClassDto.endDate)
+        : null;
+    }
     if (updateClassDto.lecturerId) {
       updateData.lecturer = { connect: { id: updateClassDto.lecturerId } };
       delete updateData.lecturerId;
@@ -780,8 +796,6 @@ export class CourseService {
     return this.onlineClassRepository.createSession(classId, {
       title: createSessionDto.title,
       scheduledAt: new Date(createSessionDto.scheduledAt),
-      mode: createSessionDto.mode,
-      roomKey: createSessionDto.roomKey,
     });
   }
 

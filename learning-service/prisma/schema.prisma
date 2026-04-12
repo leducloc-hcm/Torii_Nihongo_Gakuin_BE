@@ -581,13 +581,14 @@ model QuizAnswer {
 @@schema("learning")
 }
 
-// ===== Live Classes (WebRTC 2D/3D) =====
 model Class {
   id          Int      @id @default(autoincrement())
   courseId    Int?
   title       String
   description String?
   lecturerId  Int
+  startDate   DateTime?
+  endDate     DateTime?
   capacity    Int      @default(20)
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
@@ -626,8 +627,6 @@ model LiveSession {
   title        String
   scheduledAt  DateTime
   endedAt      DateTime?
-  mode         LiveMode  @default(MODE2D)
-  roomKey      String    @unique
   janusRoomId  Int?
   recordingUrl      String?
   whiteboardSnapshot Json?
@@ -1363,12 +1362,6 @@ enum LessonKind {
   ARTICLE
   QUIZ
   LIVE
-}
-
-enum LiveMode {
-  @@schema("learning")
-  MODE2D
-  MODE3D
 }
 
 enum AttendanceStatus {

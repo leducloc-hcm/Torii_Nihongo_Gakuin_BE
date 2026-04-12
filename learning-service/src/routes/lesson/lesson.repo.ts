@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common'
-import { PrismaService } from 'src/shared/services/prisma.service'
+import { Injectable } from "@nestjs/common";
+import { PrismaService } from "src/shared/services/prisma.service";
 import {
   Lesson,
   LessonWithRelations,
@@ -8,9 +8,9 @@ import {
   LessonWhereUniqueInput,
   LessonWhereInput,
   LessonOrderByInput,
-} from './lesson.model'
-import { S3Service } from 'src/shared/services/s3.service'
-import { MediaKind, MediaStatus } from 'src/shared/constants/media.constant'
+} from "./lesson.model";
+import { S3Service } from "src/shared/services/s3.service";
+import { MediaKind, MediaStatus } from "src/shared/constants/media.constant";
 
 @Injectable()
 export class LessonRepository {
@@ -44,7 +44,7 @@ export class LessonRepository {
         createdAt: true,
       },
       orderBy: {
-        createdAt: 'asc' as const,
+        createdAt: "asc" as const,
       },
     },
     liveSession: {
@@ -53,8 +53,6 @@ export class LessonRepository {
         title: true,
         scheduledAt: true,
         endedAt: true,
-        mode: true,
-        roomKey: true,
       },
     },
     quiz: {
@@ -74,43 +72,48 @@ export class LessonRepository {
         media: true,
       },
     },
-  }
+  };
 
   async create(data: LessonCreateInput): Promise<LessonWithRelations> {
     return await this.prisma.lesson.create({
       data,
       include: this.includeRelations,
-    })
+    });
   }
 
-  async findOne(where: LessonWhereUniqueInput): Promise<LessonWithRelations | null> {
+  async findOne(
+    where: LessonWhereUniqueInput,
+  ): Promise<LessonWithRelations | null> {
     return await this.prisma.lesson.findUnique({
       where: where as any,
       include: this.includeRelations,
-    })
+    });
   }
 
-  async update(params: { where: LessonWhereUniqueInput; data: LessonUpdateInput }): Promise<LessonWithRelations> {
-    const { where, data } = params
+  async update(params: {
+    where: LessonWhereUniqueInput;
+    data: LessonUpdateInput;
+  }): Promise<LessonWithRelations> {
+    const { where, data } = params;
 
     return await this.prisma.lesson.update({
       where: where as any,
       data,
       include: this.includeRelations,
-    })
+    });
   }
 
   async delete(where: LessonWhereUniqueInput): Promise<Lesson> {
     return await this.prisma.lesson.delete({
       where: where as any,
-    })
+    });
   }
 
   async checkModuleExists(moduleId: number): Promise<boolean> {
     const count = await this.prisma.module.count({
       where: { id: moduleId },
-    })
-    return count > 0
+    });
+    return count > 0;
   }
 
   async getMaxOrder(moduleId: number): Promise<number> {
@@ -119,12 +122,15 @@ export class LessonRepository {
       _max: {
         order: true,
       },
-    })
+    });
 
-    return result._max.order ?? 0
+    return result._max.order ?? 0;
   }
 
-  async reorderLessons(moduleId: number, lessonOrders: { id: number; order: number }[]): Promise<void> {
+  async reorderLessons(
+    moduleId: number,
+    lessonOrders: { id: number; order: number }[],
+  ): Promise<void> {
     // Use transaction to update all orders atomically
     await this.prisma.$transaction(
       lessonOrders.map(({ id, order }) =>
@@ -133,10 +139,14 @@ export class LessonRepository {
           data: { order },
         }),
       ),
-    )
+    );
   }
 
-  async generateUploadUrl(lessonId: number, filename: string, contentType: string) {
+  async generateUploadUrl(
+    lessonId: number,
+    filename: string,
+    contentType: string,
+  ) {
     const lesson = await this.prisma.lesson.findFirst({
       where: {
         id: lessonId,
@@ -148,10 +158,10 @@ export class LessonRepository {
           },
         },
       },
-    })
+    });
 
     if (!lesson) {
-      throw new Error('Lesson not found')
+      throw new Error("Lesson not found");
     }
 
     const uploadInfo = await this.s3Service.generatePresignedUploadUrl(
@@ -160,7 +170,7 @@ export class LessonRepository {
       lessonId,
       filename,
       contentType,
-    )
+    );
 
     if (!lesson.mediaId) {
       const mediaAsset = await this.prisma.mediaAsset.create({
@@ -170,17 +180,21 @@ export class LessonRepository {
           lessonId: lesson.id,
           mimeType: contentType,
         },
-      })
+      });
 
       await this.prisma.lesson.update({
         where: { id: lessonId },
         data: { mediaId: mediaAsset.id },
-      })
+      });
     }
-    return uploadInfo
+    return uploadInfo;
   }
 
-  async generateMaterialUploadUrl(lessonId: number, filename: string, contentType: string) {
+  async generateMaterialUploadUrl(
+    lessonId: number,
+    filename: string,
+    contentType: string,
+  ) {
     const lesson = await this.prisma.lesson.findFirst({
       where: {
         id: lessonId,
@@ -192,10 +206,10 @@ export class LessonRepository {
           },
         },
       },
-    })
+    });
 
     if (!lesson) {
-      throw new Error('Lesson not found')
+      throw new Error("Lesson not found");
     }
     const uploadInfo = await this.s3Service.generatePresignedMaterialUploadUrl(
       lesson.module.course.id,
@@ -203,18 +217,20 @@ export class LessonRepository {
       lessonId,
       filename,
       contentType,
-    )
+    );
 
     await this.prisma.mediaAsset.create({
       data: {
         kind: MediaKind.OTHER,
-        url: 'https://torii-nihongo-gakuin-s3.s3.ap-southeast-1.amazonaws.com/' + uploadInfo.key,
+        url:
+          "https://torii-nihongo-gakuin-s3.s3.ap-southeast-1.amazonaws.com/" +
+          uploadInfo.key,
         lessonId: lesson.id,
         mimeType: contentType,
       },
-    })
+    });
 
-    return uploadInfo
+    return uploadInfo;
   }
 
   async generatePublicStreamUrl(lessonId: number) {
@@ -229,18 +245,18 @@ export class LessonRepository {
           },
         },
       },
-    })
+    });
     if (!lesson) {
-      throw new Error('Lesson not found')
+      throw new Error("Lesson not found");
     }
     if (!lesson.mediaId) {
-      throw new Error('Media not found for this lesson')
+      throw new Error("Media not found for this lesson");
     }
     const streamInfo = await this.s3Service.generatePresignedStreamUrl(
       lesson.module.course.id,
       lesson.module.id,
       lessonId,
-    )
-    return streamInfo
+    );
+    return streamInfo;
   }
 }
