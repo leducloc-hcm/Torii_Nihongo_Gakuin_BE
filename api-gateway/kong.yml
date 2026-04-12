@@ -226,7 +226,7 @@ services:
         plugins:
           - name: rate-limiting
             config:
-              minute: 20
+              minute: 40
               hour: 400
               policy: redis
               redis:
