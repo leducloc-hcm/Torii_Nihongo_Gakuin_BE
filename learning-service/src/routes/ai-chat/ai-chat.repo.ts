@@ -185,7 +185,6 @@ export class AIQueryRepository {
     agentRole?: string;
     routingReason?: string;
     initialResponse?: string;
-    requiresApproval: boolean;
   }) {
     return this.prisma.aIQuery.create({
       data: {

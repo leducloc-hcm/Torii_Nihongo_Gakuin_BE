@@ -431,6 +431,40 @@ public class AssessmentService {
                             .map(AssessmentGroupQuestion::getQuestionId)
                             .collect(Collectors.toList());
 
+                        Map<Long, AssessmentQuestion> groupQuestionMap = assessmentQuestionRepository.findAllById(groupQuestionIds)
+                            .stream()
+                            .collect(Collectors.toMap(AssessmentQuestion::getId, q -> q, (a, b) -> a, HashMap::new));
+
+                        List<AssessmentDTO.QuestionDetailDTO> groupQuestions = groupQuestionIds.stream()
+                            .map(groupQuestionMap::get)
+                            .filter(q -> q != null)
+                            .map(q -> {
+                                List<AssessmentOption> options = assessmentOptionRepository.findByQuestionIdOrderByOrderAsc(q.getId());
+                                List<AssessmentDTO.OptionDetailDTO> optionDetails = options.stream()
+                                    .map(o -> AssessmentDTO.OptionDetailDTO.builder()
+                                        .id(o.getId())
+                                        .content(o.getContent())
+                                        .isCorrect(o.getIsCorrect())
+                                        .order(o.getOrder())
+                                        .build())
+                                    .collect(Collectors.toList());
+
+                                return AssessmentDTO.QuestionDetailDTO.builder()
+                                    .id(q.getId())
+                                    .originalQuestionId(q.getOriginalQuestionId())
+                                    .type(q.getType() != null ? q.getType().name() : null)
+                                    .level(q.getLevel() != null ? q.getLevel().name() : null)
+                                    .difficulty(q.getDifficulty() != null ? q.getDifficulty().name() : null)
+                                    .stem(q.getStem())
+                                    .passage(q.getPassage())
+                                    .explanation(q.getExplanation())
+                                    .mediaUrl(q.getMediaUrl())
+                                    .audioUrl(q.getAudioUrl())
+                                    .options(optionDetails)
+                                    .build();
+                            })
+                            .collect(Collectors.toList());
+
                         return AssessmentDTO.QuestionGroupDetailDTO.builder()
                             .id(g.getId())
                             .originalGroupId(g.getOriginalGroupId())
@@ -443,6 +477,7 @@ public class AssessmentService {
                             .mediaUrl(g.getMediaUrl())
                             .audioUrl(g.getAudioUrl())
                             .questionIds(groupQuestionIds)
+                                .questions(groupQuestions)
                             .build();
                     })
                     .collect(Collectors.toList());

@@ -428,7 +428,6 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
         routingReason:
           "Off-topic query rejected and handled by default Sensei policy.",
         initialResponse: rejectionMessage,
-        requiresApproval: false,
       });
 
       // Save user message
@@ -605,7 +604,6 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
       agentRole,
       routingReason,
       initialResponse: agentResponse.content || undefined,
-      requiresApproval: false, // Always false now (auto-execute)
     });
 
     // Save user message
@@ -632,6 +630,9 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
       await this.queryRepo.update(queryRecord.id, {
         status: QueryStatus.COMPLETED,
       });
+
+      // Ensure thread/messages cache is refreshed for immediate UI reads.
+      await this.invalidateThreadCache(threadId, userId);
 
       return {
         queryId: queryRecord.id,

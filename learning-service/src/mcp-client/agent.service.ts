@@ -24,6 +24,7 @@ import { QueryType } from "src/mcp-client/shared/query-detection.utils";
 import {
   validateQuery,
   getValidationPrompts,
+  detectLanguage,
 } from "src/mcp-client/shared/validation.utils";
 import {
   getEnabledMCPServers,
@@ -69,9 +70,25 @@ export class AgentService {
     private readonly courseMcp: CourseMcpClient,
     private readonly enrollmentMcp: EnrollmentMcpClient,
   ) {
+    const runtimeApiKey = (process.env.OPENAI_API_KEY || "")
+      .trim()
+      .replace(/^['\"]|['\"]$/g, "");
+
+    if (!runtimeApiKey) {
+      throw new Error(
+        "OPENAI_API_KEY is missing. Please set OPENAI_API_KEY in learning-service/.env and restart the service.",
+      );
+    }
+
     this.openai = new OpenAI({
-      apiKey: OPENAI_CONFIG.apiKey,
+      apiKey: runtimeApiKey,
     });
+  }
+
+  private getRuntimeModel(): string {
+    return (process.env.OPENAI_MODEL || OPENAI_CONFIG.model || "")
+      .trim()
+      .replace(/^['\"]|['\"]$/g, "");
   }
 
   /**
@@ -171,8 +188,15 @@ export class AgentService {
         toolChoice = forceTools ? "required" : "auto";
       }
 
+      const runtimeModel = this.getRuntimeModel();
+      if (!runtimeModel) {
+        throw new Error(
+          "OPENAI_MODEL is missing. Please set OPENAI_MODEL in learning-service/.env and restart the service.",
+        );
+      }
+
       const completionOptions: any = {
-        model: OPENAI_CONFIG.model,
+        model: runtimeModel,
         messages: messagesWithValidation, // Use messages with validation prompts
         tools: useTools && routedTools.length > 0 ? routedTools : undefined,
         tool_choice: toolChoice,
@@ -228,6 +252,28 @@ export class AgentService {
     } catch (error) {
       ////this.logger.error('OpenAI API error:', error)
       const message = error instanceof Error ? error.message : String(error);
+
+      const isInsufficientScopeError =
+        /missing scopes:\s*model\.request/i.test(message) ||
+        /insufficient permissions/i.test(message);
+
+      if (isInsufficientScopeError) {
+        const lang = originalQuery ? detectLanguage(originalQuery) : "vi";
+
+        const localizedMessage =
+          lang === "ja"
+            ? "現在のOpenAI APIキーには必要な権限（model.request）がありません。管理者に、プロジェクト権限（Member以上）とAPIキーのスコープ（model.request）を有効化してもらってください。"
+            : lang === "en"
+              ? "The current OpenAI API key does not have the required permission (model.request). Please ask your admin to enable project access (Member or higher) and the model.request scope for this key."
+              : "API key OpenAI hiện tại chưa có quyền cần thiết (model.request). Vui lòng cấp quyền project (Member trở lên) và bật scope model.request cho key này.";
+
+        return {
+          content: localizedMessage,
+          requiresApproval: false,
+          finishReason: "stop",
+        };
+      }
+
       throw new Error(`AI service error: ${message}`);
     }
   }
