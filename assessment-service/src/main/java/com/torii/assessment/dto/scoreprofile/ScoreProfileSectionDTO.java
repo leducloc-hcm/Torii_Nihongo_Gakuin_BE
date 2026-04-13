@@ -24,6 +24,4 @@ public class ScoreProfileSectionDTO {
     private BigDecimal weight;
     
     private Integer minPass;
-    
-    private Integer defaultTimeSec;
 }

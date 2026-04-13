@@ -16,7 +16,6 @@ public class Assessment {
     private Long id;
 
     private String title;
-    private String description;
 
     // Matches assessment_type enum in the DB (QUIZ, TEST, EXAM, ASSIGNMENT)
     @Enumerated(EnumType.STRING)
@@ -49,9 +48,6 @@ public class Assessment {
     @JoinColumn(name = "score_profile_id", nullable = false)
     private ScoreProfile scoreProfile;
 
-    @Column(name = "assigned_to_id")
-    private Integer assignedToId;
-
     @Column(name = "start_at")
     private LocalDateTime startAt;
 
@@ -61,17 +57,8 @@ public class Assessment {
     @Column(name = "lock_after_due")
     private Boolean lockAfterDue = false;
 
-    @Column(name = "time_limit_sec")
-    private Integer timeLimitSec;
-
     @Column(name = "max_attempts")
     private Integer maxAttempts;
-
-    @Column(name = "shuffle_questions")
-    private Boolean shuffleQuestions = false;
-
-    @Column(name = "shuffle_options")
-    private Boolean shuffleOptions = false;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;

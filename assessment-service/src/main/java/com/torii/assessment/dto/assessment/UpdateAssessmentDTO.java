@@ -29,19 +29,9 @@ public class UpdateAssessmentDTO {
 
     private Long scoreProfileId;
 
-    private Integer assignedToId;
-
-    private String description;
-
     private Boolean lockAfterDue;
 
-    private Integer timeLimitSec;
-
     private Integer maxAttempts;
-
-    private Boolean shuffleQuestions;
-
-    private Boolean shuffleOptions;
 
     private java.time.LocalDateTime startAt;
 

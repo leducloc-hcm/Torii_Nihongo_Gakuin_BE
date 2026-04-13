@@ -33,7 +33,4 @@ public class ScoreProfileSection {
     
     @Column(name = "min_pass")
     private Integer minPass;
-    
-    @Column(name = "default_time_sec")
-    private Integer defaultTimeSec;
 }

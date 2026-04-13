@@ -27,8 +27,6 @@ public class QueryAssessmentDTO {
 
     private Long scoreProfileId;
 
-    private Integer assignedToId;
-
     private Integer lessonId;
 
     private String keyword; // search in title
