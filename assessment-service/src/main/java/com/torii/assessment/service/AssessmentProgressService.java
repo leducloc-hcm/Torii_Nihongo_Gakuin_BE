@@ -56,6 +56,22 @@ public class AssessmentProgressService {
             progress.setTimeSpentSec(0);
             progress.setStatus(AssessmentProgress.ProgressStatus.IN_PROGRESS);
             progress.setIsSubmitted(false);
+        } else if (Boolean.TRUE.equals(progress.getIsSubmitted())
+            || AssessmentProgress.ProgressStatus.SUBMITTED.equals(progress.getStatus())
+            || AssessmentProgress.ProgressStatus.EXPIRED.equals(progress.getStatus())) {
+            // Only one progress row exists per assessment/user; reset it to start a new attempt cycle.
+            assessmentAnswerProgressRepository.deleteByProgressId(progress.getId());
+            progress.setAssignmentId(dto.getAssignmentId());
+            progress.setCurrentAttemptId(null);
+            progress.setCurrentSection(0);
+            progress.setCurrentQuestion(0);
+            progress.setTimeSpentSec(0);
+            progress.setRemainingSec(null);
+            progress.setIsSubmitted(false);
+            progress.setStatus(AssessmentProgress.ProgressStatus.IN_PROGRESS);
+            progress.setCompletedAt(null);
+            progress.setStartedAt(LocalDateTime.now());
+            progress.setLastSavedAt(LocalDateTime.now());
         }
 
         if (dto.getRemainingSec() != null) {

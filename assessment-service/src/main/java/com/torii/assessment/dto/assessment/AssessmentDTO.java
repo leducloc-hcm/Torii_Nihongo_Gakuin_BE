@@ -19,18 +19,12 @@ public class AssessmentDTO {
     private String level;
     private String type;
     private String visibility;
-    private String description;
-    private Integer courseId;
     private Integer createdBy;
     private Integer lessonId;
     private Long classId;
     private Long scoreProfileId;
-    private Integer assignedToId;
     private Boolean lockAfterDue;
-    private Integer timeLimitSec;
     private Integer maxAttempts;
-    private Boolean shuffleQuestions;
-    private Boolean shuffleOptions;
     private LocalDateTime startAt;
     private LocalDateTime dueAt;
     private LocalDateTime createdAt;

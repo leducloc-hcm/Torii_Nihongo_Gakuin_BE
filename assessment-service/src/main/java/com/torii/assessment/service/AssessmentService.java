@@ -73,18 +73,13 @@ public class AssessmentService {
             ? Assessment.AssessmentVisibility.valueOf(dto.getVisibility())
             : Assessment.AssessmentVisibility.PRIVATE);
         assessment.setCreatedBy(dto.getCreatedBy());
-        assessment.setDescription(dto.getDescription());
         assessment.setLessonId(dto.getLessonId());
         assessment.setClassId(dto.getClassId());
         assessment.setScoreProfile(resolveScoreProfile(dto.getScoreProfileId()));
-        assessment.setAssignedToId(dto.getAssignedToId());
         assessment.setStartAt(dto.getStartAt());
         assessment.setDueAt(dto.getDueAt());
         assessment.setLockAfterDue(dto.getLockAfterDue());
-        assessment.setTimeLimitSec(dto.getTimeLimitSec());
         assessment.setMaxAttempts(dto.getMaxAttempts());
-        assessment.setShuffleQuestions(dto.getShuffleQuestions());
-        assessment.setShuffleOptions(dto.getShuffleOptions());
 
         Assessment saved = assessmentRepository.save(assessment);
         autoGenerateSectionsFromScoreProfile(saved);
@@ -137,7 +132,6 @@ public class AssessmentService {
 
         Assessment cloned = new Assessment();
         cloned.setTitle(source.getTitle() + " (Clone)");
-        cloned.setDescription(source.getDescription());
         cloned.setType(source.getType());
         cloned.setLevel(source.getLevel());
         cloned.setVisibility(source.getVisibility());
@@ -145,14 +139,10 @@ public class AssessmentService {
         cloned.setLessonId(source.getLessonId());
         cloned.setClassId(source.getClassId());
         cloned.setScoreProfile(source.getScoreProfile());
-        cloned.setAssignedToId(source.getAssignedToId());
         cloned.setStartAt(source.getStartAt());
         cloned.setDueAt(source.getDueAt());
         cloned.setLockAfterDue(source.getLockAfterDue());
-        cloned.setTimeLimitSec(source.getTimeLimitSec());
         cloned.setMaxAttempts(source.getMaxAttempts());
-        cloned.setShuffleQuestions(source.getShuffleQuestions());
-        cloned.setShuffleOptions(source.getShuffleOptions());
 
         Assessment savedClone = assessmentRepository.save(cloned);
 
@@ -245,10 +235,6 @@ public class AssessmentService {
             saveLog(id, "UPDATE", "visibility", assessment.getVisibility(), dto.getVisibility(), dto.getUpdatedBy(), "UPDATE_ASSESSMENT");
             assessment.setVisibility(Assessment.AssessmentVisibility.valueOf(dto.getVisibility()));
         }
-        if (dto.getDescription() != null) {
-            saveLog(id, "UPDATE", "description", assessment.getDescription(), dto.getDescription(), dto.getUpdatedBy(), "UPDATE_ASSESSMENT");
-            assessment.setDescription(dto.getDescription());
-        }
         if (dto.getLessonId() != null) {
             saveLog(id, "UPDATE", "lessonId", assessment.getLessonId(), dto.getLessonId(), dto.getUpdatedBy(), "UPDATE_ASSESSMENT");
             assessment.setLessonId(dto.getLessonId());
@@ -262,10 +248,6 @@ public class AssessmentService {
             saveLog(id, "UPDATE", "scoreProfileId", oldProfileId, dto.getScoreProfileId(), dto.getUpdatedBy(), "UPDATE_ASSESSMENT");
             assessment.setScoreProfile(resolveScoreProfile(dto.getScoreProfileId()));
         }
-        if (dto.getAssignedToId() != null) {
-            saveLog(id, "UPDATE", "assignedToId", assessment.getAssignedToId(), dto.getAssignedToId(), dto.getUpdatedBy(), "UPDATE_ASSESSMENT");
-            assessment.setAssignedToId(dto.getAssignedToId());
-        }
         if (dto.getStartAt() != null) {
             saveLog(id, "UPDATE", "startAt", assessment.getStartAt(), dto.getStartAt(), dto.getUpdatedBy(), "UPDATE_ASSESSMENT");
             assessment.setStartAt(dto.getStartAt());
@@ -278,21 +260,9 @@ public class AssessmentService {
             saveLog(id, "UPDATE", "lockAfterDue", assessment.getLockAfterDue(), dto.getLockAfterDue(), dto.getUpdatedBy(), "UPDATE_ASSESSMENT");
             assessment.setLockAfterDue(dto.getLockAfterDue());
         }
-        if (dto.getTimeLimitSec() != null) {
-            saveLog(id, "UPDATE", "timeLimitSec", assessment.getTimeLimitSec(), dto.getTimeLimitSec(), dto.getUpdatedBy(), "UPDATE_ASSESSMENT");
-            assessment.setTimeLimitSec(dto.getTimeLimitSec());
-        }
         if (dto.getMaxAttempts() != null) {
             saveLog(id, "UPDATE", "maxAttempts", assessment.getMaxAttempts(), dto.getMaxAttempts(), dto.getUpdatedBy(), "UPDATE_ASSESSMENT");
             assessment.setMaxAttempts(dto.getMaxAttempts());
-        }
-        if (dto.getShuffleQuestions() != null) {
-            saveLog(id, "UPDATE", "shuffleQuestions", assessment.getShuffleQuestions(), dto.getShuffleQuestions(), dto.getUpdatedBy(), "UPDATE_ASSESSMENT");
-            assessment.setShuffleQuestions(dto.getShuffleQuestions());
-        }
-        if (dto.getShuffleOptions() != null) {
-            saveLog(id, "UPDATE", "shuffleOptions", assessment.getShuffleOptions(), dto.getShuffleOptions(), dto.getUpdatedBy(), "UPDATE_ASSESSMENT");
-            assessment.setShuffleOptions(dto.getShuffleOptions());
         }
 
         Assessment updated = assessmentRepository.save(assessment);
@@ -331,9 +301,6 @@ public class AssessmentService {
             if (queryDto.getScoreProfileId() != null) {
                 predicates.add(cb.equal(root.get("scoreProfile").get("id"), queryDto.getScoreProfileId()));
             }
-            if (queryDto.getAssignedToId() != null) {
-                predicates.add(cb.equal(root.get("assignedToId"), queryDto.getAssignedToId()));
-            }
             if (queryDto.getLessonId() != null) {
                 predicates.add(cb.equal(root.get("lessonId"), queryDto.getLessonId()));
             }
@@ -353,17 +320,12 @@ public class AssessmentService {
             .level(assessment.getLevel() != null ? assessment.getLevel().name() : null)
             .type(assessment.getType() != null ? assessment.getType().name() : null)
             .visibility(assessment.getVisibility() != null ? assessment.getVisibility().name() : null)
-            .description(assessment.getDescription())
             .createdBy(assessment.getCreatedBy())
             .lessonId(assessment.getLessonId())
             .classId(assessment.getClassId())
             .scoreProfileId(assessment.getScoreProfile() != null ? assessment.getScoreProfile().getId() : null)
-            .assignedToId(assessment.getAssignedToId())
             .lockAfterDue(assessment.getLockAfterDue())
-            .timeLimitSec(assessment.getTimeLimitSec())
             .maxAttempts(assessment.getMaxAttempts())
-            .shuffleQuestions(assessment.getShuffleQuestions())
-            .shuffleOptions(assessment.getShuffleOptions())
             .startAt(assessment.getStartAt())
             .dueAt(assessment.getDueAt())
             .createdAt(assessment.getCreatedAt())
@@ -532,7 +494,6 @@ public class AssessmentService {
             AssessmentSection section = new AssessmentSection();
             section.setAssessmentId(assessment.getId());
             section.setTitle(profileSection.getTitle());
-            section.setTimeLimitSec(profileSection.getDefaultTimeSec());
             section.setOrder(i + 1);
             section.setType(parseSectionType(profileSection.getType()));
 

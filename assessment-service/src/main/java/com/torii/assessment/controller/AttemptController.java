@@ -1,10 +1,14 @@
 package com.torii.assessment.controller;
 
 import com.torii.assessment.dto.attempt.AttemptDTO;
+import com.torii.assessment.dto.attempt.AttemptReviewDetailDTO;
+import com.torii.assessment.dto.attempt.AttemptedAssessmentListResponseDTO;
 import com.torii.assessment.dto.attempt.CreateAttemptDTO;
 import com.torii.assessment.dto.attempt.SubmitAnswerDTO;
 import com.torii.assessment.dto.attempt.SubmitAttemptRequestDTO;
+import com.torii.assessment.entity.Assessment;
 import com.torii.assessment.service.AttemptService;
+import com.torii.assessment.service.AttemptReviewService;
 import com.torii.assessment.util.RequestAuthUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +25,7 @@ import java.util.List;
 public class AttemptController {
     
     private final AttemptService attemptService;
+    private final AttemptReviewService attemptReviewService;
     
     @PostMapping
     public ResponseEntity<AttemptDTO> createAttempt(
@@ -78,5 +83,62 @@ public class AttemptController {
         RequestAuthUtil.AuthUser authUser = RequestAuthUtil.getAuthUser(request);
         AttemptDTO attempt = attemptService.getAttemptResults(id, authUser.userId(), authUser.role());
         return ResponseEntity.ok(attempt);
+    }
+
+    @GetMapping("/attempted/all")
+    public ResponseEntity<AttemptedAssessmentListResponseDTO> getAttemptedAssessments(
+            @RequestParam(required = false) Assessment.AssessmentType type,
+            @RequestParam(required = false) Assessment.JLPTLevel level,
+            @RequestParam(required = false, defaultValue = "1") Integer page,
+            @RequestParam(required = false, defaultValue = "10") Integer limit,
+            HttpServletRequest request) {
+        RequestAuthUtil.AuthUser authUser = RequestAuthUtil.getAuthUser(request);
+        return ResponseEntity.ok(attemptReviewService.getAttemptedAssessments(
+            authUser.userId(),
+            type,
+            level,
+            page,
+            limit
+        ));
+    }
+
+    @GetMapping("/attempted/{attemptId}/detail")
+    public ResponseEntity<AttemptReviewDetailDTO> getMyAttemptDetail(
+            @PathVariable Long attemptId,
+            HttpServletRequest request) {
+        RequestAuthUtil.AuthUser authUser = RequestAuthUtil.getAuthUser(request);
+        return ResponseEntity.ok(attemptReviewService.getAttemptDetail(attemptId, authUser.userId(), authUser.role()));
+    }
+
+    @GetMapping("/lecturer/students/{studentId}/attempted/all")
+    public ResponseEntity<AttemptedAssessmentListResponseDTO> getStudentAttemptedAssessments(
+            @PathVariable Integer studentId,
+            @RequestParam(required = false) Assessment.AssessmentType type,
+            @RequestParam(required = false) Assessment.JLPTLevel level,
+            @RequestParam(required = false, defaultValue = "1") Integer page,
+            @RequestParam(required = false, defaultValue = "10") Integer limit,
+            HttpServletRequest request) {
+        RequestAuthUtil.AuthUser authUser = RequestAuthUtil.getAuthUser(request);
+        return ResponseEntity.ok(attemptReviewService.getAttemptedAssessmentsForStudent(
+            studentId,
+            type,
+            level,
+            page,
+            limit
+        ));
+    }
+
+    @GetMapping("/lecturer/students/{studentId}/attempts/{attemptId}/detail")
+    public ResponseEntity<AttemptReviewDetailDTO> getStudentAttemptDetail(
+            @PathVariable Integer studentId,
+            @PathVariable Long attemptId,
+            HttpServletRequest request) {
+        RequestAuthUtil.AuthUser authUser = RequestAuthUtil.getAuthUser(request);
+        return ResponseEntity.ok(attemptReviewService.getAttemptDetailForStudent(
+            studentId,
+            attemptId,
+            authUser.userId(),
+            authUser.role()
+        ));
     }
 }

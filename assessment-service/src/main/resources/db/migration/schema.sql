@@ -27,11 +27,9 @@ CREATE TYPE attempt_status AS ENUM ('IN_PROGRESS', 'SUBMITTED', 'EXPIRED');
 
 -- ASSESSMENTS
 
-CREATE TABLE IF NOT EXISTS assessments (
+CREATE TABLE IF NOT EXISTS Assessments (
     id BIGSERIAL PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
-    description TEXT,
-
     type assessment_type NOT NULL,
     level jlpt_level,
 
@@ -41,18 +39,10 @@ CREATE TABLE IF NOT EXISTS assessments (
 
     lesson_id INTEGER,
     class_id BIGINT,
-    assigned_to_id INTEGER,
-    course_id INTEGER,
-
     start_at TIMESTAMP,
     due_at TIMESTAMP,
     lock_after_due BOOLEAN DEFAULT FALSE,
-
-    time_limit_sec INTEGER,
     max_attempts INTEGER,
-
-    shuffle_questions BOOLEAN DEFAULT FALSE,
-    shuffle_options BOOLEAN DEFAULT FALSE,
 
     score_profile_id BIGINT NOT NULL,
 
@@ -61,8 +51,8 @@ CREATE TABLE IF NOT EXISTS assessments (
 );
 
 CREATE INDEX IF NOT EXISTS idx_assessment_class ON assessments(class_id);
-CREATE INDEX IF NOT EXISTS idx_assessment_user ON assessments(assigned_to_id);
-CREATE INDEX IF NOT EXISTS idx_assessments_course_id ON assessments(course_id);
+CREATE INDEX IF NOT EXISTS idx_assessment_lesson ON assessments(lesson_id);
+CREATE INDEX IF NOT EXISTS idx_assessment_type_level ON assessments(type, level);
 CREATE INDEX IF NOT EXISTS idx_assessments_score_profile_id ON assessments(score_profile_id);
 
 -- AUDIT LOG
@@ -384,8 +374,7 @@ CREATE TABLE IF NOT EXISTS score_profile_sections (
     title VARCHAR(255) NOT NULL,
     max_score INTEGER NOT NULL,
     weight DECIMAL(5,2),
-    min_pass INTEGER,
-    default_time_sec INTEGER
+    min_pass INTEGER
 );
 
 ALTER TABLE assessments

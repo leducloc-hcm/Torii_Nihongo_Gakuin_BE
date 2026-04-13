@@ -55,7 +55,6 @@ public class ScoreProfileService {
             section.setMaxScore(sectionDto.getMaxScore());
             section.setWeight(sectionDto.getWeight());
             section.setMinPass(sectionDto.getMinPass());
-            section.setDefaultTimeSec(sectionDto.getDefaultTimeSec());
             scoreProfileSectionRepository.save(section);
         }
         
@@ -153,7 +152,6 @@ public class ScoreProfileService {
                 section.setMaxScore(sectionDto.getMaxScore());
                 section.setWeight(sectionDto.getWeight());
                 section.setMinPass(sectionDto.getMinPass());
-                section.setDefaultTimeSec(sectionDto.getDefaultTimeSec());
                 scoreProfileSectionRepository.save(section);
             }
         }
@@ -260,7 +258,6 @@ public class ScoreProfileService {
         dto.setMaxScore(section.getMaxScore());
         dto.setWeight(section.getWeight());
         dto.setMinPass(section.getMinPass());
-        dto.setDefaultTimeSec(section.getDefaultTimeSec());
         return dto;
     }
 }
