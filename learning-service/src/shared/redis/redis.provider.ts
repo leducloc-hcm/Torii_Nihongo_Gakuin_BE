@@ -9,19 +9,33 @@ export const redisProvider: Provider = {
   provide: REDIS_CLIENT,
   inject: [redisConfig.KEY],
   useFactory: async (cfg: ConfigType<typeof redisConfig>) => {
+    const normalizedUrl = cfg.url?.replace(/^['\"]|['\"]$/g, "");
+
     const options: RedisOptions = {
       lazyConnect: true,
-      maxRetriesPerRequest: null,
+      maxRetriesPerRequest: 3,
+      enableOfflineQueue: true,
       enableReadyCheck: true,
       connectTimeout: 10000,
+      keepAlive: 30000,
+      reconnectOnError: (error) => {
+        const message = error.message.toLowerCase();
+        return (
+          message.includes("connection is closed") ||
+          message.includes("read only")
+        );
+      },
       retryStrategy: (times) => {
-        const delay = Math.min(times * 50, 2000);
+        const delay = Math.min(100 * Math.pow(2, times - 1), 5000);
         return delay;
       },
     };
 
-    const client = cfg.url
-      ? new IORedis(cfg.url, options)
+    const client = normalizedUrl
+      ? new IORedis(normalizedUrl, {
+          ...options,
+          tls: cfg.tls,
+        })
       : new IORedis({
           ...options,
           host: cfg.host,
@@ -29,6 +43,7 @@ export const redisProvider: Provider = {
           username: cfg.username,
           password: cfg.password,
           db: Number(cfg.db),
+          tls: cfg.tls,
         });
 
     client.on("connect", () => console.log("[Redis] 🔗 Connected"));
@@ -43,8 +58,11 @@ export const redisProvider: Provider = {
       await client.connect();
       console.log("[Redis] 🚀 Successfully initialized");
     } catch (error) {
-      console.error("[Redis] 💥 Failed to connect:", error);
-      throw error;
+      // Keep app alive and let ioredis retry in background.
+      console.error(
+        "[Redis] 💥 Initial connect failed, will retry automatically:",
+        error,
+      );
     }
 
     return client;

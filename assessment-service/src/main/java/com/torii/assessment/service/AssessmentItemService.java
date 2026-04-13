@@ -3,13 +3,27 @@ package com.torii.assessment.service;
 import com.torii.assessment.dto.assessmentitem.AssessmentItemDTO;
 import com.torii.assessment.dto.assessmentitem.AssessmentItemListResponseDTO;
 import com.torii.assessment.dto.assessmentitem.CreateAssessmentItemDTO;
+import com.torii.assessment.dto.assessmentitem.ImportAssessmentItemQuestionGroupsDTO;
+import com.torii.assessment.dto.assessmentitem.ImportAssessmentItemQuestionsDTO;
 import com.torii.assessment.dto.assessmentitem.QueryAssessmentItemDTO;
 import com.torii.assessment.dto.assessmentitem.UpdateAssessmentItemDTO;
+import com.torii.assessment.entity.AssessmentGroupQuestion;
 import com.torii.assessment.entity.AssessmentItem;
+import com.torii.assessment.entity.AssessmentOption;
+import com.torii.assessment.entity.AssessmentQuestion;
+import com.torii.assessment.entity.AssessmentQuestionGroup;
+import com.torii.assessment.entity.Option;
 import com.torii.assessment.entity.Question;
+import com.torii.assessment.entity.QuestionGroupQuestion;
 import com.torii.assessment.entity.QuestionGroup;
+import com.torii.assessment.repository.AssessmentGroupQuestionRepository;
 import com.torii.assessment.repository.AssessmentItemRepository;
+import com.torii.assessment.repository.AssessmentOptionRepository;
+import com.torii.assessment.repository.AssessmentQuestionGroupRepository;
+import com.torii.assessment.repository.AssessmentQuestionRepository;
 import com.torii.assessment.repository.AssessmentSectionRepository;
+import com.torii.assessment.repository.OptionRepository;
+import com.torii.assessment.repository.QuestionGroupQuestionRepository;
 import com.torii.assessment.repository.QuestionGroupRepository;
 import com.torii.assessment.repository.QuestionRepository;
 import jakarta.persistence.criteria.Predicate;
@@ -25,9 +39,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -41,6 +57,12 @@ public class AssessmentItemService {
     private final AssessmentSectionRepository assessmentSectionRepository;
     private final QuestionRepository questionRepository;
     private final QuestionGroupRepository questionGroupRepository;
+    private final OptionRepository optionRepository;
+    private final QuestionGroupQuestionRepository questionGroupQuestionRepository;
+    private final AssessmentQuestionRepository assessmentQuestionRepository;
+    private final AssessmentQuestionGroupRepository assessmentQuestionGroupRepository;
+    private final AssessmentOptionRepository assessmentOptionRepository;
+    private final AssessmentGroupQuestionRepository assessmentGroupQuestionRepository;
 
     @Transactional
     public AssessmentItemDTO createAssessmentItem(CreateAssessmentItemDTO dto) {
@@ -145,6 +167,107 @@ public class AssessmentItemService {
         log.info("Deleted assessment item: {}", id);
     }
 
+    @Transactional
+    public Map<String, Object> importQuestionsToAssessmentItem(Long itemId, ImportAssessmentItemQuestionsDTO dto) {
+        ensureItemExists(itemId);
+
+        List<Long> sourceQuestionIds = dto.getQuestionIds();
+        List<Question> questions = questionRepository.findAllById(sourceQuestionIds);
+        if (questions.size() != sourceQuestionIds.size()) {
+            throw new RuntimeException("Some questions not found");
+        }
+
+        Map<Long, Question> questionMap = questions.stream()
+                .collect(Collectors.toMap(Question::getId, Function.identity()));
+
+        int nextOrder = assessmentItemRepository.findQuestionIdsByItemId(itemId).size();
+        List<Long> importedIds = new ArrayList<>();
+        for (Long sourceQuestionId : sourceQuestionIds) {
+            Question sourceQuestion = questionMap.get(sourceQuestionId);
+            AssessmentQuestion copied = cloneAssessmentQuestion(sourceQuestion);
+            assessmentItemRepository.insertQuestionLink(itemId, copied.getId(), nextOrder++);
+            importedIds.add(copied.getId());
+        }
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("itemId", itemId);
+        response.put("importedCount", importedIds.size());
+        response.put("assessmentQuestionIds", importedIds);
+        response.put("message", "Questions imported successfully");
+        return response;
+    }
+
+    @Transactional
+    public Map<String, Object> importQuestionGroupsToAssessmentItem(Long itemId, ImportAssessmentItemQuestionGroupsDTO dto) {
+        ensureItemExists(itemId);
+
+        List<Long> sourceGroupIds = dto.getQuestionGroupIds();
+        List<QuestionGroup> groups = questionGroupRepository.findAllById(sourceGroupIds);
+        if (groups.size() != sourceGroupIds.size()) {
+            throw new RuntimeException("Some question groups not found");
+        }
+
+        Map<Long, QuestionGroup> groupMap = groups.stream()
+                .collect(Collectors.toMap(QuestionGroup::getId, Function.identity()));
+
+        int nextGroupOrder = assessmentItemRepository.findGroupIdsByItemId(itemId).size();
+        List<Long> importedGroupIds = new ArrayList<>();
+
+        for (Long sourceGroupId : sourceGroupIds) {
+            QuestionGroup sourceGroup = groupMap.get(sourceGroupId);
+
+            AssessmentQuestionGroup copiedGroup = AssessmentQuestionGroup.builder()
+                    .originalGroupId(sourceGroup.getId())
+                    .type(sourceGroup.getType())
+                    .level(sourceGroup.getLevel())
+                    .difficulty(sourceGroup.getDifficulty())
+                    .stem(sourceGroup.getStem())
+                    .passage(sourceGroup.getPassage())
+                    .explanation(sourceGroup.getExplanation())
+                    .mediaUrl(sourceGroup.getMediaUrl())
+                    .audioUrl(sourceGroup.getAudioUrl())
+                    .build();
+            copiedGroup = assessmentQuestionGroupRepository.save(copiedGroup);
+
+            List<QuestionGroupQuestion> sourceLinks = questionGroupQuestionRepository.findByGroupIdOrderByOrderAsc(sourceGroupId);
+            List<AssessmentGroupQuestion> copiedLinks = new ArrayList<>();
+            Map<Long, Long> clonedQuestionMap = new HashMap<>();
+
+            for (int i = 0; i < sourceLinks.size(); i++) {
+                QuestionGroupQuestion sourceLink = sourceLinks.get(i);
+                Long sourceQuestionId = sourceLink.getQuestionId();
+
+                Long copiedQuestionId = clonedQuestionMap.get(sourceQuestionId);
+                if (copiedQuestionId == null) {
+                    Question sourceQuestion = questionRepository.findById(sourceQuestionId)
+                            .orElseThrow(() -> new RuntimeException("Question not found: " + sourceQuestionId));
+                    copiedQuestionId = cloneAssessmentQuestion(sourceQuestion).getId();
+                    clonedQuestionMap.put(sourceQuestionId, copiedQuestionId);
+                }
+
+                copiedLinks.add(AssessmentGroupQuestion.builder()
+                        .groupId(copiedGroup.getId())
+                        .questionId(copiedQuestionId)
+                        .order(sourceLink.getOrder() != null ? sourceLink.getOrder() : i)
+                        .build());
+            }
+
+            if (!copiedLinks.isEmpty()) {
+                assessmentGroupQuestionRepository.saveAll(copiedLinks);
+            }
+
+            assessmentItemRepository.insertGroupLink(itemId, copiedGroup.getId(), nextGroupOrder++);
+            importedGroupIds.add(copiedGroup.getId());
+        }
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("itemId", itemId);
+        response.put("importedCount", importedGroupIds.size());
+        response.put("assessmentQuestionGroupIds", importedGroupIds);
+        response.put("message", "Question groups imported successfully");
+        return response;
+    }
+
     private void validateQuestionIds(List<Long> questionIds) {
         if (questionIds == null || questionIds.isEmpty()) {
             return;
@@ -154,6 +277,45 @@ public class AssessmentItemService {
         if (questions.size() != questionIds.size()) {
             throw new RuntimeException("Some questions not found");
         }
+    }
+
+    private void ensureItemExists(Long itemId) {
+        if (!assessmentItemRepository.existsById(itemId)) {
+            throw new RuntimeException("Assessment item with ID " + itemId + " not found");
+        }
+    }
+
+    private AssessmentQuestion cloneAssessmentQuestion(Question sourceQuestion) {
+        AssessmentQuestion copied = AssessmentQuestion.builder()
+                .originalQuestionId(sourceQuestion.getId())
+                .type(sourceQuestion.getType())
+                .level(sourceQuestion.getLevel())
+                .difficulty(sourceQuestion.getDifficulty())
+                .stem(sourceQuestion.getStem())
+                .passage(sourceQuestion.getPassage())
+                .explanation(sourceQuestion.getExplanation())
+                .mediaUrl(sourceQuestion.getMediaUrl())
+                .audioUrl(null)
+                .build();
+
+        copied = assessmentQuestionRepository.save(copied);
+
+        List<Option> sourceOptions = optionRepository.findByQuestionIdOrderByOrderAsc(sourceQuestion.getId());
+        if (!sourceOptions.isEmpty()) {
+            List<AssessmentOption> copiedOptions = new ArrayList<>();
+            for (int i = 0; i < sourceOptions.size(); i++) {
+                Option sourceOption = sourceOptions.get(i);
+                copiedOptions.add(AssessmentOption.builder()
+                        .questionId(copied.getId())
+                        .content(sourceOption.getContent())
+                        .isCorrect(sourceOption.getIsCorrect() != null ? sourceOption.getIsCorrect() : false)
+                        .order(sourceOption.getOrder() != null ? sourceOption.getOrder() : i)
+                        .build());
+            }
+            assessmentOptionRepository.saveAll(copiedOptions);
+        }
+
+        return copied;
     }
 
     private void validateQuestionGroupIds(List<Long> questionGroupIds) {

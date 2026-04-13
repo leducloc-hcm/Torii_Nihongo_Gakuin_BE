@@ -109,5 +109,6 @@ public class AssessmentDTO {
         private String mediaUrl;
         private String audioUrl;
         private List<Long> questionIds;
+        private List<QuestionDetailDTO> questions;
     }
 }

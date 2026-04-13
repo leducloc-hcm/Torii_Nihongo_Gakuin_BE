@@ -1,142 +1,197 @@
-import { DOMAIN_CONSTRAINTS_PROMPT } from '../prompts/domain-constraints.prompt'
-import { JLPT_LEVEL_VALIDATION_PROMPT } from '../prompts/jlpt-validation.prompt'
+import { DOMAIN_CONSTRAINTS_PROMPT } from "../prompts/domain-constraints.prompt";
+import { JLPT_LEVEL_VALIDATION_PROMPT } from "../prompts/jlpt-validation.prompt";
+
+export function isGreetingOrIntroductionQuery(query: string): boolean {
+  const normalizedQuery = query.trim().toLowerCase();
+
+  const greetingPatterns = [
+    /^(xin\s*ch[aàáạảãâầấậẩẫăằắặẳẵ]o|ch[aàáạảãâầấậẩẫăằắặẳẵ]o|hi|hello|hey|good\s*(morning|afternoon|evening)|こんにちは|もしもし|おはよう|こんばんは)[!.,?\s]*$/i,
+    /^(b[aạ]n\s*l[aà]\s*ai|b[aạ]n\s*l[aà]\s*g[iì]|who\s*are\s*you|what\s*can\s*you\s*do|あなたは誰|何ができますか)[!.,?\s]*$/i,
+  ];
+
+  return greetingPatterns.some((pattern) => pattern.test(normalizedQuery));
+}
 
 export function isJapaneseLearningQuery(query: string): boolean {
-  const lowerQuery = query.toLowerCase()
+  const lowerQuery = query.toLowerCase();
+
+  if (isGreetingOrIntroductionQuery(query)) {
+    return true;
+  }
 
   const japaneseKeywords = [
     // English
-    'japanese',
-    'japan',
-    'jlpt',
-    'n1',
-    'n2',
-    'n3',
-    'n4',
-    'n5',
-    'kanji',
-    'hiragana',
-    'katakana',
-    'grammar',
-    'vocabulary',
-    'pronunciation',
-    'speaking',
-    'listening',
-    'reading',
-    'writing',
-    'keigo',
-    'honorific',
-    'polite',
-    'casual',
-    'formal',
-    'sensei',
-    'san',
-    'kun',
-    'chan',
-    'sama',
-    'anime',
-    'manga',
-    'culture',
-    'business japanese',
-    'conversation',
-    'dialogue',
-    'phrase',
-    'sentence',
+    "japanese",
+    "japan",
+    "jlpt",
+    "n1",
+    "n2",
+    "n3",
+    "n4",
+    "n5",
+    "kanji",
+    "hiragana",
+    "katakana",
+    "grammar",
+    "vocabulary",
+    "pronunciation",
+    "speaking",
+    "listening",
+    "reading",
+    "writing",
+    "keigo",
+    "honorific",
+    "polite",
+    "casual",
+    "formal",
+    "sensei",
+    "san",
+    "kun",
+    "chan",
+    "sama",
+    "anime",
+    "manga",
+    "culture",
+    "business japanese",
+    "conversation",
+    "dialogue",
+    "phrase",
+    "sentence",
 
-    'tiếng nhật',
-    'tieng nhat',
-    'nhật bản',
-    'nhat ban',
-    'jlpt',
-    'kanji',
-    'hiragana',
-    'katakana',
-    'ngữ pháp',
-    'ngu phap',
-    'từ vựng',
-    'tu vung',
-    'phát âm',
-    'phat am',
-    'nói',
-    'nghe',
-    'đọc',
-    'viết',
-    'kính ngữ',
-    'kinh ngu',
-    'lịch sự',
-    'lich su',
-    'thường',
-    'trang trọng',
-    'hội thoại',
-    'hoi thoai',
-    'câu',
-    'cau',
-    'văn phạm',
-    'van pham',
-    'học tiếng nhật',
-    'hoc tieng nhat',
+    "tiếng nhật",
+    "tieng nhat",
+    "nhật bản",
+    "nhat ban",
+    "jlpt",
+    "kanji",
+    "hiragana",
+    "katakana",
+    "ngữ pháp",
+    "ngu phap",
+    "từ vựng",
+    "tu vung",
+    "phát âm",
+    "phat am",
+    "nói",
+    "nghe",
+    "đọc",
+    "viết",
+    "kính ngữ",
+    "kinh ngu",
+    "lịch sự",
+    "lich su",
+    "thường",
+    "trang trọng",
+    "hội thoại",
+    "hoi thoai",
+    "câu",
+    "cau",
+    "văn phạm",
+    "van pham",
+    "học tiếng nhật",
+    "hoc tieng nhat",
 
     // Japanese
-    '日本語',
-    '日本',
-    'にほんご',
-    'ニホンゴ',
-    '文法',
-    '語彙',
-    '発音',
-    '会話',
-    '漢字',
-    'ひらがな',
-    'カタカナ',
-    '敬語',
-    '丁寧語',
-    '謙譲語',
-    '尊敬語',
-    'リスニング',
-    'スピーキング',
-    '読解',
-    '作文',
-    '初級',
-    '中級',
-    '上級',
-    '基礎',
-    '基本',
-  ]
+    "日本語",
+    "日本",
+    "にほんご",
+    "ニホンゴ",
+    "文法",
+    "語彙",
+    "発音",
+    "会話",
+    "漢字",
+    "ひらがな",
+    "カタカナ",
+    "敬語",
+    "丁寧語",
+    "謙譲語",
+    "尊敬語",
+    "リスニング",
+    "スピーキング",
+    "読解",
+    "作文",
+    "初級",
+    "中級",
+    "上級",
+    "基礎",
+    "基本",
+  ];
 
   // Check for Japanese learning keywords
-  const hasJapaneseKeywords = japaneseKeywords.some((keyword) => lowerQuery.includes(keyword))
+  const hasJapaneseKeywords = japaneseKeywords.some((keyword) =>
+    lowerQuery.includes(keyword),
+  );
 
   // Check for course-related content (assume Japanese courses)
-  const courseKeywords = ['khóa học', 'course', 'lesson', 'bài học', 'コース', '講座']
-  const hasCourseKeywords = courseKeywords.some((keyword) => lowerQuery.includes(keyword))
+  const courseKeywords = [
+    "khóa học",
+    "course",
+    "lesson",
+    "bài học",
+    "コース",
+    "講座",
+  ];
+  const hasCourseKeywords = courseKeywords.some((keyword) =>
+    lowerQuery.includes(keyword),
+  );
 
   // Check for flashcard-related content (assume Japanese flashcards)
-  const flashcardKeywords = ['flashcard', 'thẻ', 'vocabulary', 'từ vựng', 'フラッシュカード']
-  const hasFlashcardKeywords = flashcardKeywords.some((keyword) => lowerQuery.includes(keyword))
+  const flashcardKeywords = [
+    "flashcard",
+    "thẻ",
+    "vocabulary",
+    "từ vựng",
+    "フラッシュカード",
+  ];
+  const hasFlashcardKeywords = flashcardKeywords.some((keyword) =>
+    lowerQuery.includes(keyword),
+  );
 
   // Check for assessment-related content (assume JLPT assessments)
-  const assessmentKeywords = ['test', 'quiz', 'exam', 'bài thi', 'kiểm tra', 'テスト', '試験']
-  const hasAssessmentKeywords = assessmentKeywords.some((keyword) => lowerQuery.includes(keyword))
+  const assessmentKeywords = [
+    "test",
+    "quiz",
+    "exam",
+    "bài thi",
+    "kiểm tra",
+    "テスト",
+    "試験",
+  ];
+  const hasAssessmentKeywords = assessmentKeywords.some((keyword) =>
+    lowerQuery.includes(keyword),
+  );
 
   // 🆕 Check for blog-related content (assume Japanese learning blog posts)
-  const blogKeywords = ['blog', 'bài viết', 'blog post', 'article', 'ブログ', '記事']
-  const hasBlogKeywords = blogKeywords.some((keyword) => lowerQuery.includes(keyword))
+  const blogKeywords = [
+    "blog",
+    "bài viết",
+    "blog post",
+    "article",
+    "ブログ",
+    "記事",
+  ];
+  const hasBlogKeywords = blogKeywords.some((keyword) =>
+    lowerQuery.includes(keyword),
+  );
 
   // 🆕 Check for website context (queries about website features are valid)
   const websiteContextKeywords = [
-    'website',
-    'hệ thống',
-    'platform',
-    'trang web',
-    'ứng dụng',
-    'app',
-    'của website',
-    'của hệ thống',
-    'có sẵn',
-    'hiện có',
-    'available',
-  ]
-  const hasWebsiteContext = websiteContextKeywords.some((keyword) => lowerQuery.includes(keyword))
+    "website",
+    "hệ thống",
+    "platform",
+    "trang web",
+    "ứng dụng",
+    "app",
+    "của website",
+    "của hệ thống",
+    "có sẵn",
+    "hiện có",
+    "available",
+  ];
+  const hasWebsiteContext = websiteContextKeywords.some((keyword) =>
+    lowerQuery.includes(keyword),
+  );
 
   return (
     hasJapaneseKeywords ||
@@ -145,15 +200,18 @@ export function isJapaneseLearningQuery(query: string): boolean {
     hasAssessmentKeywords ||
     hasBlogKeywords ||
     hasWebsiteContext
-  )
+  );
 }
 
 /**
  * Check if a query mentions invalid JLPT levels
  */
-export function hasInvalidJLPTLevel(query: string): { hasInvalid: boolean; invalidLevels: string[] } {
-  const lowerQuery = query.toLowerCase()
-  const invalidLevels: string[] = []
+export function hasInvalidJLPTLevel(query: string): {
+  hasInvalid: boolean;
+  invalidLevels: string[];
+} {
+  const lowerQuery = query.toLowerCase();
+  const invalidLevels: string[] = [];
 
   // Patterns for invalid JLPT levels
   const invalidPatterns = [
@@ -186,25 +244,27 @@ export function hasInvalidJLPTLevel(query: string): { hasInvalid: boolean; inval
     /dưới\s*n5/gi, // Below N5 (invalid)
     /above\s*n1/gi, // Above N1 (invalid)
     /below\s*n5/gi, // Below N5 (invalid)
-  ]
+  ];
 
   invalidPatterns.forEach((pattern) => {
-    const matches = query.match(pattern)
+    const matches = query.match(pattern);
     if (matches) {
-      invalidLevels.push(...matches)
+      invalidLevels.push(...matches);
     }
-  })
+  });
 
   return {
     hasInvalid: invalidLevels.length > 0,
     invalidLevels: [...new Set(invalidLevels)], // Remove duplicates
-  }
+  };
 }
 
 /**
  * Generate domain constraint error message
  */
-export function generateDomainConstraintMessage(language: 'vi' | 'en' | 'ja' = 'vi'): string {
+export function generateDomainConstraintMessage(
+  language: "vi" | "en" | "ja" = "vi",
+): string {
   const messages = {
     vi: `Xin lỗi, tôi chỉ có thể hỗ trợ các chủ đề liên quan đến học tiếng Nhật. Tôi được thiết kế chuyên biệt để hỗ trợ ôn thi JLPT, ngữ pháp tiếng Nhật, từ vựng, kanji và các tài liệu học tập liên quan.
 
@@ -217,15 +277,17 @@ Is there anything about learning Japanese that I can help you with instead? 📚
     ja: `申し訳ございませんが、日本語学習に関連するトピックのみお手伝いできます。私は特にJLPT準備、日本語文法、語彙、漢字、および関連する学習教材をサポートするよう設計されています。
 
 代わりに、日本語学習について何かお手伝いできることはございますか？📚🇯🇵`,
-  }
+  };
 
-  return messages[language]
+  return messages[language];
 }
 
 /**
  * Generate JLPT level validation error message
  */
-export function generateJLPTValidationMessage(language: 'vi' | 'en' | 'ja' = 'vi'): string {
+export function generateJLPTValidationMessage(
+  language: "vi" | "en" | "ja" = "vi",
+): string {
   const messages = {
     vi: `Xin lỗi, chỉ có các khóa học từ N1 đến N5 thôi. Hệ thống JLPT chỉ bao gồm 5 cấp độ:
 
@@ -259,68 +321,100 @@ Would you like to find courses at any of these levels? 🎌`,
 • N1 - 上級
 
 これらのレベルのいずれかでコースをお探しでしょうか？🎌`,
-  }
+  };
 
-  return messages[language]
+  return messages[language];
 }
 
 /**
  * Detect language from query for appropriate error message
  */
-export function detectLanguage(query: string): 'vi' | 'en' | 'ja' {
-  const lowerQuery = query.toLowerCase()
-
-  // Vietnamese indicators
-  const viKeywords = ['tìm', 'khóa học', 'bài học', 'học tập', 'của tôi', 'có', 'được', 'làm']
-  const hasVietnamese = viKeywords.some((keyword) => lowerQuery.includes(keyword))
+export function detectLanguage(query: string): "vi" | "en" | "ja" {
+  const lowerQuery = query.toLowerCase();
 
   // Japanese indicators (hiragana, katakana, kanji)
-  const hasJapanese = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(query)
+  const hasJapanese = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(query);
+  if (hasJapanese) return "ja";
 
-  // English indicators (if no Vietnamese or Japanese)
-  if (hasJapanese) return 'ja'
-  if (hasVietnamese) return 'vi'
-  return 'en' // Default to English
+  // Vietnamese diacritics and common words
+  const hasVietnameseDiacritics =
+    /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i.test(
+      query,
+    );
+  if (hasVietnameseDiacritics) return "vi";
+
+  // Vietnamese indicators
+  const viKeywords = [
+    "xin chao",
+    "chao",
+    "toi",
+    "ban",
+    "tim",
+    "khoa hoc",
+    "bai hoc",
+    "hoc tap",
+    "cua toi",
+    "duoc",
+    "lam",
+  ];
+  const hasVietnamese = viKeywords.some((keyword) =>
+    lowerQuery.includes(keyword),
+  );
+  if (hasVietnamese) return "vi";
+
+  // Basic English greeting/intro indicators
+  const enKeywords = [
+    "hello",
+    "hi",
+    "hey",
+    "good morning",
+    "good afternoon",
+    "good evening",
+  ];
+  const hasEnglish = enKeywords.some((keyword) => lowerQuery.includes(keyword));
+  if (hasEnglish) return "en";
+
+  return "en"; // Default to English
 }
 
 /**
  * Validate query against domain constraints and JLPT levels
  */
 export interface ValidationResult {
-  isValid: boolean
-  violationType: 'domain' | 'jlpt' | null
-  errorMessage?: string
-  suggestedResponse?: string
+  isValid: boolean;
+  violationType: "domain" | "jlpt" | null;
+  errorMessage?: string;
+  suggestedResponse?: string;
 }
 
 export function validateQuery(query: string): ValidationResult {
   // Check domain constraints
   if (!isJapaneseLearningQuery(query)) {
-    const language = detectLanguage(query)
+    const language = detectLanguage(query);
     return {
       isValid: false,
-      violationType: 'domain',
-      errorMessage: 'Query is not related to Japanese learning',
+      violationType: "domain",
+      errorMessage: "Query is not related to Japanese learning",
       suggestedResponse: generateDomainConstraintMessage(language),
-    }
+    };
   }
 
   // Check JLPT level validation
-  const jlptValidation = hasInvalidJLPTLevel(query)
+  const jlptValidation = hasInvalidJLPTLevel(query);
   if (jlptValidation.hasInvalid) {
-    const language = detectLanguage(query)
+    const language = detectLanguage(query);
     return {
       isValid: false,
-      violationType: 'jlpt',
-      errorMessage: `Invalid JLPT levels found: ${jlptValidation.invalidLevels.join(', ')}`,
+      violationType: "jlpt",
+      errorMessage: `Invalid JLPT levels found: ${jlptValidation.invalidLevels.join(", ")}`,
       suggestedResponse: generateJLPTValidationMessage(language),
-    }
+    };
   }
 
   return {
     isValid: true,
     violationType: null,
-  }
+  };
 }
 
 /**
@@ -337,5 +431,5 @@ ${JLPT_LEVEL_VALIDATION_PROMPT}
 3. If invalid, respond with appropriate error message
 4. If valid, proceed with normal processing
 
-CRITICAL: Always validate BEFORE calling any tools or processing the request!`
+CRITICAL: Always validate BEFORE calling any tools or processing the request!`;
 }

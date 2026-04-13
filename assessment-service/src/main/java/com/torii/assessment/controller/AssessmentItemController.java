@@ -3,6 +3,8 @@ package com.torii.assessment.controller;
 import com.torii.assessment.dto.assessmentitem.AssessmentItemDTO;
 import com.torii.assessment.dto.assessmentitem.AssessmentItemListResponseDTO;
 import com.torii.assessment.dto.assessmentitem.CreateAssessmentItemDTO;
+import com.torii.assessment.dto.assessmentitem.ImportAssessmentItemQuestionGroupsDTO;
+import com.torii.assessment.dto.assessmentitem.ImportAssessmentItemQuestionsDTO;
 import com.torii.assessment.dto.assessmentitem.QueryAssessmentItemDTO;
 import com.torii.assessment.dto.assessmentitem.UpdateAssessmentItemDTO;
 import com.torii.assessment.service.AssessmentItemService;
@@ -72,5 +74,23 @@ public class AssessmentItemController {
     public ResponseEntity<Map<String, String>> deleteAssessmentItem(@PathVariable Long id) {
         assessmentItemService.deleteAssessmentItem(id);
         return ResponseEntity.ok(Map.of("message", "Assessment item deleted successfully"));
+    }
+
+    @PostMapping("/{itemId}/import/questions")
+    @Operation(summary = "Import questions into assessment item as assessment questions")
+    public ResponseEntity<Map<String, Object>> importQuestionsToAssessmentItem(
+            @PathVariable Long itemId,
+            @Valid @RequestBody ImportAssessmentItemQuestionsDTO dto) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(assessmentItemService.importQuestionsToAssessmentItem(itemId, dto));
+    }
+
+    @PostMapping("/{itemId}/import/question-groups")
+    @Operation(summary = "Import question groups into assessment item as assessment question groups")
+    public ResponseEntity<Map<String, Object>> importQuestionGroupsToAssessmentItem(
+            @PathVariable Long itemId,
+            @Valid @RequestBody ImportAssessmentItemQuestionGroupsDTO dto) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(assessmentItemService.importQuestionGroupsToAssessmentItem(itemId, dto));
     }
 }
