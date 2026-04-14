@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  UnauthorizedException,
 } from "@nestjs/common";
 import {
   LectureProfileRepository,
@@ -23,6 +24,7 @@ import {
 } from "./profile.model";
 import { RoleName } from "src/shared/constants/role.constant";
 import { S3Service } from "src/shared/services/s3.service";
+import { HashingService } from "src/shared/services/hashing.service";
 import {
   normalizeMultipartBody,
   parseOptionalDate,
@@ -39,6 +41,7 @@ export class ProfileService {
     private readonly sharedUserRepo: SharedUserRepository,
     private readonly prismaService: PrismaService,
     private readonly s3Service: S3Service,
+    private readonly hashingService: HashingService,
   ) {}
 
   async getProfile(
@@ -125,13 +128,48 @@ export class ProfileService {
     }
   }
 
+  async changePassword(
+    userId: number,
+    body: { oldPassword: string; password: string; confirmPassword: string },
+  ): Promise<{ message: string }> {
+    const { oldPassword, password, confirmPassword } = body;
+
+    if (password !== confirmPassword) {
+      throw new BadRequestException(
+        "New password and confirm password do not match",
+      );
+    }
+
+    const user = await this.sharedUserRepo.findUnique({ id: userId });
+    if (!user) {
+      throw new NotFoundException("User not found");
+    }
+
+    const isMatch = await this.hashingService.compare(
+      oldPassword,
+      user.password,
+    );
+    if (!isMatch) {
+      throw new UnauthorizedException("Old password is incorrect");
+    }
+
+    const hashedPassword = await this.hashingService.hash(password);
+
+    await this.prismaService.user.update({
+      where: { id: userId },
+      data: { password: hashedPassword },
+    });
+
+    return { message: "Password changed successfully" };
+  }
+
   /**
    * Public lecturer profile by lecturerProfile id (no auth).
    * Omits phone and date of birth.
    */
-  async getPublicLectureProfile(profileId: number): Promise<
-    Omit<GetLectureProfileType, "phoneNumber" | "dateOfBirth">
-  > {
+  async getPublicLectureProfile(
+    profileId: number,
+  ): Promise<Omit<GetLectureProfileType, "phoneNumber" | "dateOfBirth">> {
     const profile = await this.lectureProfileRepo.getLectureProfile(profileId);
     if (!profile) {
       throw new NotFoundException("Lecturer profile not found");
@@ -190,6 +228,11 @@ export class ProfileService {
       ...(coverPhotoUrl && { coverPhoto: coverPhotoUrl }),
     };
 
+    // Normalize legacy snake_case fields (front-end may send `date_of_birth`)
+    if ((updatedData as any).date_of_birth !== undefined) {
+      (updatedData as any).dateOfBirth = (updatedData as any).date_of_birth;
+      delete (updatedData as any).date_of_birth;
+    }
     switch (user.role) {
       case RoleName.Lecturer: {
         const lecturerProfile =
@@ -367,9 +410,11 @@ export class ProfileService {
     body: Record<string, string | string[] | undefined>,
     file?: Express.Multer.File,
   ) {
-    const lecturerProfile = await this.prismaService.lecturerProfile.findUnique({
-      where: { userId: targetUserId },
-    });
+    const lecturerProfile = await this.prismaService.lecturerProfile.findUnique(
+      {
+        where: { userId: targetUserId },
+      },
+    );
     if (!lecturerProfile) {
       throw new NotFoundException("Lecturer profile not found");
     }
@@ -391,9 +436,11 @@ export class ProfileService {
     body: Record<string, string | string[] | undefined>,
     file?: Express.Multer.File,
   ) {
-    const lecturerProfile = await this.prismaService.lecturerProfile.findUnique({
-      where: { userId: targetUserId },
-    });
+    const lecturerProfile = await this.prismaService.lecturerProfile.findUnique(
+      {
+        where: { userId: targetUserId },
+      },
+    );
     if (!lecturerProfile) {
       throw new NotFoundException("Lecturer profile not found");
     }
@@ -430,10 +477,15 @@ export class ProfileService {
     return this.mapSpecialtyRow(updated);
   }
 
-  async deleteLecturerSpecialtyByStaff(targetUserId: number, specialtyId: number) {
-    const lecturerProfile = await this.prismaService.lecturerProfile.findUnique({
-      where: { userId: targetUserId },
-    });
+  async deleteLecturerSpecialtyByStaff(
+    targetUserId: number,
+    specialtyId: number,
+  ) {
+    const lecturerProfile = await this.prismaService.lecturerProfile.findUnique(
+      {
+        where: { userId: targetUserId },
+      },
+    );
     if (!lecturerProfile) {
       throw new NotFoundException("Lecturer profile not found");
     }
@@ -452,9 +504,11 @@ export class ProfileService {
     body: Record<string, string | string[] | undefined>,
     file?: Express.Multer.File,
   ) {
-    const lecturerProfile = await this.prismaService.lecturerProfile.findUnique({
-      where: { userId },
-    });
+    const lecturerProfile = await this.prismaService.lecturerProfile.findUnique(
+      {
+        where: { userId },
+      },
+    );
     if (!lecturerProfile) {
       throw new NotFoundException("Lecturer profile not found");
     }
@@ -471,9 +525,11 @@ export class ProfileService {
   }
 
   async deleteOwnSpecialty(userId: number, specialtyId: number) {
-    const lecturerProfile = await this.prismaService.lecturerProfile.findUnique({
-      where: { userId },
-    });
+    const lecturerProfile = await this.prismaService.lecturerProfile.findUnique(
+      {
+        where: { userId },
+      },
+    );
     if (!lecturerProfile) {
       throw new NotFoundException("Lecturer profile not found");
     }

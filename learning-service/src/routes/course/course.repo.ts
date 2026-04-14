@@ -130,14 +130,6 @@ export class CourseRepository {
                 durationSec: true,
                 createdAt: true,
                 updatedAt: true,
-                quiz: {
-                  select: {
-                    id: true,
-                    createdAt: true,
-                    timeLimitSec: true,
-                    title: true,
-                  },
-                },
                 media: {
                   select: {
                     id: true,

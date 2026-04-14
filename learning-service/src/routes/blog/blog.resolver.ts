@@ -11,12 +11,15 @@ import {
 } from "./blog.dto";
 import { UseGuards } from "@nestjs/common";
 import { GqlAuthGuard } from "src/shared/guards/gql-auth.guard";
+import { Auth } from "src/shared/decorators/auth.decorator";
+import { AuthType } from "src/shared/constants/auth.constant";
 
 @Resolver(() => Blog)
 export class BlogResolver {
   constructor(private readonly blogService: BlogService) {}
 
   @Query(() => PaginatedBlogsResponse, { name: "blogs" })
+  @Auth([AuthType.None])
   async findAll(
     @Args("query", { nullable: true }) query?: QueryBlogsInput,
   ): Promise<PaginatedBlogsResponse> {
@@ -25,16 +28,19 @@ export class BlogResolver {
   }
 
   @Query(() => Blog, { name: "blog" })
+  @Auth([AuthType.None])
   async findOne(@Args("id", { type: () => Int }) id: number): Promise<Blog> {
     return this.blogService.findOne(id);
   }
 
   @Query(() => Blog, { name: "blogBySlug" })
+  @Auth([AuthType.None])
   async findBySlug(@Args("slug") slug: string): Promise<Blog> {
     return this.blogService.findBySlug(slug);
   }
 
   @Query(() => PaginatedBlogsResponse, { name: "blogsByAuthor" })
+  @Auth([AuthType.None])
   async findByAuthor(
     @Args("authorId", { type: () => Int }) authorId: number,
     @Args("query", { nullable: true }) query?: QueryBlogsInput,
@@ -44,6 +50,7 @@ export class BlogResolver {
   }
 
   @Query(() => PaginatedBlogsResponse, { name: "blogsByTag" })
+  @Auth([AuthType.None])
   async findByTag(
     @Args("tagId", { type: () => Int }) tagId: number,
     @Args("query", { nullable: true }) query?: QueryBlogsInput,

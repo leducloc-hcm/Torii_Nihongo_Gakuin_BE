@@ -187,6 +187,17 @@ services:
           - name: jwt-validator
             config:
               secret: nhatngutorii
+      - name: profile-password-route
+        paths:
+          - /profile/password
+        strip_path: false
+        methods:
+          - POST
+          - OPTIONS
+        plugins:
+          - name: jwt-validator
+            config:
+              secret: nhatngutorii
       - name: profile-route
         paths:
           - /profile

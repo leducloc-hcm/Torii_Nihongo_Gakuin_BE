@@ -139,6 +139,17 @@ export class ProfileController {
   ) {
     return this.profileService.deleteOwnSpecialty(userId, specialtyId);
   }
+  @Post("password")
+  @Auth([AuthType.Bearer])
+  @HttpCode(HttpStatus.OK)
+  async changePassword(
+    @ActiveUser("userId") userId: number,
+    @Body()
+    body: { oldPassword: string; password: string; confirmPassword: string },
+  ) {
+    // You should implement the logic in profileService.changePassword
+    return this.profileService.changePassword(userId, body);
+  }
 
   @Patch()
   @Auth([AuthType.Bearer])
