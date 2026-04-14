@@ -64,9 +64,6 @@ model User {
   aiMessages AIChatMessage[]
   aiQueries  AIQuery[]
 
-  
-  quiz           Quiz[]
-  quizAttempts   QuizAttempt[]
   Class Class[]
 
 
@@ -317,7 +314,6 @@ model Lesson {
   module      Module       @relation(fields: [moduleId], references: [id])
   media   MediaAsset[]
   liveSession LiveSession?
-  quiz        Quiz?
   notes       LessonNote[]
   progress    LessonProgress[]
 @@schema("learning")
@@ -336,9 +332,6 @@ model MediaAsset {
   createdAt DateTime  @default(now())
 
   lesson    Lesson?    @relation(fields: [lessonId], references: [id])
-  questions Question[]
-  questionGroups QuestionGroup[]
-  options   Option[]
   liveSessions LiveSessionMedia[]
 @@schema("learning")
 }
@@ -395,191 +388,6 @@ model LessonProgress {
 @@schema("learning")
 }
 
-// ===== Placement Test & Question Bank =====
-
-
-model Question {
-  id               Int              @id @default(autoincrement())
-  uuid             String?          @default(uuid())
-  version          Int              @default(1)
-  type             QuestionType
-  level            JLPTLevel
-  difficulty       Difficulty       @default(MEDIUM)
-  stem             String
-  passage          String?
-  mediaId          Int?
-  explanation      String?
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
-  readingLength    ReadingLength?
-  media            MediaAsset?      @relation(fields: [mediaId], references: [id])
-
-  groups                   QuestionGroupQuestion[]
-  options                  Option[]
-  quizItems                QuizItemQuestion[]
-  quizAnswers              QuizAnswer[]
-  
-  
-  @@unique([uuid, version])
-  @@index([uuid])
-  @@index([version])
-  @@index([type])
-  @@index([level])
-@@schema("learning")
-}
-
-model QuestionGroup {
-  id          Int       @id @default(autoincrement())
-  uuid        String?   @default(uuid()) 
-  version     Int       @default(1)
-  type        QuestionGroupType
-  title       String?
-  passage     String?          
-  mediaId     Int?
-  order       Int?
-  metadata    Json?
-  createdAt   DateTime  @default(now())
-
-  media       MediaAsset? @relation(fields: [mediaId], references: [id])
-
-  questions   QuestionGroupQuestion[]
-
-  quizItems       QuizItemGroup[]
-  
-  @@unique([uuid, version])
-  @@index([uuid])
-  @@index([version])
-@@schema("learning")
-}
-
-model QuestionGroupQuestion {
-  questionId Int
-  groupId    Int
-  order      Int?         
-  score      Float?       
-  createdAt  DateTime     @default(now())
-
-  question   Question      @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  group      QuestionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
-
-  @@id([questionId, groupId]) 
-@@schema("learning")
-}
-
-model Option {
-  id         Int     @id @default(autoincrement())
-  questionId Int
-  content    String?
-  mediaId    Int?
-  isCorrect  Boolean @default(false)
-  order      Int     @default(0)
-  
-  quizAnswers     QuizAnswer[]
-  
-  image     MediaAsset? @relation(fields: [mediaId], references: [id])
-  question  Question     @relation(fields: [questionId], references: [id],onDelete: Cascade)
-@@schema("learning")
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-model Quiz {
-  id        Int      @id @default(autoincrement())
-  lessonId  Int?     @unique
-  title     String
-  version   Int      @default(1)
-  createdAt DateTime @default(now())
-  createdBy  Int
-  timeLimitSec    Int
-
-  author    User    @relation(fields: [createdBy], references: [id])
-  lesson   Lesson?       @relation(fields: [lessonId], references: [id])
-  items    QuizItem[]
-  attempts QuizAttempt[]
-@@schema("learning")
-}
-
-model QuizItem {
-  id    Int @id @default(autoincrement())
-  quizId Int
-  order Int @default(0)
-
-  quiz           Quiz              @relation(fields: [quizId], references: [id])
-  questions      QuizItemQuestion[]
-  questionGroups QuizItemGroup[]
-@@schema("learning")
-}
-
-model QuizItemQuestion {
-  itemId     Int
-  questionId Int
-  order      Int?
-  createdAt  DateTime @default(now())
-
-  item     QuizItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
-
-  @@id([itemId, questionId])
-@@schema("learning")
-}
-
-model QuizItemGroup {
-  itemId    Int
-  groupId   Int
-  order     Int?
-  
-  createdAt DateTime @default(now())
-
-  item  QuizItem      @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  group QuestionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
-
-  @@id([itemId, groupId])
-@@schema("learning")
-}
-
-model QuizAttempt {
-  id          Int       @id @default(autoincrement())
-  quizId      Int
-  userId      Int
-
-  startedAt   DateTime  @default(now())
-  submittedAt DateTime?
-  score       Float?    // Accuracy percentage (0-100)
-  
-  quiz    Quiz         @relation(fields: [quizId], references: [id])
-  user    User         @relation(fields: [userId], references: [id])
-  answers QuizAnswer[]
-@@schema("learning")
-}
-
-model QuizAnswer {
-  id               Int      @id @default(autoincrement())
-  attemptId        Int
-  questionId       Int
-  selectedOptionId Int?
-  isCorrect        Boolean?
-  explanation      String?
-
-  attempt        QuizAttempt @relation(fields: [attemptId], references: [id])
-  question       Question    @relation(fields: [questionId], references: [id])
-  selectedOption Option?     @relation(fields: [selectedOptionId], references: [id])
-@@schema("learning")
-}
 
 model Class {
   id          Int      @id @default(autoincrement())

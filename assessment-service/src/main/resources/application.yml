@@ -3,9 +3,9 @@ spring:
     name: assessment-service
 
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/postgres?currentSchema=assessment&sslmode=disable}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://database.czgcs6yqwtym.ap-southeast-1.rds.amazonaws.com:5432/postgres?currentSchema=assessment}
     username: ${SPRING_DATASOURCE_USERNAME:postgres}
-    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:nhatngutorii}
     driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:org.postgresql.Driver}
     hikari:
       maximum-pool-size: ${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE:2}

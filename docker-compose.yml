@@ -54,7 +54,7 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       PORT: ${LEARNING_SERVICE_PORT:-4001}
-      DATABASE_URL: "postgresql://postgres:nhatngutorii@db.rkizlomnljifkbdimrup.supabase.co:5432/postgres?schema=learning&sslmode=no-verify"
+      DATABASE_URL: "postgresql://postgres:nhatngutorii@database.czgcs6yqwtym.ap-southeast-1.rds.amazonaws.com:5432/postgres?schema=learning&sslmode=no-verify"
       REDIS_URL: redis://${REDIS_USERNAME:-}${REDIS_PASSWORD:+:${REDIS_PASSWORD}}@redis:6379
       RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-admin}:${RABBITMQ_DEFAULT_PASS:-admin}@rabbitmq:5672
       RABBITMQ_HOST: rabbitmq
@@ -151,7 +151,7 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       SERVER_PORT: ${ASSESSMENT_SERVICE_PORT:-4002}
-      SPRING_DATASOURCE_URL: jdbc:postgresql://db.rkizlomnljifkbdimrup.supabase.co:5432/postgres?currentSchema=assessment&sslmode=disable
+      SPRING_DATASOURCE_URL: jdbc:postgresql://database.czgcs6yqwtym.ap-southeast-1.rds.amazonaws.com:5432/postgres?currentSchema=assessment
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: nhatngutorii
       SPRING_DATASOURCE_DRIVER_CLASS_NAME: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:-org.postgresql.Driver}
@@ -196,7 +196,7 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       PORT: ${GAMIFICATION_SERVICE_PORT:-4003}
-      DATABASE_URL: "postgresql://postgres:nhatngutorii@db.rkizlomnljifkbdimrup.supabase.co:5432/postgres?schema=gamification&sslmode=no-verify"
+      DATABASE_URL: "postgresql://postgres:nhatngutorii@database.czgcs6yqwtym.ap-southeast-1.rds.amazonaws.com:5432/postgres?schema=gamification&sslmode=no-verify"
       REDIS_URL: redis://${REDIS_USERNAME:-}${REDIS_PASSWORD:+:${REDIS_PASSWORD}}@redis:6379
       REDIS_HOST: redis
       REDIS_PORT: 6379
