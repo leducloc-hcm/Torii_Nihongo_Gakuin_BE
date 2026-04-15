@@ -81,6 +81,7 @@ model User {
   couponRedemptions  CouponRedemption[] @relation("UserCouponRedemptions")
   couponAuditLogs    CouponAuditLog[] @relation("CouponAuditor")
   reviewVotes        ReviewVote[]
+  substituteSessions LiveSession[] @relation("SubstituteLecturer")
   
   
   
@@ -438,9 +439,11 @@ model LiveSession {
   janusRoomId  Int?
   recordingUrl      String?
   whiteboardSnapshot Json?
+  substituteLecturerId Int? @map("substitute_lecturer_id")
 
   class      Class             @relation(fields: [classId], references: [id])
   lesson     Lesson?           @relation(fields: [lessonId], references: [id])
+  substituteLecturer User?     @relation("SubstituteLecturer", fields: [substituteLecturerId], references: [id])
   pings      ResourcePing[]
   chats      LiveChatMessage[]
   hands      RaiseHand[]

@@ -58,6 +58,12 @@ export const CreateSessionSchema = z.object({
 export const UpdateSessionSchema = z.object({
   title: z.string().min(1, "Title is required").optional(),
   scheduledAt: z.string().datetime("Invalid datetime format").optional(),
+  substituteLecturerId: z
+    .number()
+    .int()
+    .positive("Substitute Lecturer ID must be a positive integer")
+    .nullable()
+    .optional(),
 });
 
 export class CreateClassDTO extends createZodDto(CreateClassSchema) {}

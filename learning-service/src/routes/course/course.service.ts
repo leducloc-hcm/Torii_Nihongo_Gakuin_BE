@@ -852,11 +852,37 @@ export class CourseService {
       );
     }
 
-    const data: { title?: string; scheduledAt?: Date } = {};
+    const data: {
+      title?: string;
+      scheduledAt?: Date;
+      substituteLecturerId?: number | null;
+    } = {};
     if (updateSessionDto.title !== undefined)
       data.title = updateSessionDto.title;
     if (updateSessionDto.scheduledAt !== undefined)
       data.scheduledAt = new Date(updateSessionDto.scheduledAt);
+    if (updateSessionDto.substituteLecturerId !== undefined) {
+      if (updateSessionDto.substituteLecturerId !== null) {
+        // Validate substitute lecturer exists and is a lecturer
+        const lecturerExists = await this.courseRepository.checkLecturerExists(
+          updateSessionDto.substituteLecturerId,
+        );
+        if (!lecturerExists) {
+          throw new BadRequestException(
+            `Substitute lecturer with ID ${updateSessionDto.substituteLecturerId} does not exist or is not a lecturer`,
+          );
+        }
+        // Substitute cannot be the same as the class's primary lecturer
+        if (
+          updateSessionDto.substituteLecturerId === session.class.lecturerId
+        ) {
+          throw new BadRequestException(
+            "Substitute lecturer cannot be the same as the primary lecturer of the class",
+          );
+        }
+      }
+      data.substituteLecturerId = updateSessionDto.substituteLecturerId;
+    }
 
     return this.onlineClassRepository.updateSession(sessionId, data);
   }

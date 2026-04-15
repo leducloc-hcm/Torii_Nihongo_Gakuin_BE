@@ -254,24 +254,24 @@ export class OnlineClassService {
     try {
       const sessionIdInt = parseInt(sessionId);
 
-      // Verify lecturer permission - find class that has the session
-      const onlineClass = await this.prisma.class.findFirst({
-        where: {
-          sessions: {
-            some: { id: sessionIdInt },
-          },
-        },
+      // Verify lecturer permission - find the session and its class
+      const sessionToStart = await this.prisma.liveSession.findUnique({
+        where: { id: sessionIdInt },
+        include: { class: true },
       });
-      console.log("OnlineClass:", onlineClass);
-      console.log(
-        "LecturerId:",
-        lecturerId,
-        "OnlineClass LecturerId:",
-        onlineClass?.lecturerId,
-      );
-      if (!onlineClass || onlineClass.lecturerId !== lecturerId) {
+
+      if (!sessionToStart) {
+        throw new NotFoundException("Session not found");
+      }
+
+      const onlineClass = sessionToStart.class;
+      const isAssignedLecturer = onlineClass.lecturerId === lecturerId;
+      const isSubstituteLecturer =
+        sessionToStart.substituteLecturerId === lecturerId;
+
+      if (!isAssignedLecturer && !isSubstituteLecturer) {
         throw new ForbiddenException(
-          "Only the assigned lecturer can start this class",
+          "Only the assigned or substitute lecturer can start this session",
         );
       }
 
@@ -323,7 +323,8 @@ export class OnlineClassService {
       this.logger.error("Failed to start online class session:", error);
       throw error instanceof Error &&
         (error instanceof ForbiddenException ||
-          error instanceof BadRequestException)
+          error instanceof BadRequestException ||
+          error instanceof NotFoundException)
         ? error
         : new BadRequestException("Failed to start class session");
     }
@@ -358,9 +359,13 @@ export class OnlineClassService {
         throw new NotFoundException("No active session found for this class");
       }
 
-      if (activeSession.class.lecturerId !== lecturerId) {
+      const isAssignedLecturer = activeSession.class.lecturerId === lecturerId;
+      const isSubstituteLecturer =
+        activeSession.substituteLecturerId === lecturerId;
+
+      if (!isAssignedLecturer && !isSubstituteLecturer) {
         throw new ForbiddenException(
-          "Only the assigned lecturer can end this class",
+          "Only the assigned or substitute lecturer can end this session",
         );
       }
 
@@ -622,9 +627,21 @@ export class OnlineClassService {
   // Due to length constraints, I'm providing the core structure
 
   private async checkClassAccess(
-    classId: number,
+    sessionId: number,
     userId: number,
   ): Promise<boolean> {
+    // Check if user is a substitute lecturer for this session
+    const session = await this.prisma.liveSession.findUnique({
+      where: { id: sessionId },
+      select: { classId: true, substituteLecturerId: true },
+    });
+
+    if (!session) return false;
+
+    if (session.substituteLecturerId === userId) return true;
+
+    const classId = session.classId;
+
     // Check if user is the lecturer
     const isLecturer = await this.prisma.class.findFirst({
       where: {
@@ -913,7 +930,7 @@ export class OnlineClassService {
       await this.notifyRecordingAvailable(liveSession.classId, recordingUrl);
     } catch (error) {
       this.logger.warn(
-        `⚠️ Failed to notify participants about recording availability: ${error.message}`,
+        `⚠️ Failed to notify participants about recording availability`,
       );
     }
 
@@ -971,9 +988,7 @@ export class OnlineClassService {
         `📧 Sent recording notifications to ${classMembers.length} participants`,
       );
     } catch (error) {
-      this.logger.error(
-        `Failed to send recording notifications: ${error.message}`,
-      );
+      this.logger.error(`Failed to send recording notifications`);
       // Don't throw error - notifications are optional
     }
   }
@@ -1093,6 +1108,18 @@ export class OnlineClassService {
   }
   async getMyAssignedOnlineClasses(userId: number) {
     try {
+      const sessionInclude = {
+        substituteLecturer: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            lecturerProfile: {
+              select: { name: true, avatar: true },
+            },
+          },
+        },
+      };
       // Get all classes where the user is the lecturer
       const classes = await this.prisma.class.findMany({
         where: { lecturerId: userId, isActive: true },
@@ -1132,6 +1159,7 @@ export class OnlineClassService {
           },
           sessions: {
             orderBy: { scheduledAt: "asc" },
+            include: sessionInclude,
           },
           _count: {
             select: {
@@ -1143,7 +1171,81 @@ export class OnlineClassService {
         orderBy: { createdAt: "desc" },
       });
 
-      return classes;
+      // Get classes where this user is a substitute lecturer for at least one session
+      const substituteSessions = await this.prisma.liveSession.findMany({
+        where: {
+          substituteLecturerId: userId,
+          class: { isActive: true },
+        },
+        select: { classId: true },
+        distinct: ["classId"],
+      });
+
+      const substituteClassIds = substituteSessions
+        .map((s) => s.classId)
+        .filter((id) => !classes.some((c) => c.id === id));
+
+      let substituteClasses: any[] = [];
+      if (substituteClassIds.length > 0) {
+        substituteClasses = await this.prisma.class.findMany({
+          where: { id: { in: substituteClassIds }, isActive: true },
+          include: {
+            lecturer: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                lecturerProfile: {
+                  select: {
+                    name: true,
+                    bio: true,
+                    avatar: true,
+                  },
+                },
+              },
+            },
+            members: {
+              select: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                  },
+                },
+              },
+            },
+            course: {
+              select: {
+                id: true,
+                title: true,
+                level: true,
+                thumbnailUrl: true,
+              },
+            },
+            sessions: {
+              orderBy: { scheduledAt: "asc" },
+              include: sessionInclude,
+            },
+            _count: {
+              select: {
+                sessions: true,
+                members: true,
+              },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+        });
+      }
+
+      // Merge: own classes as-is, substitute classes with isSubstitute flag
+      const ownWithFlag = classes.map((c) => ({ ...c, isSubstitute: false }));
+      const subWithFlag = substituteClasses.map((c) => ({
+        ...c,
+        isSubstitute: true,
+      }));
+
+      return [...ownWithFlag, ...subWithFlag];
     } catch (error) {
       this.logger.error("Failed to get assigned online classes:", error);
       throw new BadRequestException(

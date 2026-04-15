@@ -245,6 +245,16 @@ export class OnlineClassRepository {
       orderBy: { scheduledAt: "asc" },
       include: {
         class: true,
+        substituteLecturer: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            lecturerProfile: {
+              select: { name: true, avatar: true },
+            },
+          },
+        },
         attendance: {
           include: {
             user: {
@@ -276,18 +286,131 @@ export class OnlineClassRepository {
   async findSession(sessionId: number) {
     return this.prisma.liveSession.findUnique({
       where: { id: sessionId },
-      include: { class: true },
+      include: {
+        class: true,
+        substituteLecturer: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            lecturerProfile: {
+              select: { name: true, avatar: true },
+            },
+          },
+        },
+      },
     });
   }
 
   async updateSession(
     sessionId: number,
-    data: { title?: string; scheduledAt?: Date },
+    data: {
+      title?: string;
+      scheduledAt?: Date;
+      substituteLecturerId?: number | null;
+    },
   ) {
+    const updateData: any = { ...data };
+    if ("substituteLecturerId" in data) {
+      if (
+        data.substituteLecturerId !== null &&
+        data.substituteLecturerId !== undefined
+      ) {
+        updateData.substituteLecturer = {
+          connect: { id: data.substituteLecturerId },
+        };
+      } else {
+        updateData.substituteLecturer = { disconnect: true };
+      }
+      delete updateData.substituteLecturerId;
+    }
     return this.prisma.liveSession.update({
       where: { id: sessionId },
-      data,
-      include: { class: true },
+      data: updateData,
+      include: {
+        class: true,
+        substituteLecturer: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            lecturerProfile: {
+              select: { name: true, avatar: true },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  async findSubstituteSessionsByLecturer(lecturerId: number) {
+    return this.prisma.liveSession.findMany({
+      where: {
+        substituteLecturerId: lecturerId,
+        endedAt: null,
+        class: { isActive: true },
+      },
+      orderBy: { scheduledAt: "asc" },
+      include: {
+        class: {
+          include: {
+            lecturer: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                lecturerProfile: {
+                  select: {
+                    name: true,
+                    bio: true,
+                    avatar: true,
+                  },
+                },
+              },
+            },
+            members: {
+              select: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                  },
+                },
+              },
+            },
+            course: {
+              select: {
+                id: true,
+                title: true,
+                level: true,
+                thumbnailUrl: true,
+              },
+            },
+            sessions: {
+              orderBy: { scheduledAt: "asc" },
+              include: {
+                substituteLecturer: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    lecturerProfile: {
+                      select: { name: true, avatar: true },
+                    },
+                  },
+                },
+              },
+            },
+            _count: {
+              select: {
+                sessions: true,
+                members: true,
+              },
+            },
+          },
+        },
+      },
     });
   }
 
