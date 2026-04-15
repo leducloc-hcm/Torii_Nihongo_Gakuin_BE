@@ -25,6 +25,8 @@ public class AssessmentDTO {
     private Long scoreProfileId;
     private Boolean lockAfterDue;
     private Integer maxAttempts;
+    private Long sectionCount;
+    private Long attemptCount;
     private LocalDateTime startAt;
     private LocalDateTime dueAt;
     private LocalDateTime createdAt;

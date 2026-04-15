@@ -25,6 +25,7 @@ import com.torii.assessment.entity.AssessmentLog;
 import com.torii.assessment.repository.AssessmentSectionRepository;
 import com.torii.assessment.repository.ItemAssessmentGroupRepository;
 import com.torii.assessment.repository.ItemAssessmentQuestionRepository;
+import com.torii.assessment.repository.AttemptRepository;
 import com.torii.assessment.repository.ScoreProfileRepository;
 import com.torii.assessment.repository.ScoreProfileSectionRepository;
 import jakarta.persistence.criteria.Predicate;
@@ -62,6 +63,7 @@ public class AssessmentService {
     private final ScoreProfileSectionRepository scoreProfileSectionRepository;
     private final ItemAssessmentQuestionRepository itemAssessmentQuestionRepository;
     private final ItemAssessmentGroupRepository itemAssessmentGroupRepository;
+    private final AttemptRepository attemptRepository;
 
     @Transactional
     public AssessmentDTO createAssessment(CreateAssessmentDTO dto) {
@@ -314,6 +316,9 @@ public class AssessmentService {
     }
 
     private AssessmentDTO mapToDTO(Assessment assessment) {
+        long sectionCount = assessmentSectionRepository.countByAssessmentId(assessment.getId());
+        long attemptCount = attemptRepository.countByAssessmentId(assessment.getId());
+
         return AssessmentDTO.builder()
             .id(assessment.getId())
             .title(assessment.getTitle())
@@ -326,6 +331,8 @@ public class AssessmentService {
             .scoreProfileId(assessment.getScoreProfile() != null ? assessment.getScoreProfile().getId() : null)
             .lockAfterDue(assessment.getLockAfterDue())
             .maxAttempts(assessment.getMaxAttempts())
+            .sectionCount(sectionCount)
+            .attemptCount(attemptCount)
             .startAt(assessment.getStartAt())
             .dueAt(assessment.getDueAt())
             .createdAt(assessment.getCreatedAt())

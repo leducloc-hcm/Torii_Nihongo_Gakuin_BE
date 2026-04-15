@@ -17,6 +17,8 @@ public interface AssessmentSectionRepository extends JpaRepository<AssessmentSec
 
     List<AssessmentSection> findByAssessmentId(Long assessmentId);
 
+    long countByAssessmentId(Long assessmentId);
+
     Page<AssessmentSection> findAll(Pageable pageable);
 
     boolean existsByAssessmentIdAndTitle(Long assessmentId, String title);

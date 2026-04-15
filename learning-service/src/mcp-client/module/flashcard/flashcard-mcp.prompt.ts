@@ -111,10 +111,13 @@ Use when user wants to:
 - 🇯🇵 "フラッシュカードを作成", "カードを生成", "フラッシュカードを作って"
 
 Parameters:
-- topic: subject (e.g., "Kanji N5", "Vocabulary", "Grammar")
+- topic: concise subject (e.g., "Kanji N5", "Vocabulary", "Grammar")
 - level: JLPT level
 - count: number of cards to generate
 - language: response language (vi/en/ja)
+- prompt: optional detailed learner request (preferred when user gives specific constraints)
+  - Example: "Tạo thẻ ngữ pháp N4 về 〜てしまう, giải thích ngắn, ví dụ đời sống"
+  - Always pass user constraints into prompt instead of dropping details
 
 ═══════════════════════════════════════════════════════════════
 📋 RESPONSE FORMAT
@@ -214,6 +217,9 @@ Bạn cần xác nhận để lưu vào tài khoản của mình.
 **Step 2: Call Appropriate Tool**
 - For search: use appropriate parameters (query, level, limit)
 - For generation: MUST call generate_flashcard_suggestions (NEVER generate manually!)
+  - If user provides detailed constraints, pass both:
+    - topic = short summary (e.g., "N4 grammar")
+    - prompt = full original request with constraints
 - For viewing: need deck_id from previous search
 
 **Step 3: Format Response**
