@@ -77,7 +77,7 @@ export class DashboardRepository {
         ${Prisma.raw(groupByFormat)} as period,
         COALESCE(SUM("totalAmount"), 0) as revenue,
         COUNT(*) as order_count
-      FROM "Order"
+      FROM learning."Order"
       WHERE status = 'COMPLETED'
         AND "createdAt" >= ${startDate}
         AND "createdAt" <= ${endDate}
@@ -149,7 +149,7 @@ export class DashboardRepository {
       SELECT 
         ${Prisma.raw(groupByFormat)} as period,
         COUNT(*) as new_users
-      FROM "User"
+      FROM learning."User"
       WHERE "deletedAt" IS NULL
         AND "createdAt" >= ${startDate}
         AND "createdAt" <= ${endDate}
@@ -201,9 +201,9 @@ export class DashboardRepository {
           THEN COALESCE(SUM(oi."unitPrice"), 0) / COUNT(DISTINCT o.id)
           ELSE 0 
         END as average_price
-      FROM "Course" c
-      LEFT JOIN "OrderItem" oi ON c.id = oi."courseId"
-      LEFT JOIN "Order" o ON oi."orderId" = o.id AND o.status = 'COMPLETED'
+      FROM learning."Course" c
+      LEFT JOIN learning."OrderItem" oi ON c.id = oi."courseId"
+      LEFT JOIN learning."Order" o ON oi."orderId" = o.id AND o.status = 'COMPLETED'
       WHERE c.status = 'PUBLISHED'
       GROUP BY c.id, c.title, c.slug, c."thumbnailUrl", c.level
       ORDER BY total_revenue DESC
@@ -242,10 +242,10 @@ export class DashboardRepository {
         c.level,
         COALESCE(SUM(oi."unitPrice"), 0) as total_revenue,
         COUNT(DISTINCT e.id) as total_enrollments
-      FROM "Course" c
-      LEFT JOIN "OrderItem" oi ON c.id = oi."courseId"
-      LEFT JOIN "Order" o ON oi."orderId" = o.id AND o.status = 'COMPLETED'
-      LEFT JOIN "Enrollment" e ON c.id = e."courseId"
+      FROM learning."Course" c
+      LEFT JOIN learning."OrderItem" oi ON c.id = oi."courseId"
+      LEFT JOIN learning."Order" o ON oi."orderId" = o.id AND o.status = 'COMPLETED'
+      LEFT JOIN learning."Enrollment" e ON c.id = e."courseId"
       WHERE c.status = 'PUBLISHED'
       GROUP BY c.id, c.title, c.slug, c."thumbnailUrl", c.level
       ORDER BY total_revenue DESC
@@ -283,10 +283,10 @@ export class DashboardRepository {
         c.level,
         COALESCE(SUM(oi."unitPrice"), 0) as total_revenue,
         COUNT(DISTINCT e.id) as total_enrollments
-      FROM "Course" c
-      LEFT JOIN "OrderItem" oi ON c.id = oi."courseId"
-      LEFT JOIN "Order" o ON oi."orderId" = o.id AND o.status = 'COMPLETED'
-      LEFT JOIN "Enrollment" e ON c.id = e."courseId"
+      FROM learning."Course" c
+      LEFT JOIN learning."OrderItem" oi ON c.id = oi."courseId"
+      LEFT JOIN learning."Order" o ON oi."orderId" = o.id AND o.status = 'COMPLETED'
+      LEFT JOIN learning."Enrollment" e ON c.id = e."courseId"
       WHERE c.status = 'PUBLISHED'
       GROUP BY c.id, c.title, c.slug, c."thumbnailUrl", c.level
       ORDER BY total_enrollments DESC
@@ -314,8 +314,8 @@ export class DashboardRepository {
       this.prisma.enrollment.count(),
       this.prisma.$queryRaw<Array<{ total_revenue: bigint }>>`
         SELECT COALESCE(SUM(oi."unitPrice"), 0) as total_revenue
-        FROM "OrderItem" oi
-        JOIN "Order" o ON oi."orderId" = o.id
+        FROM learning."OrderItem" oi
+        JOIN learning."Order" o ON oi."orderId" = o.id
         WHERE o.status = 'COMPLETED' AND oi."courseId" IS NOT NULL
       `,
     ]);
@@ -383,21 +383,21 @@ export class DashboardRepository {
         COUNT(DISTINCT CASE 
           WHEN (
             SELECT COUNT(*)
-            FROM "Lesson" l
-            JOIN "Module" m ON l."moduleId" = m.id
+            FROM learning."Lesson" l
+            JOIN learning."Module" m ON l."moduleId" = m.id
             WHERE m."courseId" = e."courseId"
           ) = (
             SELECT COUNT(*)
-            FROM lesson_progress lp
-            JOIN "Lesson" l2 ON lp."lessonId" = l2.id
-            JOIN "Module" m2 ON l2."moduleId" = m2.id
+            FROM learning.lesson_progress lp
+            JOIN learning."Lesson" l2 ON lp."lessonId" = l2.id
+            JOIN learning."Module" m2 ON l2."moduleId" = m2.id
             WHERE m2."courseId" = e."courseId" 
               AND lp."userId" = ${userId} 
               AND lp.completed = true
           ) AND (
             SELECT COUNT(*)
-            FROM "Lesson" l3
-            JOIN "Module" m3 ON l3."moduleId" = m3.id
+            FROM learning."Lesson" l3
+            JOIN learning."Module" m3 ON l3."moduleId" = m3.id
             WHERE m3."courseId" = e."courseId"
           ) > 0
           THEN e."courseId" 
@@ -405,28 +405,28 @@ export class DashboardRepository {
         COUNT(DISTINCT CASE 
           WHEN EXISTS (
             SELECT 1
-            FROM lesson_progress lp2
-            JOIN "Lesson" l4 ON lp2."lessonId" = l4.id
-            JOIN "Module" m4 ON l4."moduleId" = m4.id
+            FROM learning.lesson_progress lp2
+            JOIN learning."Lesson" l4 ON lp2."lessonId" = l4.id
+            JOIN learning."Module" m4 ON l4."moduleId" = m4.id
             WHERE m4."courseId" = e."courseId" 
               AND lp2."userId" = ${userId}
           ) AND NOT (
             SELECT COUNT(*)
-            FROM "Lesson" l5
-            JOIN "Module" m5 ON l5."moduleId" = m5.id
+            FROM learning."Lesson" l5
+            JOIN learning."Module" m5 ON l5."moduleId" = m5.id
             WHERE m5."courseId" = e."courseId"
           ) = (
             SELECT COUNT(*)
-            FROM lesson_progress lp3
-            JOIN "Lesson" l6 ON lp3."lessonId" = l6.id
-            JOIN "Module" m6 ON l6."moduleId" = m6.id
+            FROM learning.lesson_progress lp3
+            JOIN learning."Lesson" l6 ON lp3."lessonId" = l6.id
+            JOIN learning."Module" m6 ON l6."moduleId" = m6.id
             WHERE m6."courseId" = e."courseId" 
               AND lp3."userId" = ${userId} 
               AND lp3.completed = true
           )
           THEN e."courseId"
         END) as in_progress_courses
-      FROM "Enrollment" e
+      FROM learning."Enrollment" e
       WHERE e."userId" = ${userId}
     `;
 
@@ -487,11 +487,11 @@ export class DashboardRepository {
             ELSE 0 
           END
         ), 0) / 60 as month_study_minutes
-      FROM lesson_progress lp
+      FROM learning.lesson_progress lp
       WHERE lp."userId" = ${userId}
     `;
 
-    // Get assessment study time (time spent on assessments and quizzes)
+    // Get assessment study time from assessment schema (attempts table)
     const assessmentTimeResult = await this.prisma.$queryRaw<
       Array<{
         total_assessment_minutes: bigint;
@@ -503,68 +503,40 @@ export class DashboardRepository {
       SELECT 
         COALESCE(SUM(
           CASE 
-            WHEN aa."submittedAt" IS NOT NULL AND aa."startedAt" IS NOT NULL
-            THEN EXTRACT(EPOCH FROM (aa."submittedAt" - aa."startedAt")) / 60
-            ELSE 0
-          END
-        ), 0) + COALESCE(SUM(
-          CASE 
-            WHEN qa."submittedAt" IS NOT NULL AND qa."startedAt" IS NOT NULL
-            THEN EXTRACT(EPOCH FROM (qa."submittedAt" - qa."startedAt")) / 60
+            WHEN att.submitted_at IS NOT NULL AND att.started_at IS NOT NULL
+            THEN EXTRACT(EPOCH FROM (att.submitted_at - att.started_at)) / 60
             ELSE 0
           END
         ), 0) as total_assessment_minutes,
         
         COALESCE(SUM(
           CASE 
-            WHEN aa."submittedAt" IS NOT NULL AND aa."startedAt" IS NOT NULL 
-            AND aa."submittedAt"::date = ${todayStart}::date
-            THEN EXTRACT(EPOCH FROM (aa."submittedAt" - aa."startedAt")) / 60
-            ELSE 0
-          END
-        ), 0) + COALESCE(SUM(
-          CASE 
-            WHEN qa."submittedAt" IS NOT NULL AND qa."startedAt" IS NOT NULL 
-            AND qa."submittedAt"::date = ${todayStart}::date
-            THEN EXTRACT(EPOCH FROM (qa."submittedAt" - qa."startedAt")) / 60
+            WHEN att.submitted_at IS NOT NULL AND att.started_at IS NOT NULL 
+            AND att.submitted_at::date = ${todayStart}::date
+            THEN EXTRACT(EPOCH FROM (att.submitted_at - att.started_at)) / 60
             ELSE 0
           END
         ), 0) as today_assessment_minutes,
         
         COALESCE(SUM(
           CASE 
-            WHEN aa."submittedAt" IS NOT NULL AND aa."startedAt" IS NOT NULL 
-            AND aa."submittedAt" >= ${weekStart}
-            THEN EXTRACT(EPOCH FROM (aa."submittedAt" - aa."startedAt")) / 60
-            ELSE 0
-          END
-        ), 0) + COALESCE(SUM(
-          CASE 
-            WHEN qa."submittedAt" IS NOT NULL AND qa."startedAt" IS NOT NULL 
-            AND qa."submittedAt" >= ${weekStart}
-            THEN EXTRACT(EPOCH FROM (qa."submittedAt" - qa."startedAt")) / 60
+            WHEN att.submitted_at IS NOT NULL AND att.started_at IS NOT NULL 
+            AND att.submitted_at >= ${weekStart}
+            THEN EXTRACT(EPOCH FROM (att.submitted_at - att.started_at)) / 60
             ELSE 0
           END
         ), 0) as week_assessment_minutes,
         
         COALESCE(SUM(
           CASE 
-            WHEN aa."submittedAt" IS NOT NULL AND aa."startedAt" IS NOT NULL 
-            AND aa."submittedAt" >= ${monthStart}
-            THEN EXTRACT(EPOCH FROM (aa."submittedAt" - aa."startedAt")) / 60
-            ELSE 0
-          END
-        ), 0) + COALESCE(SUM(
-          CASE 
-            WHEN qa."submittedAt" IS NOT NULL AND qa."startedAt" IS NOT NULL 
-            AND qa."submittedAt" >= ${monthStart}
-            THEN EXTRACT(EPOCH FROM (qa."submittedAt" - qa."startedAt")) / 60
+            WHEN att.submitted_at IS NOT NULL AND att.started_at IS NOT NULL 
+            AND att.submitted_at >= ${monthStart}
+            THEN EXTRACT(EPOCH FROM (att.submitted_at - att.started_at)) / 60
             ELSE 0
           END
         ), 0) as month_assessment_minutes
-      FROM (SELECT ${userId}::integer as user_id) u
-      LEFT JOIN "AssessmentAttempt" aa ON aa."userId" = u.user_id
-      LEFT JOIN "QuizAttempt" qa ON qa."userId" = u.user_id
+      FROM assessment.attempts att
+      WHERE att.user_id = ${userId}
     `;
 
     // Get daily breakdown for the last 30 days
@@ -587,34 +559,26 @@ export class DashboardRepository {
         SELECT 
           lp."updatedAt"::date as study_date,
           COALESCE(SUM(lp."watchedSec"), 0) / 60 as lesson_minutes
-        FROM lesson_progress lp
+        FROM learning.lesson_progress lp
         WHERE lp."userId" = ${userId}
           AND lp."updatedAt" >= ${thirtyDaysAgo}
         GROUP BY lp."updatedAt"::date
       ),
       assessment_daily AS (
         SELECT 
-          COALESCE(aa."submittedAt"::date, qa."submittedAt"::date) as study_date,
+          att.submitted_at::date as study_date,
           COALESCE(SUM(
             CASE 
-              WHEN aa."submittedAt" IS NOT NULL AND aa."startedAt" IS NOT NULL
-              THEN EXTRACT(EPOCH FROM (aa."submittedAt" - aa."startedAt")) / 60
-              ELSE 0
-            END
-          ), 0) + COALESCE(SUM(
-            CASE 
-              WHEN qa."submittedAt" IS NOT NULL AND qa."startedAt" IS NOT NULL
-              THEN EXTRACT(EPOCH FROM (qa."submittedAt" - qa."startedAt")) / 60
+              WHEN att.submitted_at IS NOT NULL AND att.started_at IS NOT NULL
+              THEN EXTRACT(EPOCH FROM (att.submitted_at - att.started_at)) / 60
               ELSE 0
             END
           ), 0) as assessment_minutes
-        FROM (SELECT ${userId}::integer as user_id) u
-        LEFT JOIN "AssessmentAttempt" aa ON aa."userId" = u.user_id 
-          AND aa."submittedAt" >= ${thirtyDaysAgo}
-        LEFT JOIN "QuizAttempt" qa ON qa."userId" = u.user_id 
-          AND qa."submittedAt" >= ${thirtyDaysAgo}
-        WHERE COALESCE(aa."submittedAt", qa."submittedAt") IS NOT NULL
-        GROUP BY COALESCE(aa."submittedAt"::date, qa."submittedAt"::date)
+        FROM assessment.attempts att
+        WHERE att.user_id = ${userId}
+          AND att.submitted_at >= ${thirtyDaysAgo}
+          AND att.submitted_at IS NOT NULL
+        GROUP BY att.submitted_at::date
       )
       SELECT 
         ds.study_date,
@@ -649,16 +613,12 @@ export class DashboardRepository {
         SELECT DISTINCT study_date 
         FROM (
           SELECT lp."updatedAt"::date as study_date
-          FROM lesson_progress lp
+          FROM learning.lesson_progress lp
           WHERE lp."userId" = ${userId} AND lp."watchedSec" > 0
           UNION
-          SELECT aa."submittedAt"::date as study_date
-          FROM "AssessmentAttempt" aa
-          WHERE aa."userId" = ${userId} AND aa."submittedAt" IS NOT NULL
-          UNION
-          SELECT qa."submittedAt"::date as study_date
-          FROM "QuizAttempt" qa
-          WHERE qa."userId" = ${userId} AND qa."submittedAt" IS NOT NULL
+          SELECT att.submitted_at::date as study_date
+          FROM assessment.attempts att
+          WHERE att.user_id = ${userId} AND att.submitted_at IS NOT NULL
         ) combined_study
         ORDER BY study_date DESC
       ),
@@ -697,16 +657,12 @@ export class DashboardRepository {
       SELECT COUNT(DISTINCT study_date) as active_days
       FROM (
         SELECT lp."updatedAt"::date as study_date
-        FROM lesson_progress lp
+        FROM learning.lesson_progress lp
         WHERE lp."userId" = ${userId} AND lp."watchedSec" > 0
         UNION
-        SELECT aa."submittedAt"::date as study_date
-        FROM "AssessmentAttempt" aa
-        WHERE aa."userId" = ${userId} AND aa."submittedAt" IS NOT NULL
-        UNION
-        SELECT qa."submittedAt"::date as study_date
-        FROM "QuizAttempt" qa
-        WHERE qa."userId" = ${userId} AND qa."submittedAt" IS NOT NULL
+        SELECT att.submitted_at::date as study_date
+        FROM assessment.attempts att
+        WHERE att.user_id = ${userId} AND att.submitted_at IS NOT NULL
       ) combined_study
     `;
 
@@ -750,7 +706,7 @@ export class DashboardRepository {
     };
   }
 
-  // Assessment statistics for customer
+  // Assessment statistics for customer (from assessment schema)
   async getCustomerAssessmentStats(userId: number) {
     const result = await this.prisma.$queryRaw<
       Array<{
@@ -764,13 +720,13 @@ export class DashboardRepository {
     >`
       SELECT 
         COUNT(*) as total_attempts,
-        COUNT(CASE WHEN aa."submittedAt" IS NOT NULL THEN 1 END) as completed_assessments,
-        COALESCE(AVG(CASE WHEN aa.score IS NOT NULL THEN aa.score END), 0) as average_score,
-        COALESCE(MAX(aa.score), 0) as highest_score,
-        COUNT(CASE WHEN aa.score >= 60 THEN 1 END) as passed_assessments,
-        COUNT(CASE WHEN aa.score IS NOT NULL AND aa.score < 60 THEN 1 END) as failed_assessments
-      FROM "AssessmentAttempt" aa
-      WHERE aa."userId" = ${userId}
+        COUNT(CASE WHEN att.submitted_at IS NOT NULL THEN 1 END) as completed_assessments,
+        COALESCE(AVG(CASE WHEN att.score IS NOT NULL THEN att.score END), 0) as average_score,
+        COALESCE(MAX(att.score), 0) as highest_score,
+        COUNT(CASE WHEN att.score >= 60 THEN 1 END) as passed_assessments,
+        COUNT(CASE WHEN att.score IS NOT NULL AND att.score < 60 THEN 1 END) as failed_assessments
+      FROM assessment.attempts att
+      WHERE att.user_id = ${userId}
     `;
 
     const stats = result[0] || {
@@ -819,7 +775,7 @@ export class DashboardRepository {
           WHEN cp."dueAt"::date <= CURRENT_DATE AND cp."lastGrade" IS NOT NULL 
           THEN cp."cardId" 
         END) as daily_reviews_completed
-      FROM "CardProgress" cp
+      FROM learning."CardProgress" cp
       WHERE cp."userId" = ${userId}
     `;
 
@@ -841,7 +797,7 @@ export class DashboardRepository {
           THEN AVG(CASE WHEN "lastGrade" >= 3 THEN 100.0 ELSE 0.0 END)
           ELSE 0 
         END as accuracy_rate
-      FROM "CardProgress" 
+      FROM learning."CardProgress" 
       WHERE "userId" = ${userId} 
         AND "lastGrade" IS NOT NULL
         AND "dueAt" >= CURRENT_DATE - INTERVAL '30 days'
@@ -878,7 +834,7 @@ export class DashboardRepository {
         COUNT(CASE WHEN o.status = 'PENDING' OR o.status = 'PROCESSING' THEN 1 END) as pending_payments,
         COUNT(CASE WHEN o.status = 'CANCELLED' THEN 1 END) as failed_payments,
         MAX(CASE WHEN o.status = 'COMPLETED' THEN o."createdAt" END) as last_payment_date
-      FROM "Order" o
+      FROM learning."Order" o
       WHERE o."userId" = ${userId}
     `;
 
@@ -933,11 +889,11 @@ export class DashboardRepository {
         COUNT(DISTINCT l.id) as total_lessons,
         MAX(lp."updatedAt") as last_studied_at,
         c.level
-      FROM "Enrollment" e
-      JOIN "Course" c ON e."courseId" = c.id
-      JOIN "Module" m ON c.id = m."courseId"
-      JOIN "Lesson" l ON m.id = l."moduleId"
-      LEFT JOIN lesson_progress lp ON l.id = lp."lessonId" AND lp."userId" = ${userId} AND lp.completed = true
+      FROM learning."Enrollment" e
+      JOIN learning."Course" c ON e."courseId" = c.id
+      JOIN learning."Module" m ON c.id = m."courseId"
+      JOIN learning."Lesson" l ON m.id = l."moduleId"
+      LEFT JOIN learning.lesson_progress lp ON l.id = lp."lessonId" AND lp."userId" = ${userId} AND lp.completed = true
       WHERE e."userId" = ${userId}
       GROUP BY c.id, c.title, c.slug, c."thumbnailUrl", e."createdAt", c.level
       ORDER BY last_studied_at DESC NULLS LAST, enrollment_date DESC
@@ -990,9 +946,9 @@ export class DashboardRepository {
         MAX(cp."dueAt") as last_reviewed_at,
         NULL as course_id,
         NULL as course_name
-      FROM "FlashcardDeck" fd
-      LEFT JOIN "Flashcard" f ON fd.id = f."deckId"
-      LEFT JOIN "CardProgress" cp ON f.id = cp."cardId" AND cp."userId" = ${userId}
+      FROM learning."FlashcardDeck" fd
+      LEFT JOIN learning."Flashcard" f ON fd.id = f."deckId"
+      LEFT JOIN learning."CardProgress" cp ON f.id = cp."cardId" AND cp."userId" = ${userId}
       WHERE fd."ownerId" = ${userId}
       GROUP BY fd.id, fd.title
       ORDER BY last_reviewed_at DESC NULLS LAST
@@ -1041,10 +997,10 @@ export class DashboardRepository {
         o.status,
         o."createdAt" as payment_date,
         p.method as payment_method
-      FROM "Order" o
-      LEFT JOIN "OrderItem" oi ON o.id = oi."orderId"
-      LEFT JOIN "Course" c ON oi."courseId" = c.id
-      LEFT JOIN "Payment" p ON o.id = p."orderId" AND p.status = 'PAID'
+      FROM learning."Order" o
+      LEFT JOIN learning."OrderItem" oi ON o.id = oi."orderId"
+      LEFT JOIN learning."Course" c ON oi."courseId" = c.id
+      LEFT JOIN learning."Payment" p ON o.id = p."orderId" AND p.status = 'PAID'
       WHERE o."userId" = ${userId}
       ORDER BY o."createdAt" DESC
       LIMIT ${limit}
