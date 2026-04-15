@@ -55,9 +55,15 @@ export const CreateSessionSchema = z.object({
   scheduledAt: z.string().datetime("Invalid datetime format"),
 });
 
+export const UpdateSessionSchema = z.object({
+  title: z.string().min(1, "Title is required").optional(),
+  scheduledAt: z.string().datetime("Invalid datetime format").optional(),
+});
+
 export class CreateClassDTO extends createZodDto(CreateClassSchema) {}
 export class UpdateClassDTO extends createZodDto(UpdateClassSchema) {}
 export class CreateSessionDTO extends createZodDto(CreateSessionSchema) {}
+export class UpdateSessionDTO extends createZodDto(UpdateSessionSchema) {}
 
 export class UpdateCourseStatusDTOForAdmin extends createZodDto(
   UpdateCourseStatusSchemaForAdmin,

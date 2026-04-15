@@ -14,6 +14,7 @@ import {
   CreateClassDTO,
   UpdateClassDTO,
   CreateSessionDTO,
+  UpdateSessionDTO,
 } from "./course.dto";
 import {
   CourseWithRelations,
@@ -817,6 +818,84 @@ export class CourseService {
 
     return this.onlineClassRepository.getClassSessions(classId);
   }
+
+  async updateClassSession(
+    courseId: number,
+    classId: number,
+    sessionId: number,
+    updateSessionDto: UpdateSessionDTO,
+  ) {
+    await this.findOne(courseId);
+
+    const belongsToCourse =
+      await this.onlineClassRepository.checkClassBelongsToCourse(
+        classId,
+        courseId,
+      );
+    if (!belongsToCourse) {
+      throw new NotFoundException(
+        `Class with ID ${classId} not found in course ${courseId}`,
+      );
+    }
+
+    const session = await this.onlineClassRepository.findSession(sessionId);
+    if (!session || session.classId !== classId) {
+      throw new NotFoundException(
+        `Session with ID ${sessionId} not found in class ${classId}`,
+      );
+    }
+
+    // If session has started (has janusRoomId) or ended, cannot update
+    if (session.janusRoomId !== null || session.endedAt !== null) {
+      throw new BadRequestException(
+        "Cannot update a session that has already started or ended",
+      );
+    }
+
+    const data: { title?: string; scheduledAt?: Date } = {};
+    if (updateSessionDto.title !== undefined)
+      data.title = updateSessionDto.title;
+    if (updateSessionDto.scheduledAt !== undefined)
+      data.scheduledAt = new Date(updateSessionDto.scheduledAt);
+
+    return this.onlineClassRepository.updateSession(sessionId, data);
+  }
+
+  async deleteClassSession(
+    courseId: number,
+    classId: number,
+    sessionId: number,
+  ) {
+    await this.findOne(courseId);
+
+    const belongsToCourse =
+      await this.onlineClassRepository.checkClassBelongsToCourse(
+        classId,
+        courseId,
+      );
+    if (!belongsToCourse) {
+      throw new NotFoundException(
+        `Class with ID ${classId} not found in course ${courseId}`,
+      );
+    }
+
+    const session = await this.onlineClassRepository.findSession(sessionId);
+    if (!session || session.classId !== classId) {
+      throw new NotFoundException(
+        `Session with ID ${sessionId} not found in class ${classId}`,
+      );
+    }
+
+    // If session has started (has janusRoomId) or ended, cannot delete
+    if (session.janusRoomId !== null || session.endedAt !== null) {
+      throw new BadRequestException(
+        "Cannot delete a session that has already started or ended",
+      );
+    }
+
+    return this.onlineClassRepository.deleteSession(sessionId);
+  }
+
   async getMyCourseDetail(userId: number, courseId: number) {
     // Check if user is enrolled in the course
     const enrollment = await this.enrollmentService.findByUserAndCourse(

@@ -26,6 +26,7 @@ import {
   CreateClassDTO,
   UpdateClassDTO,
   CreateSessionDTO,
+  UpdateSessionDTO,
   UpdateCourseStatusDTOForAdmin,
 } from "./course.dto";
 import { Auth, IsPublic } from "src/shared/decorators/auth.decorator";
@@ -356,6 +357,40 @@ export class CourseController {
     @Param("classId", ParseIntPipe) classId: number,
   ) {
     return await this.courseService.getClassSessions(courseId, classId);
+  }
+
+  @Put(":courseId/classes/:classId/sessions/:sessionId")
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Admin, RoleName.Staff)
+  @HttpCode(HttpStatus.OK)
+  async updateClassSession(
+    @Param("courseId", ParseIntPipe) courseId: number,
+    @Param("classId", ParseIntPipe) classId: number,
+    @Param("sessionId", ParseIntPipe) sessionId: number,
+    @Body() updateSessionDto: UpdateSessionDTO,
+  ) {
+    return await this.courseService.updateClassSession(
+      courseId,
+      classId,
+      sessionId,
+      updateSessionDto,
+    );
+  }
+
+  @Delete(":courseId/classes/:classId/sessions/:sessionId")
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Admin, RoleName.Staff)
+  @HttpCode(HttpStatus.OK)
+  async deleteClassSession(
+    @Param("courseId", ParseIntPipe) courseId: number,
+    @Param("classId", ParseIntPipe) classId: number,
+    @Param("sessionId", ParseIntPipe) sessionId: number,
+  ) {
+    return await this.courseService.deleteClassSession(
+      courseId,
+      classId,
+      sessionId,
+    );
   }
 
   // Learning Progress Routes

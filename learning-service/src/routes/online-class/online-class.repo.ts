@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common'
-import { PrismaService } from 'src/shared/services/prisma.service'
-import { Prisma } from '@prisma/client'
+import { Injectable } from "@nestjs/common";
+import { PrismaService } from "src/shared/services/prisma.service";
+import { Prisma } from "@prisma/client";
 
 @Injectable()
 export class OnlineClassRepository {
@@ -24,7 +24,7 @@ export class OnlineClassRepository {
           },
         },
         sessions: {
-          orderBy: { scheduledAt: 'asc' },
+          orderBy: { scheduledAt: "asc" },
         },
         members: {
           include: {
@@ -44,7 +44,7 @@ export class OnlineClassRepository {
           },
         },
       },
-    })
+    });
   }
   async findByCourseSlug(slug: string) {
     return this.prisma.class.findMany({
@@ -68,7 +68,7 @@ export class OnlineClassRepository {
           },
         },
         sessions: {
-          orderBy: { scheduledAt: 'asc' },
+          orderBy: { scheduledAt: "asc" },
         },
         _count: {
           select: {
@@ -77,7 +77,7 @@ export class OnlineClassRepository {
           },
         },
       },
-    })
+    });
   }
 
   async findByCourseIdAndClassId(courseId: number, classId: number) {
@@ -93,7 +93,7 @@ export class OnlineClassRepository {
           },
         },
         sessions: {
-          orderBy: { scheduledAt: 'asc' },
+          orderBy: { scheduledAt: "asc" },
         },
         members: {
           include: {
@@ -113,7 +113,7 @@ export class OnlineClassRepository {
           },
         },
       },
-    })
+    });
   }
   async getPublicCourseClasses(courseId: number) {
     return this.prisma.class.findMany({
@@ -125,7 +125,7 @@ export class OnlineClassRepository {
           },
         },
         sessions: {
-          orderBy: { scheduledAt: 'asc' },
+          orderBy: { scheduledAt: "asc" },
         },
         _count: {
           select: {
@@ -134,7 +134,7 @@ export class OnlineClassRepository {
           },
         },
       },
-    })
+    });
   }
 
   async create(data: Prisma.ClassCreateInput) {
@@ -170,7 +170,7 @@ export class OnlineClassRepository {
           },
         },
       },
-    })
+    });
   }
 
   async update(classId: number, data: Prisma.ClassUpdateInput) {
@@ -187,13 +187,13 @@ export class OnlineClassRepository {
         sessions: true,
         members: true,
       },
-    })
+    });
   }
 
   async delete(classId: number) {
     return this.prisma.class.delete({
       where: { id: classId },
-    })
+    });
   }
 
   async findOne(classId: number) {
@@ -207,7 +207,7 @@ export class OnlineClassRepository {
         },
         course: true,
         sessions: {
-          orderBy: { scheduledAt: 'asc' },
+          orderBy: { scheduledAt: "asc" },
         },
         members: {
           include: {
@@ -221,10 +221,13 @@ export class OnlineClassRepository {
           },
         },
       },
-    })
+    });
   }
 
-  async createSession(classId: number, sessionData: Omit<Prisma.LiveSessionCreateInput, 'class'>) {
+  async createSession(
+    classId: number,
+    sessionData: Omit<Prisma.LiveSessionCreateInput, "class">,
+  ) {
     return this.prisma.liveSession.create({
       data: {
         ...sessionData,
@@ -233,13 +236,13 @@ export class OnlineClassRepository {
       include: {
         class: true,
       },
-    })
+    });
   }
 
   async getClassSessions(classId: number) {
     return this.prisma.liveSession.findMany({
       where: { classId },
-      orderBy: { scheduledAt: 'asc' },
+      orderBy: { scheduledAt: "asc" },
       include: {
         class: true,
         attendance: {
@@ -254,16 +257,43 @@ export class OnlineClassRepository {
           },
         },
       },
-    })
+    });
   }
 
-  async checkClassBelongsToCourse(classId: number, courseId: number): Promise<boolean> {
+  async checkClassBelongsToCourse(
+    classId: number,
+    courseId: number,
+  ): Promise<boolean> {
     const classItem = await this.prisma.class.findFirst({
       where: {
         id: classId,
         courseId: courseId,
       },
-    })
-    return !!classItem
+    });
+    return !!classItem;
+  }
+
+  async findSession(sessionId: number) {
+    return this.prisma.liveSession.findUnique({
+      where: { id: sessionId },
+      include: { class: true },
+    });
+  }
+
+  async updateSession(
+    sessionId: number,
+    data: { title?: string; scheduledAt?: Date },
+  ) {
+    return this.prisma.liveSession.update({
+      where: { id: sessionId },
+      data,
+      include: { class: true },
+    });
+  }
+
+  async deleteSession(sessionId: number) {
+    return this.prisma.liveSession.delete({
+      where: { id: sessionId },
+    });
   }
 }
