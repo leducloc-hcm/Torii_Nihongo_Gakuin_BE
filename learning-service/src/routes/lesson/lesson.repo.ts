@@ -55,17 +55,6 @@ export class LessonRepository {
         endedAt: true,
       },
     },
-    quiz: {
-      select: {
-        id: true,
-        title: true,
-        _count: {
-          select: {
-            items: true,
-          },
-        },
-      },
-    },
     _count: {
       select: {
         notes: true,
@@ -74,20 +63,59 @@ export class LessonRepository {
     },
   };
 
+  private async findQuizForLesson(
+    lessonId: number,
+  ): Promise<{ id: number; title: string; _count: { items: number } } | null> {
+    const result = await this.prisma.$queryRaw<
+      Array<{ id: bigint; title: string; items_count: bigint }>
+    >`
+      SELECT 
+        a.id,
+        a.title,
+        COALESCE((
+          SELECT COUNT(*)
+          FROM assessment.items i
+          JOIN assessment.sections s ON i.section_id = s.id
+          WHERE s.assessment_id = a.id
+        ), 0) as items_count
+      FROM assessment.assessments a
+      WHERE a.lesson_id = ${lessonId}
+      LIMIT 1
+    `;
+
+    if (!result.length) return null;
+
+    return {
+      id: Number(result[0].id),
+      title: result[0].title,
+      _count: { items: Number(result[0].items_count) },
+    };
+  }
+
+  private async enrichWithQuiz(
+    lesson: Omit<LessonWithRelations, "quiz"> & { quiz?: any },
+  ): Promise<LessonWithRelations> {
+    const quiz = await this.findQuizForLesson(lesson.id);
+    return { ...lesson, quiz } as LessonWithRelations;
+  }
+
   async create(data: LessonCreateInput): Promise<LessonWithRelations> {
-    return await this.prisma.lesson.create({
+    const lesson = await this.prisma.lesson.create({
       data,
       include: this.includeRelations,
     });
+    return this.enrichWithQuiz(lesson);
   }
 
   async findOne(
     where: LessonWhereUniqueInput,
   ): Promise<LessonWithRelations | null> {
-    return await this.prisma.lesson.findUnique({
+    const lesson = await this.prisma.lesson.findUnique({
       where: where as any,
       include: this.includeRelations,
     });
+    if (!lesson) return null;
+    return this.enrichWithQuiz(lesson);
   }
 
   async update(params: {
@@ -96,11 +124,12 @@ export class LessonRepository {
   }): Promise<LessonWithRelations> {
     const { where, data } = params;
 
-    return await this.prisma.lesson.update({
+    const lesson = await this.prisma.lesson.update({
       where: where as any,
       data,
       include: this.includeRelations,
     });
+    return this.enrichWithQuiz(lesson);
   }
 
   async delete(where: LessonWhereUniqueInput): Promise<Lesson> {
