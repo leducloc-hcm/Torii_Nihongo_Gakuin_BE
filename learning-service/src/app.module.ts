@@ -27,6 +27,8 @@ import { DashboardModule } from "./routes/dashboard/dashboard.module";
 import { RedisModule } from "./shared/redis/redis.module";
 import { RabbitMQModule } from "./shared/rabbitmq/rabbitmq.module";
 import { ReviewModule } from "./routes/review/review.module";
+import { AssessmentAIModule } from "./routes/assessment-ai/assessment-ai.module";
+import { MultiAgentModule } from "./routes/multi-agent/multi-agent.module";
 
 @Module({
   imports: [
@@ -70,6 +72,8 @@ import { ReviewModule } from "./routes/review/review.module";
     CouponModule,
     DashboardModule,
     ReviewModule,
+    AssessmentAIModule,
+    MultiAgentModule,
   ],
   controllers: [AppController],
   providers: [AppService],

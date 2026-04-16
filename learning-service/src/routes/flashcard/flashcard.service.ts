@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  ServiceUnavailableException,
 } from "@nestjs/common";
 import { FlashcardRepository } from "./flashcard.repo";
 import { FlashcardGenerationService } from "./flashcard-generation.service";
@@ -386,7 +387,9 @@ export class FlashcardService {
     );
 
     if (!result.success) {
-      throw new Error(result.error || "Failed to generate flashcards");
+      throw new ServiceUnavailableException(
+        result.error || "Failed to generate flashcards via MCP server",
+      );
     }
 
     // Format the response for MCP server

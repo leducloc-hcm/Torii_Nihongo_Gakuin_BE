@@ -9,6 +9,7 @@ import { getEnrollmentPrompt } from "../enrollment/enrollment-mcp.prompt";
 import { getFlashcardPrompt } from "../flashcard/flashcard-mcp.prompt";
 import { BLOG_MCP_SYSTEM_PROMPT } from "../blog/blog-mcp.prompt";
 import { getAssessmentHistoryPrompt } from "../assessment_history/history-mcp.prompt";
+import { ASSESSMENT_MCP_PROMPT } from "../assessment/assessment-mcp.prompt";
 
 @Injectable()
 export class PromptService {
@@ -64,6 +65,10 @@ export class PromptService {
     // Check for assessment history query
     if (queryType === QueryType.ASSESSMENT_HISTORY) {
       return getAssessmentHistoryPrompt(QueryType.ASSESSMENT_HISTORY, userId);
+    }
+
+    if (queryType === QueryType.ASSESSMENT) {
+      return ASSESSMENT_MCP_PROMPT;
     }
 
     // Check for blog query

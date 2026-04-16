@@ -1,14 +1,19 @@
-import { Module } from '@nestjs/common'
-import { ConfigModule } from '@nestjs/config'
-import { FlashcardController } from './flashcard.controller'
-import { FlashcardService } from './flashcard.service'
-import { FlashcardRepository } from './flashcard.repo'
-import { FlashcardGenerationService } from './flashcard-generation.service'
+import { Module } from "@nestjs/common";
+import { ConfigModule } from "@nestjs/config";
+import { McpClientModule } from "src/mcp-client/mcp-client.module";
+import { FlashcardController } from "./flashcard.controller";
+import { FlashcardService } from "./flashcard.service";
+import { FlashcardRepository } from "./flashcard.repo";
+import { FlashcardGenerationService } from "./flashcard-generation.service";
 
 @Module({
-  imports: [ConfigModule],
+  imports: [ConfigModule, McpClientModule],
   controllers: [FlashcardController],
-  providers: [FlashcardService, FlashcardRepository, FlashcardGenerationService],
+  providers: [
+    FlashcardService,
+    FlashcardRepository,
+    FlashcardGenerationService,
+  ],
   exports: [FlashcardService, FlashcardGenerationService],
 })
 export class FlashcardModule {}
