@@ -1,6 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
-import OpenAI from "openai";
+import { FlashcardMcpClient } from "src/mcp-client/module/flashcard/flashcard-mcp.service";
 
 export interface GeneratedFlashcard {
   front: string;
@@ -25,13 +24,7 @@ export interface FlashcardGenerationResult {
 
 @Injectable()
 export class FlashcardGenerationService {
-  private openai: OpenAI;
-
-  constructor(private configService: ConfigService) {
-    this.openai = new OpenAI({
-      apiKey: this.configService.get<string>("OPENAI_API_KEY"),
-    });
-  }
+  constructor(private readonly flashcardMcpClient: FlashcardMcpClient) {}
 
   async generateFlashcards(
     topic: string,
@@ -52,93 +45,35 @@ export class FlashcardGenerationService {
         };
       }
 
-      console.log(
-        `\n=== Generating ${count} flashcards for ${generationTopic} (${normalizedLevel}) ===`,
-      );
-
       // Validate count
       if (count > 50) {
         count = 50;
-        console.log("Count limited to 50");
       }
 
       if (count < 1) {
         count = 1;
       }
 
-      // Language mapping
-      const langName =
-        {
-          vi: "Vietnamese",
-          en: "English",
-          ja: "Japanese",
-        }[normalizedLanguage] || "Vietnamese";
+      const mcpResult =
+        await this.flashcardMcpClient.generateFlashcardSuggestions({
+          topic: generationTopic,
+          level: normalizedLevel,
+          count,
+          language: normalizedLanguage,
+          prompt: prompt?.trim() || undefined,
+        });
 
-      const requestPrompt = `Create ${count} Japanese flashcards.
-
-Learner request:
-"${generationTopic}"
-
-Constraints:
-- Target JLPT level: ${normalizedLevel}
-- Explanation language: ${langName}
-- Include only content appropriate for JLPT ${normalizedLevel}
-- Prefer practical words/phrases/grammar patterns used in real conversations and exams
-- Keep front concise and unambiguous
-- Keep back clear and easy to memorize
-- pronunciation: hiragana preferred, fallback to romaji
-- example: one short Japanese sentence + ${langName} translation in the same line
-- hint: short mnemonic or usage cue
-- tags: 1-4 short tags
-
-Return STRICT JSON only, with this exact structure:
-{
-  "flashcards": [
-    {
-      "front": "...",
-      "back": "...",
-      "pronunciation": "...",
-      "example": "...",
-      "hint": "...",
-      "tags": ["..."]
-    }
-  ]
-}
-
-Rules:
-- No markdown
-- No comments
-- No extra keys
-- Exactly ${count} items in flashcards
-- Do not include empty front/back values`;
-
-      const response = await this.openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are an expert JLPT curriculum designer. Produce pedagogically sound Japanese flashcards and always return strict JSON only.",
-          },
-          { role: "user", content: requestPrompt },
-        ],
-        temperature: 0.4,
-        max_tokens: 4000,
-      });
-
-      let flashcardsJson = response.choices[0].message.content?.trim() || "[]";
-
-      // Clean up markdown code blocks if present
-      if (flashcardsJson.startsWith("```")) {
-        const lines = flashcardsJson.split("\n");
-        flashcardsJson = lines.slice(1, -1).join("\n");
-        if (flashcardsJson.startsWith("json")) {
-          flashcardsJson = flashcardsJson.slice(4).trim();
-        }
+      if (!mcpResult.success) {
+        return {
+          success: false,
+          error: mcpResult.error || "MCP server failed to generate flashcards",
+        };
       }
 
-      const parsed = this.extractJson(flashcardsJson);
-      const rawCards = Array.isArray(parsed) ? parsed : parsed?.flashcards;
+      const mcpPayload = this.unwrapMcpPayload(mcpResult.data);
+      const rawCards = Array.isArray(mcpPayload)
+        ? mcpPayload
+        : mcpPayload?.flashcards;
       const flashcards = this.normalizeFlashcards(rawCards, count);
 
       if (flashcards.length === 0) {
@@ -148,18 +83,16 @@ Rules:
         };
       }
 
-      console.log(
-        `✅ Generated ${flashcards.length} flashcards successfully\n`,
-      );
-
       return {
         success: true,
         flashcards,
         metadata: {
-          topic: generationTopic,
-          level: normalizedLevel,
+          topic: String(mcpPayload?.metadata?.topic || generationTopic),
+          level: String(mcpPayload?.metadata?.level || normalizedLevel),
           count: flashcards.length,
-          language: normalizedLanguage,
+          language: String(
+            mcpPayload?.metadata?.language || normalizedLanguage,
+          ),
         },
       };
     } catch (error: any) {
@@ -169,6 +102,22 @@ Rules:
         error: `Failed to generate flashcards: ${error.message}`,
       };
     }
+  }
+
+  private unwrapMcpPayload(raw: any): any {
+    if (!raw) {
+      return null;
+    }
+
+    if (typeof raw === "string") {
+      return this.extractJson(raw);
+    }
+
+    if (raw.data && typeof raw.data === "object") {
+      return raw.data;
+    }
+
+    return raw;
   }
 
   private normalizeLevel(level: string): string {

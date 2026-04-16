@@ -62,6 +62,7 @@ public class QuestionGroupService {
         // Add questions if provided
         List<Long> questionIds = resolveQuestionIds(dto.getQuestions(), dto.getQuestionIds());
         if (!questionIds.isEmpty()) {
+            validateQuestionsExist(questionIds);
             addQuestionsToGroupInternal(saved.getId(), questionIds);
         }
 
@@ -144,6 +145,7 @@ public class QuestionGroupService {
         if (dto.getQuestions() != null || dto.getQuestionIds() != null) {
             questionGroupQuestionRepository.deleteAllByGroupId(id);
             if (!questionIds.isEmpty()) {
+                validateQuestionsExist(questionIds);
                 addQuestionsToGroupInternal(id, questionIds);
             }
         }
