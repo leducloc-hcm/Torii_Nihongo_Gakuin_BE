@@ -948,8 +948,50 @@ export class CourseService {
         course.lecturerIds,
       );
 
+    // Collect QUIZ lesson IDs
+    const quizLessonIds: number[] = [];
+    for (const mod of course.modules ?? []) {
+      for (const lesson of mod.lessons ?? []) {
+        if (lesson.kind === "QUIZ") {
+          quizLessonIds.push(lesson.id);
+        }
+      }
+    }
+
+    // Fetch quizzes from assessment.assessments for QUIZ lessons
+    const quizByLessonId = new Map<number, any>();
+    if (quizLessonIds.length > 0) {
+      const quizzes: any[] = await this.prisma.$queryRawUnsafe(
+        `SELECT a.id, a.title, a.type, a.level, a.visibility, a.lesson_id AS "lessonId",
+                a.class_id AS "classId", a.max_attempts AS "maxAttempts",
+                a.score_profile_id AS "scoreProfileId",
+                a.start_at AS "startAt", a.due_at AS "dueAt",
+                a.lock_after_due AS "lockAfterDue",
+                a.created_at AS "createdAt", a.updated_at AS "updatedAt"
+         FROM assessment.assessments a
+         WHERE a.lesson_id = ANY($1) AND a.type = 'QUIZ'`,
+        quizLessonIds,
+      );
+
+      for (const quiz of quizzes) {
+        quizByLessonId.set(quiz.lessonId, quiz);
+      }
+    }
+
+    // Attach quiz data to QUIZ lessons
+    const modulesWithQuiz = (course.modules ?? []).map((mod: any) => ({
+      ...mod,
+      lessons: (mod.lessons ?? []).map((lesson: any) => {
+        if (lesson.kind === "QUIZ" && quizByLessonId.has(lesson.id)) {
+          return { ...lesson, quiz: quizByLessonId.get(lesson.id) };
+        }
+        return lesson;
+      }),
+    }));
+
     return {
       ...course,
+      modules: modulesWithQuiz,
       lecturers: lecturerArray,
     };
   }
