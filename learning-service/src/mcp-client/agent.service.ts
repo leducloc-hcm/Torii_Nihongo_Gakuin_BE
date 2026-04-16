@@ -52,7 +52,7 @@ export class AgentService {
     { allowedServers: string[]; fallbackServers: string[] }
   > = {
     [AgentRole.SENSEI]: {
-      allowedServers: ["course", "flashcard", "blog"],
+      allowedServers: ["sensei", "course", "flashcard", "blog"],
       fallbackServers: ["enrollment"],
     },
     [AgentRole.ASSESSMENT]: {
@@ -140,6 +140,7 @@ export class AgentService {
     originalQuery?: string,
     agentRole?: AgentRole,
     collaboratorRoles: AgentRole[] = [],
+    queryType?: string,
   ): Promise<AgentResponse> {
     if (!this.toolsLoaded) {
       await this.loadTools();
@@ -183,9 +184,23 @@ export class AgentService {
     try {
       const routedTools = this.getToolsForRole(agentRole, collaboratorRoles);
 
-      let toolChoice: "auto" | "required" | undefined = undefined;
+      // For GRAMMAR/TRANSLATION, lock the tool choice to the single relevant tool
+      // so the AI cannot call generate_flashcards_from_lesson simultaneously.
+      let toolChoice: any = undefined;
       if (useTools && routedTools.length > 0) {
-        toolChoice = forceTools ? "required" : "auto";
+        if (queryType === "GRAMMAR") {
+          toolChoice = {
+            type: "function",
+            function: { name: "explain_grammar_personalized" },
+          };
+        } else if (queryType === "TRANSLATION") {
+          toolChoice = {
+            type: "function",
+            function: { name: "translate_with_level_context" },
+          };
+        } else {
+          toolChoice = forceTools ? "required" : "auto";
+        }
       }
 
       const runtimeModel = this.getRuntimeModel();
@@ -256,6 +271,28 @@ export class AgentService {
       const isInsufficientScopeError =
         /missing scopes:\s*model\.request/i.test(message) ||
         /insufficient permissions/i.test(message);
+
+      const isInvalidApiKeyError =
+        /incorrect api key/i.test(message) ||
+        /invalid api key/i.test(message) ||
+        (/\b401\b/.test(message) && /api key/i.test(message));
+
+      if (isInvalidApiKeyError) {
+        const lang = originalQuery ? detectLanguage(originalQuery) : "vi";
+
+        const localizedMessage =
+          lang === "ja"
+            ? "OpenAI APIキーが無効、期限切れ、または無効化されています。管理者に有効なOPENAI_API_KEYへ更新してサービスを再起動してもらってください。"
+            : lang === "en"
+              ? "The OpenAI API key is invalid, expired, or revoked. Please ask your admin to update OPENAI_API_KEY and restart the service."
+              : "OpenAI API key hiện tại không hợp lệ, đã hết hạn, hoặc đã bị thu hồi. Vui lòng cập nhật OPENAI_API_KEY hợp lệ và khởi động lại service.";
+
+        return {
+          content: localizedMessage,
+          requiresApproval: false,
+          finishReason: "stop",
+        };
+      }
 
       if (isInsufficientScopeError) {
         const lang = originalQuery ? detectLanguage(originalQuery) : "vi";
@@ -548,6 +585,40 @@ Use EXACT data from tool result - do not modify.`,
         });
       }
     } else if (
+      request.queryType === "GRAMMAR" ||
+      request.queryType === QueryType.GRAMMAR
+    ) {
+      messages.push({
+        role: "user",
+        content: `The tool explain_grammar_personalized has returned a result.
+
+Do two things:
+1. Write a short formatted explanation (grammar point → structure → examples table → notes), responding in the same language the user wrote in.
+2. After the explanation, output the raw tool result data inside a JSON code block like this:
+\`\`\`json
+{...the data object from the tool result...}
+\`\`\`
+
+IMPORTANT: The JSON code block MUST contain the inner data object (with fields: type, grammar_point, level, meaning, structure, notes, examples). Do not omit or modify any fields.`,
+      });
+    } else if (
+      request.queryType === "TRANSLATION" ||
+      request.queryType === QueryType.TRANSLATION
+    ) {
+      messages.push({
+        role: "user",
+        content: `The tool translate_with_level_context has returned a result.
+
+Do two things:
+1. Write a short formatted response (clean translation → vocabulary table with ⚠️ for above-level words → grammar patterns → learning tip), responding in the same language the user wrote in.
+2. After the explanation, output the raw tool result data inside a JSON code block like this:
+\`\`\`json
+{...the data object from the tool result...}
+\`\`\`
+
+IMPORTANT: The JSON code block MUST contain the inner data object (with fields: type, original_text, translation, vocabulary, grammar_patterns, learning_tip). Do not omit or modify any fields.`,
+      });
+    } else if (
       request.queryType !== "ASSESSMENT" &&
       request.queryType !== QueryType.ASSESSMENT &&
       request.queryType !== "ASSESSMENT_HISTORY" &&
@@ -573,8 +644,17 @@ Use EXACT data from tool result - do not modify.`,
       }
     });
 
+    const runtimeModel = this.getRuntimeModel();
+    if (!runtimeModel) {
+      return {
+        results,
+        finalResponse: undefined,
+        hasMoreTools: false,
+      };
+    }
+
     const finalCompletionOptions: any = {
-      model: OPENAI_CONFIG.model,
+      model: runtimeModel,
       messages,
       temperature: OPENAI_CONFIG.temperature,
     };
@@ -813,6 +893,25 @@ Use EXACT data from tool result - do not modify.`,
       }
 
       return this.toJsonCodeBlock({ decks, count: decks.length });
+    }
+
+    if (type === "ASSESSMENT") {
+      const assessments = this.extractArrayFromToolResults(results, [
+        "results",
+        "assessments",
+        "items",
+        "data",
+      ]);
+
+      if (!assessments) {
+        return undefined;
+      }
+
+      return this.toJsonCodeBlock({
+        type: "assessment_search",
+        results: assessments,
+        count: assessments.length,
+      });
     }
 
     return undefined;

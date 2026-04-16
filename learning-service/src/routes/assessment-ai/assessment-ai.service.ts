@@ -4,11 +4,18 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common";
 import { AssessmentMcpClient } from "src/mcp-client/module/assessment/assessment-mcp.service";
-import { GenerateAssessmentByAIDto } from "./assessment-ai.dto";
+import { AssessmentHistoryMcpClient } from "src/mcp-client/module/assessment_history/history-mcp.service";
+import {
+  EvaluateWrongAnswersDto,
+  GenerateAssessmentByAIDto,
+} from "./assessment-ai.dto";
 
 @Injectable()
 export class AssessmentAIService {
-  constructor(private readonly assessmentMcpClient: AssessmentMcpClient) {}
+  constructor(
+    private readonly assessmentMcpClient: AssessmentMcpClient,
+    private readonly historyMcpClient: AssessmentHistoryMcpClient,
+  ) {}
 
   async generateByAI(dto: GenerateAssessmentByAIDto) {
     if (dto.sectionType !== "READING" && dto.readingGroupType) {
@@ -34,6 +41,25 @@ export class AssessmentAIService {
     if (!result.success) {
       throw new ServiceUnavailableException(
         result.error || "Failed to generate assessment content via MCP",
+      );
+    }
+
+    return {
+      success: true,
+      data: result.data,
+    };
+  }
+
+  async evaluateWrongAnswers(userId: number, dto: EvaluateWrongAnswersDto) {
+    const result = await this.historyMcpClient.evaluateWrongAnswers({
+      attemptId: dto.attemptId,
+      language: dto.language ?? "vi",
+      maxQuestions: dto.maxQuestions ?? 10,
+    });
+
+    if (!result.success) {
+      throw new ServiceUnavailableException(
+        result.error || "Failed to evaluate wrong answers via MCP",
       );
     }
 

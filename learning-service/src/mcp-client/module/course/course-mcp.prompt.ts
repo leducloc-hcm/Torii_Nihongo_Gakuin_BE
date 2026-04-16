@@ -11,6 +11,18 @@ import { BLOG_MCP_SYSTEM_PROMPT } from "../blog/blog-mcp.prompt";
 import { getAssessmentHistoryPrompt } from "../assessment_history/history-mcp.prompt";
 import { ASSESSMENT_MCP_PROMPT } from "../assessment/assessment-mcp.prompt";
 
+const GRAMMAR_MCP_SYSTEM_PROMPT = `Focus: Personalised Grammar Explanation
+You have access to the tool explain_grammar_personalized.
+Call ONLY this tool for grammar queries — do NOT call generate_flashcards_from_lesson or any other tool at the same time.
+After the tool returns, format the result: grammar point → structure rule → examples table → notes.
+Respond in the same language the user used.`;
+
+const TRANSLATION_MCP_SYSTEM_PROMPT = `Focus: Level-Aware Translation
+You have access to the tool translate_with_level_context.
+Call ONLY this tool for translation queries.
+After the tool returns, format: clean translation → vocabulary table (flag words above user level with ⚠️) → grammar patterns → learning tip.
+Respond in the same language the user used.`;
+
 @Injectable()
 export class PromptService {
   private readonly logger = new Logger(PromptService.name);
@@ -62,6 +74,16 @@ export class PromptService {
     const flashcardPrompt = getFlashcardPrompt(queryType, userId);
     if (flashcardPrompt) return flashcardPrompt;
 
+    // Check for grammar query
+    if (queryType === QueryType.GRAMMAR) {
+      return GRAMMAR_MCP_SYSTEM_PROMPT;
+    }
+
+    // Check for translation query
+    if (queryType === QueryType.TRANSLATION) {
+      return TRANSLATION_MCP_SYSTEM_PROMPT;
+    }
+
     // Check for assessment history query
     if (queryType === QueryType.ASSESSMENT_HISTORY) {
       return getAssessmentHistoryPrompt(QueryType.ASSESSMENT_HISTORY, userId);
@@ -108,6 +130,40 @@ export class PromptService {
         return `Tool: ${result.toolName}\nResult: ${data}`;
       })
       .join("\n\n");
+
+    // Special handling for GRAMMAR queries
+    if (queryType === QueryType.GRAMMAR) {
+      return `Based on the tool results below, provide a structured grammar explanation.
+
+Tool Results:
+${resultsText}
+
+**Format:**
+1. Grammar point name + meaning (1 sentence)
+2. Formation/structure rule in a code block
+3. Examples table (Japanese | Romaji | Translation | Level)
+4. Notes on common mistakes or nuances
+5. Offer to compare with similar grammar patterns
+
+Respond in the same language the user wrote in.`;
+    }
+
+    // Special handling for TRANSLATION queries
+    if (queryType === QueryType.TRANSLATION) {
+      return `Based on the tool results below, present the translation with level-aware vocabulary breakdown.
+
+Tool Results:
+${resultsText}
+
+**Format:**
+1. Clean translation of the original text
+2. Vocabulary table: Word | Reading | Meaning | JLPT Level | Note (flag words above user's level)
+3. Grammar patterns found with brief explanations
+4. Learning tip from the tool result
+5. Encourage the user to study any above-level words
+
+Respond in the same language the user wrote in.`;
+    }
 
     // Special handling for COURSE queries - use JSON format
     if (queryType === QueryType.COURSE) {

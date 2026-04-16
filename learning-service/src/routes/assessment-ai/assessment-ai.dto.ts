@@ -62,3 +62,20 @@ export class GenerateAssessmentByAIDto {
   @Min(0)
   scorePerQuestion?: number;
 }
+
+export class EvaluateWrongAnswersDto {
+  @IsInt()
+  @IsPositive()
+  attemptId: number;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(["vi", "en", "ja"])
+  language?: "vi" | "en" | "ja";
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(20)
+  maxQuestions?: number;
+}

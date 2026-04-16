@@ -38,6 +38,10 @@ function roleForQueryType(queryType: QueryType): AgentRole {
     return AgentRole.ANALYTICS;
   }
 
+  if (queryType === QueryType.GRAMMAR || queryType === QueryType.TRANSLATION) {
+    return AgentRole.SENSEI;
+  }
+
   return AgentRole.SENSEI;
 }
 
