@@ -64,6 +64,7 @@ public class AssessmentService {
     private final ItemAssessmentQuestionRepository itemAssessmentQuestionRepository;
     private final ItemAssessmentGroupRepository itemAssessmentGroupRepository;
     private final AttemptRepository attemptRepository;
+    private final LearningUserLookupService learningUserLookupService;
 
     @Transactional
     public AssessmentDTO createAssessment(CreateAssessmentDTO dto) {
@@ -105,8 +106,45 @@ public class AssessmentService {
         Specification<Assessment> spec = buildSpecification(queryDto);
         Page<Assessment> assessmentPage = assessmentRepository.findAll(spec, pageable);
 
+        Map<Integer, AssessmentDTO.CreatorInfoDTO> creators = learningUserLookupService.getCreatorsByIds(
+            assessmentPage.getContent().stream().map(Assessment::getCreatedBy).collect(Collectors.toSet())
+        );
+
         List<AssessmentDTO> data = assessmentPage.getContent().stream()
-            .map(this::mapToDTO)
+            .map(assessment -> mapToDTO(assessment, creators.get(assessment.getCreatedBy())))
+            .collect(Collectors.toList());
+
+        AssessmentListResponseDTO.PaginationDTO pagination = new AssessmentListResponseDTO.PaginationDTO(
+            assessmentPage.getTotalElements(),
+            page,
+            limit,
+            assessmentPage.getTotalPages(),
+            assessmentPage.hasNext(),
+            assessmentPage.hasPrevious()
+        );
+
+        return new AssessmentListResponseDTO(data, pagination);
+    }
+
+    public AssessmentListResponseDTO getAssessmentsForUser(QueryAssessmentDTO queryDto, Integer userId) {
+        int page = queryDto.getPage() != null ? queryDto.getPage() : 1;
+        int limit = queryDto.getLimit() != null ? queryDto.getLimit() : 20;
+
+        Sort sort = Sort.by(
+            "desc".equalsIgnoreCase(queryDto.getSortOrder()) ? Sort.Direction.DESC : Sort.Direction.ASC,
+            queryDto.getSortBy() != null ? queryDto.getSortBy() : "createdAt"
+        );
+        Pageable pageable = PageRequest.of(page - 1, limit, sort);
+
+        Specification<Assessment> spec = buildUserScopedSpecification(queryDto, userId);
+        Page<Assessment> assessmentPage = assessmentRepository.findAll(spec, pageable);
+
+        Map<Integer, AssessmentDTO.CreatorInfoDTO> creators = learningUserLookupService.getCreatorsByIds(
+            assessmentPage.getContent().stream().map(Assessment::getCreatedBy).collect(Collectors.toSet())
+        );
+
+        List<AssessmentDTO> data = assessmentPage.getContent().stream()
+            .map(assessment -> mapToDTO(assessment, creators.get(assessment.getCreatedBy())))
             .collect(Collectors.toList());
 
         AssessmentListResponseDTO.PaginationDTO pagination = new AssessmentListResponseDTO.PaginationDTO(
@@ -315,9 +353,51 @@ public class AssessmentService {
         };
     }
 
+    private Specification<Assessment> buildUserScopedSpecification(QueryAssessmentDTO queryDto, Integer userId) {
+        return (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+
+            predicates.add(cb.equal(root.get("visibility"), Assessment.AssessmentVisibility.PUBLIC));
+
+            if (queryDto.getLevel() != null && !queryDto.getLevel().isBlank()) {
+                predicates.add(cb.equal(root.get("level"), Assessment.JLPTLevel.valueOf(queryDto.getLevel())));
+            }
+            if (queryDto.getType() != null && !queryDto.getType().isBlank()) {
+                predicates.add(cb.equal(root.get("type"), Assessment.AssessmentType.valueOf(queryDto.getType())));
+            }
+            if (queryDto.getVisibility() != null && !queryDto.getVisibility().isBlank()) {
+                predicates.add(cb.equal(root.get("visibility"), Assessment.AssessmentVisibility.valueOf(queryDto.getVisibility())));
+            }
+            if (queryDto.getClassId() != null) {
+                predicates.add(cb.equal(root.get("classId"), queryDto.getClassId()));
+            }
+            if (queryDto.getScoreProfileId() != null) {
+                predicates.add(cb.equal(root.get("scoreProfile").get("id"), queryDto.getScoreProfileId()));
+            }
+            if (queryDto.getLessonId() != null) {
+                predicates.add(cb.equal(root.get("lessonId"), queryDto.getLessonId()));
+            }
+            if (queryDto.getKeyword() != null && !queryDto.getKeyword().isBlank()) {
+                String kw = "%" + queryDto.getKeyword().toLowerCase() + "%";
+                predicates.add(cb.like(cb.lower(root.get("title")), kw));
+            }
+
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+    }
+
     private AssessmentDTO mapToDTO(Assessment assessment) {
+        return mapToDTO(assessment, learningUserLookupService.getCreatorById(assessment.getCreatedBy()));
+    }
+
+    private AssessmentDTO mapToDTO(Assessment assessment, AssessmentDTO.CreatorInfoDTO creator) {
         long sectionCount = assessmentSectionRepository.countByAssessmentId(assessment.getId());
-        long attemptCount = attemptRepository.countByAssessmentId(assessment.getId());
+        long submittedAttemptCount = attemptRepository.countByAssessmentIdAndSubmittedAtIsNotNull(assessment.getId());
+        long studentCount = attemptRepository.countDistinctUserIdByAssessmentIdAndSubmittedAtIsNotNull(assessment.getId());
+
+        String publishStatus = assessment.getVisibility() == Assessment.AssessmentVisibility.PUBLIC
+            ? "PUBLISHED"
+            : "DRAFT";
 
         return AssessmentDTO.builder()
             .id(assessment.getId())
@@ -326,13 +406,17 @@ public class AssessmentService {
             .type(assessment.getType() != null ? assessment.getType().name() : null)
             .visibility(assessment.getVisibility() != null ? assessment.getVisibility().name() : null)
             .createdBy(assessment.getCreatedBy())
+            .creator(creator)
             .lessonId(assessment.getLessonId())
             .classId(assessment.getClassId())
             .scoreProfileId(assessment.getScoreProfile() != null ? assessment.getScoreProfile().getId() : null)
             .lockAfterDue(assessment.getLockAfterDue())
             .maxAttempts(assessment.getMaxAttempts())
             .sectionCount(sectionCount)
-            .attemptCount(attemptCount)
+            .attemptCount(submittedAttemptCount)
+            .studentCount(studentCount)
+            .averageAttemptsPerStudent((double) submittedAttemptCount)
+            .publishStatus(publishStatus)
             .startAt(assessment.getStartAt())
             .dueAt(assessment.getDueAt())
             .createdAt(assessment.getCreatedAt())

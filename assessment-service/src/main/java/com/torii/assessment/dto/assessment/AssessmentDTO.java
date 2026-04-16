@@ -20,6 +20,7 @@ public class AssessmentDTO {
     private String type;
     private String visibility;
     private Integer createdBy;
+    private CreatorInfoDTO creator;
     private Integer lessonId;
     private Long classId;
     private Long scoreProfileId;
@@ -27,6 +28,9 @@ public class AssessmentDTO {
     private Integer maxAttempts;
     private Long sectionCount;
     private Long attemptCount;
+    private Long studentCount;
+    private Double averageAttemptsPerStudent;
+    private String publishStatus;
     private LocalDateTime startAt;
     private LocalDateTime dueAt;
     private LocalDateTime createdAt;
@@ -106,5 +110,17 @@ public class AssessmentDTO {
         private String audioUrl;
         private List<Long> questionIds;
         private List<QuestionDetailDTO> questions;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class CreatorInfoDTO {
+        private Integer id;
+        private String email;
+        private String name;
+        private String role;
+        private String username;
     }
 }

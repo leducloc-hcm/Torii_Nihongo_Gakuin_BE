@@ -2,6 +2,7 @@ package com.torii.assessment.service;
 
 import com.torii.assessment.dto.attempt.AttemptReviewDetailDTO;
 import com.torii.assessment.dto.attempt.AttemptedAssessmentListResponseDTO;
+import com.torii.assessment.dto.assessment.AssessmentDTO;
 import com.torii.assessment.entity.Assessment;
 import com.torii.assessment.entity.AssessmentAnswer;
 import com.torii.assessment.entity.AssessmentGroupQuestion;
@@ -36,6 +37,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.time.LocalDateTime;
 import java.util.stream.Collectors;
 
 @Service
@@ -52,6 +54,7 @@ public class AttemptReviewService {
     private final AssessmentAnswerRepository assessmentAnswerRepository;
     private final AssessmentQuestionRepository assessmentQuestionRepository;
     private final AssessmentOptionRepository assessmentOptionRepository;
+    private final LearningUserLookupService learningUserLookupService;
 
     public AttemptedAssessmentListResponseDTO getAttemptedAssessments(
         Integer userId,
@@ -98,6 +101,172 @@ public class AttemptReviewService {
         }
 
         return buildAttemptDetail(attempt);
+    }
+
+    public Map<String, Object> getAssessmentOverview(
+        Long assessmentId,
+        Integer page,
+        Integer limit,
+        String keyword,
+        String sortBy,
+        String sortOrder
+    ) {
+        Assessment assessment = assessmentRepository.findById(assessmentId)
+            .orElseThrow(() -> new RuntimeException("Assessment not found: " + assessmentId));
+
+        int safePage = page == null || page < 1 ? 1 : page;
+        int safeLimit = limit == null || limit < 1 ? 20 : limit;
+
+        List<Attempt> submittedAttempts = attemptRepository.findByAssessmentId(assessmentId)
+            .stream()
+            .filter(a -> a.getSubmittedAt() != null)
+            .collect(Collectors.toList());
+
+        Map<Integer, List<Attempt>> attemptsByStudent = submittedAttempts.stream()
+            .collect(Collectors.groupingBy(Attempt::getUserId));
+
+        List<Map<String, Object>> studentRows = attemptsByStudent.entrySet().stream()
+            .map(entry -> {
+                Integer studentId = entry.getKey();
+                List<Attempt> attempts = entry.getValue();
+
+                Double bestScore = attempts.stream()
+                    .map(Attempt::getScore)
+                    .filter(score -> score != null)
+                    .max(Double::compareTo)
+                    .orElse(null);
+
+                LocalDateTime lastAttempt = attempts.stream()
+                    .map(Attempt::getSubmittedAt)
+                    .filter(ts -> ts != null)
+                    .max(LocalDateTime::compareTo)
+                    .orElse(null);
+
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("studentId", studentId);
+                row.put("attempts", attempts.size());
+                row.put("bestScore", bestScore);
+                row.put("lastAttempt", lastAttempt);
+                return row;
+            })
+            .collect(Collectors.toList());
+
+        if (keyword != null && !keyword.isBlank()) {
+            String kw = keyword.trim().toLowerCase();
+            studentRows = studentRows.stream()
+                .filter(row -> String.valueOf(row.get("studentId")).toLowerCase().contains(kw))
+                .collect(Collectors.toList());
+        }
+
+        String sortField = sortBy == null || sortBy.isBlank() ? "lastAttempt" : sortBy;
+        boolean asc = "asc".equalsIgnoreCase(sortOrder);
+        Comparator<Map<String, Object>> comparator;
+        switch (sortField) {
+            case "studentId" -> comparator = Comparator.comparing(row -> (Integer) row.get("studentId"));
+            case "attempts" -> comparator = Comparator.comparing(row -> (Integer) row.get("attempts"));
+            case "bestScore" -> comparator = Comparator.comparing(
+                row -> (Double) row.get("bestScore"),
+                Comparator.nullsLast(Double::compareTo)
+            );
+            default -> comparator = Comparator.comparing(
+                row -> (LocalDateTime) row.get("lastAttempt"),
+                Comparator.nullsLast(LocalDateTime::compareTo)
+            );
+        }
+
+        if (!asc) {
+            comparator = comparator.reversed();
+        }
+        studentRows.sort(comparator);
+
+        int total = studentRows.size();
+        int from = Math.min((safePage - 1) * safeLimit, total);
+        int to = Math.min(from + safeLimit, total);
+        List<Map<String, Object>> pagedRows = studentRows.subList(from, to);
+
+        Map<String, Object> assessmentInfo = new LinkedHashMap<>();
+        AssessmentDTO.CreatorInfoDTO creator = learningUserLookupService.getCreatorById(assessment.getCreatedBy());
+        assessmentInfo.put("id", assessment.getId());
+        assessmentInfo.put("title", assessment.getTitle());
+        assessmentInfo.put("type", assessment.getType() != null ? assessment.getType().name() : null);
+        assessmentInfo.put("level", assessment.getLevel() != null ? assessment.getLevel().name() : null);
+        assessmentInfo.put("visibility", assessment.getVisibility() != null ? assessment.getVisibility().name() : null);
+        assessmentInfo.put("createdBy", assessment.getCreatedBy());
+        assessmentInfo.put("creator", creator);
+        assessmentInfo.put("publishStatus", assessment.getVisibility() == Assessment.AssessmentVisibility.PUBLIC ? "PUBLISHED" : "DRAFT");
+
+        Map<String, Object> pagination = new LinkedHashMap<>();
+        pagination.put("total", total);
+        pagination.put("page", safePage);
+        pagination.put("limit", safeLimit);
+        pagination.put("totalPages", total == 0 ? 0 : (int) Math.ceil((double) total / safeLimit));
+        pagination.put("hasNext", safePage * safeLimit < total);
+        pagination.put("hasPrev", safePage > 1);
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("assessment", assessmentInfo);
+        response.put("totalStudents", attemptsByStudent.size());
+        response.put("students", pagedRows);
+        response.put("pagination", pagination);
+        return response;
+    }
+
+    public Map<String, Object> getAssessmentStudentAttempts(
+        Long assessmentId,
+        Integer studentId,
+        Integer page,
+        Integer limit
+    ) {
+        if (!assessmentRepository.existsById(assessmentId)) {
+            throw new RuntimeException("Assessment not found: " + assessmentId);
+        }
+
+        int safePage = page == null || page < 1 ? 1 : page;
+        int safeLimit = limit == null || limit < 1 ? 20 : limit;
+
+        List<Attempt> studentAttempts = attemptRepository.findByAssessmentId(assessmentId)
+            .stream()
+            .filter(a -> a.getUserId().equals(studentId))
+            .sorted(Comparator.comparing(Attempt::getAttemptNo, Comparator.nullsLast(Integer::compareTo)).reversed())
+            .collect(Collectors.toList());
+
+        int total = studentAttempts.size();
+        int from = Math.min((safePage - 1) * safeLimit, total);
+        int to = Math.min(from + safeLimit, total);
+
+        List<Map<String, Object>> attempts = studentAttempts.subList(from, to).stream().map(attempt -> {
+            Integer timeSpentSec = assessmentAnswerRepository.findByAttemptIdOrderByIdAsc(attempt.getId())
+                .stream()
+                .map(AssessmentAnswer::getTimeSpentSec)
+                .filter(v -> v != null)
+                .reduce(0, Integer::sum);
+
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("attemptId", attempt.getId());
+            row.put("attempt", attempt.getAttemptNo());
+            row.put("score", attempt.getScore());
+            row.put("earnedScore", attempt.getEarnedScore());
+            row.put("timeSpentSec", timeSpentSec);
+            row.put("status", attempt.getStatus() != null ? attempt.getStatus().name() : null);
+            row.put("startedAt", attempt.getStartedAt());
+            row.put("submittedAt", attempt.getSubmittedAt());
+            return row;
+        }).collect(Collectors.toList());
+
+        Map<String, Object> pagination = new LinkedHashMap<>();
+        pagination.put("total", total);
+        pagination.put("page", safePage);
+        pagination.put("limit", safeLimit);
+        pagination.put("totalPages", total == 0 ? 0 : (int) Math.ceil((double) total / safeLimit));
+        pagination.put("hasNext", safePage * safeLimit < total);
+        pagination.put("hasPrev", safePage > 1);
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("assessmentId", assessmentId);
+        response.put("studentId", studentId);
+        response.put("attempts", attempts);
+        response.put("pagination", pagination);
+        return response;
     }
 
     private AttemptedAssessmentListResponseDTO buildAttemptedListResponse(
