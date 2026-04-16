@@ -73,15 +73,20 @@ export class OnlineClassService {
 
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
+        include: { lecturerProfile: true },
       });
 
       if (!user) {
         throw new NotFoundException("User not found");
       }
 
-      // Determine user role in class
+      // Determine user role in class (substitute lecturers get lecturer permissions)
+      const isSubstituteLecturer =
+        activeSession.substituteLecturerId === userId;
       const userRole: "lecturer" | "customer" =
-        onlineClass.lecturerId === userId ? "lecturer" : "customer";
+        onlineClass.lecturerId === userId || isSubstituteLecturer
+          ? "lecturer"
+          : "customer";
 
       // Get participants in the active session through Janus
       let participants: any[] = [];
@@ -142,7 +147,9 @@ export class OnlineClassService {
         displayName: user.name,
         avatar:
           userRole === "lecturer"
-            ? onlineClass.lecturer.lecturerProfile?.avatar
+            ? isSubstituteLecturer
+              ? (user as any).lecturerProfile?.avatar
+              : onlineClass.lecturer.lecturerProfile?.avatar
             : undefined,
         janusRoomId: activeSession.janusRoomId ?? undefined,
         sessionId: activeSession.id.toString(),
