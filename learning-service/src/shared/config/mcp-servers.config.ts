@@ -57,6 +57,14 @@ export const MCP_SERVERS: Record<string, MCPServerConfig> = {
     enabled: process.env.MCP_ASSESSMENT_HISTORY_ENABLED !== "false",
     description: "User assessment history and performance tracking",
   },
+  analytics: {
+    name: "analytics-mcp",
+    url:
+      process.env.MCP_ANALYTICS_SERVER_URL ||
+      "https://agent.torii-nihongo-gakuin.io.vn/analytics/mcp",
+    enabled: process.env.MCP_ANALYTICS_ENABLED !== "false",
+    description: "Learning analytics, progress insights, and recommendations",
+  },
 };
 
 export function getEnabledMCPServers(): MCPServerConfig[] {
