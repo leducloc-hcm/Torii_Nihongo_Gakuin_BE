@@ -31,6 +31,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -267,6 +268,191 @@ public class AttemptReviewService {
         response.put("attempts", attempts);
         response.put("pagination", pagination);
         return response;
+    }
+
+    public Map<String, Object> getWrongAnswerLab(
+        Integer userId,
+        Integer limitAttempts,
+        Integer maxQuestionsPerDrill,
+        Boolean includeListening,
+        List<String> sourceTypes
+    ) {
+        int safeLimitAttempts = limitAttempts == null || limitAttempts < 1 ? 20 : Math.min(limitAttempts, 100);
+        int safeMaxQuestions = maxQuestionsPerDrill == null || maxQuestionsPerDrill < 1
+            ? 8
+            : Math.min(maxQuestionsPerDrill, 30);
+        boolean allowListening = Boolean.TRUE.equals(includeListening);
+
+        Set<String> allowedTypes = sourceTypes == null || sourceTypes.isEmpty()
+            ? Set.of("TEST", "EXAM", "QUIZ", "ASSIGNMENT")
+            : sourceTypes.stream().map(String::toUpperCase).collect(Collectors.toSet());
+
+        List<Attempt> submittedAttempts = attemptRepository.findByUserIdAndSubmittedAtIsNotNullOrderBySubmittedAtDesc(userId);
+        List<Attempt> slicedAttempts = submittedAttempts.size() > safeLimitAttempts
+            ? submittedAttempts.subList(0, safeLimitAttempts)
+            : submittedAttempts;
+
+        Map<Long, Assessment> assessmentMap = assessmentRepository.findAllById(
+            slicedAttempts.stream().map(Attempt::getAssessmentId).collect(Collectors.toSet())
+        ).stream().collect(Collectors.toMap(Assessment::getId, a -> a));
+
+        Map<Long, Map<String, Object>> uniqueWrongQuestions = new LinkedHashMap<>();
+        Map<String, Integer> sourceTypeCounts = new LinkedHashMap<>();
+
+        for (Attempt attempt : slicedAttempts) {
+            Assessment assessment = assessmentMap.get(attempt.getAssessmentId());
+            if (assessment == null || assessment.getType() == null) {
+                continue;
+            }
+
+            String sourceType = assessment.getType().name();
+            if (!allowedTypes.contains(sourceType)) {
+                continue;
+            }
+
+            AttemptReviewDetailDTO detail = buildAttemptDetail(attempt);
+            for (AttemptReviewDetailDTO.SectionDetailDTO section : detail.getSectionDetails()) {
+                String sectionType = section.getSectionType();
+                if (!allowListening && "LISTENING".equalsIgnoreCase(sectionType)) {
+                    continue;
+                }
+
+                for (AttemptReviewDetailDTO.QuestionResultDTO question : section.getQuestions()) {
+                    if (Boolean.TRUE.equals(question.getIsCorrect())) {
+                        continue;
+                    }
+
+                    Long questionId = question.getQuestionId();
+                    if (questionId == null || uniqueWrongQuestions.containsKey(questionId)) {
+                        continue;
+                    }
+
+                    List<Map<String, Object>> options = question.getOptions() == null
+                        ? Collections.emptyList()
+                        : question.getOptions().stream().map(o -> {
+                            Map<String, Object> optionMap = new LinkedHashMap<>();
+                            optionMap.put("id", o.getId());
+                            optionMap.put("content", o.getContent());
+                            optionMap.put("order", o.getOrder());
+                            return optionMap;
+                        }).collect(Collectors.toList());
+
+                    Map<String, Object> payload = new LinkedHashMap<>();
+                    payload.put("questionId", questionId);
+                    payload.put("stem", question.getStem());
+                    payload.put("sectionType", sectionType);
+                    payload.put("focus", mapSectionTypeToFocus(sectionType));
+                    payload.put("assessmentType", sourceType);
+                    payload.put("assessmentId", detail.getAssessmentId());
+                    payload.put("assessmentTitle", detail.getAssessmentTitle());
+                    payload.put("attemptId", detail.getAttemptId());
+                    payload.put("selectedOptionId", question.getSelectedOptionId());
+                    payload.put("options", options);
+                    uniqueWrongQuestions.put(questionId, payload);
+
+                    sourceTypeCounts.put(sourceType, sourceTypeCounts.getOrDefault(sourceType, 0) + 1);
+                }
+            }
+        }
+
+        Map<String, List<Map<String, Object>>> groupedByFocus = new LinkedHashMap<>();
+        for (Map<String, Object> question : uniqueWrongQuestions.values()) {
+            String focus = String.valueOf(question.get("focus"));
+            groupedByFocus.computeIfAbsent(focus, k -> new ArrayList<>()).add(question);
+        }
+
+        List<Map<String, Object>> drills = new ArrayList<>();
+        for (Map.Entry<String, List<Map<String, Object>>> entry : groupedByFocus.entrySet()) {
+            String focus = entry.getKey();
+            List<Map<String, Object>> questions = entry.getValue();
+            List<Map<String, Object>> limitedQuestions = questions.size() > safeMaxQuestions
+                ? questions.subList(0, safeMaxQuestions)
+                : questions;
+
+            Map<String, Object> drill = new LinkedHashMap<>();
+            drill.put("id", "drill-" + focus.toLowerCase());
+            drill.put("focus", focus);
+            drill.put("title", focus + " Wrong Answer Retry");
+            drill.put("questionCount", limitedQuestions.size());
+            drill.put("questions", limitedQuestions);
+            drills.add(drill);
+        }
+
+        drills.sort((a, b) -> Integer.compare((Integer) b.get("questionCount"), (Integer) a.get("questionCount")));
+
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("attemptsAnalyzed", slicedAttempts.size());
+        summary.put("wrongQuestionCount", uniqueWrongQuestions.size());
+        summary.put("drillCount", drills.size());
+        summary.put("sourceTypeCounts", sourceTypeCounts);
+        summary.put("includeListening", allowListening);
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("summary", summary);
+        response.put("drills", drills);
+        return response;
+    }
+
+    public Map<String, Object> gradeWrongAnswerLab(List<com.torii.assessment.dto.attempt.WrongAnswerLabGradeRequestDTO.AnswerDTO> answers) {
+        if (answers == null || answers.isEmpty()) {
+            return Map.of(
+                "total", 0,
+                "correct", 0,
+                "accuracy", 0,
+                "results", List.of()
+            );
+        }
+
+        List<Map<String, Object>> results = new ArrayList<>();
+        int correctCount = 0;
+
+        for (com.torii.assessment.dto.attempt.WrongAnswerLabGradeRequestDTO.AnswerDTO answer : answers) {
+            Long questionId = answer.getQuestionId();
+            Long selectedOptionId = answer.getSelectedOptionId();
+
+            Long correctOptionId = assessmentOptionRepository.findByQuestionIdOrderByOrderAsc(questionId)
+                .stream()
+                .filter(o -> Boolean.TRUE.equals(o.getIsCorrect()))
+                .map(AssessmentOption::getId)
+                .findFirst()
+                .orElse(null);
+
+            boolean isCorrect = correctOptionId != null && correctOptionId.equals(selectedOptionId);
+            if (isCorrect) {
+                correctCount++;
+            }
+
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("questionId", questionId);
+            item.put("selectedOptionId", selectedOptionId);
+            item.put("correctOptionId", correctOptionId);
+            item.put("isCorrect", isCorrect);
+            results.add(item);
+        }
+
+        int total = answers.size();
+        double accuracy = total == 0 ? 0d : (correctCount * 100.0) / total;
+
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("total", total);
+        payload.put("correct", correctCount);
+        payload.put("accuracy", Math.round(accuracy * 10.0) / 10.0);
+        payload.put("results", results);
+        return payload;
+    }
+
+    private String mapSectionTypeToFocus(String sectionType) {
+        String normalized = sectionType == null ? "" : sectionType.toUpperCase();
+        if (normalized.contains("VOCAB") || normalized.contains("KANJI")) {
+            return "VOCAB";
+        }
+        if (normalized.contains("GRAMMAR")) {
+            return "GRAMMAR";
+        }
+        if (normalized.contains("READING")) {
+            return "READING";
+        }
+        return "READING";
     }
 
     private AttemptedAssessmentListResponseDTO buildAttemptedListResponse(

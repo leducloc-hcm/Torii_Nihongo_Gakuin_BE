@@ -92,11 +92,38 @@ public class AttemptService {
     
     @Transactional
     public AttemptDTO submitAttempt(Long id, SubmitAttemptRequestDTO requestDto, Integer requesterUserId, String requesterRole) {
-        Attempt attempt = attemptRepository.findById(id).orElse(null);
+        AssessmentProgress progress = assessmentProgressRepository.findById(id).orElse(null);
+        Attempt attempt;
 
-        if (attempt == null) {
-            attempt = createAttemptFromProgress(id, requestDto, requesterUserId, requesterRole);
+        if (progress != null) {
+            boolean privileged = "STAFF".equalsIgnoreCase(requesterRole)
+                || "LECTURER".equalsIgnoreCase(requesterRole)
+                || "ADMIN".equalsIgnoreCase(requesterRole);
+
+            if (!privileged && !progress.getUserId().equals(requesterUserId)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "CUSTOMER can only submit their own progress");
+            }
+
+            List<Attempt> attempts = attemptRepository.findByProgressIdOrderByAttemptNoDesc(progress.getId());
+            Attempt latestAttempt = attempts.isEmpty() ? null : attempts.get(0);
+
+            if (latestAttempt != null
+                && latestAttempt.getStatus() == Attempt.AttemptStatus.SUBMITTED
+                && Boolean.TRUE.equals(progress.getIsSubmitted())) {
+                return mapToDTO(latestAttempt);
+            }
+
+            if (latestAttempt != null && latestAttempt.getStatus() != Attempt.AttemptStatus.SUBMITTED) {
+                attempt = latestAttempt;
+                applyAnswersToAttempt(attempt.getId(), requestDto != null ? requestDto.getAnswers() : null);
+            } else {
+                attempt = createAttemptFromProgress(progress.getId(), requestDto, requesterUserId, requesterRole);
+            }
         } else {
+            attempt = attemptRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Attempt not found: " + id));
+
             ensureCanAccessAttempt(attempt, requesterUserId, requesterRole);
             applyAnswersToAttempt(attempt.getId(), requestDto != null ? requestDto.getAnswers() : null);
         }
