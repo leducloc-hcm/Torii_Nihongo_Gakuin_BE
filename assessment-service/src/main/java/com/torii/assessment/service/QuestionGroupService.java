@@ -1,9 +1,11 @@
 package com.torii.assessment.service;
 
 import com.torii.assessment.dto.questiongroup.*;
+import com.torii.assessment.entity.Option;
 import com.torii.assessment.entity.Question;
 import com.torii.assessment.entity.QuestionGroup;
 import com.torii.assessment.entity.QuestionGroupQuestion;
+import com.torii.assessment.repository.OptionRepository;
 import com.torii.assessment.repository.QuestionGroupQuestionRepository;
 import com.torii.assessment.repository.QuestionGroupRepository;
 import com.torii.assessment.repository.QuestionRepository;
@@ -31,6 +33,7 @@ public class QuestionGroupService {
     private final QuestionGroupRepository questionGroupRepository;
     private final QuestionGroupQuestionRepository questionGroupQuestionRepository;
     private final QuestionRepository questionRepository;
+    private final OptionRepository optionRepository;
     private final S3Service s3Service;
 
     @Transactional
@@ -350,10 +353,25 @@ public class QuestionGroupService {
     private QuestionGroupResponseDTO mapToResponseDTO(QuestionGroup group) {
         List<QuestionGroupQuestion> qgqs = questionGroupQuestionRepository.findByGroupIdOrderByOrderAsc(group.getId());
 
+        // Batch-load questions to avoid Hibernate first-level cache returning stale entities with null question
+        List<Long> qIds = qgqs.stream().map(QuestionGroupQuestion::getQuestionId).collect(Collectors.toList());
+        Map<Long, Question> questionsById = qIds.isEmpty() ? Collections.emptyMap() :
+            questionRepository.findAllById(qIds).stream().collect(Collectors.toMap(Question::getId, q -> q));
+
         List<QuestionGroupResponseDTO.QuestionDTO> questionDTOs = qgqs.stream()
             .map(qgq -> {
-                Question q = qgq.getQuestion();
+                Question q = questionsById.get(qgq.getQuestionId());
                 if (q == null) return null;
+                List<QuestionGroupResponseDTO.OptionDTO> optionDTOs = optionRepository
+                    .findByQuestionIdOrderByOrderAsc(q.getId()).stream()
+                    .map(opt -> QuestionGroupResponseDTO.OptionDTO.builder()
+                        .id(opt.getId())
+                        .content(opt.getContent())
+                        .isCorrect(opt.getIsCorrect())
+                        .order(opt.getOrder())
+                        .mediaUrl(opt.getMediaUrl())
+                        .build())
+                    .collect(Collectors.toList());
                 return QuestionGroupResponseDTO.QuestionDTO.builder()
                     .id(q.getId())
                     .stem(q.getStem())
@@ -362,6 +380,7 @@ public class QuestionGroupService {
                     .difficulty(q.getDifficulty().name())
                     .order(qgq.getOrder())
                     .score(qgq.getScore())
+                    .options(optionDTOs)
                     .build();
             })
             .filter(Objects::nonNull)
