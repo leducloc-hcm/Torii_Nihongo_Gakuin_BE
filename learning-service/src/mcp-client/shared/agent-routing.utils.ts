@@ -86,7 +86,15 @@ export function routeAgentForQuery(
   }
 
   const uniqueCandidateRoles = uniqueRoles(candidateRoles);
-  const primaryRole = pickPrimaryRole(uniqueCandidateRoles);
+
+  // For GRAMMAR/TRANSLATION queries, always keep SENSEI as primary
+  // (pickPrimaryRole would override to ASSESSMENT due to ROLE_PRIORITY)
+  const primaryRole =
+    (queryType === QueryType.GRAMMAR || queryType === QueryType.TRANSLATION) &&
+    baseRole === AgentRole.SENSEI
+      ? AgentRole.SENSEI
+      : pickPrimaryRole(uniqueCandidateRoles);
+
   const collaboratorRoles = uniqueCandidateRoles.filter(
     (role) => role !== primaryRole,
   );

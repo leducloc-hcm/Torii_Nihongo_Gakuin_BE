@@ -162,6 +162,50 @@ export function isJapaneseLearningQuery(query: string): boolean {
     lowerQuery.includes(keyword),
   );
 
+  // Check for assessment history / personal progress queries
+  const historyKeywords = [
+    // Vietnamese
+    "kết quả",
+    "điểm",
+    "điểm số",
+    "bài làm",
+    "đã làm",
+    "đã thi",
+    "lịch sử",
+    "thành tích",
+    "tiến bộ",
+    "tiến độ",
+    "cải thiện",
+    "của tôi",
+    "của mình",
+    "tôi đã",
+    "mình đã",
+    // English
+    "score",
+    "result",
+    "history",
+    "progress",
+    "summary",
+    "focus on",
+    "my test",
+    "my exam",
+    "my quiz",
+    "my progress",
+    "learning progress",
+    "i took",
+    "i did",
+    "performance",
+    // Japanese
+    "スコア",
+    "点数",
+    "成績",
+    "結果",
+    "履歴",
+  ];
+  const hasHistoryKeywords = historyKeywords.some((keyword) =>
+    lowerQuery.includes(keyword),
+  );
+
   // 🆕 Check for blog-related content (assume Japanese learning blog posts)
   const blogKeywords = [
     "blog",
@@ -198,6 +242,7 @@ export function isJapaneseLearningQuery(query: string): boolean {
     hasCourseKeywords ||
     hasFlashcardKeywords ||
     hasAssessmentKeywords ||
+    hasHistoryKeywords ||
     hasBlogKeywords ||
     hasWebsiteContext
   );

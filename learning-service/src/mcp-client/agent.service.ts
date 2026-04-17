@@ -213,14 +213,24 @@ export class AgentService {
       const routedTools = this.getToolsForRole(agentRole, collaboratorRoles);
 
       // For GRAMMAR/TRANSLATION, lock the tool choice to the single relevant tool
+      // but only if the tool actually exists in routedTools (sensei MCP must be reachable)
       let toolChoice: Anthropic.Messages.ToolChoice | undefined = undefined;
       if (useTools && routedTools.length > 0) {
-        if (queryType === "GRAMMAR") {
+        const toolExists = (name: string) =>
+          routedTools.some((t) => t.name === name);
+
+        if (
+          queryType === "GRAMMAR" &&
+          toolExists("explain_grammar_personalized")
+        ) {
           toolChoice = {
             type: "tool",
             name: "explain_grammar_personalized",
           };
-        } else if (queryType === "TRANSLATION") {
+        } else if (
+          queryType === "TRANSLATION" &&
+          toolExists("translate_with_level_context")
+        ) {
           toolChoice = {
             type: "tool",
             name: "translate_with_level_context",
@@ -624,14 +634,28 @@ Use EXACT data from tool result - do not modify.`;
     ) {
       formatInstruction = `The tool explain_grammar_personalized has returned a result.
 
-Do two things:
-1. Write a short formatted explanation (grammar point → structure → examples table → notes), responding in the same language the user wrote in.
-2. After the explanation, output the raw tool result data inside a JSON code block like this:
+MANDATORY — Do BOTH parts in order:
+
+PART 1 — Write a SHORT, structured explanation (under 250 words) in the SAME language the user wrote in:
+- Grammar point + level
+- Meaning / usage
+- Structure / conjugation pattern
+- 2–3 example sentences (Japanese / romaji / translation)
+- 1–2 common pitfalls (notes)
+
+PART 2 — You MUST append this JSON block EXACTLY at the very end of your response (no text after it):
+
 \`\`\`json
-{...the data object from the tool result...}
+{"type":"grammar_explanation","grammar_point":"FILL","level":"FILL","meaning":"FILL","structure":"FILL","notes":"FILL","examples":[{"jp":"FILL","romaji":"FILL","translation":"FILL"},{"jp":"FILL","romaji":"FILL","translation":"FILL"},{"jp":"FILL","romaji":"FILL","translation":"FILL"}]}
 \`\`\`
 
-IMPORTANT: The JSON code block MUST contain the inner data object (with fields: type, grammar_point, level, meaning, structure, notes, examples). Do not omit or modify any fields.`;
+Replace every "FILL" with the actual value from the tool result. Use the inner explanation object fields.
+
+RULES:
+- ✅ The \`\`\`json block is REQUIRED — never omit it
+- ✅ All examples must have jp, romaji, translation
+- ✅ notes must be a string (join array items with " • " if array)
+- ❌ Do NOT add any text after the closing \`\`\` fence`;
     } else if (
       request.queryType === "TRANSLATION" ||
       request.queryType === QueryType.TRANSLATION
