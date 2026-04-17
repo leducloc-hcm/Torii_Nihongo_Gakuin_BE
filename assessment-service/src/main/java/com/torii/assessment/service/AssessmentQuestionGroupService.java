@@ -5,12 +5,15 @@ import com.torii.assessment.dto.assessmentquestiongroup.CreateAssessmentQuestion
 import com.torii.assessment.dto.assessmentquestiongroup.ModifyAssessmentGroupQuestionsDTO;
 import com.torii.assessment.dto.assessmentquestiongroup.QueryAssessmentQuestionGroupDTO;
 import com.torii.assessment.dto.assessmentquestiongroup.UpdateAssessmentQuestionGroupDTO;
+import com.torii.assessment.dto.assessmentquestion.AssessmentQuestionResponseDTO;
+import com.torii.assessment.dto.assessmentoption.AssessmentOptionResponseDTO;
 import com.torii.assessment.entity.AssessmentGroupQuestion;
 import com.torii.assessment.entity.AssessmentItem;
 import com.torii.assessment.entity.AssessmentQuestion;
 import com.torii.assessment.entity.AssessmentQuestionGroup;
 import com.torii.assessment.repository.AssessmentItemRepository;
 import com.torii.assessment.repository.AssessmentGroupQuestionRepository;
+import com.torii.assessment.repository.AssessmentOptionRepository;
 import com.torii.assessment.repository.AssessmentQuestionGroupRepository;
 import com.torii.assessment.repository.AssessmentQuestionRepository;
 import jakarta.persistence.criteria.Predicate;
@@ -39,6 +42,7 @@ public class AssessmentQuestionGroupService {
     private final AssessmentQuestionGroupRepository assessmentQuestionGroupRepository;
     private final AssessmentGroupQuestionRepository assessmentGroupQuestionRepository;
     private final AssessmentQuestionRepository assessmentQuestionRepository;
+    private final AssessmentOptionRepository assessmentOptionRepository;
     private final AssessmentItemRepository assessmentItemRepository;
 
     @Transactional
@@ -216,8 +220,39 @@ public class AssessmentQuestionGroupService {
     }
 
     private AssessmentQuestionGroupResponseDTO mapToResponse(AssessmentQuestionGroup group) {
-        List<Long> questionIds = assessmentGroupQuestionRepository.findByGroupIdOrderByOrderAsc(group.getId()).stream()
+        List<AssessmentGroupQuestion> links = assessmentGroupQuestionRepository.findByGroupIdOrderByOrderAsc(group.getId());
+        List<Long> questionIds = links.stream()
                 .map(AssessmentGroupQuestion::getQuestionId)
+                .collect(Collectors.toList());
+
+        List<AssessmentQuestionResponseDTO> questions = assessmentQuestionRepository.findAllById(questionIds).stream()
+                .map(q -> {
+                    List<AssessmentOptionResponseDTO> options = assessmentOptionRepository
+                            .findByQuestionIdOrderByOrderAsc(q.getId()).stream()
+                            .map(opt -> AssessmentOptionResponseDTO.builder()
+                                    .id(opt.getId())
+                                    .questionId(opt.getQuestionId())
+                                    .content(opt.getContent())
+                                    .isCorrect(opt.getIsCorrect())
+                                    .order(opt.getOrder())
+                                    .createdAt(opt.getCreatedAt())
+                                    .build())
+                            .collect(Collectors.toList());
+                    return AssessmentQuestionResponseDTO.builder()
+                            .id(q.getId())
+                            .originalQuestionId(q.getOriginalQuestionId())
+                            .type(q.getType())
+                            .level(q.getLevel())
+                            .difficulty(q.getDifficulty())
+                            .stem(q.getStem())
+                            .passage(q.getPassage())
+                            .explanation(q.getExplanation())
+                            .mediaUrl(q.getMediaUrl())
+                            .audioUrl(q.getAudioUrl())
+                            .createdAt(q.getCreatedAt())
+                            .options(options)
+                            .build();
+                })
                 .collect(Collectors.toList());
 
         return AssessmentQuestionGroupResponseDTO.builder()
@@ -235,6 +270,7 @@ public class AssessmentQuestionGroupService {
                 .createdAt(group.getCreatedAt())
                 .questionIds(questionIds)
                 .assessmentQuestionIds(questionIds)
+                .questions(questions)
                 .build();
     }
 }
