@@ -18,7 +18,7 @@ dist/
 *.swo
 *~
 
-diagram_docs/
+/diagram_docs
 # Logs
 logs/
 *.log

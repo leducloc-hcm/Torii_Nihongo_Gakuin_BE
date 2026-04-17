@@ -1,5 +1,5 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
-import { ChatCompletionMessageParam } from "openai/resources/chat/completions";
+import { ClaudeMessageParam } from "src/mcp-client/mcp.model";
 import {
   AIThreadRepository,
   AIQueryRepository,
@@ -514,8 +514,9 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
       systemPrompt = `${systemPrompt}\n\n${multiToolHint}`;
     }
 
-    const messages: ChatCompletionMessageParam[] = [
-      { role: "system", content: systemPrompt },
+    const messages: ClaudeMessageParam[] = [
+      // System messages are extracted by AgentService.extractSystemAndMessages() before the Anthropic API call
+      { role: "system", content: systemPrompt } as any,
     ];
 
     // Add recent thread messages for context (last 10)

@@ -273,12 +273,6 @@ services:
                 port: 6379
                 password: ""
                 database: 0
-          - name: jwt-validator
-            config:
-              secret: nhatngutorii
-              skip_on_methods:
-                - GET
-                - OPTIONS
       - name: flashcards-route
         paths:
           - /flashcards
@@ -703,6 +697,21 @@ services:
       - name: assessment-sections-route
         paths:
           - /assessment-sections
+        strip_path: false
+        methods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - PATCH
+          - OPTIONS
+        plugins:
+          - name: jwt-validator
+            config:
+              secret: nhatngutorii
+      - name: assessment-attempts-route
+        paths:
+          - /assessment-attempts
         strip_path: false
         methods:
           - GET

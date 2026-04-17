@@ -21,6 +21,7 @@
     "prisma:studio": "prisma studio --schema=./prisma/schema.prisma"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.90.0",
     "@apollo/server": "^5.4.0",
     "@as-integrations/express5": "^1.1.2",
     "@aws-sdk/client-s3": "^3.896.0",
@@ -63,7 +64,6 @@
     "multer": "^2.0.2",
     "nestjs-pino": "^4.4.1",
     "nestjs-zod": "^4.3.1",
-    "openai": "^6.7.0",
     "otpauth": "^9.4.1",
     "pg": "^8.16.3",
     "react": "19.1.1",

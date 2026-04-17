@@ -1,7 +1,9 @@
-import {
-  ChatCompletionMessageParam,
-  ChatCompletionTool,
-} from "openai/resources/chat/completions";
+import Anthropic from "@anthropic-ai/sdk";
+
+// Re-export Anthropic types used throughout the codebase
+export type ClaudeMessageParam = Anthropic.Messages.MessageParam;
+export type ClaudeTool = Anthropic.Messages.Tool;
+export type ClaudeToolChoice = Anthropic.Messages.ToolChoice;
 
 export interface MCPTool {
   name: string;
@@ -63,14 +65,14 @@ export interface MCPListToolsResponse {
   tools: MCPTool[];
 }
 
-export function transformMCPToolToOpenAI(mcpTool: MCPTool): ChatCompletionTool {
+export function transformMCPToolToClaude(mcpTool: MCPTool): ClaudeTool {
   return {
-    type: "function",
-    function: {
-      name: mcpTool.name,
-      description: mcpTool.description,
-      parameters: mcpTool.inputSchema,
-      strict: false,
+    name: mcpTool.name,
+    description: mcpTool.description,
+    input_schema: {
+      type: "object" as const,
+      properties: mcpTool.inputSchema.properties,
+      required: mcpTool.inputSchema.required,
     },
   };
 }
@@ -78,8 +80,8 @@ export function transformMCPToolToOpenAI(mcpTool: MCPTool): ChatCompletionTool {
 export interface ChatContext {
   threadId: number;
   userId: number;
-  messages: ChatCompletionMessageParam[];
-  tools?: ChatCompletionTool[];
+  messages: ClaudeMessageParam[];
+  tools?: ClaudeTool[];
 }
 
 export interface ToolCallRequest {
@@ -103,7 +105,7 @@ export interface ExecuteToolsRequest {
   }>;
   threadId: number;
   userId: number;
-  messages?: ChatCompletionMessageParam[];
+  messages?: ClaudeMessageParam[];
   queryType?: string; // Add queryType to know how to format the final response
   agentRole?: string;
 }

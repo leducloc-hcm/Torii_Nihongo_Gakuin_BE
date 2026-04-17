@@ -6,6 +6,11 @@ import helmet from "helmet";
 import { NestExpressApplication } from "@nestjs/platform-express";
 import { WebsocketAdapter } from "./websockets/websockets.adapter";
 
+// Allow JSON.stringify to serialize BigInt values returned by Prisma raw queries
+(BigInt.prototype as any).toJSON = function () {
+  return Number(this);
+};
+
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bufferLogs: true,
@@ -24,7 +29,7 @@ async function bootstrap() {
         },
       },
       crossOriginEmbedderPolicy: false,
-    })
+    }),
   );
   app.useWebSocketAdapter(new WebsocketAdapter(app));
 

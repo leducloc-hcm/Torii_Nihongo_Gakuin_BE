@@ -221,10 +221,10 @@ variable "frontend_url" {
   default     = "https://torii-nihongo-gakuin.io.vn"
 }
 
-# ===== OpenAI Configuration =====
+# ===== Claude (Anthropic) Configuration =====
 
-variable "openai_api_key" {
-  description = "OpenAI API key"
+variable "claude_api_key" {
+  description = "Claude (Anthropic) API key"
   type        = string
   sensitive   = true
   default     = ""
