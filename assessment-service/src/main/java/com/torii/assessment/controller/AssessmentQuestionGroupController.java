@@ -15,7 +15,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -29,8 +32,12 @@ public class AssessmentQuestionGroupController {
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Create an assessment question group (multipart)")
     public ResponseEntity<AssessmentQuestionGroupResponseDTO> createMultipart(
-            @Valid @ModelAttribute CreateAssessmentQuestionGroupDTO dto) {
-        AssessmentQuestionGroupResponseDTO group = assessmentQuestionGroupService.create(dto);
+            @Valid @ModelAttribute CreateAssessmentQuestionGroupDTO dto,
+            @RequestParam(value = "assessmentQuestionIds", required = false) List<Long> assessmentQuestionIds,
+            @RequestParam(value = "image", required = false) MultipartFile image,
+            @RequestParam(value = "audio", required = false) MultipartFile audio) throws IOException {
+        if (assessmentQuestionIds != null) dto.setAssessmentQuestionIds(assessmentQuestionIds);
+        AssessmentQuestionGroupResponseDTO group = assessmentQuestionGroupService.create(dto, image, audio);
         return ResponseEntity.status(HttpStatus.CREATED).body(group);
     }
 
@@ -68,8 +75,12 @@ public class AssessmentQuestionGroupController {
     @Operation(summary = "Update an assessment question group (multipart)")
     public ResponseEntity<AssessmentQuestionGroupResponseDTO> updateMultipart(
             @PathVariable Long id,
-            @Valid @ModelAttribute UpdateAssessmentQuestionGroupDTO dto) {
-        AssessmentQuestionGroupResponseDTO group = assessmentQuestionGroupService.update(id, dto);
+            @Valid @ModelAttribute UpdateAssessmentQuestionGroupDTO dto,
+            @RequestParam(value = "assessmentQuestionIds", required = false) List<Long> assessmentQuestionIds,
+            @RequestParam(value = "image", required = false) MultipartFile image,
+            @RequestParam(value = "audio", required = false) MultipartFile audio) throws IOException {
+        if (assessmentQuestionIds != null) dto.setAssessmentQuestionIds(assessmentQuestionIds);
+        AssessmentQuestionGroupResponseDTO group = assessmentQuestionGroupService.update(id, dto, image, audio);
         return ResponseEntity.ok(group);
     }
 
@@ -80,20 +91,26 @@ public class AssessmentQuestionGroupController {
         return ResponseEntity.ok(Map.of("message", "Assessment question group deleted successfully"));
     }
 
-    @PostMapping("/{id}/questions")
+    @PostMapping(value = "/{id}/questions", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Add questions to an assessment question group")
     public ResponseEntity<AssessmentQuestionGroupResponseDTO> addQuestions(
             @PathVariable Long id,
-            @Valid @RequestBody ModifyAssessmentGroupQuestionsDTO dto) {
+            @RequestParam(value = "assessmentQuestionIds") List<Long> assessmentQuestionIds) {
+        ModifyAssessmentGroupQuestionsDTO dto = ModifyAssessmentGroupQuestionsDTO.builder()
+                .assessmentQuestionIds(assessmentQuestionIds)
+                .build();
         AssessmentQuestionGroupResponseDTO group = assessmentQuestionGroupService.addQuestions(id, dto);
         return ResponseEntity.ok(group);
     }
 
-    @DeleteMapping("/{id}/questions")
+    @PostMapping(value = "/{id}/questions/remove", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Remove questions from an assessment question group")
     public ResponseEntity<AssessmentQuestionGroupResponseDTO> removeQuestions(
             @PathVariable Long id,
-            @Valid @RequestBody ModifyAssessmentGroupQuestionsDTO dto) {
+            @RequestParam(value = "assessmentQuestionIds") List<Long> assessmentQuestionIds) {
+        ModifyAssessmentGroupQuestionsDTO dto = ModifyAssessmentGroupQuestionsDTO.builder()
+                .assessmentQuestionIds(assessmentQuestionIds)
+                .build();
         AssessmentQuestionGroupResponseDTO group = assessmentQuestionGroupService.removeQuestions(id, dto);
         return ResponseEntity.ok(group);
     }

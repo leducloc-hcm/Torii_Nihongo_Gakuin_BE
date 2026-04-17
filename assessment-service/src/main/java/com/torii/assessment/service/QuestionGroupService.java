@@ -353,9 +353,14 @@ public class QuestionGroupService {
     private QuestionGroupResponseDTO mapToResponseDTO(QuestionGroup group) {
         List<QuestionGroupQuestion> qgqs = questionGroupQuestionRepository.findByGroupIdOrderByOrderAsc(group.getId());
 
+        // Batch-load questions to avoid Hibernate first-level cache returning stale entities with null question
+        List<Long> qIds = qgqs.stream().map(QuestionGroupQuestion::getQuestionId).collect(Collectors.toList());
+        Map<Long, Question> questionsById = qIds.isEmpty() ? Collections.emptyMap() :
+            questionRepository.findAllById(qIds).stream().collect(Collectors.toMap(Question::getId, q -> q));
+
         List<QuestionGroupResponseDTO.QuestionDTO> questionDTOs = qgqs.stream()
             .map(qgq -> {
-                Question q = qgq.getQuestion();
+                Question q = questionsById.get(qgq.getQuestionId());
                 if (q == null) return null;
                 List<QuestionGroupResponseDTO.OptionDTO> optionDTOs = optionRepository
                     .findByQuestionIdOrderByOrderAsc(q.getId()).stream()
