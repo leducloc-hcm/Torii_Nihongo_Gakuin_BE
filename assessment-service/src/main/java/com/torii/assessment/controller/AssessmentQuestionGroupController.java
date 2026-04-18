@@ -7,8 +7,10 @@ import com.torii.assessment.dto.assessmentquestiongroup.QueryAssessmentQuestionG
 import com.torii.assessment.dto.assessmentquestiongroup.UpdateAssessmentQuestionGroupDTO;
 import com.torii.assessment.entity.QuestionGroup;
 import com.torii.assessment.service.AssessmentQuestionGroupService;
+import com.torii.assessment.util.RequestAuthUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -35,9 +37,11 @@ public class AssessmentQuestionGroupController {
             @Valid @ModelAttribute CreateAssessmentQuestionGroupDTO dto,
             @RequestParam(value = "assessmentQuestionIds", required = false) List<Long> assessmentQuestionIds,
             @RequestParam(value = "image", required = false) MultipartFile image,
-            @RequestParam(value = "audio", required = false) MultipartFile audio) throws IOException {
+            @RequestParam(value = "audio", required = false) MultipartFile audio,
+            HttpServletRequest request) throws IOException {
+        Integer userId = RequestAuthUtil.requireUser(request).userId();
         if (assessmentQuestionIds != null) dto.setAssessmentQuestionIds(assessmentQuestionIds);
-        AssessmentQuestionGroupResponseDTO group = assessmentQuestionGroupService.create(dto, image, audio);
+        AssessmentQuestionGroupResponseDTO group = assessmentQuestionGroupService.create(dto, image, audio, userId);
         return ResponseEntity.status(HttpStatus.CREATED).body(group);
     }
 
@@ -78,16 +82,21 @@ public class AssessmentQuestionGroupController {
             @Valid @ModelAttribute UpdateAssessmentQuestionGroupDTO dto,
             @RequestParam(value = "assessmentQuestionIds", required = false) List<Long> assessmentQuestionIds,
             @RequestParam(value = "image", required = false) MultipartFile image,
-            @RequestParam(value = "audio", required = false) MultipartFile audio) throws IOException {
+            @RequestParam(value = "audio", required = false) MultipartFile audio,
+            HttpServletRequest request) throws IOException {
+        Integer userId = RequestAuthUtil.requireUser(request).userId();
         if (assessmentQuestionIds != null) dto.setAssessmentQuestionIds(assessmentQuestionIds);
-        AssessmentQuestionGroupResponseDTO group = assessmentQuestionGroupService.update(id, dto, image, audio);
+        AssessmentQuestionGroupResponseDTO group = assessmentQuestionGroupService.update(id, dto, image, audio, userId);
         return ResponseEntity.ok(group);
     }
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete an assessment question group")
-    public ResponseEntity<Map<String, String>> delete(@PathVariable Long id) {
-        assessmentQuestionGroupService.delete(id);
+    public ResponseEntity<Map<String, String>> delete(
+            @PathVariable Long id,
+            HttpServletRequest request) {
+        Integer userId = RequestAuthUtil.requireUser(request).userId();
+        assessmentQuestionGroupService.delete(id, userId);
         return ResponseEntity.ok(Map.of("message", "Assessment question group deleted successfully"));
     }
 
@@ -95,11 +104,13 @@ public class AssessmentQuestionGroupController {
     @Operation(summary = "Add questions to an assessment question group")
     public ResponseEntity<AssessmentQuestionGroupResponseDTO> addQuestions(
             @PathVariable Long id,
-            @RequestParam(value = "assessmentQuestionIds") List<Long> assessmentQuestionIds) {
+            @RequestParam(value = "assessmentQuestionIds") List<Long> assessmentQuestionIds,
+            HttpServletRequest request) {
+        Integer userId = RequestAuthUtil.requireUser(request).userId();
         ModifyAssessmentGroupQuestionsDTO dto = ModifyAssessmentGroupQuestionsDTO.builder()
                 .assessmentQuestionIds(assessmentQuestionIds)
                 .build();
-        AssessmentQuestionGroupResponseDTO group = assessmentQuestionGroupService.addQuestions(id, dto);
+        AssessmentQuestionGroupResponseDTO group = assessmentQuestionGroupService.addQuestions(id, dto, userId);
         return ResponseEntity.ok(group);
     }
 
@@ -107,11 +118,13 @@ public class AssessmentQuestionGroupController {
     @Operation(summary = "Remove questions from an assessment question group")
     public ResponseEntity<AssessmentQuestionGroupResponseDTO> removeQuestions(
             @PathVariable Long id,
-            @RequestParam(value = "assessmentQuestionIds") List<Long> assessmentQuestionIds) {
+            @RequestParam(value = "assessmentQuestionIds") List<Long> assessmentQuestionIds,
+            HttpServletRequest request) {
+        Integer userId = RequestAuthUtil.requireUser(request).userId();
         ModifyAssessmentGroupQuestionsDTO dto = ModifyAssessmentGroupQuestionsDTO.builder()
                 .assessmentQuestionIds(assessmentQuestionIds)
                 .build();
-        AssessmentQuestionGroupResponseDTO group = assessmentQuestionGroupService.removeQuestions(id, dto);
+        AssessmentQuestionGroupResponseDTO group = assessmentQuestionGroupService.removeQuestions(id, dto, userId);
         return ResponseEntity.ok(group);
     }
 }

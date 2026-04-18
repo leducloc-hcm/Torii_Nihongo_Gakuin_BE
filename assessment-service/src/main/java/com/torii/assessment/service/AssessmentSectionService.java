@@ -20,7 +20,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
+
+import static com.torii.assessment.service.AuditLogService.*;
 
 @Service
 @RequiredArgsConstructor
@@ -30,9 +33,10 @@ public class AssessmentSectionService {
     private final AssessmentSectionRepository assessmentSectionRepository;
     private final AssessmentItemRepository assessmentItemRepository;
     private final AssessmentRepository assessmentRepository;
+    private final AuditLogService auditLogService;
 
     @Transactional
-    public AssessmentSectionDTO createAssessmentSection(CreateAssessmentSectionDTO dto) {
+    public AssessmentSectionDTO createAssessmentSection(CreateAssessmentSectionDTO dto, Integer updatedBy) {
         if (!assessmentRepository.existsById(dto.getAssessmentId())) {
             throw new RuntimeException("Assessment with ID " + dto.getAssessmentId() + " not found");
         }
@@ -46,6 +50,11 @@ public class AssessmentSectionService {
 
         AssessmentSection saved = assessmentSectionRepository.save(section);
         log.info("Created assessment section: {}", saved.getId());
+
+        auditLogService.logAction(dto.getAssessmentId(), ENTITY_SECTION, saved.getId(),
+                ACTION_CREATE, updatedBy, "CREATE_SECTION",
+                Map.of("title", saved.getTitle() != null ? saved.getTitle() : "",
+                       "type", saved.getType() != null ? saved.getType().name() : ""));
 
         return mapToDTO(saved);
     }
@@ -87,9 +96,11 @@ public class AssessmentSectionService {
     }
 
     @Transactional
-    public AssessmentSectionDTO updateAssessmentSection(Long id, UpdateAssessmentSectionDTO dto) {
+    public AssessmentSectionDTO updateAssessmentSection(Long id, UpdateAssessmentSectionDTO dto, Integer updatedBy) {
         AssessmentSection section = assessmentSectionRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Assessment section with ID " + id + " not found"));
+
+        Long assessmentId = section.getAssessmentId();
 
         if (dto.getTitle() != null) {
             boolean titleExists = assessmentSectionRepository
@@ -98,12 +109,22 @@ public class AssessmentSectionService {
                 throw new RuntimeException(
                         "Section with title \"" + dto.getTitle() + "\" already exists in this assessment");
             }
+            auditLogService.logFieldChange(assessmentId, ENTITY_SECTION, id, "title", section.getTitle(), dto.getTitle(), updatedBy);
             section.setTitle(dto.getTitle());
         }
 
-        if (dto.getType() != null) section.setType(AssessmentSection.SectionType.valueOf(dto.getType()));
-        if (dto.getTimeLimitSec() != null) section.setTimeLimitSec(dto.getTimeLimitSec());
-        if (dto.getOrder() != null) section.setOrder(dto.getOrder());
+        if (dto.getType() != null) {
+            auditLogService.logFieldChange(assessmentId, ENTITY_SECTION, id, "type", section.getType(), dto.getType(), updatedBy);
+            section.setType(AssessmentSection.SectionType.valueOf(dto.getType()));
+        }
+        if (dto.getTimeLimitSec() != null) {
+            auditLogService.logFieldChange(assessmentId, ENTITY_SECTION, id, "timeLimitSec", section.getTimeLimitSec(), dto.getTimeLimitSec(), updatedBy);
+            section.setTimeLimitSec(dto.getTimeLimitSec());
+        }
+        if (dto.getOrder() != null) {
+            auditLogService.logFieldChange(assessmentId, ENTITY_SECTION, id, "order", section.getOrder(), dto.getOrder(), updatedBy);
+            section.setOrder(dto.getOrder());
+        }
 
         AssessmentSection updated = assessmentSectionRepository.save(section);
         log.info("Updated assessment section: {}", updated.getId());
@@ -112,10 +133,14 @@ public class AssessmentSectionService {
     }
 
     @Transactional
-    public void deleteAssessmentSection(Long id) {
-        if (!assessmentSectionRepository.existsById(id)) {
-            throw new RuntimeException("Assessment section with ID " + id + " not found");
-        }
+    public void deleteAssessmentSection(Long id, Integer updatedBy) {
+        AssessmentSection section = assessmentSectionRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Assessment section with ID " + id + " not found"));
+
+        auditLogService.logAction(section.getAssessmentId(), ENTITY_SECTION, id,
+                ACTION_DELETE, updatedBy, "DELETE_SECTION",
+                Map.of("title", section.getTitle() != null ? section.getTitle() : ""));
+
         assessmentSectionRepository.deleteById(id);
         log.info("Deleted assessment section: {}", id);
     }

@@ -58,7 +58,7 @@ export class AgentService {
       fallbackServers: ["course"],
     },
     [AgentRole.ANALYTICS]: {
-      allowedServers: ["enrollment", "assessmentHistory"],
+      allowedServers: ["enrollment"],
       fallbackServers: ["course"],
     },
   };

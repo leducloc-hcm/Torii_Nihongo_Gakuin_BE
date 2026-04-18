@@ -28,6 +28,7 @@ import { RedisModule } from "./shared/redis/redis.module";
 import { RabbitMQModule } from "./shared/rabbitmq/rabbitmq.module";
 import { ReviewModule } from "./routes/review/review.module";
 import { AssessmentAIModule } from "./routes/assessment-ai/assessment-ai.module";
+import { BlogAIModule } from "./routes/blog-ai/blog-ai.module";
 import { MultiAgentModule } from "./routes/multi-agent/multi-agent.module";
 import { CertificateModule } from "./routes/certificate/certificate.module";
 
@@ -74,6 +75,7 @@ import { CertificateModule } from "./routes/certificate/certificate.module";
     DashboardModule,
     ReviewModule,
     AssessmentAIModule,
+    BlogAIModule,
     MultiAgentModule,
     CertificateModule,
   ],

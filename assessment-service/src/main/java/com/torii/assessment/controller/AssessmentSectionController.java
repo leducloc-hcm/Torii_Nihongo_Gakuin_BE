@@ -2,8 +2,10 @@ package com.torii.assessment.controller;
 
 import com.torii.assessment.dto.section.*;
 import com.torii.assessment.service.AssessmentSectionService;
+import com.torii.assessment.util.RequestAuthUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -22,9 +24,11 @@ public class AssessmentSectionController {
 
     @PostMapping
     @Operation(summary = "Create a new assessment section")
-    public ResponseEntity<AssessmentSectionDTO> create(@Valid @RequestBody CreateAssessmentSectionDTO dto) {
+    public ResponseEntity<AssessmentSectionDTO> create(@Valid @RequestBody CreateAssessmentSectionDTO dto,
+                                                       HttpServletRequest request) {
+        Integer userId = RequestAuthUtil.requireUser(request).userId();
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(assessmentSectionService.createAssessmentSection(dto));
+                .body(assessmentSectionService.createAssessmentSection(dto, userId));
     }
 
     @GetMapping
@@ -67,14 +71,17 @@ public class AssessmentSectionController {
     @Operation(summary = "Update an assessment section")
     public ResponseEntity<AssessmentSectionDTO> update(
             @PathVariable Long id,
-            @Valid @RequestBody UpdateAssessmentSectionDTO dto) {
-        return ResponseEntity.ok(assessmentSectionService.updateAssessmentSection(id, dto));
+            @Valid @RequestBody UpdateAssessmentSectionDTO dto,
+            HttpServletRequest request) {
+        Integer userId = RequestAuthUtil.requireUser(request).userId();
+        return ResponseEntity.ok(assessmentSectionService.updateAssessmentSection(id, dto, userId));
     }
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete an assessment section")
-    public ResponseEntity<Map<String, String>> remove(@PathVariable Long id) {
-        assessmentSectionService.deleteAssessmentSection(id);
+    public ResponseEntity<Map<String, String>> remove(@PathVariable Long id, HttpServletRequest request) {
+        Integer userId = RequestAuthUtil.requireUser(request).userId();
+        assessmentSectionService.deleteAssessmentSection(id, userId);
         return ResponseEntity.ok(Map.of("message", "Assessment section deleted successfully"));
     }
 }

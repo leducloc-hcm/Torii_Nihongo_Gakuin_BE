@@ -417,6 +417,32 @@ export function detectQueryType(query: string): QueryType {
     "tổng hợp",
     "phân tích",
     "xem lại",
+
+    // 🇻🇳 Vietnamese - Wrong answer analysis
+    "câu sai",
+    "phân tích câu sai",
+    "tại sao sai",
+    "tại sao tôi sai",
+    "giải thích câu sai",
+    "lỗi sai",
+    "điểm yếu",
+    "luyện câu sai",
+    "ôn tập câu sai",
+    "phòng luyện câu sai",
+    "đánh giá bài thi",
+    "phân tích bài thi",
+    "phân tích bài làm",
+
+    // 🇬🇧 English - Wrong answer analysis
+    "wrong answer",
+    "wrong answers",
+    "mistakes",
+    "analyze mistakes",
+    "why wrong",
+    "explain wrong",
+    "weak points",
+    "wrong answer lab",
+    "error analysis",
     // REMOVED: 'tiến độ học', 'quá trình học' - too generic, conflicts with enrollment progress queries
 
     // 🇯🇵 Japanese - History/Past
@@ -444,6 +470,16 @@ export function detectQueryType(query: string): QueryType {
     "統計",
     "分析",
     "レビュー",
+
+    // 🇯🇵 Japanese - Wrong answer analysis
+    "間違い",
+    "間違えた",
+    "誤答",
+    "弱点",
+    "間違い分析",
+    "なぜ間違えた",
+    "弱点分析",
+    "間違え練習",
     // REMOVED: '進捗', '進度', '進捗状況', '学習進捗' - too generic, conflicts with enrollment progress queries
   ];
 

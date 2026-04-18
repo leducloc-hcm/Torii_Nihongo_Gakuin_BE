@@ -59,22 +59,29 @@ CREATE INDEX IF NOT EXISTS idx_assessments_score_profile_id ON assessments(score
 
 CREATE TABLE IF NOT EXISTS assessment_logs (
     id BIGSERIAL PRIMARY KEY,
-    assessment_id BIGINT REFERENCES assessments(id) ON DELETE CASCADE,
+    assessment_id BIGINT REFERENCES assessments(id) ON DELETE SET NULL,
 
-    action VARCHAR(50),
+    entity_type VARCHAR(50) NOT NULL,
+    entity_id BIGINT,
+
+    action VARCHAR(50) NOT NULL,
     field_name VARCHAR(100),
 
     old_value TEXT,
     new_value TEXT,
 
     metadata JSONB,
-    change_summary VARCHAR(255),
+    change_summary VARCHAR(500),
 
     updated_by INTEGER,
     updated_by_name VARCHAR(255),
 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE INDEX IF NOT EXISTS idx_assessment_logs_assessment_id ON assessment_logs(assessment_id);
+CREATE INDEX IF NOT EXISTS idx_assessment_logs_entity ON assessment_logs(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_assessment_logs_created_at ON assessment_logs(created_at);
 
 -- STRUCTURE
 

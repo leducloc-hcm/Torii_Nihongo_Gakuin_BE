@@ -23,6 +23,8 @@ import com.torii.assessment.repository.AssessmentRepository;
 import com.torii.assessment.repository.AssessmentLogRepository;
 import com.torii.assessment.entity.AssessmentLog;
 import com.torii.assessment.repository.AssessmentSectionRepository;
+
+import static com.torii.assessment.service.AuditLogService.*;
 import com.torii.assessment.repository.ItemAssessmentGroupRepository;
 import com.torii.assessment.repository.ItemAssessmentQuestionRepository;
 import com.torii.assessment.repository.AttemptRepository;
@@ -53,6 +55,7 @@ public class AssessmentService {
 
     private final AssessmentRepository assessmentRepository;
     private final AssessmentLogRepository assessmentLogRepository;
+    private final AuditLogService auditLogService;
     private final ScoreProfileRepository scoreProfileRepository;
     private final AssessmentSectionRepository assessmentSectionRepository;
     private final AssessmentItemRepository assessmentItemRepository;
@@ -682,16 +685,6 @@ public class AssessmentService {
     }
 
     private void saveLog(Long assessmentId, String action, String fieldName, Object oldValue, Object newValue, Integer updatedBy, String changeSummary) {
-        AssessmentLog logEntry = new AssessmentLog();
-        logEntry.setAssessmentId(assessmentId);
-        logEntry.setAction(action);
-        logEntry.setFieldName(fieldName);
-        logEntry.setOldValue(oldValue != null ? oldValue.toString() : null);
-        logEntry.setNewValue(newValue != null ? newValue.toString() : null);
-        logEntry.setMetadata(null);
-        logEntry.setUpdatedBy(updatedBy);
-        logEntry.setUpdatedByName(null);
-        logEntry.setChangeSummary(changeSummary);
-        assessmentLogRepository.save(logEntry);
+        auditLogService.logAction(assessmentId, ENTITY_ASSESSMENT, assessmentId, action, fieldName, oldValue, newValue, updatedBy, changeSummary, null);
     }
 }

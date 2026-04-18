@@ -29,6 +29,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import static com.torii.assessment.service.AuditLogService.*;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -37,9 +39,10 @@ public class AssessmentQuestionService {
     private final AssessmentQuestionRepository assessmentQuestionRepository;
     private final AssessmentOptionRepository assessmentOptionRepository;
     private final AssessmentItemRepository assessmentItemRepository;
+    private final AuditLogService auditLogService;
 
     @Transactional
-    public AssessmentQuestionResponseDTO create(CreateAssessmentQuestionDTO dto) {
+    public AssessmentQuestionResponseDTO create(CreateAssessmentQuestionDTO dto, Integer updatedBy) {
         AssessmentItem item = assessmentItemRepository.findById(dto.getItemId())
             .orElseThrow(() -> new RuntimeException("Assessment item not found: " + dto.getItemId()));
 
@@ -75,6 +78,12 @@ public class AssessmentQuestionService {
         assessmentItemRepository.insertQuestionLink(item.getId(), saved.getId(), nextOrder);
 
         log.info("Created assessment question copy {}", saved.getId());
+
+        auditLogService.logAction(null, ENTITY_ASSESSMENT_QUESTION, saved.getId(),
+                ACTION_CREATE, null, null, null, updatedBy,
+                "Tạo assessment question: " + saved.getStem(),
+                Map.of("type", String.valueOf(saved.getType()), "itemId", dto.getItemId()));
+
         return getById(saved.getId());
     }
 
@@ -116,7 +125,7 @@ public class AssessmentQuestionService {
     }
 
     @Transactional
-    public AssessmentQuestionResponseDTO update(Long id, UpdateAssessmentQuestionDTO dto) {
+    public AssessmentQuestionResponseDTO update(Long id, UpdateAssessmentQuestionDTO dto, Integer updatedBy) {
         AssessmentQuestion question = assessmentQuestionRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Assessment question not found: " + id));
 
@@ -130,17 +139,27 @@ public class AssessmentQuestionService {
         if (dto.getAudioUrl() != null) question.setAudioUrl(dto.getAudioUrl());
 
         assessmentQuestionRepository.save(question);
+
+        auditLogService.logAction(null, ENTITY_ASSESSMENT_QUESTION, id,
+                ACTION_UPDATE, null, null, null, updatedBy,
+                "Cập nhật assessment question", null);
+
         log.info("Updated assessment question copy {}", id);
         return mapToResponse(question);
     }
 
     @Transactional
-    public void delete(Long id) {
+    public void delete(Long id, Integer updatedBy) {
         if (!assessmentQuestionRepository.existsById(id)) {
             throw new RuntimeException("Assessment question not found: " + id);
         }
         assessmentOptionRepository.deleteAllByQuestionId(id);
         assessmentQuestionRepository.deleteById(id);
+
+        auditLogService.logAction(null, ENTITY_ASSESSMENT_QUESTION, id,
+                ACTION_DELETE, null, null, null, updatedBy,
+                "Xóa assessment question #" + id, null);
+
         log.info("Deleted assessment question copy {}", id);
     }
 

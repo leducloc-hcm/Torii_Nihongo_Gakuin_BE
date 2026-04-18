@@ -3,8 +3,10 @@ package com.torii.assessment.controller;
 import com.torii.assessment.dto.question.*;
 import com.torii.assessment.entity.Question;
 import com.torii.assessment.service.QuestionService;
+import com.torii.assessment.util.RequestAuthUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -29,8 +31,10 @@ public class QuestionController {
     public ResponseEntity<QuestionResponseDTO> createQuestion(
             @ModelAttribute @Valid CreateQuestionDTO dto,
             @RequestPart(value = "image", required = false) MultipartFile image,
-            @RequestPart(value = "audio", required = false) MultipartFile audio) {
-        QuestionResponseDTO question = questionService.createQuestion(dto, image, audio);
+            @RequestPart(value = "audio", required = false) MultipartFile audio,
+            HttpServletRequest request) {
+        Integer userId = RequestAuthUtil.requireUser(request).userId();
+        QuestionResponseDTO question = questionService.createQuestion(dto, image, audio, userId);
         return ResponseEntity.status(HttpStatus.CREATED).body(question);
     }
 
@@ -152,15 +156,20 @@ public class QuestionController {
             @PathVariable Long id,
             @ModelAttribute @Valid UpdateQuestionDTO dto,
             @RequestPart(value = "image", required = false) MultipartFile image,
-            @RequestPart(value = "audio", required = false) MultipartFile audio) {
-        QuestionResponseDTO question = questionService.updateQuestion(id, dto, image, audio);
+            @RequestPart(value = "audio", required = false) MultipartFile audio,
+            HttpServletRequest request) {
+        Integer userId = RequestAuthUtil.requireUser(request).userId();
+        QuestionResponseDTO question = questionService.updateQuestion(id, dto, image, audio, userId);
         return ResponseEntity.ok(question);
     }
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete a question")
-    public ResponseEntity<Map<String, String>> deleteQuestion(@PathVariable Long id) {
-        questionService.deleteQuestion(id);
+    public ResponseEntity<Map<String, String>> deleteQuestion(
+            @PathVariable Long id,
+            HttpServletRequest request) {
+        Integer userId = RequestAuthUtil.requireUser(request).userId();
+        questionService.deleteQuestion(id, userId);
         return ResponseEntity.ok(Map.of("message", "Question deleted successfully"));
     }
 

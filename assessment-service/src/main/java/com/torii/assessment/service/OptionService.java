@@ -19,6 +19,8 @@ import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static com.torii.assessment.service.AuditLogService.*;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -27,9 +29,15 @@ public class OptionService {
     private final OptionRepository optionRepository;
     private final QuestionRepository questionRepository;
     private final S3Service s3Service;
+    private final AuditLogService auditLogService;
 
     @Transactional
     public OptionResponseDTO createOption(Long questionId, CreateOptionDTO dto, MultipartFile image) {
+        return createOption(questionId, dto, image, null);
+    }
+
+    @Transactional
+    public OptionResponseDTO createOption(Long questionId, CreateOptionDTO dto, MultipartFile image, Integer updatedBy) {
         // Validate question exists
         Question question = questionRepository.findById(questionId)
             .orElseThrow(() -> new RuntimeException("Question not found: " + questionId));
@@ -61,6 +69,12 @@ public class OptionService {
 
         Option saved = optionRepository.save(option);
         log.info("Created option {} for question {}", saved.getId(), questionId);
+
+        if (updatedBy != null) {
+            auditLogService.logAction(null, ENTITY_OPTION, saved.getId(),
+                    ACTION_CREATE, null, null, null, updatedBy,
+                    "Tạo option cho question bank #" + questionId, null);
+        }
 
         return mapToResponseDTO(saved, question);
     }
@@ -111,6 +125,11 @@ public class OptionService {
 
     @Transactional
     public OptionResponseDTO updateOption(Long id, UpdateOptionDTO dto, MultipartFile image) {
+        return updateOption(id, dto, image, null);
+    }
+
+    @Transactional
+    public OptionResponseDTO updateOption(Long id, UpdateOptionDTO dto, MultipartFile image, Integer updatedBy) {
         Option option = optionRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Option not found: " + id));
 
@@ -142,12 +161,23 @@ public class OptionService {
         Option saved = optionRepository.save(option);
         log.info("Updated option: {}", id);
 
+        if (updatedBy != null) {
+            auditLogService.logAction(null, ENTITY_OPTION, id,
+                    ACTION_UPDATE, null, null, null, updatedBy,
+                    "Cập nhật option bank #" + id, null);
+        }
+
         Question question = questionRepository.findById(saved.getQuestionId()).orElse(null);
         return mapToResponseDTO(saved, question);
     }
 
     @Transactional
     public void deleteOption(Long id) {
+        deleteOption(id, null);
+    }
+
+    @Transactional
+    public void deleteOption(Long id, Integer updatedBy) {
         Option option = optionRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Option not found: " + id));
 
@@ -166,6 +196,13 @@ public class OptionService {
         }
 
         optionRepository.deleteById(id);
+
+        if (updatedBy != null) {
+            auditLogService.logAction(null, ENTITY_OPTION, id,
+                    ACTION_DELETE, null, null, null, updatedBy,
+                    "Xóa option bank #" + id, null);
+        }
+
         log.info("Deleted option: {}", id);
     }
 

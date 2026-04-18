@@ -6,8 +6,10 @@ import com.torii.assessment.dto.assessmentquestion.QueryAssessmentQuestionDTO;
 import com.torii.assessment.dto.assessmentquestion.UpdateAssessmentQuestionDTO;
 import com.torii.assessment.entity.Question;
 import com.torii.assessment.service.AssessmentQuestionService;
+import com.torii.assessment.util.RequestAuthUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -27,8 +29,11 @@ public class AssessmentQuestionController {
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Create an assessment question copy (multipart)")
-    public ResponseEntity<AssessmentQuestionResponseDTO> createMultipart(@Valid @ModelAttribute CreateAssessmentQuestionDTO dto) {
-        AssessmentQuestionResponseDTO question = assessmentQuestionService.create(dto);
+    public ResponseEntity<AssessmentQuestionResponseDTO> createMultipart(
+            @Valid @ModelAttribute CreateAssessmentQuestionDTO dto,
+            HttpServletRequest request) {
+        Integer userId = RequestAuthUtil.requireUser(request).userId();
+        AssessmentQuestionResponseDTO question = assessmentQuestionService.create(dto, userId);
         return ResponseEntity.status(HttpStatus.CREATED).body(question);
     }
 
@@ -70,15 +75,20 @@ public class AssessmentQuestionController {
     @Operation(summary = "Update an assessment question copy (multipart)")
     public ResponseEntity<AssessmentQuestionResponseDTO> updateMultipart(
             @PathVariable Long id,
-            @Valid @ModelAttribute UpdateAssessmentQuestionDTO dto) {
-        AssessmentQuestionResponseDTO question = assessmentQuestionService.update(id, dto);
+            @Valid @ModelAttribute UpdateAssessmentQuestionDTO dto,
+            HttpServletRequest request) {
+        Integer userId = RequestAuthUtil.requireUser(request).userId();
+        AssessmentQuestionResponseDTO question = assessmentQuestionService.update(id, dto, userId);
         return ResponseEntity.ok(question);
     }
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete an assessment question copy")
-    public ResponseEntity<Map<String, String>> delete(@PathVariable Long id) {
-        assessmentQuestionService.delete(id);
+    public ResponseEntity<Map<String, String>> delete(
+            @PathVariable Long id,
+            HttpServletRequest request) {
+        Integer userId = RequestAuthUtil.requireUser(request).userId();
+        assessmentQuestionService.delete(id, userId);
         return ResponseEntity.ok(Map.of("message", "Assessment question deleted successfully"));
     }
 }

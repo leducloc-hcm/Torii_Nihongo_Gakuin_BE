@@ -6,6 +6,7 @@ import { AnalyticsMcpClient } from "src/mcp-client/module/analytics/analytics-mc
 import { CourseMcpClient } from "src/mcp-client/module/course/course-mcp.service";
 import { EnrollmentMcpClient } from "src/mcp-client/module/enrollment/enrollment-mcp.service";
 import { FlashcardMcpClient } from "src/mcp-client/module/flashcard/flashcard-mcp.service";
+import { BlogMcpClient } from "src/mcp-client/module/blog/blog-mcp.service";
 
 @Module({
   providers: [
@@ -16,6 +17,7 @@ import { FlashcardMcpClient } from "src/mcp-client/module/flashcard/flashcard-mc
     CourseMcpClient,
     EnrollmentMcpClient,
     FlashcardMcpClient,
+    BlogMcpClient,
   ],
   exports: [
     McpBaseService,
@@ -25,6 +27,7 @@ import { FlashcardMcpClient } from "src/mcp-client/module/flashcard/flashcard-mc
     CourseMcpClient,
     EnrollmentMcpClient,
     FlashcardMcpClient,
+    BlogMcpClient,
   ],
 })
 export class McpClientModule {}

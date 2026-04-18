@@ -2,8 +2,10 @@ package com.torii.assessment.controller;
 
 import com.torii.assessment.dto.option.*;
 import com.torii.assessment.service.OptionService;
+import com.torii.assessment.util.RequestAuthUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -27,8 +29,10 @@ public class OptionController {
     public ResponseEntity<OptionResponseDTO> createOption(
             @PathVariable Long questionId,
             @ModelAttribute @Valid CreateOptionDTO dto,
-            @RequestPart(value = "image", required = false) MultipartFile image) {
-        OptionResponseDTO option = optionService.createOption(questionId, dto, image);
+            @RequestPart(value = "image", required = false) MultipartFile image,
+            HttpServletRequest request) {
+        Integer userId = RequestAuthUtil.requireUser(request).userId();
+        OptionResponseDTO option = optionService.createOption(questionId, dto, image, userId);
         return ResponseEntity.status(HttpStatus.CREATED).body(option);
     }
 
@@ -98,15 +102,20 @@ public class OptionController {
     public ResponseEntity<OptionResponseDTO> updateOption(
             @PathVariable Long id,
             @ModelAttribute @Valid UpdateOptionDTO dto,
-            @RequestPart(value = "image", required = false) MultipartFile image) {
-        OptionResponseDTO option = optionService.updateOption(id, dto, image);
+            @RequestPart(value = "image", required = false) MultipartFile image,
+            HttpServletRequest request) {
+        Integer userId = RequestAuthUtil.requireUser(request).userId();
+        OptionResponseDTO option = optionService.updateOption(id, dto, image, userId);
         return ResponseEntity.ok(option);
     }
 
     @DeleteMapping("/options/{id}")
     @Operation(summary = "Delete an option")
-    public ResponseEntity<Map<String, String>> deleteOption(@PathVariable Long id) {
-        optionService.deleteOption(id);
+    public ResponseEntity<Map<String, String>> deleteOption(
+            @PathVariable Long id,
+            HttpServletRequest request) {
+        Integer userId = RequestAuthUtil.requireUser(request).userId();
+        optionService.deleteOption(id, userId);
         return ResponseEntity.ok(Map.of("message", "Option deleted successfully"));
     }
 }

@@ -5,8 +5,10 @@ import com.torii.assessment.dto.assessmentoption.CreateAssessmentOptionDTO;
 import com.torii.assessment.dto.assessmentoption.QueryAssessmentOptionDTO;
 import com.torii.assessment.dto.assessmentoption.UpdateAssessmentOptionDTO;
 import com.torii.assessment.service.AssessmentOptionService;
+import com.torii.assessment.util.RequestAuthUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -27,9 +29,11 @@ public class AssessmentOptionController {
     @Operation(summary = "Create an assessment option (multipart)")
     public ResponseEntity<AssessmentOptionResponseDTO> createMultipart(
             @PathVariable Long questionId,
-            @Valid @ModelAttribute CreateAssessmentOptionDTO dto) {
+            @Valid @ModelAttribute CreateAssessmentOptionDTO dto,
+            HttpServletRequest request) {
+        Integer userId = RequestAuthUtil.requireUser(request).userId();
         dto.setQuestionId(questionId);
-        AssessmentOptionResponseDTO option = assessmentOptionService.create(dto);
+        AssessmentOptionResponseDTO option = assessmentOptionService.create(dto, userId);
         return ResponseEntity.status(HttpStatus.CREATED).body(option);
     }
 
@@ -73,15 +77,20 @@ public class AssessmentOptionController {
     @Operation(summary = "Update an assessment option (multipart)")
     public ResponseEntity<AssessmentOptionResponseDTO> updateMultipart(
             @PathVariable Long id,
-            @Valid @ModelAttribute UpdateAssessmentOptionDTO dto) {
-        AssessmentOptionResponseDTO option = assessmentOptionService.update(id, dto);
+            @Valid @ModelAttribute UpdateAssessmentOptionDTO dto,
+            HttpServletRequest request) {
+        Integer userId = RequestAuthUtil.requireUser(request).userId();
+        AssessmentOptionResponseDTO option = assessmentOptionService.update(id, dto, userId);
         return ResponseEntity.ok(option);
     }
 
     @DeleteMapping("/assessment-options/{id}")
     @Operation(summary = "Delete an assessment option")
-    public ResponseEntity<Map<String, String>> delete(@PathVariable Long id) {
-        assessmentOptionService.delete(id);
+    public ResponseEntity<Map<String, String>> delete(
+            @PathVariable Long id,
+            HttpServletRequest request) {
+        Integer userId = RequestAuthUtil.requireUser(request).userId();
+        assessmentOptionService.delete(id, userId);
         return ResponseEntity.ok(Map.of("message", "Assessment option deleted successfully"));
     }
 }

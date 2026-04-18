@@ -8,6 +8,8 @@ import { ActiveUser } from "src/shared/decorators/active-user.decorator";
 import {
   EvaluateWrongAnswersDto,
   GenerateAssessmentByAIDto,
+  GenerateFlashcardsFromWrongAnswersDto,
+  GenerateQuestionBankDto,
 } from "./assessment-ai.dto";
 import { AssessmentAIService } from "./assessment-ai.service";
 
@@ -31,5 +33,21 @@ export class AssessmentAIController {
     @Body() dto: EvaluateWrongAnswersDto,
   ) {
     return this.assessmentAIService.evaluateWrongAnswers(userId, dto);
+  }
+
+  @Post("generate-question-bank")
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
+  async generateQuestionBank(@Body() dto: GenerateQuestionBankDto) {
+    return this.assessmentAIService.generateQuestionBank(dto);
+  }
+
+  @Post("generate-flashcards-from-wrong-answers")
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Customer, RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
+  async generateFlashcardsFromWrongAnswers(
+    @Body() dto: GenerateFlashcardsFromWrongAnswersDto,
+  ) {
+    return this.assessmentAIService.generateFlashcardsFromWrongAnswers(dto);
   }
 }

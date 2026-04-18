@@ -25,6 +25,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static com.torii.assessment.service.AuditLogService.*;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -35,9 +37,15 @@ public class QuestionGroupService {
     private final QuestionRepository questionRepository;
     private final OptionRepository optionRepository;
     private final S3Service s3Service;
+    private final AuditLogService auditLogService;
 
     @Transactional
     public QuestionGroupResponseDTO createQuestionGroup(CreateQuestionGroupDTO dto, MultipartFile image, MultipartFile audio) throws IOException {
+        return createQuestionGroup(dto, image, audio, null);
+    }
+
+    @Transactional
+    public QuestionGroupResponseDTO createQuestionGroup(CreateQuestionGroupDTO dto, MultipartFile image, MultipartFile audio, Integer updatedBy) throws IOException {
         String mediaUrl = dto.getMediaUrl();
         if (image != null && !image.isEmpty()) {
             mediaUrl = s3Service.uploadFile(image, "question-groups/images");
@@ -61,6 +69,13 @@ public class QuestionGroupService {
 
         QuestionGroup saved = questionGroupRepository.save(group);
         log.info("Created question group: {}", saved.getId());
+
+        if (updatedBy != null) {
+            auditLogService.logAction(null, ENTITY_QUESTION_GROUP, saved.getId(),
+                    ACTION_CREATE, null, null, null, updatedBy,
+                    "Tạo nhóm câu hỏi bank",
+                    Map.of("type", String.valueOf(saved.getType())));
+        }
 
         // Add questions if provided
         List<Long> questionIds = resolveQuestionIds(dto.getQuestions(), dto.getQuestionIds());
@@ -112,6 +127,11 @@ public class QuestionGroupService {
 
     @Transactional
     public QuestionGroupResponseDTO updateQuestionGroup(Long id, UpdateQuestionGroupDTO dto, MultipartFile image, MultipartFile audio) throws IOException {
+        return updateQuestionGroup(id, dto, image, audio, null);
+    }
+
+    @Transactional
+    public QuestionGroupResponseDTO updateQuestionGroup(Long id, UpdateQuestionGroupDTO dto, MultipartFile image, MultipartFile audio, Integer updatedBy) throws IOException {
         if (dto.getQuestionGroupId() != null && !dto.getQuestionGroupId().equals(id)) {
             throw new RuntimeException("questionGroupId in payload does not match path id");
         }
@@ -141,6 +161,13 @@ public class QuestionGroupService {
         if (dto.getExplanation() != null) group.setExplanation(dto.getExplanation());
 
         questionGroupRepository.save(group);
+
+        if (updatedBy != null) {
+            auditLogService.logAction(null, ENTITY_QUESTION_GROUP, id,
+                    ACTION_UPDATE, null, null, null, updatedBy,
+                    "Cập nhật nhóm câu hỏi bank #" + id, null);
+        }
+
         log.info("Updated question group: {}", id);
 
         // Update questions if provided
@@ -158,37 +185,71 @@ public class QuestionGroupService {
 
     @Transactional
     public void deleteQuestionGroup(Long id) {
+        deleteQuestionGroup(id, null);
+    }
+
+    @Transactional
+    public void deleteQuestionGroup(Long id, Integer updatedBy) {
         if (!questionGroupRepository.existsById(id)) {
             throw new RuntimeException("Question Group not found: " + id);
         }
         questionGroupRepository.deleteById(id);
+
+        if (updatedBy != null) {
+            auditLogService.logAction(null, ENTITY_QUESTION_GROUP, id,
+                    ACTION_DELETE, null, null, null, updatedBy,
+                    "Xóa nhóm câu hỏi bank #" + id, null);
+        }
+
         log.info("Deleted question group: {}", id);
     }
 
     @Transactional
     public QuestionGroupResponseDTO addQuestionsToGroup(Long groupId, AddQuestionsToGroupDTO dto) {
+        return addQuestionsToGroup(groupId, dto, null);
+    }
+
+    @Transactional
+    public QuestionGroupResponseDTO addQuestionsToGroup(Long groupId, AddQuestionsToGroupDTO dto, Integer updatedBy) {
         if (!questionGroupRepository.existsById(groupId)) {
             throw new RuntimeException("Question Group not found: " + groupId);
         }
 
-        // Validate questions exist
         List<Long> questionIds = resolveQuestionIds(dto.getQuestions(), dto.getQuestionIds());
         validateQuestionsExist(questionIds);
 
         addQuestionsToGroupInternal(groupId, questionIds);
+
+        if (updatedBy != null) {
+            auditLogService.logAction(null, ENTITY_QUESTION_GROUP, groupId,
+                    ACTION_ADD, null, null, null, updatedBy,
+                    "Thêm câu hỏi vào nhóm bank", null);
+        }
+
         return getQuestionGroupById(groupId);
     }
 
     @Transactional
     public QuestionGroupResponseDTO removeQuestionsFromGroup(Long groupId, RemoveQuestionsFromGroupDTO dto) {
+        return removeQuestionsFromGroup(groupId, dto, null);
+    }
+
+    @Transactional
+    public QuestionGroupResponseDTO removeQuestionsFromGroup(Long groupId, RemoveQuestionsFromGroupDTO dto, Integer updatedBy) {
         if (!questionGroupRepository.existsById(groupId)) {
             throw new RuntimeException("Question Group not found: " + groupId);
         }
 
         List<Long> questionIds = resolveQuestionIds(dto.getQuestions(), dto.getQuestionIds());
         questionGroupQuestionRepository.deleteByGroupIdAndQuestionIds(groupId, questionIds);
-        log.info("Removed {} questions from group {}", questionIds.size(), groupId);
 
+        if (updatedBy != null) {
+            auditLogService.logAction(null, ENTITY_QUESTION_GROUP, groupId,
+                    ACTION_REMOVE, null, null, null, updatedBy,
+                    "Xóa câu hỏi khỏi nhóm bank", null);
+        }
+
+        log.info("Removed {} questions from group {}", questionIds.size(), groupId);
         return getQuestionGroupById(groupId);
     }
 

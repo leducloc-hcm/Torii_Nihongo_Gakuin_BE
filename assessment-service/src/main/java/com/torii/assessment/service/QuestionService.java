@@ -21,6 +21,8 @@ import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static com.torii.assessment.service.AuditLogService.*;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -29,9 +31,15 @@ public class QuestionService {
     private final QuestionRepository questionRepository;
     private final OptionRepository optionRepository;
     private final S3Service s3Service;
+    private final AuditLogService auditLogService;
 
     @Transactional
     public QuestionResponseDTO createQuestion(CreateQuestionDTO dto, MultipartFile image, MultipartFile audio) {
+        return createQuestion(dto, image, audio, null);
+    }
+
+    @Transactional
+    public QuestionResponseDTO createQuestion(CreateQuestionDTO dto, MultipartFile image, MultipartFile audio, Integer updatedBy) {
         // Upload files to S3 if provided
         String mediaUrl = null;
         try {
@@ -74,6 +82,13 @@ public class QuestionService {
 
         Question saved = questionRepository.save(question);
         log.info("Created question: {}", saved.getId());
+
+        if (updatedBy != null) {
+            auditLogService.logAction(null, ENTITY_QUESTION, saved.getId(),
+                    ACTION_CREATE, null, null, null, updatedBy,
+                    "Tạo câu hỏi bank: " + saved.getStem(),
+                    Map.of("type", String.valueOf(saved.getType()), "level", String.valueOf(saved.getLevel())));
+        }
 
         // Create options
         if (dto.getOptions() != null && !dto.getOptions().isEmpty()) {
@@ -142,6 +157,11 @@ public class QuestionService {
 
     @Transactional
     public QuestionResponseDTO updateQuestion(Long id, UpdateQuestionDTO dto, MultipartFile image, MultipartFile audio) {
+        return updateQuestion(id, dto, image, audio, null);
+    }
+
+    @Transactional
+    public QuestionResponseDTO updateQuestion(Long id, UpdateQuestionDTO dto, MultipartFile image, MultipartFile audio, Integer updatedBy) {
         Question question = questionRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Question not found: " + id));
 
@@ -192,6 +212,13 @@ public class QuestionService {
         if (dto.getReadingLength() != null) question.setReadingLength(dto.getReadingLength());
 
         questionRepository.save(question);
+
+        if (updatedBy != null) {
+            auditLogService.logAction(null, ENTITY_QUESTION, id,
+                    ACTION_UPDATE, null, null, null, updatedBy,
+                    "Cập nhật câu hỏi bank #" + id, null);
+        }
+
         log.info("Updated question: {}", id);
 
         // Update options if provided
@@ -227,10 +254,22 @@ public class QuestionService {
 
     @Transactional
     public void deleteQuestion(Long id) {
+        deleteQuestion(id, null);
+    }
+
+    @Transactional
+    public void deleteQuestion(Long id, Integer updatedBy) {
         if (!questionRepository.existsById(id)) {
             throw new RuntimeException("Question not found: " + id);
         }
         questionRepository.deleteById(id);
+
+        if (updatedBy != null) {
+            auditLogService.logAction(null, ENTITY_QUESTION, id,
+                    ACTION_DELETE, null, null, null, updatedBy,
+                    "Xóa câu hỏi bank #" + id, null);
+        }
+
         log.info("Deleted question: {}", id);
     }
 

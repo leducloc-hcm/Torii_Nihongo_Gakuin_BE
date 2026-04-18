@@ -63,4 +63,30 @@ export class AssessmentMcpClient {
       },
     );
   }
+
+  async generateQuestionBank(payload: {
+    type: string;
+    level: string;
+    topic: string;
+    difficulty?: string;
+    count?: number;
+    readingGroupType?: string;
+  }): Promise<FastMCPResult> {
+    if (!MCP_SERVERS.assessment.enabled) {
+      return {
+        success: false,
+        error: "Assessment MCP server is disabled",
+        data: null,
+      };
+    }
+
+    return this.mcpBase.executeTool(this.serverUrl, "generate_question_bank", {
+      type: payload.type,
+      level: payload.level,
+      topic: payload.topic,
+      difficulty: payload.difficulty || "MEDIUM",
+      count: payload.count || 5,
+      reading_group_type: payload.readingGroupType,
+    });
+  }
 }

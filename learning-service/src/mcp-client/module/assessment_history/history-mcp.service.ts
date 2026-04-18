@@ -43,4 +43,37 @@ export class AssessmentHistoryMcpClient {
       max_questions: payload.maxQuestions ?? 10,
     });
   }
+
+  async generateFlashcardsFromWrongAnswers(payload: {
+    sectionType: string;
+    level: string;
+    assessmentTitle: string;
+    wrongQuestions: {
+      stem: string;
+      correctAnswer: string;
+      selectedAnswer: string;
+      options: { content: string; isCorrect: boolean }[];
+    }[];
+    language?: string;
+  }): Promise<FastMCPResult> {
+    if (!MCP_SERVERS.assessmentHistory.enabled) {
+      return {
+        success: false,
+        error: "AssessmentHistory MCP server is disabled",
+        data: null,
+      };
+    }
+
+    return this.mcpBase.executeTool(
+      this.serverUrl,
+      "generate_flashcards_from_wrong_answers",
+      {
+        section_type: payload.sectionType,
+        level: payload.level,
+        assessment_title: payload.assessmentTitle,
+        wrong_questions_json: JSON.stringify(payload.wrongQuestions),
+        language: payload.language ?? "vi",
+      },
+    );
+  }
 }

@@ -3,8 +3,10 @@ package com.torii.assessment.controller;
 import com.torii.assessment.dto.questiongroup.*;
 import com.torii.assessment.entity.QuestionGroup;
 import com.torii.assessment.service.QuestionGroupService;
+import com.torii.assessment.util.RequestAuthUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -31,9 +33,11 @@ public class QuestionGroupController {
             @ModelAttribute @Valid CreateQuestionGroupDTO dto,
             @RequestParam(value = "questionIds", required = false) List<Long> questionIds,
             @RequestParam(value = "audio", required = false) MultipartFile audio,
-            @RequestParam(value = "image", required = false) MultipartFile image) throws IOException {
+            @RequestParam(value = "image", required = false) MultipartFile image,
+            HttpServletRequest request) throws IOException {
+        Integer userId = RequestAuthUtil.requireUser(request).userId();
         if (questionIds != null) dto.setQuestionIds(questionIds);
-        QuestionGroupResponseDTO group = questionGroupService.createQuestionGroup(dto, image, audio);
+        QuestionGroupResponseDTO group = questionGroupService.createQuestionGroup(dto, image, audio, userId);
         return ResponseEntity.status(HttpStatus.CREATED).body(group);
     }
 
@@ -112,9 +116,11 @@ public class QuestionGroupController {
             @ModelAttribute @Valid UpdateQuestionGroupDTO dto,
             @RequestParam(value = "questionIds", required = false) List<Long> questionIds,
             @RequestParam(value = "audio", required = false) MultipartFile audio,
-            @RequestParam(value = "image", required = false) MultipartFile image) throws IOException {
+            @RequestParam(value = "image", required = false) MultipartFile image,
+            HttpServletRequest request) throws IOException {
+        Integer userId = RequestAuthUtil.requireUser(request).userId();
         if (questionIds != null) dto.setQuestionIds(questionIds);
-        QuestionGroupResponseDTO group = questionGroupService.updateQuestionGroup(id, dto, image, audio);
+        QuestionGroupResponseDTO group = questionGroupService.updateQuestionGroup(id, dto, image, audio, userId);
         return ResponseEntity.ok(group);
     }
 
@@ -123,12 +129,14 @@ public class QuestionGroupController {
     public ResponseEntity<QuestionGroupResponseDTO> addQuestionsToGroup(
             @PathVariable Long id,
             @RequestParam(value = "questionIds", required = false) List<Long> questionIds,
-            @RequestParam(value = "questions", required = false) List<Long> questions) {
+            @RequestParam(value = "questions", required = false) List<Long> questions,
+            HttpServletRequest request) {
+        Integer userId = RequestAuthUtil.requireUser(request).userId();
         AddQuestionsToGroupDTO dto = AddQuestionsToGroupDTO.builder()
                 .questionIds(questionIds)
                 .questions(questions)
                 .build();
-        QuestionGroupResponseDTO group = questionGroupService.addQuestionsToGroup(id, dto);
+        QuestionGroupResponseDTO group = questionGroupService.addQuestionsToGroup(id, dto, userId);
         return ResponseEntity.ok(group);
     }
 
@@ -137,19 +145,24 @@ public class QuestionGroupController {
     public ResponseEntity<QuestionGroupResponseDTO> removeQuestionsFromGroup(
             @PathVariable Long id,
             @RequestParam(value = "questionIds", required = false) List<Long> questionIds,
-            @RequestParam(value = "questions", required = false) List<Long> questions) {
+            @RequestParam(value = "questions", required = false) List<Long> questions,
+            HttpServletRequest request) {
+        Integer userId = RequestAuthUtil.requireUser(request).userId();
         RemoveQuestionsFromGroupDTO dto = RemoveQuestionsFromGroupDTO.builder()
                 .questionIds(questionIds)
                 .questions(questions)
                 .build();
-        QuestionGroupResponseDTO group = questionGroupService.removeQuestionsFromGroup(id, dto);
+        QuestionGroupResponseDTO group = questionGroupService.removeQuestionsFromGroup(id, dto, userId);
         return ResponseEntity.ok(group);
     }
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete a question group")
-    public ResponseEntity<Map<String, String>> deleteQuestionGroup(@PathVariable Long id) {
-        questionGroupService.deleteQuestionGroup(id);
+    public ResponseEntity<Map<String, String>> deleteQuestionGroup(
+            @PathVariable Long id,
+            HttpServletRequest request) {
+        Integer userId = RequestAuthUtil.requireUser(request).userId();
+        questionGroupService.deleteQuestionGroup(id, userId);
         return ResponseEntity.ok(Map.of("message", "Question group deleted successfully"));
     }
 

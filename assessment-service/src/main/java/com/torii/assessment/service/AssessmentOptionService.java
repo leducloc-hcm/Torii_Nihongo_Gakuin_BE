@@ -23,6 +23,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import static com.torii.assessment.service.AuditLogService.*;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -30,9 +32,10 @@ public class AssessmentOptionService {
 
     private final AssessmentOptionRepository assessmentOptionRepository;
     private final AssessmentQuestionRepository assessmentQuestionRepository;
+    private final AuditLogService auditLogService;
 
     @Transactional
-    public AssessmentOptionResponseDTO create(CreateAssessmentOptionDTO dto) {
+    public AssessmentOptionResponseDTO create(CreateAssessmentOptionDTO dto, Integer updatedBy) {
         AssessmentQuestion question = assessmentQuestionRepository.findById(dto.getQuestionId())
                 .orElseThrow(() -> new RuntimeException("Assessment question not found: " + dto.getQuestionId()));
 
@@ -48,6 +51,12 @@ public class AssessmentOptionService {
 
         AssessmentOption saved = assessmentOptionRepository.save(option);
         log.info("Created assessment option {} for question {}", saved.getId(), question.getId());
+
+        auditLogService.logAction(null, ENTITY_ASSESSMENT_OPTION, saved.getId(),
+                ACTION_CREATE, null, null, null, updatedBy,
+                "Tạo assessment option cho question #" + question.getId(),
+                Map.of("questionId", question.getId(), "content", saved.getContent()));
+
         return mapToResponse(saved);
     }
 
@@ -91,7 +100,7 @@ public class AssessmentOptionService {
     }
 
     @Transactional
-    public AssessmentOptionResponseDTO update(Long id, UpdateAssessmentOptionDTO dto) {
+    public AssessmentOptionResponseDTO update(Long id, UpdateAssessmentOptionDTO dto, Integer updatedBy) {
         AssessmentOption option = assessmentOptionRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Assessment option not found: " + id));
 
@@ -107,16 +116,26 @@ public class AssessmentOptionService {
         if (dto.getOrder() != null) option.setOrder(dto.getOrder());
 
         assessmentOptionRepository.save(option);
+
+        auditLogService.logAction(null, ENTITY_ASSESSMENT_OPTION, id,
+                ACTION_UPDATE, null, null, null, updatedBy,
+                "Cập nhật assessment option", null);
+
         log.info("Updated assessment option {}", id);
         return mapToResponse(option);
     }
 
     @Transactional
-    public void delete(Long id) {
+    public void delete(Long id, Integer updatedBy) {
         AssessmentOption option = assessmentOptionRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Assessment option not found: " + id));
 
         assessmentOptionRepository.delete(option);
+
+        auditLogService.logAction(null, ENTITY_ASSESSMENT_OPTION, id,
+                ACTION_DELETE, null, null, null, updatedBy,
+                "Xóa assessment option #" + id, null);
+
         log.info("Deleted assessment option {}", id);
     }
 

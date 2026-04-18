@@ -26,6 +26,7 @@ import com.torii.assessment.repository.OptionRepository;
 import com.torii.assessment.repository.QuestionGroupQuestionRepository;
 import com.torii.assessment.repository.QuestionGroupRepository;
 import com.torii.assessment.repository.QuestionRepository;
+import com.torii.assessment.entity.AssessmentSection;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -46,6 +47,8 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import static com.torii.assessment.service.AuditLogService.*;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -63,9 +66,15 @@ public class AssessmentItemService {
     private final AssessmentQuestionGroupRepository assessmentQuestionGroupRepository;
     private final AssessmentOptionRepository assessmentOptionRepository;
     private final AssessmentGroupQuestionRepository assessmentGroupQuestionRepository;
+    private final AuditLogService auditLogService;
+
+    private Long resolveAssessmentId(Long sectionId) {
+        return assessmentSectionRepository.findById(sectionId)
+                .map(AssessmentSection::getAssessmentId).orElse(null);
+    }
 
     @Transactional
-    public AssessmentItemDTO createAssessmentItem(CreateAssessmentItemDTO dto) {
+    public AssessmentItemDTO createAssessmentItem(CreateAssessmentItemDTO dto, Integer updatedBy) {
         if (!assessmentSectionRepository.existsById(dto.getSectionId())) {
             throw new RuntimeException("Assessment section with ID " + dto.getSectionId() + " not found");
         }
@@ -85,6 +94,13 @@ public class AssessmentItemService {
         upsertGroupLinks(saved.getId(), dto.getQuestionGroupIds(), false);
 
         log.info("Created assessment item: {}", saved.getId());
+
+        Long assessmentId = resolveAssessmentId(dto.getSectionId());
+        auditLogService.logAction(assessmentId, ENTITY_ITEM, saved.getId(),
+                ACTION_CREATE, null, null, null, updatedBy,
+                "Tạo item: " + saved.getName(),
+                Map.of("name", saved.getName(), "sectionId", dto.getSectionId()));
+
         return getAssessmentItem(saved.getId());
     }
 
@@ -128,12 +144,17 @@ public class AssessmentItemService {
     }
 
     @Transactional
-    public AssessmentItemDTO updateAssessmentItem(Long id, UpdateAssessmentItemDTO dto) {
+    public AssessmentItemDTO updateAssessmentItem(Long id, UpdateAssessmentItemDTO dto, Integer updatedBy) {
         AssessmentItem item = assessmentItemRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Assessment item with ID " + id + " not found"));
 
+        Long assessmentId = resolveAssessmentId(item.getSectionId());
+
         validateQuestionIds(dto.getQuestionIds());
         validateQuestionGroupIds(dto.getQuestionGroupIds());
+
+        String oldName = item.getName();
+        Integer oldOrder = item.getOrder();
 
         if (dto.getName() != null) {
             item.setName(dto.getName());
@@ -150,25 +171,36 @@ public class AssessmentItemService {
         upsertQuestionLinks(id, dto.getQuestionIds(), true);
         upsertGroupLinks(id, dto.getQuestionGroupIds(), true);
 
+        auditLogService.logFieldChange(assessmentId, ENTITY_ITEM, id, "name", oldName, item.getName(), updatedBy);
+        auditLogService.logFieldChange(assessmentId, ENTITY_ITEM, id, "order",
+                oldOrder != null ? oldOrder.toString() : null,
+                item.getOrder() != null ? item.getOrder().toString() : null, updatedBy);
+
         log.info("Updated assessment item: {}", id);
         return getAssessmentItem(id);
     }
 
     @Transactional
-    public void deleteAssessmentItem(Long id) {
-        if (!assessmentItemRepository.existsById(id)) {
-            throw new RuntimeException("Assessment item with ID " + id + " not found");
-        }
+    public void deleteAssessmentItem(Long id, Integer updatedBy) {
+        AssessmentItem item = assessmentItemRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Assessment item with ID " + id + " not found"));
+
+        Long assessmentId = resolveAssessmentId(item.getSectionId());
 
         assessmentItemRepository.deleteQuestionLinksByItemId(id);
         assessmentItemRepository.deleteGroupLinksByItemId(id);
         assessmentItemRepository.deleteById(id);
 
+        auditLogService.logAction(assessmentId, ENTITY_ITEM, id,
+                ACTION_DELETE, null, null, null, updatedBy,
+                "Xóa item: " + item.getName(),
+                Map.of("name", item.getName(), "sectionId", item.getSectionId()));
+
         log.info("Deleted assessment item: {}", id);
     }
 
     @Transactional
-    public Map<String, Object> importQuestionsToAssessmentItem(Long itemId, ImportAssessmentItemQuestionsDTO dto) {
+    public Map<String, Object> importQuestionsToAssessmentItem(Long itemId, ImportAssessmentItemQuestionsDTO dto, Integer updatedBy) {
         ensureItemExists(itemId);
 
         List<Long> sourceQuestionIds = dto.getQuestionIds();
@@ -194,11 +226,19 @@ public class AssessmentItemService {
         response.put("importedCount", importedIds.size());
         response.put("assessmentQuestionIds", importedIds);
         response.put("message", "Questions imported successfully");
+
+        AssessmentItem item = assessmentItemRepository.findById(itemId).orElse(null);
+        Long assessmentId = item != null ? resolveAssessmentId(item.getSectionId()) : null;
+        auditLogService.logAction(assessmentId, ENTITY_ITEM, itemId,
+                ACTION_IMPORT, null, null, null, updatedBy,
+                "Import " + importedIds.size() + " câu hỏi vào item",
+                Map.of("importedQuestionIds", importedIds));
+
         return response;
     }
 
     @Transactional
-    public Map<String, Object> importQuestionGroupsToAssessmentItem(Long itemId, ImportAssessmentItemQuestionGroupsDTO dto) {
+    public Map<String, Object> importQuestionGroupsToAssessmentItem(Long itemId, ImportAssessmentItemQuestionGroupsDTO dto, Integer updatedBy) {
         ensureItemExists(itemId);
 
         List<Long> sourceGroupIds = dto.getQuestionGroupIds();
@@ -265,6 +305,14 @@ public class AssessmentItemService {
         response.put("importedCount", importedGroupIds.size());
         response.put("assessmentQuestionGroupIds", importedGroupIds);
         response.put("message", "Question groups imported successfully");
+
+        AssessmentItem item = assessmentItemRepository.findById(itemId).orElse(null);
+        Long assessmentId = item != null ? resolveAssessmentId(item.getSectionId()) : null;
+        auditLogService.logAction(assessmentId, ENTITY_ITEM, itemId,
+                ACTION_IMPORT, null, null, null, updatedBy,
+                "Import " + importedGroupIds.size() + " nhóm câu hỏi vào item",
+                Map.of("importedGroupIds", importedGroupIds));
+
         return response;
     }
 

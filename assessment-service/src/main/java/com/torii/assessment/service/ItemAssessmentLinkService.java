@@ -14,6 +14,8 @@ import com.torii.assessment.repository.AssessmentQuestionGroupRepository;
 import com.torii.assessment.repository.AssessmentQuestionRepository;
 import com.torii.assessment.repository.ItemAssessmentGroupRepository;
 import com.torii.assessment.repository.ItemAssessmentQuestionRepository;
+import com.torii.assessment.repository.AssessmentSectionRepository;
+import com.torii.assessment.entity.AssessmentSection;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -26,6 +28,8 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import static com.torii.assessment.service.AuditLogService.*;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -36,6 +40,15 @@ public class ItemAssessmentLinkService {
     private final AssessmentQuestionGroupRepository assessmentQuestionGroupRepository;
     private final ItemAssessmentQuestionRepository itemAssessmentQuestionRepository;
     private final ItemAssessmentGroupRepository itemAssessmentGroupRepository;
+    private final AssessmentSectionRepository assessmentSectionRepository;
+    private final AuditLogService auditLogService;
+
+    private Long resolveAssessmentId(Long itemId) {
+        return assessmentItemRepository.findById(itemId)
+                .map(item -> assessmentSectionRepository.findById(item.getSectionId())
+                        .map(AssessmentSection::getAssessmentId).orElse(null))
+                .orElse(null);
+    }
 
     @Transactional(readOnly = true)
     public List<ItemAssessmentQuestionLinkDTO> getQuestions(Long itemId) {
@@ -47,6 +60,11 @@ public class ItemAssessmentLinkService {
 
     @Transactional
     public List<ItemAssessmentQuestionLinkDTO> replaceQuestions(Long itemId, UpdateItemAssessmentQuestionsDTO dto) {
+        return replaceQuestions(itemId, dto, null);
+    }
+
+    @Transactional
+    public List<ItemAssessmentQuestionLinkDTO> replaceQuestions(Long itemId, UpdateItemAssessmentQuestionsDTO dto, Integer updatedBy) {
         ensureItemExists(itemId);
         List<ItemAssessmentQuestionLinkDTO> links = dto != null && dto.getQuestions() != null
                 ? dto.getQuestions()
@@ -68,6 +86,15 @@ public class ItemAssessmentLinkService {
             itemAssessmentQuestionRepository.save(entity);
         }
         log.info("Replaced item {} assessment questions with {} link(s)", itemId, links.size());
+
+        if (updatedBy != null) {
+            Long assessmentId = resolveAssessmentId(itemId);
+            auditLogService.logAction(assessmentId, ENTITY_ITEM_LINK, itemId,
+                    ACTION_REPLACE, null, null, null, updatedBy,
+                    "Thay thế question links cho item #" + itemId,
+                    Map.of("questionCount", links.size()));
+        }
+
         return getQuestions(itemId);
     }
 
@@ -81,6 +108,11 @@ public class ItemAssessmentLinkService {
 
     @Transactional
     public List<ItemAssessmentGroupLinkDTO> replaceGroups(Long itemId, UpdateItemAssessmentGroupsDTO dto) {
+        return replaceGroups(itemId, dto, null);
+    }
+
+    @Transactional
+    public List<ItemAssessmentGroupLinkDTO> replaceGroups(Long itemId, UpdateItemAssessmentGroupsDTO dto, Integer updatedBy) {
         ensureItemExists(itemId);
         List<ItemAssessmentGroupLinkDTO> links = dto != null && dto.getGroups() != null
                 ? dto.getGroups()
@@ -102,6 +134,15 @@ public class ItemAssessmentLinkService {
             itemAssessmentGroupRepository.save(entity);
         }
         log.info("Replaced item {} assessment groups with {} link(s)", itemId, links.size());
+
+        if (updatedBy != null) {
+            Long assessmentId = resolveAssessmentId(itemId);
+            auditLogService.logAction(assessmentId, ENTITY_ITEM_LINK, itemId,
+                    ACTION_REPLACE, null, null, null, updatedBy,
+                    "Thay thế group links cho item #" + itemId,
+                    Map.of("groupCount", links.size()));
+        }
+
         return getGroups(itemId);
     }
 

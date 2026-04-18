@@ -36,6 +36,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import static com.torii.assessment.service.AuditLogService.*;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -47,9 +49,10 @@ public class AssessmentQuestionGroupService {
     private final AssessmentOptionRepository assessmentOptionRepository;
     private final AssessmentItemRepository assessmentItemRepository;
     private final S3Service s3Service;
+    private final AuditLogService auditLogService;
 
     @Transactional
-    public AssessmentQuestionGroupResponseDTO create(CreateAssessmentQuestionGroupDTO dto, MultipartFile image, MultipartFile audio) throws IOException {
+    public AssessmentQuestionGroupResponseDTO create(CreateAssessmentQuestionGroupDTO dto, MultipartFile image, MultipartFile audio, Integer updatedBy) throws IOException {
         AssessmentItem item = assessmentItemRepository.findById(dto.getItemId())
                 .orElseThrow(() -> new RuntimeException("Assessment item not found: " + dto.getItemId()));
 
@@ -85,6 +88,12 @@ public class AssessmentQuestionGroupService {
         int nextOrder = assessmentItemRepository.findGroupIdsByItemId(item.getId()).size();
         assessmentItemRepository.insertGroupLink(item.getId(), saved.getId(), nextOrder);
         log.info("Created assessment question group copy {}", saved.getId());
+
+        auditLogService.logAction(null, ENTITY_ASSESSMENT_QUESTION_GROUP, saved.getId(),
+                ACTION_CREATE, null, null, null, updatedBy,
+                "Tạo assessment question group",
+                Map.of("type", String.valueOf(saved.getType()), "itemId", dto.getItemId()));
+
         return getById(saved.getId());
     }
 
@@ -126,7 +135,7 @@ public class AssessmentQuestionGroupService {
     }
 
     @Transactional
-    public AssessmentQuestionGroupResponseDTO update(Long id, UpdateAssessmentQuestionGroupDTO dto, MultipartFile image, MultipartFile audio) throws IOException {
+    public AssessmentQuestionGroupResponseDTO update(Long id, UpdateAssessmentQuestionGroupDTO dto, MultipartFile image, MultipartFile audio, Integer updatedBy) throws IOException {
         AssessmentQuestionGroup group = assessmentQuestionGroupRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Assessment question group not found: " + id));
 
@@ -163,30 +172,45 @@ public class AssessmentQuestionGroupService {
         }
 
         log.info("Updated assessment question group copy {}", id);
+
+        auditLogService.logAction(null, ENTITY_ASSESSMENT_QUESTION_GROUP, id,
+                ACTION_UPDATE, null, null, null, updatedBy,
+                "Cập nhật assessment question group", null);
+
         return getById(id);
     }
 
     @Transactional
-    public void delete(Long id) {
+    public void delete(Long id, Integer updatedBy) {
         if (!assessmentQuestionGroupRepository.existsById(id)) {
             throw new RuntimeException("Assessment question group not found: " + id);
         }
         assessmentGroupQuestionRepository.deleteAllByGroupId(id);
         assessmentQuestionGroupRepository.deleteById(id);
+
+        auditLogService.logAction(null, ENTITY_ASSESSMENT_QUESTION_GROUP, id,
+                ACTION_DELETE, null, null, null, updatedBy,
+                "Xóa assessment question group #" + id, null);
+
         log.info("Deleted assessment question group copy {}", id);
     }
 
     @Transactional
-    public AssessmentQuestionGroupResponseDTO addQuestions(Long groupId, ModifyAssessmentGroupQuestionsDTO dto) {
+    public AssessmentQuestionGroupResponseDTO addQuestions(Long groupId, ModifyAssessmentGroupQuestionsDTO dto, Integer updatedBy) {
         if (!assessmentQuestionGroupRepository.existsById(groupId)) {
             throw new RuntimeException("Assessment question group not found: " + groupId);
         }
         addQuestionsInternal(groupId, resolveAssessmentQuestionIds(dto.getQuestionIds(), dto.getAssessmentQuestionIds()));
+
+        auditLogService.logAction(null, ENTITY_ASSESSMENT_QUESTION_GROUP, groupId,
+                ACTION_ADD, null, null, null, updatedBy,
+                "Thêm câu hỏi vào assessment question group", null);
+
         return getById(groupId);
     }
 
     @Transactional
-    public AssessmentQuestionGroupResponseDTO removeQuestions(Long groupId, ModifyAssessmentGroupQuestionsDTO dto) {
+    public AssessmentQuestionGroupResponseDTO removeQuestions(Long groupId, ModifyAssessmentGroupQuestionsDTO dto, Integer updatedBy) {
         if (!assessmentQuestionGroupRepository.existsById(groupId)) {
             throw new RuntimeException("Assessment question group not found: " + groupId);
         }
@@ -197,6 +221,11 @@ public class AssessmentQuestionGroupService {
                 .collect(Collectors.toList());
         assessmentGroupQuestionRepository.deleteAllByGroupId(groupId);
         assessmentGroupQuestionRepository.saveAll(links);
+
+        auditLogService.logAction(null, ENTITY_ASSESSMENT_QUESTION_GROUP, groupId,
+                ACTION_REMOVE, null, null, null, updatedBy,
+                "Xóa câu hỏi khỏi assessment question group", null);
+
         return getById(groupId);
     }
 
