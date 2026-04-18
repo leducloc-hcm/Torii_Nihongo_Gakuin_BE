@@ -164,9 +164,22 @@ export class PaymentService {
           },
           coupon: {
             select: {
+              id: true,
               code: true,
               title: true,
               type: true,
+              discountType: true,
+              discountValue: true,
+              maxDiscountAmount: true,
+            },
+          },
+          redemption: {
+            select: {
+              id: true,
+              discountApplied: true,
+              status: true,
+              redeemedAt: true,
+              completedAt: true,
             },
           },
         },

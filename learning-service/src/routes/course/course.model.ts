@@ -254,6 +254,7 @@ export type CourseWithRelations = {
   status: "DRAFT" | "PENDING_REVIEW" | "PUBLISHED" | "ARCHIVED";
   createdAt: Date;
   updatedAt: Date;
+  createdBy: number;
   lecturerIds: number[];
   lecturers?: any[];
   modules: Array<{

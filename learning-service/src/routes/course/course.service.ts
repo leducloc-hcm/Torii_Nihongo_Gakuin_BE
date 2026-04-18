@@ -27,6 +27,7 @@ import { EnrollmentService } from "../enrollment/enrollment.service";
 import { S3Service } from "src/shared/services/s3.service";
 import { PrismaService } from "src/shared/services/prisma.service";
 import { ActivityLogService } from "../activity-log/activity-log.service";
+import { NotificationService } from "../notification/notification.service";
 
 @Injectable()
 export class CourseService {
@@ -39,6 +40,7 @@ export class CourseService {
     private readonly s3Service: S3Service,
     private readonly prisma: PrismaService,
     private readonly activityLogService: ActivityLogService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   /** Guest-facing lecturer profile URL path (Next.js `/lecturers/[profileId]`). */
@@ -1060,7 +1062,10 @@ export class CourseService {
 
     return updatedCourse;
   }
-  async pendingReview(id: number): Promise<CourseWithRelations> {
+  async pendingReview(
+    id: number,
+    userId: number,
+  ): Promise<CourseWithRelations> {
     // Check if course exists
     const existingCourse = await this.findOne(id);
 
@@ -1071,22 +1076,76 @@ export class CourseService {
     }
 
     // Update course status to PENDING_REVIEW
-    return this.courseRepository.update({
+    const updatedCourse = await this.courseRepository.update({
       where: { id },
       data: { status: "PENDING_REVIEW" },
     });
+
+    // Notify all admins
+    const admins = await this.prisma.user.findMany({
+      where: { role: "ADMIN", deletedAt: null },
+      select: { id: true },
+    });
+    const staff = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true },
+    });
+    for (const admin of admins) {
+      await this.notificationService.create({
+        type: "COURSE_PENDING_REVIEW",
+        title: "Course Pending Review",
+        message: `${staff?.name ?? "Staff"} submitted course "${existingCourse.title}" for review`,
+        userId: admin.id,
+        relatedUserId: userId,
+        entityId: id,
+        entityType: "COURSE",
+        priority: "HIGH",
+        actionUrl: `/admin/manage-course/${existingCourse.slug}`,
+      });
+    }
+
+    return updatedCourse;
   }
   async getPendingReviewCourses() {
     return this.courseRepository.findAllPendingReviewCourses({ where: {} });
   }
-  async updateCourseStatus(id: number, body: UpdateCourseStatusTypeForAdmin) {
+  async updateCourseStatus(
+    id: number,
+    body: UpdateCourseStatusTypeForAdmin,
+    adminUserId: number,
+  ) {
     // Check if course exists
     const existingCourse = await this.findOne(id);
 
     // Update course status
-    return this.courseRepository.update({
+    const updatedCourse = await this.courseRepository.update({
       where: { id },
       data: { status: body.status },
     });
+
+    // Notify the course creator when approved (PUBLISHED) or rejected (DRAFT/ARCHIVED)
+    if (
+      body.status === "PUBLISHED" ||
+      body.status === "DRAFT" ||
+      body.status === "ARCHIVED"
+    ) {
+      const isApproved = body.status === "PUBLISHED";
+      const notifType = isApproved ? "COURSE_APPROVED" : "COURSE_REJECTED";
+      const statusLabel = isApproved ? "approved" : "rejected";
+
+      await this.notificationService.create({
+        type: notifType as any,
+        title: `Course ${isApproved ? "Approved" : "Rejected"}`,
+        message: `Your course "${existingCourse.title}" has been ${statusLabel} by admin`,
+        userId: existingCourse.createdBy,
+        relatedUserId: adminUserId,
+        entityId: id,
+        entityType: "COURSE",
+        priority: "HIGH",
+        actionUrl: `/staff/manage-course/${existingCourse.slug}`,
+      });
+    }
+
+    return updatedCourse;
   }
 }

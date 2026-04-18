@@ -351,6 +351,8 @@ services:
           - name: jwt-validator
             config:
               secret: nhatngutorii
+              skip_on_methods:
+                - OPTIONS
       - name: cart-route
         paths:
           - /cart

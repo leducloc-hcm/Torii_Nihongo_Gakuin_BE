@@ -32,6 +32,8 @@ import {
   GiftRedemptionResult,
 } from "./coupon.model";
 import { ActivityLogService } from "../activity-log/activity-log.service";
+import { NotificationService } from "../notification/notification.service";
+import { PrismaService } from "src/shared/services/prisma.service";
 
 @Injectable()
 export class CouponService {
@@ -42,6 +44,8 @@ export class CouponService {
     private readonly courseRepository: CourseRepository,
     private readonly enrollmentRepository: EnrollmentRepository,
     private readonly activityLogService: ActivityLogService,
+    private readonly notificationService: NotificationService,
+    private readonly prisma: PrismaService,
   ) {}
 
   // ===== CRUD Operations =====
@@ -303,6 +307,30 @@ export class CouponService {
     this.logger.log(
       `Coupon ${coupon.code} submitted for approval by user ${submittedBy}`,
     );
+
+    // Notify all admins
+    const admins = await this.prisma.user.findMany({
+      where: { role: "ADMIN", deletedAt: null },
+      select: { id: true },
+    });
+    const staff = await this.prisma.user.findUnique({
+      where: { id: submittedBy },
+      select: { name: true },
+    });
+    for (const admin of admins) {
+      await this.notificationService.create({
+        type: "COUPON_PENDING_APPROVAL",
+        title: "Coupon Pending Approval",
+        message: `${staff?.name ?? "Staff"} submitted coupon "${coupon.code}" for approval`,
+        userId: admin.id,
+        relatedUserId: submittedBy,
+        entityId: id,
+        entityType: "COUPON",
+        priority: "HIGH",
+        actionUrl: `/admin/manage-coupon/${id}`,
+      });
+    }
+
     return updatedCoupon;
   }
 
@@ -347,6 +375,19 @@ export class CouponService {
       entityId: id,
       description: `Coupon "${coupon.code}" ${approvalDto.action}d`,
       metadata: { code: coupon.code, note: approvalDto.note },
+    });
+
+    // Notify the coupon creator
+    await this.notificationService.create({
+      type: isApproval ? "COUPON_APPROVED" : "COUPON_REJECTED",
+      title: `Coupon ${isApproval ? "Approved" : "Rejected"}`,
+      message: `Your coupon "${coupon.code}" has been ${approvalDto.action}d by admin${approvalDto.note ? `: ${approvalDto.note}` : ""}`,
+      userId: coupon.createdBy,
+      relatedUserId: actionBy,
+      entityId: id,
+      entityType: "COUPON",
+      priority: "HIGH",
+      actionUrl: `/staff/manage-coupon/${id}`,
     });
 
     return updatedCoupon;
@@ -990,5 +1031,85 @@ export class CouponService {
     // This would validate that the class exists for the course and has capacity
     // Placeholder implementation
     return true;
+  }
+
+  // ===== Available Coupons for Cart =====
+
+  async getAvailableCouponsForCart(
+    userId: number,
+    courseIds: number[],
+    totalAmount: number,
+  ) {
+    const activeCoupons =
+      await this.couponRepository.findActiveDiscountCoupons();
+
+    const applicable: any[] = [];
+    const nonApplicable: any[] = [];
+
+    for (const coupon of activeCoupons) {
+      let validationResult: any;
+      try {
+        validationResult = await this.validateCoupon(
+          { code: coupon.code, courseIds, totalAmount },
+          userId,
+        );
+      } catch {
+        validationResult = { isValid: false, errors: ["Validation failed"] };
+      }
+
+      const couponInfo = {
+        id: coupon.id,
+        code: coupon.code,
+        title: coupon.title,
+        description: (coupon as any).description || null,
+        type: coupon.type,
+        discountType: coupon.discountType,
+        discountValue: coupon.discountValue,
+        minOrderAmount: coupon.minOrderAmount,
+        maxDiscountAmount: coupon.maxDiscountAmount,
+        startsAt: coupon.startsAt,
+        endsAt: coupon.endsAt,
+        courses: coupon.courses.map((cc: any) => ({
+          courseId: cc.courseId,
+          required: cc.required,
+          course: cc.course,
+        })),
+      };
+
+      if (validationResult.isValid && validationResult.discount) {
+        applicable.push({
+          ...couponInfo,
+          isApplicable: true,
+          discount: validationResult.discount,
+          errors: [],
+        });
+      } else {
+        nonApplicable.push({
+          ...couponInfo,
+          isApplicable: false,
+          discount: null,
+          errors: validationResult.errors,
+        });
+      }
+    }
+
+    // Sort applicable coupons by discount amount descending
+    applicable.sort(
+      (a, b) =>
+        (b.discount?.appliedAmount || 0) - (a.discount?.appliedAmount || 0),
+    );
+
+    return { applicable, nonApplicable };
+  }
+
+  // ===== Coupon Usage Logs (Admin) =====
+
+  async getCouponUsageLogs(params: {
+    page?: number;
+    limit?: number;
+    couponId?: number;
+    userId?: number;
+  }) {
+    return this.couponRepository.getCouponUsageLogs(params);
   }
 }

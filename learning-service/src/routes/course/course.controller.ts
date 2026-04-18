@@ -223,8 +223,11 @@ export class CourseController {
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff)
   @HttpCode(HttpStatus.OK)
-  async pendingReview(@Param("id", ParseIntPipe) id: number) {
-    return this.courseService.pendingReview(id);
+  async pendingReview(
+    @Param("id", ParseIntPipe) id: number,
+    @ActiveUser("userId") userId: number,
+  ) {
+    return this.courseService.pendingReview(id, userId);
   }
 
   @Put("admin/publish/:id")
@@ -241,8 +244,9 @@ export class CourseController {
   async updateCourseStatus(
     @Param("id", ParseIntPipe) id: number,
     @Body() body: UpdateCourseStatusDTOForAdmin,
+    @ActiveUser("userId") userId: number,
   ) {
-    return this.courseService.updateCourseStatus(id, body);
+    return this.courseService.updateCourseStatus(id, body, userId);
   }
 
   @Put(":id")
