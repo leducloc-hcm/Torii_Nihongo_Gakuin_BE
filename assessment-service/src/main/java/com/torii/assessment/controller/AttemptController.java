@@ -6,6 +6,7 @@ import com.torii.assessment.dto.attempt.AttemptedAssessmentListResponseDTO;
 import com.torii.assessment.dto.attempt.CreateAttemptDTO;
 import com.torii.assessment.dto.attempt.SubmitAnswerDTO;
 import com.torii.assessment.dto.attempt.SubmitAttemptRequestDTO;
+import com.torii.assessment.dto.attempt.WrongAnswerLabGradeRequestDTO;
 import com.torii.assessment.entity.Assessment;
 import com.torii.assessment.service.AttemptService;
 import com.torii.assessment.service.AttemptReviewService;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping({"/assessment/attempts", "/assessment-attempts"})
@@ -140,5 +142,30 @@ public class AttemptController {
             authUser.userId(),
             authUser.role()
         ));
+    }
+
+    @GetMapping("/attempted/wrong-answer-lab")
+    public ResponseEntity<Map<String, Object>> getWrongAnswerLab(
+            @RequestParam(required = false, defaultValue = "20") Integer limitAttempts,
+            @RequestParam(required = false, defaultValue = "8") Integer maxQuestionsPerDrill,
+            @RequestParam(required = false, defaultValue = "false") Boolean includeListening,
+            @RequestParam(required = false) List<String> sourceTypes,
+            HttpServletRequest request) {
+        RequestAuthUtil.AuthUser authUser = RequestAuthUtil.getAuthUser(request);
+        return ResponseEntity.ok(attemptReviewService.getWrongAnswerLab(
+            authUser.userId(),
+            limitAttempts,
+            maxQuestionsPerDrill,
+            includeListening,
+            sourceTypes
+        ));
+    }
+
+    @PostMapping("/attempted/wrong-answer-lab/grade")
+    public ResponseEntity<Map<String, Object>> gradeWrongAnswerLab(
+            @Valid @RequestBody WrongAnswerLabGradeRequestDTO dto,
+            HttpServletRequest request) {
+        RequestAuthUtil.getAuthUser(request);
+        return ResponseEntity.ok(attemptReviewService.gradeWrongAnswerLab(dto.getAnswers()));
     }
 }

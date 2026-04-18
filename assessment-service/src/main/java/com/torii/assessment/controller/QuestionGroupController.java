@@ -29,8 +29,10 @@ public class QuestionGroupController {
     @Operation(summary = "Create a new question group")
     public ResponseEntity<QuestionGroupResponseDTO> createQuestionGroup(
             @ModelAttribute @Valid CreateQuestionGroupDTO dto,
-            @RequestPart(value = "audio", required = false) MultipartFile audio,
-            @RequestPart(value = "image", required = false) MultipartFile image) throws IOException {
+            @RequestParam(value = "questionIds", required = false) List<Long> questionIds,
+            @RequestParam(value = "audio", required = false) MultipartFile audio,
+            @RequestParam(value = "image", required = false) MultipartFile image) throws IOException {
+        if (questionIds != null) dto.setQuestionIds(questionIds);
         QuestionGroupResponseDTO group = questionGroupService.createQuestionGroup(dto, image, audio);
         return ResponseEntity.status(HttpStatus.CREATED).body(group);
     }
@@ -108,26 +110,38 @@ public class QuestionGroupController {
     public ResponseEntity<QuestionGroupResponseDTO> updateQuestionGroup(
             @PathVariable Long id,
             @ModelAttribute @Valid UpdateQuestionGroupDTO dto,
-            @RequestPart(value = "audio", required = false) MultipartFile audio,
-            @RequestPart(value = "image", required = false) MultipartFile image) throws IOException {
+            @RequestParam(value = "questionIds", required = false) List<Long> questionIds,
+            @RequestParam(value = "audio", required = false) MultipartFile audio,
+            @RequestParam(value = "image", required = false) MultipartFile image) throws IOException {
+        if (questionIds != null) dto.setQuestionIds(questionIds);
         QuestionGroupResponseDTO group = questionGroupService.updateQuestionGroup(id, dto, image, audio);
         return ResponseEntity.ok(group);
     }
 
-    @PostMapping("/{id}/questions")
+    @PostMapping(value = "/{id}/questions", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Add questions to a group")
     public ResponseEntity<QuestionGroupResponseDTO> addQuestionsToGroup(
             @PathVariable Long id,
-            @Valid @RequestBody AddQuestionsToGroupDTO dto) {
+            @RequestParam(value = "questionIds", required = false) List<Long> questionIds,
+            @RequestParam(value = "questions", required = false) List<Long> questions) {
+        AddQuestionsToGroupDTO dto = AddQuestionsToGroupDTO.builder()
+                .questionIds(questionIds)
+                .questions(questions)
+                .build();
         QuestionGroupResponseDTO group = questionGroupService.addQuestionsToGroup(id, dto);
         return ResponseEntity.ok(group);
     }
 
-    @DeleteMapping("/{id}/questions")
+    @PostMapping(value = "/{id}/questions/remove", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Remove questions from a group")
     public ResponseEntity<QuestionGroupResponseDTO> removeQuestionsFromGroup(
             @PathVariable Long id,
-            @Valid @RequestBody RemoveQuestionsFromGroupDTO dto) {
+            @RequestParam(value = "questionIds", required = false) List<Long> questionIds,
+            @RequestParam(value = "questions", required = false) List<Long> questions) {
+        RemoveQuestionsFromGroupDTO dto = RemoveQuestionsFromGroupDTO.builder()
+                .questionIds(questionIds)
+                .questions(questions)
+                .build();
         QuestionGroupResponseDTO group = questionGroupService.removeQuestionsFromGroup(id, dto);
         return ResponseEntity.ok(group);
     }

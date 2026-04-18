@@ -44,6 +44,19 @@ public class QuestionGroupResponseDTO {
         private String difficulty;
         private Integer order;
         private Double score;
+        private List<OptionDTO> options;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class OptionDTO {
+        private Long id;
+        private String content;
+        private Boolean isCorrect;
+        private Integer order;
+        private String mediaUrl;
     }
 
 }

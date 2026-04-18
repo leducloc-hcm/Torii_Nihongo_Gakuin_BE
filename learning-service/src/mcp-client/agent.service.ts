@@ -1,17 +1,15 @@
 import { Injectable, Logger } from "@nestjs/common";
-import OpenAI from "openai";
-import {
-  ChatCompletionMessageParam,
-  ChatCompletionTool,
-} from "openai/resources/chat/completions";
+import Anthropic from "@anthropic-ai/sdk";
 import { McpBaseService } from "src/mcp-client/mcp-client.service";
 import {
   AgentResponse,
+  ClaudeMessageParam,
+  ClaudeTool,
   ExecuteToolsRequest,
   ExecuteToolsResponse,
   FastMCPResult,
   MCPToolResult,
-  transformMCPToolToOpenAI,
+  transformMCPToolToClaude,
 } from "src/mcp-client/mcp.model";
 import { CourseMcpClient } from "src/mcp-client/module/course/course-mcp.service";
 import { EnrollmentMcpClient } from "src/mcp-client/module/enrollment/enrollment-mcp.service";
@@ -30,21 +28,21 @@ import {
   getEnabledMCPServers,
   MCP_SERVERS,
 } from "src/shared/config/mcp-servers.config";
-import { OPENAI_CONFIG } from "src/shared/config/openai.config";
+import { CLAUDE_CONFIG } from "src/shared/config/claude.config";
 import { AgentRole } from "src/mcp-client/shared/agent-routing.utils";
 import { getAgentRolePrompt } from "src/mcp-client/prompts/agent-role.prompt";
 
 interface ToolRegistryItem {
   serverKey: string;
   serverUrl: string;
-  tool: ChatCompletionTool;
+  tool: ClaudeTool;
 }
 
 @Injectable()
 export class AgentService {
   private readonly logger = new Logger(AgentService.name);
-  private readonly openai: OpenAI;
-  private allTools: ChatCompletionTool[] = [];
+  private readonly anthropic: Anthropic;
+  private allTools: ClaudeTool[] = [];
   private toolRegistry: ToolRegistryItem[] = [];
   private toolsLoaded = false;
   private readonly roleServerPolicies: Record<
@@ -52,7 +50,7 @@ export class AgentService {
     { allowedServers: string[]; fallbackServers: string[] }
   > = {
     [AgentRole.SENSEI]: {
-      allowedServers: ["course", "flashcard", "blog"],
+      allowedServers: ["sensei", "course", "flashcard", "blog"],
       fallbackServers: ["enrollment"],
     },
     [AgentRole.ASSESSMENT]: {
@@ -70,25 +68,29 @@ export class AgentService {
     private readonly courseMcp: CourseMcpClient,
     private readonly enrollmentMcp: EnrollmentMcpClient,
   ) {
-    const runtimeApiKey = (process.env.OPENAI_API_KEY || "")
+    const runtimeApiKey = (process.env.CLAUDE_API_KEY || CLAUDE_CONFIG.apiKey)
       .trim()
-      .replace(/^['\"]|['\"]$/g, "");
+      .replace(/^['"]|['"]$/g, "");
 
     if (!runtimeApiKey) {
       throw new Error(
-        "OPENAI_API_KEY is missing. Please set OPENAI_API_KEY in learning-service/.env and restart the service.",
+        "CLAUDE_API_KEY is missing. Please set CLAUDE_API_KEY in learning-service/.env and restart the service.",
       );
     }
 
-    this.openai = new OpenAI({
+    this.anthropic = new Anthropic({
       apiKey: runtimeApiKey,
     });
   }
 
   private getRuntimeModel(): string {
-    return (process.env.OPENAI_MODEL || OPENAI_CONFIG.model || "")
+    return (
+      process.env.CLAUDE_MODEL ||
+      CLAUDE_CONFIG.model ||
+      "claude-sonnet-4-6"
+    )
       .trim()
-      .replace(/^['\"]|['\"]$/g, "");
+      .replace(/^['"]|['"]$/g, "");
   }
 
   /**
@@ -98,7 +100,7 @@ export class AgentService {
     if (this.toolsLoaded) return;
 
     //this.logger.log('Loading tools from MCP servers...')
-    const tools: ChatCompletionTool[] = [];
+    const tools: ClaudeTool[] = [];
     const registry: ToolRegistryItem[] = [];
 
     try {
@@ -109,16 +111,16 @@ export class AgentService {
 
         try {
           const mcpTools = await this.mcpBase.listTools(server.url);
-          const openAITools = mcpTools.map(transformMCPToolToOpenAI);
-          tools.push(...openAITools);
-          for (const tool of openAITools) {
+          const claudeTools = mcpTools.map(transformMCPToolToClaude);
+          tools.push(...claudeTools);
+          for (const tool of claudeTools) {
             registry.push({
               serverKey,
               serverUrl: server.url,
               tool,
             });
           }
-          //this.logger.log(`Loaded ${openAITools.length} tools from ${server.name}`)
+          //this.logger.log(`Loaded ${claudeTools.length} tools from ${server.name}`)
         } catch (error) {
           //this.logger.error(`Failed to load tools from ${server.name}:`, error.message)
         }
@@ -133,13 +135,43 @@ export class AgentService {
     }
   }
 
+  /**
+   * Helper: Extract system prompt strings from messages, separating them from user/assistant messages.
+   * Anthropic requires system to be a top-level parameter, not in the messages array.
+   */
+  private extractSystemAndMessages(
+    messages: ClaudeMessageParam[],
+    extraSystemParts: string[] = [],
+  ): { system: string; userMessages: ClaudeMessageParam[] } {
+    const systemParts: string[] = [...extraSystemParts];
+    const userMessages: ClaudeMessageParam[] = [];
+
+    for (const msg of messages) {
+      if ((msg as any).role === "system") {
+        // Extract system content
+        const content = (msg as any).content;
+        if (typeof content === "string") {
+          systemParts.push(content);
+        }
+      } else {
+        userMessages.push(msg);
+      }
+    }
+
+    return {
+      system: systemParts.join("\n\n"),
+      userMessages,
+    };
+  }
+
   async getResponse(
-    messages: ChatCompletionMessageParam[],
+    messages: ClaudeMessageParam[],
     useTools = true,
     forceTools = false,
     originalQuery?: string,
     agentRole?: AgentRole,
     collaboratorRoles: AgentRole[] = [],
+    queryType?: string,
   ): Promise<AgentResponse> {
     if (!this.toolsLoaded) {
       await this.loadTools();
@@ -158,114 +190,154 @@ export class AgentService {
       }
     }
 
-    // 🎯 INJECT VALIDATION PROMPTS: Add domain and JLPT validation prompts to messages
+    // 🎯 INJECT VALIDATION PROMPTS: Add domain and JLPT validation prompts
     const validationPrompts = getValidationPrompts();
     const rolePrompt = getAgentRolePrompt(agentRole || AgentRole.SENSEI);
-    const messagesWithValidation: ChatCompletionMessageParam[] = [
-      {
-        role: "system",
-        content: validationPrompts,
-      },
-      {
-        role: "system",
-        content: rolePrompt,
-      },
-      ...messages,
-    ];
+
+    // Build system parts (Anthropic requires system as a top-level param)
+    const systemParts: string[] = [rolePrompt, validationPrompts];
 
     if (collaboratorRoles.length > 0) {
-      messagesWithValidation.unshift({
-        role: "system",
-        content: `Collaborator roles available: ${collaboratorRoles.join(", ")}. Use tools and responses that stay consistent with the primary role while considering collaborator context when needed.`,
-      });
+      systemParts.unshift(
+        `Collaborator roles available: ${collaboratorRoles.join(", ")}. Use tools and responses that stay consistent with the primary role while considering collaborator context when needed.`,
+      );
     }
+
+    // Separate system messages from user/assistant messages
+    const { system, userMessages } = this.extractSystemAndMessages(
+      messages,
+      systemParts,
+    );
 
     try {
       const routedTools = this.getToolsForRole(agentRole, collaboratorRoles);
 
-      let toolChoice: "auto" | "required" | undefined = undefined;
+      // For GRAMMAR/TRANSLATION, lock the tool choice to the single relevant tool
+      // but only if the tool actually exists in routedTools (sensei MCP must be reachable)
+      let toolChoice: Anthropic.Messages.ToolChoice | undefined = undefined;
       if (useTools && routedTools.length > 0) {
-        toolChoice = forceTools ? "required" : "auto";
+        const toolExists = (name: string) =>
+          routedTools.some((t) => t.name === name);
+
+        if (
+          queryType === "GRAMMAR" &&
+          toolExists("explain_grammar_personalized")
+        ) {
+          toolChoice = {
+            type: "tool",
+            name: "explain_grammar_personalized",
+          };
+        } else if (
+          queryType === "TRANSLATION" &&
+          toolExists("translate_with_level_context")
+        ) {
+          toolChoice = {
+            type: "tool",
+            name: "translate_with_level_context",
+          };
+        } else {
+          toolChoice = forceTools ? { type: "any" } : { type: "auto" };
+        }
       }
 
       const runtimeModel = this.getRuntimeModel();
       if (!runtimeModel) {
         throw new Error(
-          "OPENAI_MODEL is missing. Please set OPENAI_MODEL in learning-service/.env and restart the service.",
+          "CLAUDE_MODEL is missing. Please set CLAUDE_MODEL in learning-service/.env and restart the service.",
         );
       }
 
-      const completionOptions: any = {
-        model: runtimeModel,
-        messages: messagesWithValidation, // Use messages with validation prompts
-        tools: useTools && routedTools.length > 0 ? routedTools : undefined,
-        tool_choice: toolChoice,
-        temperature: OPENAI_CONFIG.temperature,
-      };
-      if (OPENAI_CONFIG.maxTokens !== undefined) {
-        completionOptions.max_completion_tokens = OPENAI_CONFIG.maxTokens;
-      }
+      const completionOptions: Anthropic.Messages.MessageCreateParamsNonStreaming =
+        {
+          model: runtimeModel,
+          system,
+          messages: userMessages,
+          tools: useTools && routedTools.length > 0 ? routedTools : undefined,
+          tool_choice: toolChoice,
+          temperature: CLAUDE_CONFIG.temperature,
+          max_tokens: CLAUDE_CONFIG.maxTokens,
+        };
 
-      const response =
-        await this.openai.chat.completions.create(completionOptions);
+      const response = await this.anthropic.messages.create(completionOptions);
 
-      const choice = response.choices[0];
-      const toolCalls = choice.message.tool_calls;
+      // Extract text content and tool_use blocks from response
+      const textContent = response.content
+        .filter(
+          (block): block is Anthropic.Messages.TextBlock =>
+            block.type === "text",
+        )
+        .map((block) => block.text)
+        .join("");
 
-      if (toolCalls && toolCalls.length > 0) {
+      const toolUseBlocks = response.content.filter(
+        (block): block is Anthropic.Messages.ToolUseBlock =>
+          block.type === "tool_use",
+      );
+
+      if (toolUseBlocks.length > 0) {
         return {
-          content: choice.message.content,
-          toolCalls: toolCalls.map((tc) => {
-            // Handle both regular and custom tool calls
-            if ("function" in tc) {
-              return {
-                id: tc.id,
-                name: tc.function.name,
-                arguments: tc.function.arguments,
-              };
-            }
-            // Fallback for custom tool calls
-            return {
-              id: tc.id,
-              name: (tc as any).name || "unknown",
-              arguments: (tc as any).arguments || "{}",
-            };
-          }),
+          content: textContent || null,
+          toolCalls: toolUseBlocks.map((tc) => ({
+            id: tc.id,
+            name: tc.name,
+            arguments: JSON.stringify(tc.input),
+          })),
           requiresApproval: false,
-          finishReason: choice.finish_reason as
-            | "stop"
-            | "tool_calls"
-            | "length"
-            | null,
+          finishReason:
+            response.stop_reason === "tool_use"
+              ? "tool_calls"
+              : (response.stop_reason as any),
         };
       }
 
       return {
-        content: choice.message.content,
+        content: textContent || null,
         requiresApproval: false,
-        finishReason: choice.finish_reason as
-          | "stop"
-          | "tool_calls"
-          | "length"
-          | null,
+        finishReason:
+          response.stop_reason === "end_turn"
+            ? "stop"
+            : (response.stop_reason as any),
       };
     } catch (error) {
-      ////this.logger.error('OpenAI API error:', error)
+      ////this.logger.error('Claude API error:', error)
       const message = error instanceof Error ? error.message : String(error);
 
-      const isInsufficientScopeError =
-        /missing scopes:\s*model\.request/i.test(message) ||
-        /insufficient permissions/i.test(message);
+      const isInvalidApiKeyError =
+        /invalid.*api.key/i.test(message) ||
+        /authentication/i.test(message) ||
+        (/\b401\b/.test(message) && /api.key/i.test(message));
 
-      if (isInsufficientScopeError) {
+      const isPermissionError =
+        /permission/i.test(message) ||
+        /forbidden/i.test(message) ||
+        /\b403\b/.test(message);
+
+      if (isInvalidApiKeyError) {
         const lang = originalQuery ? detectLanguage(originalQuery) : "vi";
 
         const localizedMessage =
           lang === "ja"
-            ? "現在のOpenAI APIキーには必要な権限（model.request）がありません。管理者に、プロジェクト権限（Member以上）とAPIキーのスコープ（model.request）を有効化してもらってください。"
+            ? "Claude APIキーが無効、期限切れ、または無効化されています。管理者に有効なCLAUDE_API_KEYへ更新してサービスを再起動してもらってください。"
             : lang === "en"
-              ? "The current OpenAI API key does not have the required permission (model.request). Please ask your admin to enable project access (Member or higher) and the model.request scope for this key."
-              : "API key OpenAI hiện tại chưa có quyền cần thiết (model.request). Vui lòng cấp quyền project (Member trở lên) và bật scope model.request cho key này.";
+              ? "The Claude API key is invalid, expired, or revoked. Please ask your admin to update CLAUDE_API_KEY and restart the service."
+              : "Claude API key hiện tại không hợp lệ, đã hết hạn, hoặc đã bị thu hồi. Vui lòng cập nhật CLAUDE_API_KEY hợp lệ và khởi động lại service.";
+
+        return {
+          content: localizedMessage,
+          requiresApproval: false,
+          finishReason: "stop",
+        };
+      }
+
+      if (isPermissionError) {
+        const lang = originalQuery ? detectLanguage(originalQuery) : "vi";
+
+        const localizedMessage =
+          lang === "ja"
+            ? "現在のClaude APIキーには必要な権限がありません。管理者に、APIキーの権限を確認してもらってください。"
+            : lang === "en"
+              ? "The current Claude API key does not have the required permissions. Please ask your admin to check the API key permissions."
+              : "API key Claude hiện tại chưa có quyền cần thiết. Vui lòng kiểm tra quyền của API key.";
 
         return {
           content: localizedMessage,
@@ -332,7 +404,7 @@ export class AgentService {
 
     if (fastResponse) {
       this.logger.log(
-        `⚡ Fast-path response generated for queryType=${request.queryType} (skip second OpenAI call).`,
+        `⚡ Fast-path response generated for queryType=${request.queryType} (skip second Claude call).`,
       );
       return {
         results,
@@ -341,74 +413,93 @@ export class AgentService {
       };
     }
 
-    const toolMessages: ChatCompletionMessageParam[] = results.map(
-      (result) => ({
-        role: "tool" as const,
-        tool_call_id: result.toolCallId,
+    // Build tool_result messages for Claude
+    // Anthropic format: user message with tool_result content blocks
+    const toolResultContents: Anthropic.Messages.ToolResultBlockParam[] =
+      results.map((result) => ({
+        type: "tool_result" as const,
+        tool_use_id: result.toolCallId,
         content: result.error || JSON.stringify(result.result),
-      }),
+      }));
+
+    // Build the assistant message that contains the tool_use blocks
+    const assistantToolUseContent: Anthropic.Messages.ContentBlockParam[] =
+      request.toolCalls.map((tc) => ({
+        type: "tool_use" as const,
+        id: tc.id,
+        name: tc.name,
+        input: tc.arguments,
+      }));
+
+    // Build message chain: existing messages + assistant(tool_use) + user(tool_result)
+    const existingMessages = (request.messages || []).filter(
+      (m) => (m as any).role !== "system",
     );
 
-    const messages: ChatCompletionMessageParam[] = [
-      ...(request.messages || []),
-      ...toolMessages,
+    const messages: ClaudeMessageParam[] = [
+      ...existingMessages,
+      {
+        role: "assistant",
+        content: assistantToolUseContent,
+      } as ClaudeMessageParam,
+      {
+        role: "user",
+        content: toolResultContents,
+      } as ClaudeMessageParam,
     ];
+
+    // Build system prompt parts
+    const systemParts: string[] = [];
 
     // Add format instructions based on query type before final response
     //this.logger.log(`🔍 QueryType for final response: "${request.queryType}" (type: ${typeof request.queryType})`)
 
-    // Inject module-specific system prompt at the BEGINNING for ASSESSMENT or ASSESSMENT_HISTORY
+    // Inject module-specific system prompt for ASSESSMENT or ASSESSMENT_HISTORY
     if (
       request.queryType === "ASSESSMENT" ||
       request.queryType === QueryType.ASSESSMENT
     ) {
-      //this.logger.log('📋 Injecting ASSESSMENT module system prompt at the beginning')
-      messages.unshift({
-        role: "system",
-        content: ASSESSMENT_MCP_PROMPT,
-      });
+      //this.logger.log('📋 Injecting ASSESSMENT module system prompt')
+      systemParts.push(ASSESSMENT_MCP_PROMPT);
     } else if (
       request.queryType === "ASSESSMENT_HISTORY" ||
       request.queryType === QueryType.ASSESSMENT_HISTORY
     ) {
-      //this.logger.log('📊 Injecting ASSESSMENT_HISTORY module system prompt at the beginning')
-      messages.unshift({
-        role: "system",
-        content: getAssessmentHistoryPrompt(
+      //this.logger.log('📊 Injecting ASSESSMENT_HISTORY module system prompt')
+      systemParts.push(
+        getAssessmentHistoryPrompt(
           QueryType.ASSESSMENT_HISTORY,
           request.userId,
         ),
-      });
+      );
     }
 
-    // 🔒 INJECT VALIDATION PROMPTS: Add domain and JLPT validation prompts to all final responses
+    // 🔒 INJECT VALIDATION PROMPTS
     const validationPrompts = getValidationPrompts();
     const resolvedRole =
       request.agentRole === AgentRole.ASSESSMENT ||
       request.agentRole === AgentRole.ANALYTICS ||
       request.agentRole === AgentRole.SENSEI
-        ? request.agentRole
+        ? (request.agentRole as AgentRole)
         : AgentRole.SENSEI;
 
     const rolePrompt = getAgentRolePrompt(resolvedRole);
-    messages.unshift({
-      role: "system",
-      content: validationPrompts,
-    });
-    messages.unshift({
-      role: "system",
-      content: rolePrompt,
-    });
+    systemParts.unshift(validationPrompts);
+    systemParts.unshift(rolePrompt);
 
-    // Add user instructions for other types
+    // Extract any system messages from existing messages
+    const { system: existingSystem, userMessages: cleanMessages } =
+      this.extractSystemAndMessages(messages, systemParts);
+
+    // Add user instructions for specific query types
+    let formatInstruction: string | undefined;
+
     if (
       request.queryType === "COURSE" ||
       request.queryType === QueryType.COURSE
     ) {
       //this.logger.log('📋 Adding COURSE format instructions to messages')
-      messages.push({
-        role: "user",
-        content: `CRITICAL INSTRUCTION - READ CAREFULLY:
+      formatInstruction = `CRITICAL INSTRUCTION - READ CAREFULLY:
 
 You MUST respond with ONLY the JSON code block below. NOTHING ELSE.
 
@@ -430,16 +521,13 @@ Your ENTIRE response must be EXACTLY this format:
 That's it. Nothing before the \`\`\`json. Nothing after the closing \`\`\`.
 
 Include in each course: id, title, slug, level, thumbnailUrl, courseType, price, moduleCount, lessonCount
-Use EXACT data from tool result - do not modify.`,
-      });
+Use EXACT data from tool result - do not modify.`;
     } else if (
       request.queryType === "BLOG" ||
       request.queryType === QueryType.BLOG
     ) {
       //this.logger.log('📋 Adding BLOG format instructions to messages')
-      messages.push({
-        role: "user",
-        content: `CRITICAL INSTRUCTION - READ CAREFULLY:
+      formatInstruction = `CRITICAL INSTRUCTION - READ CAREFULLY:
 
 You MUST respond with ONLY the JSON code block below. NOTHING ELSE.
 
@@ -461,24 +549,21 @@ Your ENTIRE response must be EXACTLY this format:
 That's it. Nothing before the \`\`\`json. Nothing after the closing \`\`\`.
 
 Include in each blog: id, title, slug, date, image, excerpt, tags
-Use EXACT data from tool result - do not modify.`,
-      });
+Use EXACT data from tool result - do not modify.`;
     } else if (
       request.queryType === "FLASHCARD" ||
       request.queryType === QueryType.FLASHCARD
     ) {
       //this.logger.log('📋 Adding FLASHCARD format instructions to messages')
 
-      // Check if this is a generation request (generate_flashcard_suggestions tool was called)
+      // Check if this is a generation request
       const isFlashcardGeneration = results.some(
         (r) => r.toolName === "generate_flashcard_suggestions",
       );
 
       if (isFlashcardGeneration) {
         //this.logger.log('🎴 Flashcard GENERATION detected - using formatted text response')
-        messages.push({
-          role: "user",
-          content: `CRITICAL INSTRUCTION - FLASHCARD GENERATION FORMAT:
+        formatInstruction = `CRITICAL INSTRUCTION - FLASHCARD GENERATION FORMAT:
 
 The tool generate_flashcard_suggestions has returned flashcard data.
 
@@ -516,13 +601,10 @@ MANDATORY RULES:
 - ✅ MUST include action buttons at the end
 - ✅ MUST include "CHƯA được lưu" warning
 - ❌ DO NOT use JSON format for generation!
-- ❌ DO NOT say "decks": [] or "count": 0`,
-        });
+- ❌ DO NOT say "decks": [] or "count": 0`;
       } else {
         //this.logger.log('🔍 Flashcard SEARCH detected - using JSON format')
-        messages.push({
-          role: "user",
-          content: `CRITICAL INSTRUCTION - READ CAREFULLY:
+        formatInstruction = `CRITICAL INSTRUCTION - READ CAREFULLY:
 
 You MUST respond with ONLY the JSON code block below. NOTHING ELSE.
 
@@ -544,9 +626,50 @@ Your ENTIRE response must be EXACTLY this format:
 That's it. Nothing before the \`\`\`json. Nothing after the closing \`\`\`.
 
 Include in each deck: id, title, level, card_count, owner_name, createdAt, updatedAt
-Use EXACT data from tool result - do not modify.`,
-        });
+Use EXACT data from tool result - do not modify.`;
       }
+    } else if (
+      request.queryType === "GRAMMAR" ||
+      request.queryType === QueryType.GRAMMAR
+    ) {
+      formatInstruction = `The tool explain_grammar_personalized has returned a result.
+
+MANDATORY — Do BOTH parts in order:
+
+PART 1 — Write a SHORT, structured explanation (under 250 words) in the SAME language the user wrote in:
+- Grammar point + level
+- Meaning / usage
+- Structure / conjugation pattern
+- 2–3 example sentences (Japanese / romaji / translation)
+- 1–2 common pitfalls (notes)
+
+PART 2 — You MUST append this JSON block EXACTLY at the very end of your response (no text after it):
+
+\`\`\`json
+{"type":"grammar_explanation","grammar_point":"FILL","level":"FILL","meaning":"FILL","structure":"FILL","notes":"FILL","examples":[{"jp":"FILL","romaji":"FILL","translation":"FILL"},{"jp":"FILL","romaji":"FILL","translation":"FILL"},{"jp":"FILL","romaji":"FILL","translation":"FILL"}]}
+\`\`\`
+
+Replace every "FILL" with the actual value from the tool result. Use the inner explanation object fields.
+
+RULES:
+- ✅ The \`\`\`json block is REQUIRED — never omit it
+- ✅ All examples must have jp, romaji, translation
+- ✅ notes must be a string (join array items with " • " if array)
+- ❌ Do NOT add any text after the closing \`\`\` fence`;
+    } else if (
+      request.queryType === "TRANSLATION" ||
+      request.queryType === QueryType.TRANSLATION
+    ) {
+      formatInstruction = `The tool translate_with_level_context has returned a result.
+
+Do two things:
+1. Write a short formatted response (clean translation → vocabulary table with ⚠️ for above-level words → grammar patterns → learning tip), responding in the same language the user wrote in.
+2. After the explanation, output the raw tool result data inside a JSON code block like this:
+\`\`\`json
+{...the data object from the tool result...}
+\`\`\`
+
+IMPORTANT: The JSON code block MUST contain the inner data object (with fields: type, original_text, translation, vocabulary, grammar_patterns, learning_tip). Do not omit or modify any fields.`;
     } else if (
       request.queryType !== "ASSESSMENT" &&
       request.queryType !== QueryType.ASSESSMENT &&
@@ -562,62 +685,71 @@ Use EXACT data from tool result - do not modify.`,
       //this.logger.warn(`⚠️ No format instructions added - queryType was: "${request.queryType}"`)
     }
 
-    //this.logger.debug('Messages being sent to OpenAI:')
-    messages.forEach((msg, idx) => {
-      if (msg.role === "assistant" && "tool_calls" in msg) {
-        //this.logger.debug(`[${idx}] ${msg.role} - has ${msg.tool_calls?.length || 0} tool_calls`)
-      } else if (msg.role === "tool") {
-        //this.logger.debug(`[${idx}] ${msg.role} - tool_call_id: ${msg.tool_call_id}`)
-      } else {
-        //this.logger.debug(`[${idx}] ${msg.role}`)
-      }
-    });
-
-    const finalCompletionOptions: any = {
-      model: OPENAI_CONFIG.model,
-      messages,
-      temperature: OPENAI_CONFIG.temperature,
-    };
-
-    if (OPENAI_CONFIG.maxTokens !== undefined) {
-      finalCompletionOptions.max_completion_tokens = OPENAI_CONFIG.maxTokens;
+    // If we have format instructions, append to last user message
+    if (formatInstruction) {
+      cleanMessages.push({
+        role: "user",
+        content: formatInstruction,
+      });
     }
 
-    try {
-      //this.logger.log('🔄 Calling OpenAI with tool results...')
-      const openaiStartTime = Date.now();
+    const runtimeModel = this.getRuntimeModel();
+    if (!runtimeModel) {
+      return {
+        results,
+        finalResponse: undefined,
+        hasMoreTools: false,
+      };
+    }
 
-      const finalResponse = await this.openai.chat.completions.create(
+    const finalCompletionOptions: Anthropic.Messages.MessageCreateParamsNonStreaming =
+      {
+        model: runtimeModel,
+        system: existingSystem,
+        messages: cleanMessages,
+        temperature: CLAUDE_CONFIG.temperature,
+        max_tokens: CLAUDE_CONFIG.maxTokens,
+      };
+
+    try {
+      //this.logger.log('🔄 Calling Claude with tool results...')
+      const claudeStartTime = Date.now();
+
+      const finalResponse = await this.anthropic.messages.create(
         finalCompletionOptions,
       );
 
-      const openaiTime = Date.now() - openaiStartTime;
-      //this.logger.log(`✅ OpenAI response received in ${openaiTime}ms`)
-      //this.logger.log(
-      //  `⏱️  Total executeApprovedTools: ${Date.now() - executeStartTime}ms (Tools: ${toolCallsTime}ms, OpenAI: ${openaiTime}ms)`,
-      //  )
+      const claudeTime = Date.now() - claudeStartTime;
+      //this.logger.log(`✅ Claude response received in ${claudeTime}ms`)
 
-      const finalChoice = finalResponse.choices[0];
+      // Extract text from content blocks
+      const responseText = finalResponse.content
+        .filter(
+          (block): block is Anthropic.Messages.TextBlock =>
+            block.type === "text",
+        )
+        .map((block) => block.text)
+        .join("");
 
-      if (!finalChoice.message.content) {
-        //this.logger.warn('⚠️ OpenAI returned empty content in final response')
-        //this.logger.debug(`Tool results: ${JSON.stringify(results, null, 2)}`)
+      const hasMoreToolUse = finalResponse.content.some(
+        (block) => block.type === "tool_use",
+      );
+
+      if (!responseText) {
+        //this.logger.warn('⚠️ Claude returned empty content in final response')
       } else {
-        //this.logger.log(`✅ Final response: ${finalChoice.message.content.substring(0, 200)}...`)
+        //this.logger.log(`✅ Final response: ${responseText.substring(0, 200)}...`)
       }
 
       return {
         results,
-        finalResponse: finalChoice.message.content || undefined,
-        hasMoreTools: (finalChoice.message.tool_calls?.length ?? 0) > 0,
+        finalResponse: responseText || undefined,
+        hasMoreTools: hasMoreToolUse,
       };
     } catch (error) {
-      //this.logger.error('❌ Failed to get final response from OpenAI:', error.message)
-      //this.logger.error('Stack:', error.stack)
-      //this.logger.debug(`Messages sent: ${JSON.stringify(messages, null, 2)}`)
+      //this.logger.error('❌ Failed to get final response from Claude:', error.message)
 
       // Return results but with no final response
-      // The calling service will handle fallback message
       return {
         results,
         finalResponse: undefined,
@@ -685,11 +817,7 @@ Use EXACT data from tool result - do not modify.`,
 
   private getServerUrlForTool(toolName: string): string | null {
     const registryMatch = this.toolRegistry.find((item) => {
-      if (!("function" in item.tool)) {
-        return false;
-      }
-
-      return item.tool.function.name === toolName;
+      return item.tool.name === toolName;
     });
 
     if (registryMatch) {
@@ -751,7 +879,7 @@ Use EXACT data from tool result - do not modify.`,
     return enabledServers.length > 0 ? enabledServers[0].url : null;
   }
 
-  getAvailableTools(): ChatCompletionTool[] {
+  getAvailableTools(): ClaudeTool[] {
     return this.allTools;
   }
 
@@ -815,6 +943,25 @@ Use EXACT data from tool result - do not modify.`,
       return this.toJsonCodeBlock({ decks, count: decks.length });
     }
 
+    if (type === "ASSESSMENT") {
+      const assessments = this.extractArrayFromToolResults(results, [
+        "results",
+        "assessments",
+        "items",
+        "data",
+      ]);
+
+      if (!assessments) {
+        return undefined;
+      }
+
+      return this.toJsonCodeBlock({
+        type: "assessment_search",
+        results: assessments,
+        count: assessments.length,
+      });
+    }
+
     return undefined;
   }
 
@@ -864,7 +1011,7 @@ Use EXACT data from tool result - do not modify.`,
   private getToolsForRole(
     primaryRole?: AgentRole,
     collaboratorRoles: AgentRole[] = [],
-  ): ChatCompletionTool[] {
+  ): ClaudeTool[] {
     if (!primaryRole && collaboratorRoles.length === 0) {
       return this.allTools;
     }
@@ -905,15 +1052,11 @@ Use EXACT data from tool result - do not modify.`,
 
     const seenToolNames = new Set<string>();
     const filteredTools = [...allowedTools, ...fallbackTools].filter((tool) => {
-      if (!("function" in tool)) {
+      if (seenToolNames.has(tool.name)) {
         return false;
       }
 
-      if (seenToolNames.has(tool.function.name)) {
-        return false;
-      }
-
-      seenToolNames.add(tool.function.name);
+      seenToolNames.add(tool.name);
       return true;
     });
 

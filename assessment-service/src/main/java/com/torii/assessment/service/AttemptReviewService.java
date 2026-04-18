@@ -2,6 +2,7 @@ package com.torii.assessment.service;
 
 import com.torii.assessment.dto.attempt.AttemptReviewDetailDTO;
 import com.torii.assessment.dto.attempt.AttemptedAssessmentListResponseDTO;
+import com.torii.assessment.dto.assessment.AssessmentDTO;
 import com.torii.assessment.entity.Assessment;
 import com.torii.assessment.entity.AssessmentAnswer;
 import com.torii.assessment.entity.AssessmentGroupQuestion;
@@ -30,12 +31,14 @@ import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.time.LocalDateTime;
 import java.util.stream.Collectors;
 
 @Service
@@ -52,6 +55,7 @@ public class AttemptReviewService {
     private final AssessmentAnswerRepository assessmentAnswerRepository;
     private final AssessmentQuestionRepository assessmentQuestionRepository;
     private final AssessmentOptionRepository assessmentOptionRepository;
+    private final LearningUserLookupService learningUserLookupService;
 
     public AttemptedAssessmentListResponseDTO getAttemptedAssessments(
         Integer userId,
@@ -98,6 +102,357 @@ public class AttemptReviewService {
         }
 
         return buildAttemptDetail(attempt);
+    }
+
+    public Map<String, Object> getAssessmentOverview(
+        Long assessmentId,
+        Integer page,
+        Integer limit,
+        String keyword,
+        String sortBy,
+        String sortOrder
+    ) {
+        Assessment assessment = assessmentRepository.findById(assessmentId)
+            .orElseThrow(() -> new RuntimeException("Assessment not found: " + assessmentId));
+
+        int safePage = page == null || page < 1 ? 1 : page;
+        int safeLimit = limit == null || limit < 1 ? 20 : limit;
+
+        List<Attempt> submittedAttempts = attemptRepository.findByAssessmentId(assessmentId)
+            .stream()
+            .filter(a -> a.getSubmittedAt() != null)
+            .collect(Collectors.toList());
+
+        Map<Integer, List<Attempt>> attemptsByStudent = submittedAttempts.stream()
+            .collect(Collectors.groupingBy(Attempt::getUserId));
+
+        List<Map<String, Object>> studentRows = attemptsByStudent.entrySet().stream()
+            .map(entry -> {
+                Integer studentId = entry.getKey();
+                List<Attempt> attempts = entry.getValue();
+
+                Double bestScore = attempts.stream()
+                    .map(Attempt::getScore)
+                    .filter(score -> score != null)
+                    .max(Double::compareTo)
+                    .orElse(null);
+
+                LocalDateTime lastAttempt = attempts.stream()
+                    .map(Attempt::getSubmittedAt)
+                    .filter(ts -> ts != null)
+                    .max(LocalDateTime::compareTo)
+                    .orElse(null);
+
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("studentId", studentId);
+                row.put("attempts", attempts.size());
+                row.put("bestScore", bestScore);
+                row.put("lastAttempt", lastAttempt);
+                return row;
+            })
+            .collect(Collectors.toList());
+
+        if (keyword != null && !keyword.isBlank()) {
+            String kw = keyword.trim().toLowerCase();
+            studentRows = studentRows.stream()
+                .filter(row -> String.valueOf(row.get("studentId")).toLowerCase().contains(kw))
+                .collect(Collectors.toList());
+        }
+
+        String sortField = sortBy == null || sortBy.isBlank() ? "lastAttempt" : sortBy;
+        boolean asc = "asc".equalsIgnoreCase(sortOrder);
+        Comparator<Map<String, Object>> comparator;
+        switch (sortField) {
+            case "studentId" -> comparator = Comparator.comparing(row -> (Integer) row.get("studentId"));
+            case "attempts" -> comparator = Comparator.comparing(row -> (Integer) row.get("attempts"));
+            case "bestScore" -> comparator = Comparator.comparing(
+                row -> (Double) row.get("bestScore"),
+                Comparator.nullsLast(Double::compareTo)
+            );
+            default -> comparator = Comparator.comparing(
+                row -> (LocalDateTime) row.get("lastAttempt"),
+                Comparator.nullsLast(LocalDateTime::compareTo)
+            );
+        }
+
+        if (!asc) {
+            comparator = comparator.reversed();
+        }
+        studentRows.sort(comparator);
+
+        int total = studentRows.size();
+        int from = Math.min((safePage - 1) * safeLimit, total);
+        int to = Math.min(from + safeLimit, total);
+        List<Map<String, Object>> pagedRows = studentRows.subList(from, to);
+
+        Map<String, Object> assessmentInfo = new LinkedHashMap<>();
+        AssessmentDTO.CreatorInfoDTO creator = learningUserLookupService.getCreatorById(assessment.getCreatedBy());
+        assessmentInfo.put("id", assessment.getId());
+        assessmentInfo.put("title", assessment.getTitle());
+        assessmentInfo.put("type", assessment.getType() != null ? assessment.getType().name() : null);
+        assessmentInfo.put("level", assessment.getLevel() != null ? assessment.getLevel().name() : null);
+        assessmentInfo.put("visibility", assessment.getVisibility() != null ? assessment.getVisibility().name() : null);
+        assessmentInfo.put("createdBy", assessment.getCreatedBy());
+        assessmentInfo.put("creator", creator);
+        assessmentInfo.put("publishStatus", assessment.getVisibility() == Assessment.AssessmentVisibility.PUBLIC ? "PUBLISHED" : "DRAFT");
+
+        Map<String, Object> pagination = new LinkedHashMap<>();
+        pagination.put("total", total);
+        pagination.put("page", safePage);
+        pagination.put("limit", safeLimit);
+        pagination.put("totalPages", total == 0 ? 0 : (int) Math.ceil((double) total / safeLimit));
+        pagination.put("hasNext", safePage * safeLimit < total);
+        pagination.put("hasPrev", safePage > 1);
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("assessment", assessmentInfo);
+        response.put("totalStudents", attemptsByStudent.size());
+        response.put("students", pagedRows);
+        response.put("pagination", pagination);
+        return response;
+    }
+
+    public Map<String, Object> getAssessmentStudentAttempts(
+        Long assessmentId,
+        Integer studentId,
+        Integer page,
+        Integer limit
+    ) {
+        if (!assessmentRepository.existsById(assessmentId)) {
+            throw new RuntimeException("Assessment not found: " + assessmentId);
+        }
+
+        int safePage = page == null || page < 1 ? 1 : page;
+        int safeLimit = limit == null || limit < 1 ? 20 : limit;
+
+        List<Attempt> studentAttempts = attemptRepository.findByAssessmentId(assessmentId)
+            .stream()
+            .filter(a -> a.getUserId().equals(studentId))
+            .sorted(Comparator.comparing(Attempt::getAttemptNo, Comparator.nullsLast(Integer::compareTo)).reversed())
+            .collect(Collectors.toList());
+
+        int total = studentAttempts.size();
+        int from = Math.min((safePage - 1) * safeLimit, total);
+        int to = Math.min(from + safeLimit, total);
+
+        List<Map<String, Object>> attempts = studentAttempts.subList(from, to).stream().map(attempt -> {
+            Integer timeSpentSec = assessmentAnswerRepository.findByAttemptIdOrderByIdAsc(attempt.getId())
+                .stream()
+                .map(AssessmentAnswer::getTimeSpentSec)
+                .filter(v -> v != null)
+                .reduce(0, Integer::sum);
+
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("attemptId", attempt.getId());
+            row.put("attempt", attempt.getAttemptNo());
+            row.put("score", attempt.getScore());
+            row.put("earnedScore", attempt.getEarnedScore());
+            row.put("timeSpentSec", timeSpentSec);
+            row.put("status", attempt.getStatus() != null ? attempt.getStatus().name() : null);
+            row.put("startedAt", attempt.getStartedAt());
+            row.put("submittedAt", attempt.getSubmittedAt());
+            return row;
+        }).collect(Collectors.toList());
+
+        Map<String, Object> pagination = new LinkedHashMap<>();
+        pagination.put("total", total);
+        pagination.put("page", safePage);
+        pagination.put("limit", safeLimit);
+        pagination.put("totalPages", total == 0 ? 0 : (int) Math.ceil((double) total / safeLimit));
+        pagination.put("hasNext", safePage * safeLimit < total);
+        pagination.put("hasPrev", safePage > 1);
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("assessmentId", assessmentId);
+        response.put("studentId", studentId);
+        response.put("attempts", attempts);
+        response.put("pagination", pagination);
+        return response;
+    }
+
+    public Map<String, Object> getWrongAnswerLab(
+        Integer userId,
+        Integer limitAttempts,
+        Integer maxQuestionsPerDrill,
+        Boolean includeListening,
+        List<String> sourceTypes
+    ) {
+        int safeLimitAttempts = limitAttempts == null || limitAttempts < 1 ? 20 : Math.min(limitAttempts, 100);
+        int safeMaxQuestions = maxQuestionsPerDrill == null || maxQuestionsPerDrill < 1
+            ? 8
+            : Math.min(maxQuestionsPerDrill, 30);
+        boolean allowListening = Boolean.TRUE.equals(includeListening);
+
+        Set<String> allowedTypes = sourceTypes == null || sourceTypes.isEmpty()
+            ? Set.of("TEST", "EXAM", "QUIZ", "ASSIGNMENT")
+            : sourceTypes.stream().map(String::toUpperCase).collect(Collectors.toSet());
+
+        List<Attempt> submittedAttempts = attemptRepository.findByUserIdAndSubmittedAtIsNotNullOrderBySubmittedAtDesc(userId);
+        List<Attempt> slicedAttempts = submittedAttempts.size() > safeLimitAttempts
+            ? submittedAttempts.subList(0, safeLimitAttempts)
+            : submittedAttempts;
+
+        Map<Long, Assessment> assessmentMap = assessmentRepository.findAllById(
+            slicedAttempts.stream().map(Attempt::getAssessmentId).collect(Collectors.toSet())
+        ).stream().collect(Collectors.toMap(Assessment::getId, a -> a));
+
+        Map<Long, Map<String, Object>> uniqueWrongQuestions = new LinkedHashMap<>();
+        Map<String, Integer> sourceTypeCounts = new LinkedHashMap<>();
+
+        for (Attempt attempt : slicedAttempts) {
+            Assessment assessment = assessmentMap.get(attempt.getAssessmentId());
+            if (assessment == null || assessment.getType() == null) {
+                continue;
+            }
+
+            String sourceType = assessment.getType().name();
+            if (!allowedTypes.contains(sourceType)) {
+                continue;
+            }
+
+            AttemptReviewDetailDTO detail = buildAttemptDetail(attempt);
+            for (AttemptReviewDetailDTO.SectionDetailDTO section : detail.getSectionDetails()) {
+                String sectionType = section.getSectionType();
+                if (!allowListening && "LISTENING".equalsIgnoreCase(sectionType)) {
+                    continue;
+                }
+
+                for (AttemptReviewDetailDTO.QuestionResultDTO question : section.getQuestions()) {
+                    if (Boolean.TRUE.equals(question.getIsCorrect())) {
+                        continue;
+                    }
+
+                    Long questionId = question.getQuestionId();
+                    if (questionId == null || uniqueWrongQuestions.containsKey(questionId)) {
+                        continue;
+                    }
+
+                    List<Map<String, Object>> options = question.getOptions() == null
+                        ? Collections.emptyList()
+                        : question.getOptions().stream().map(o -> {
+                            Map<String, Object> optionMap = new LinkedHashMap<>();
+                            optionMap.put("id", o.getId());
+                            optionMap.put("content", o.getContent());
+                            optionMap.put("order", o.getOrder());
+                            return optionMap;
+                        }).collect(Collectors.toList());
+
+                    Map<String, Object> payload = new LinkedHashMap<>();
+                    payload.put("questionId", questionId);
+                    payload.put("stem", question.getStem());
+                    payload.put("sectionType", sectionType);
+                    payload.put("focus", mapSectionTypeToFocus(sectionType));
+                    payload.put("assessmentType", sourceType);
+                    payload.put("assessmentId", detail.getAssessmentId());
+                    payload.put("assessmentTitle", detail.getAssessmentTitle());
+                    payload.put("attemptId", detail.getAttemptId());
+                    payload.put("selectedOptionId", question.getSelectedOptionId());
+                    payload.put("options", options);
+                    uniqueWrongQuestions.put(questionId, payload);
+
+                    sourceTypeCounts.put(sourceType, sourceTypeCounts.getOrDefault(sourceType, 0) + 1);
+                }
+            }
+        }
+
+        Map<String, List<Map<String, Object>>> groupedByFocus = new LinkedHashMap<>();
+        for (Map<String, Object> question : uniqueWrongQuestions.values()) {
+            String focus = String.valueOf(question.get("focus"));
+            groupedByFocus.computeIfAbsent(focus, k -> new ArrayList<>()).add(question);
+        }
+
+        List<Map<String, Object>> drills = new ArrayList<>();
+        for (Map.Entry<String, List<Map<String, Object>>> entry : groupedByFocus.entrySet()) {
+            String focus = entry.getKey();
+            List<Map<String, Object>> questions = entry.getValue();
+            List<Map<String, Object>> limitedQuestions = questions.size() > safeMaxQuestions
+                ? questions.subList(0, safeMaxQuestions)
+                : questions;
+
+            Map<String, Object> drill = new LinkedHashMap<>();
+            drill.put("id", "drill-" + focus.toLowerCase());
+            drill.put("focus", focus);
+            drill.put("title", focus + " Wrong Answer Retry");
+            drill.put("questionCount", limitedQuestions.size());
+            drill.put("questions", limitedQuestions);
+            drills.add(drill);
+        }
+
+        drills.sort((a, b) -> Integer.compare((Integer) b.get("questionCount"), (Integer) a.get("questionCount")));
+
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("attemptsAnalyzed", slicedAttempts.size());
+        summary.put("wrongQuestionCount", uniqueWrongQuestions.size());
+        summary.put("drillCount", drills.size());
+        summary.put("sourceTypeCounts", sourceTypeCounts);
+        summary.put("includeListening", allowListening);
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("summary", summary);
+        response.put("drills", drills);
+        return response;
+    }
+
+    public Map<String, Object> gradeWrongAnswerLab(List<com.torii.assessment.dto.attempt.WrongAnswerLabGradeRequestDTO.AnswerDTO> answers) {
+        if (answers == null || answers.isEmpty()) {
+            return Map.of(
+                "total", 0,
+                "correct", 0,
+                "accuracy", 0,
+                "results", List.of()
+            );
+        }
+
+        List<Map<String, Object>> results = new ArrayList<>();
+        int correctCount = 0;
+
+        for (com.torii.assessment.dto.attempt.WrongAnswerLabGradeRequestDTO.AnswerDTO answer : answers) {
+            Long questionId = answer.getQuestionId();
+            Long selectedOptionId = answer.getSelectedOptionId();
+
+            Long correctOptionId = assessmentOptionRepository.findByQuestionIdOrderByOrderAsc(questionId)
+                .stream()
+                .filter(o -> Boolean.TRUE.equals(o.getIsCorrect()))
+                .map(AssessmentOption::getId)
+                .findFirst()
+                .orElse(null);
+
+            boolean isCorrect = correctOptionId != null && correctOptionId.equals(selectedOptionId);
+            if (isCorrect) {
+                correctCount++;
+            }
+
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("questionId", questionId);
+            item.put("selectedOptionId", selectedOptionId);
+            item.put("correctOptionId", correctOptionId);
+            item.put("isCorrect", isCorrect);
+            results.add(item);
+        }
+
+        int total = answers.size();
+        double accuracy = total == 0 ? 0d : (correctCount * 100.0) / total;
+
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("total", total);
+        payload.put("correct", correctCount);
+        payload.put("accuracy", Math.round(accuracy * 10.0) / 10.0);
+        payload.put("results", results);
+        return payload;
+    }
+
+    private String mapSectionTypeToFocus(String sectionType) {
+        String normalized = sectionType == null ? "" : sectionType.toUpperCase();
+        if (normalized.contains("VOCAB") || normalized.contains("KANJI")) {
+            return "VOCAB";
+        }
+        if (normalized.contains("GRAMMAR")) {
+            return "GRAMMAR";
+        }
+        if (normalized.contains("READING")) {
+            return "READING";
+        }
+        return "READING";
     }
 
     private AttemptedAssessmentListResponseDTO buildAttemptedListResponse(

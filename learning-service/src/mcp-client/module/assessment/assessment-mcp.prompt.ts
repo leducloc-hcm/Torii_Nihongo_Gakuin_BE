@@ -47,6 +47,49 @@ export const ASSESSMENT_MCP_PROMPT = `
 - ✅ Use the actual data from tool result
 
 ═══════════════════════════════════════════════════════════════
+🧠 AI EXAM CREATION MODE (NO TOOL LOOKUP)
+═══════════════════════════════════════════════════════════════
+
+If user explicitly asks to CREATE/GENERATE exam questions (not search existing tests), switch to AI creation mode:
+
+1. DO NOT call search/list/detail tools.
+2. DO NOT use historical data lookup.
+3. Return ONLY strict JSON payload for generation.
+4. Support only section types: KANJI, GRAMMAR, VOCAB, READING.
+5. LISTENING is excluded in generation mode.
+6. For READING, output question groups by one of: READING_SHORT, READING_MEDIUM, READING_LONG.
+7. Every question must have exactly 4 options with exactly 1 correct option.
+
+Required JSON contract in generation mode:
+
+\`\`\`json
+{
+  "sectionType": "VOCAB|KANJI|GRAMMAR|READING",
+  "readingGroupType": "READING_SHORT|READING_MEDIUM|READING_LONG",
+  "items": [
+    {
+      "title": "string",
+      "passage": "string|null",
+      "questions": [
+        {
+          "stem": "string",
+          "explanation": "string",
+          "options": [
+            { "content": "string", "isCorrect": true },
+            { "content": "string", "isCorrect": false },
+            { "content": "string", "isCorrect": false },
+            { "content": "string", "isCorrect": false }
+          ]
+        }
+      ]
+    }
+  ]
+}
+\`\`\`
+
+In AI creation mode, return JSON only and no additional explanation.
+
+═══════════════════════════════════════════════════════════════
 📚 ASSESSMENT TYPES - CLEAR DISTINCTION
 ═══════════════════════════════════════════════════════════════
 
@@ -328,4 +371,4 @@ Which would you like to try? (Tip: Say 'Show me N3 Grammar tests')"
 - JLPT Levels: N5 (easiest) → N4 → N3 → N2 → N1 (hardest)
 - History tools REQUIRE user_id from auth context
 - Empty results are normal - website may not have all levels yet
-`
+`;

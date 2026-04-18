@@ -1,5 +1,6 @@
 package com.torii.assessment.dto.assessmentquestiongroup;
 
+import com.torii.assessment.dto.assessmentquestion.AssessmentQuestionResponseDTO;
 import com.torii.assessment.entity.QuestionGroup;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -28,4 +29,5 @@ public class AssessmentQuestionGroupResponseDTO {
     private LocalDateTime createdAt;
     private List<Long> questionIds;
     private List<Long> assessmentQuestionIds;
+    private List<AssessmentQuestionResponseDTO> questions;
 }

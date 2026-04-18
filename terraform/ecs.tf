@@ -242,7 +242,7 @@ resource "aws_secretsmanager_secret_version" "app_secrets" {
     google_client_secret  = var.google_client_secret
     aws_access_key_id     = var.aws_access_key_id
     aws_secret_access_key = var.aws_secret_access_key
-    openai_api_key        = var.openai_api_key
+    claude_api_key        = var.claude_api_key
     sepay_access_key      = var.sepay_access_key
     firebase_private_key  = var.firebase_private_key
     payment_api_key       = var.payment_api_key
@@ -395,9 +395,9 @@ resource "aws_ecs_task_definition" "learning_service" {
       { name = "FRONTEND_URL", value = var.frontend_url },
       { name = "AWS_REGION", value = var.aws_region },
       { name = "AWS_S3_BUCKET_NAME", value = var.s3_bucket_name },
-      { name = "OPENAI_MODEL", value = "gpt-4" },
-      { name = "OPENAI_TEMPERATURE", value = "0.3" },
-      { name = "OPENAI_MAX_TOKENS", value = "0" },
+      { name = "CLAUDE_MODEL", value = "claude-sonnet-4-20250514" },
+      { name = "CLAUDE_TEMPERATURE", value = "0.3" },
+      { name = "CLAUDE_MAX_TOKENS", value = "4096" },
       { name = "MCP_ENABLED", value = "true" },
       { name = "MCP_TOOL_APPROVAL_REQUIRED", value = "false" },
       { name = "MCP_MAX_TOOL_EXECUTIONS", value = "10" },
@@ -446,7 +446,7 @@ resource "aws_ecs_task_definition" "learning_service" {
       { name = "GOOGLE_CLIENT_SECRET", valueFrom = "${aws_secretsmanager_secret.app_secrets.arn}:google_client_secret::" },
       { name = "AWS_ACCESS_KEY_ID", valueFrom = "${aws_secretsmanager_secret.app_secrets.arn}:aws_access_key_id::" },
       { name = "AWS_SECRET_ACCESS_KEY", valueFrom = "${aws_secretsmanager_secret.app_secrets.arn}:aws_secret_access_key::" },
-      { name = "OPENAI_API_KEY", valueFrom = "${aws_secretsmanager_secret.app_secrets.arn}:openai_api_key::" },
+      { name = "CLAUDE_API_KEY", valueFrom = "${aws_secretsmanager_secret.app_secrets.arn}:claude_api_key::" },
       { name = "RABBITMQ_PASSWORD", valueFrom = aws_secretsmanager_secret.rabbitmq.arn },
       { name = "SEPAY_ACCESS_KEY", valueFrom = "${aws_secretsmanager_secret.app_secrets.arn}:sepay_access_key::" },
       { name = "FIREBASE_PRIVATE_KEY", valueFrom = "${aws_secretsmanager_secret.app_secrets.arn}:firebase_private_key::" },

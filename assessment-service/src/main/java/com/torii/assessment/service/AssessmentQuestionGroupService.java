@@ -5,12 +5,15 @@ import com.torii.assessment.dto.assessmentquestiongroup.CreateAssessmentQuestion
 import com.torii.assessment.dto.assessmentquestiongroup.ModifyAssessmentGroupQuestionsDTO;
 import com.torii.assessment.dto.assessmentquestiongroup.QueryAssessmentQuestionGroupDTO;
 import com.torii.assessment.dto.assessmentquestiongroup.UpdateAssessmentQuestionGroupDTO;
+import com.torii.assessment.dto.assessmentquestion.AssessmentQuestionResponseDTO;
+import com.torii.assessment.dto.assessmentoption.AssessmentOptionResponseDTO;
 import com.torii.assessment.entity.AssessmentGroupQuestion;
 import com.torii.assessment.entity.AssessmentItem;
 import com.torii.assessment.entity.AssessmentQuestion;
 import com.torii.assessment.entity.AssessmentQuestionGroup;
 import com.torii.assessment.repository.AssessmentItemRepository;
 import com.torii.assessment.repository.AssessmentGroupQuestionRepository;
+import com.torii.assessment.repository.AssessmentOptionRepository;
 import com.torii.assessment.repository.AssessmentQuestionGroupRepository;
 import com.torii.assessment.repository.AssessmentQuestionRepository;
 import jakarta.persistence.criteria.Predicate;
@@ -23,7 +26,9 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
@@ -39,14 +44,26 @@ public class AssessmentQuestionGroupService {
     private final AssessmentQuestionGroupRepository assessmentQuestionGroupRepository;
     private final AssessmentGroupQuestionRepository assessmentGroupQuestionRepository;
     private final AssessmentQuestionRepository assessmentQuestionRepository;
+    private final AssessmentOptionRepository assessmentOptionRepository;
     private final AssessmentItemRepository assessmentItemRepository;
+    private final S3Service s3Service;
 
     @Transactional
-    public AssessmentQuestionGroupResponseDTO create(CreateAssessmentQuestionGroupDTO dto) {
+    public AssessmentQuestionGroupResponseDTO create(CreateAssessmentQuestionGroupDTO dto, MultipartFile image, MultipartFile audio) throws IOException {
         AssessmentItem item = assessmentItemRepository.findById(dto.getItemId())
                 .orElseThrow(() -> new RuntimeException("Assessment item not found: " + dto.getItemId()));
 
         Long sourceGroupId = dto.getAssessmentQuestionGroupId() != null ? dto.getAssessmentQuestionGroupId() : dto.getOriginalGroupId();
+
+        String mediaUrl = dto.getMediaUrl();
+        if (image != null && !image.isEmpty()) {
+            mediaUrl = s3Service.uploadFile(image, "assessment-question-groups/images");
+        }
+
+        String audioUrl = dto.getAudioUrl();
+        if (audio != null && !audio.isEmpty()) {
+            audioUrl = s3Service.uploadFile(audio, "assessment-question-groups/audio");
+        }
 
         AssessmentQuestionGroup group = AssessmentQuestionGroup.builder()
                 .originalGroupId(sourceGroupId)
@@ -56,8 +73,8 @@ public class AssessmentQuestionGroupService {
                 .stem(dto.getStem())
                 .passage(dto.getPassage())
                 .explanation(dto.getExplanation())
-                .mediaUrl(dto.getMediaUrl())
-                .audioUrl(dto.getAudioUrl())
+                .mediaUrl(mediaUrl)
+                .audioUrl(audioUrl)
                 .build();
 
         AssessmentQuestionGroup saved = assessmentQuestionGroupRepository.save(group);
@@ -109,7 +126,7 @@ public class AssessmentQuestionGroupService {
     }
 
     @Transactional
-    public AssessmentQuestionGroupResponseDTO update(Long id, UpdateAssessmentQuestionGroupDTO dto) {
+    public AssessmentQuestionGroupResponseDTO update(Long id, UpdateAssessmentQuestionGroupDTO dto, MultipartFile image, MultipartFile audio) throws IOException {
         AssessmentQuestionGroup group = assessmentQuestionGroupRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Assessment question group not found: " + id));
 
@@ -122,8 +139,19 @@ public class AssessmentQuestionGroupService {
         if (dto.getStem() != null) group.setStem(dto.getStem());
         if (dto.getPassage() != null) group.setPassage(dto.getPassage());
         if (dto.getExplanation() != null) group.setExplanation(dto.getExplanation());
-        if (dto.getMediaUrl() != null) group.setMediaUrl(dto.getMediaUrl());
-        if (dto.getAudioUrl() != null) group.setAudioUrl(dto.getAudioUrl());
+
+        if (image != null && !image.isEmpty()) {
+            group.setMediaUrl(s3Service.uploadFile(image, "assessment-question-groups/images"));
+        } else if (dto.getMediaUrl() != null) {
+            group.setMediaUrl(dto.getMediaUrl());
+        }
+
+        if (audio != null && !audio.isEmpty()) {
+            group.setAudioUrl(s3Service.uploadFile(audio, "assessment-question-groups/audio"));
+        } else if (dto.getAudioUrl() != null) {
+            group.setAudioUrl(dto.getAudioUrl());
+        }
+
         assessmentQuestionGroupRepository.save(group);
 
         List<Long> questionIds = resolveAssessmentQuestionIds(dto.getQuestionIds(), dto.getAssessmentQuestionIds());
@@ -216,8 +244,39 @@ public class AssessmentQuestionGroupService {
     }
 
     private AssessmentQuestionGroupResponseDTO mapToResponse(AssessmentQuestionGroup group) {
-        List<Long> questionIds = assessmentGroupQuestionRepository.findByGroupIdOrderByOrderAsc(group.getId()).stream()
+        List<AssessmentGroupQuestion> links = assessmentGroupQuestionRepository.findByGroupIdOrderByOrderAsc(group.getId());
+        List<Long> questionIds = links.stream()
                 .map(AssessmentGroupQuestion::getQuestionId)
+                .collect(Collectors.toList());
+
+        List<AssessmentQuestionResponseDTO> questions = assessmentQuestionRepository.findAllById(questionIds).stream()
+                .map(q -> {
+                    List<AssessmentOptionResponseDTO> options = assessmentOptionRepository
+                            .findByQuestionIdOrderByOrderAsc(q.getId()).stream()
+                            .map(opt -> AssessmentOptionResponseDTO.builder()
+                                    .id(opt.getId())
+                                    .questionId(opt.getQuestionId())
+                                    .content(opt.getContent())
+                                    .isCorrect(opt.getIsCorrect())
+                                    .order(opt.getOrder())
+                                    .createdAt(opt.getCreatedAt())
+                                    .build())
+                            .collect(Collectors.toList());
+                    return AssessmentQuestionResponseDTO.builder()
+                            .id(q.getId())
+                            .originalQuestionId(q.getOriginalQuestionId())
+                            .type(q.getType())
+                            .level(q.getLevel())
+                            .difficulty(q.getDifficulty())
+                            .stem(q.getStem())
+                            .passage(q.getPassage())
+                            .explanation(q.getExplanation())
+                            .mediaUrl(q.getMediaUrl())
+                            .audioUrl(q.getAudioUrl())
+                            .createdAt(q.getCreatedAt())
+                            .options(options)
+                            .build();
+                })
                 .collect(Collectors.toList());
 
         return AssessmentQuestionGroupResponseDTO.builder()
@@ -235,6 +294,7 @@ public class AssessmentQuestionGroupService {
                 .createdAt(group.getCreatedAt())
                 .questionIds(questionIds)
                 .assessmentQuestionIds(questionIds)
+                .questions(questions)
                 .build();
     }
 }

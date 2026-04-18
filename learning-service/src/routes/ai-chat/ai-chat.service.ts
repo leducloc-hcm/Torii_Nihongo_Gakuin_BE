@@ -1,5 +1,5 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
-import { ChatCompletionMessageParam } from "openai/resources/chat/completions";
+import { ClaudeMessageParam } from "src/mcp-client/mcp.model";
 import {
   AIThreadRepository,
   AIQueryRepository,
@@ -514,18 +514,27 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
       systemPrompt = `${systemPrompt}\n\n${multiToolHint}`;
     }
 
-    const messages: ChatCompletionMessageParam[] = [
-      { role: "system", content: systemPrompt },
+    const messages: ClaudeMessageParam[] = [
+      // System messages are extracted by AgentService.extractSystemAndMessages() before the Anthropic API call
+      { role: "system", content: systemPrompt } as any,
     ];
 
     // Add recent thread messages for context (last 10)
     const recentMessages = thread.messages.slice(-10);
     for (const msg of recentMessages) {
       if (msg.role === ChatRole.USER || msg.role === ChatRole.ASSISTANT) {
-        messages.push({
-          role: msg.role.toLowerCase() as "user" | "assistant",
-          content: msg.content,
-        });
+        // Strip embedded JSON code blocks from assistant messages so the AI
+        // doesn't get confused by large raw data blobs in conversation history.
+        let content = msg.content;
+        if (msg.role === ChatRole.ASSISTANT) {
+          content = content.replace(/```json[\s\S]*?```/g, "").trim();
+        }
+        if (content) {
+          messages.push({
+            role: msg.role.toLowerCase() as "user" | "assistant",
+            content,
+          });
+        }
       }
     }
 
@@ -552,6 +561,7 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
       query,
       agentRole,
       routingDecision.collaboratorRoles,
+      queryType,
     );
     const aiCallTime = Date.now() - aiCallStartTime;
     this.logger.log(
@@ -692,6 +702,33 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
     let finalResponse = executeResult.finalResponse;
 
     // Check if response contains empty JSON (no data)
+    // For GRAMMAR / TRANSLATION: always append the raw tool data as a JSON block.
+    // This is done server-side so we are NOT dependent on the AI including it.
+    const qtStr = queryType as string;
+    if (
+      qtStr === "GRAMMAR" &&
+      finalResponse &&
+      !finalResponse.includes("```json")
+    ) {
+      const grammarResult = executeResult.results.find(
+        (r) => r.toolName === "explain_grammar_personalized",
+      );
+      if (grammarResult?.result?.data) {
+        finalResponse += `\n\n\`\`\`json\n${JSON.stringify(grammarResult.result.data, null, 2)}\n\`\`\``;
+      }
+    } else if (
+      qtStr === "TRANSLATION" &&
+      finalResponse &&
+      !finalResponse.includes("```json")
+    ) {
+      const translationResult = executeResult.results.find(
+        (r) => r.toolName === "translate_with_level_context",
+      );
+      if (translationResult?.result?.data) {
+        finalResponse += `\n\n\`\`\`json\n${JSON.stringify(translationResult.result.data, null, 2)}\n\`\`\``;
+      }
+    }
+
     const isEmptyJsonResponse = this.checkEmptyJsonResponse(
       finalResponse,
       queryType,

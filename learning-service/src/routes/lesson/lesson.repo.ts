@@ -252,7 +252,7 @@ export class LessonRepository {
       data: {
         kind: MediaKind.OTHER,
         url:
-          "https://torii-nihongo-gakuin-s3.s3.ap-southeast-1.amazonaws.com/" +
+          "https://torii-nihongo-storage-v2.s3.ap-southeast-1.amazonaws.com/" +
           uploadInfo.key,
         lessonId: lesson.id,
         mimeType: contentType,

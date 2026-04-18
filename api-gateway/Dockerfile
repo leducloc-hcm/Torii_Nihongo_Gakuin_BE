@@ -28,7 +28,8 @@ COPY kong.yml /usr/local/kong/kong.yml
 
 # Copy entrypoint script
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
+RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh && \
+  chmod +x /usr/local/bin/entrypoint.sh
 
 # Set environment variables
 ENV KONG_DATABASE=off
@@ -44,5 +45,5 @@ ENV KONG_PLUGINS=bundled,jwt-validator
 # Expose Kong ports
 EXPOSE 8000 8443 8001 8444
 
-# Use custom entrypoint
-ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+# Use custom entrypoint via sh to avoid interpreter issues
+ENTRYPOINT ["/bin/sh", "/usr/local/bin/entrypoint.sh"]

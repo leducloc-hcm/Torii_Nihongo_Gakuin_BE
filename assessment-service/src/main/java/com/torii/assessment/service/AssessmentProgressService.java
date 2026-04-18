@@ -16,6 +16,7 @@ import com.torii.assessment.repository.AssessmentProgressRepository;
 import com.torii.assessment.repository.AssessmentQuestionRepository;
 import com.torii.assessment.repository.AssessmentRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -106,7 +107,24 @@ public class AssessmentProgressService {
             answerProgress.setIsFlagged(dto.getIsFlagged());
         }
 
-        return mapToDTO(assessmentAnswerProgressRepository.save(answerProgress));
+        try {
+            return mapToDTO(assessmentAnswerProgressRepository.save(answerProgress));
+        } catch (DataIntegrityViolationException ex) {
+            // Handle concurrent requests inserting the same (progress_id, question_id).
+            AssessmentAnswerProgress existing = assessmentAnswerProgressRepository
+                .findByProgressIdAndQuestionId(dto.getProgressId(), dto.getQuestionId())
+                .orElseThrow(() -> ex);
+
+            existing.setSelectedOptionId(dto.getSelectedOptionId());
+            if (dto.getTimeSpentSec() != null) {
+                existing.setTimeSpentSec(dto.getTimeSpentSec());
+            }
+            if (dto.getIsFlagged() != null) {
+                existing.setIsFlagged(dto.getIsFlagged());
+            }
+
+            return mapToDTO(assessmentAnswerProgressRepository.save(existing));
+        }
     }
 
     @Transactional

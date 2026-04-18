@@ -10,6 +10,7 @@ import com.torii.assessment.repository.AssessmentOptionRepository;
 import com.torii.assessment.repository.AssessmentQuestionRepository;
 import com.torii.assessment.repository.AttemptRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -59,7 +60,18 @@ public class AssessmentAnswerService {
         answer.setSelectedOptionId(selectedOptionId);
         answer.setTimeSpentSec(timeSpentSec);
 
-        return mapToDTO(assessmentAnswerRepository.save(answer));
+        try {
+            return mapToDTO(assessmentAnswerRepository.save(answer));
+        } catch (DataIntegrityViolationException ex) {
+            // Handle concurrent requests inserting same (attempt_id, question_id).
+            AssessmentAnswer existing = assessmentAnswerRepository
+                .findByAttemptIdAndQuestionId(attemptId, questionId)
+                .orElseThrow(() -> ex);
+
+            existing.setSelectedOptionId(selectedOptionId);
+            existing.setTimeSpentSec(timeSpentSec);
+            return mapToDTO(assessmentAnswerRepository.save(existing));
+        }
     }
 
     public AnswerDTO getAnswerById(Long id) {
