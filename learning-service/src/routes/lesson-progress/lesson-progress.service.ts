@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ForbiddenException,
 } from "@nestjs/common";
+import { $Enums } from "@prisma/client";
 import { LessonProgressRepository } from "./lesson-progress.repo";
 import {
   UpdateProgressType,
@@ -11,6 +12,7 @@ import {
 } from "./lesson-progress.model";
 import { EnrollmentService } from "../enrollment/enrollment.service";
 import { RabbitMQPublisher } from "src/shared/rabbitmq/rabbitmq.publisher";
+import { CertificateService } from "../certificate/certificate.service";
 
 @Injectable()
 export class LessonProgressService {
@@ -18,6 +20,7 @@ export class LessonProgressService {
     private readonly progressRepository: LessonProgressRepository,
     private readonly enrollmentService: EnrollmentService,
     private readonly rabbitMQPublisher: RabbitMQPublisher,
+    private readonly certificateService: CertificateService,
   ) {}
 
   async updateProgress(userId: number, data: UpdateProgressType) {
@@ -86,9 +89,39 @@ export class LessonProgressService {
           // Non-blocking: don't fail progress update if event publish fails
           console.error("Failed to publish lesson.progressed event:", err);
         });
+
+      // Check if the entire course is now 100% complete and issue a certificate
+      this.checkAndIssueCertificate(userId, courseId).catch((err) => {
+        console.error("Failed to check/issue certificate:", err);
+      });
     }
 
     return progress;
+  }
+
+  private async checkAndIssueCertificate(
+    userId: number,
+    courseId: number,
+  ): Promise<void> {
+    const totalLessons = await this.progressRepository["prisma"].lesson.count({
+      where: { module: { courseId }, status: $Enums.LessonStatus.PUBLISHED },
+    });
+
+    if (totalLessons === 0) return;
+
+    const completedLessons = await this.progressRepository[
+      "prisma"
+    ].lessonProgress.count({
+      where: {
+        userId,
+        completed: true,
+        lesson: { module: { courseId }, status: $Enums.LessonStatus.PUBLISHED },
+      },
+    });
+
+    if (completedLessons >= totalLessons) {
+      await this.certificateService.issueCertificate(userId, courseId);
+    }
   }
 
   async getCourseProgress(

@@ -601,6 +601,39 @@ services:
           - name: jwt-validator
             config:
               secret: nhatngutorii
+      - name: certificates-me-route
+        paths:
+          - /certificates/me
+        strip_path: false
+        methods:
+          - GET
+          - OPTIONS
+        plugins:
+          - name: jwt-validator
+            config:
+              secret: nhatngutorii
+              skip_on_methods:
+                - OPTIONS
+      - name: certificates-verify-route
+        paths:
+          - /certificates/verify
+        strip_path: false
+        methods:
+          - GET
+          - OPTIONS
+      - name: certificates-route
+        paths:
+          - /certificates
+        strip_path: false
+        methods:
+          - GET
+          - OPTIONS
+        plugins:
+          - name: jwt-validator
+            config:
+              secret: nhatngutorii
+              skip_on_methods:
+                - OPTIONS
   - name: assessment-service
     url: http://assessment-service:4002
     routes:

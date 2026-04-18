@@ -1,297 +1,492 @@
-import { Body, Container, Head, Heading, Html, Img, Section, Text, Button } from '@react-email/components'
-import * as React from 'react'
+import {
+  Body,
+  Container,
+  Head,
+  Heading,
+  Html,
+  Img,
+  Section,
+  Text,
+  Button,
+} from "@react-email/components";
+import * as React from "react";
 
 interface EmailProps {
-  studentName: string
-  courseTitle: string
-  courseThumbnail?: string
-  expiresAt: Date
-  courseId: number
+  studentName: string;
+  courseTitle: string;
+  courseThumbnail?: string;
+  expiresAt: Date;
+  courseId: number;
 }
 
-const logoUrl = 'https://torii-nihongo-gakuin-s3.s3.ap-southeast-1.amazonaws.com/Torii_Nihongo_Gakuin_Logo.png'
-const appUrl = 'https://torii-nihongo-gakuin.io.vn'
+const logoUrl =
+  "https://torii-nihongo-storage-v2.s3.ap-southeast-1.amazonaws.com/logoTori.png";
+const appUrl = "https://torii-nihongo-gakuin.io.vn";
 
-export const CourseWelcomeEmail = ({ studentName, courseTitle, courseThumbnail, expiresAt, courseId }: EmailProps) => (
-  <Html>
-    <Head>
-      <title>Chào mừng bạn đến với khóa học: {courseTitle}</title>
-    </Head>
-    <Body style={main}>
-      <Container style={container}>
-        {/* Header */}
-        <Section style={header}>
-          <Img src={logoUrl} width="200" height="200" alt="Torii Nihongo Gakuin Logo" style={logo} />
-        </Section>
+export const CourseWelcomeEmail = ({
+  studentName,
+  courseTitle,
+  courseThumbnail,
+  expiresAt,
+  courseId,
+}: EmailProps) => {
+  const formattedExpiry = new Date(expiresAt).toLocaleDateString("en-US", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
 
-        {/* Content */}
-        <Section style={content}>
-          <Text style={greeting}>Xin chào {studentName}!</Text>
-          <Heading style={titleCss}>Chào mừng bạn đến với khóa học mới! 🎉</Heading>
+  return (
+    <Html>
+      <Head>
+        <title>Welcome to your course: {courseTitle}</title>
+      </Head>
+      <Body style={main}>
+        <Container style={outerContainer}>
+          {/* Header */}
+          <Section style={header}>
+            <Img
+              src={logoUrl}
+              width="88"
+              height="88"
+              alt="Torii Nihongo Gakuin"
+              style={logo}
+            />
+            <Text style={institutionName}>TORII NIHONGO GAKUIN</Text>
+            <Text style={institutionTagline}>
+              Online Japanese Language Academy
+            </Text>
+          </Section>
 
-          <Text style={description}>
-            Chúc mừng bạn đã đăng ký thành công khóa học <strong>{courseTitle}</strong>. Chúng tôi rất vui mừng được
-            đồng hành cùng bạn trong hành trình học tiếng Nhật!
-          </Text>
+          {/* Body card */}
+          <Section style={cardWrapper}>
+            <Section style={card}>
+              <Text style={eyebrow}>Enrollment Confirmation</Text>
+              <Heading as="h1" style={title}>
+                Welcome to your new course
+              </Heading>
+              <Text style={ornament}>— ◆ —</Text>
 
-          {/* Course Thumbnail */}
-          {courseThumbnail && (
-            <Section style={courseImageSection}>
-              <Img src={courseThumbnail} width="400" height="225" alt={courseTitle} style={courseImage} />
+              <Text style={greeting}>Dear {studentName},</Text>
+              <Text style={description}>
+                Thank you for enrolling in{" "}
+                <strong style={strong}>{courseTitle}</strong>. We are delighted
+                to welcome you to Torii Nihongo Gakuin and look forward to
+                supporting you throughout your journey in mastering the Japanese
+                language.
+              </Text>
+
+              {/* Course Thumbnail */}
+              {courseThumbnail && (
+                <Section style={courseImageSection}>
+                  <Img
+                    src={courseThumbnail}
+                    width="520"
+                    height="292"
+                    alt={courseTitle}
+                    style={courseImage}
+                  />
+                </Section>
+              )}
+
+              {/* Course Info */}
+              <Section style={infoBox}>
+                <Text style={infoLabel}>COURSE DETAILS</Text>
+                <table
+                  cellPadding={0}
+                  cellSpacing={0}
+                  border={0}
+                  style={infoTable}
+                >
+                  <tbody>
+                    <tr>
+                      <td style={infoKey}>Course</td>
+                      <td style={infoValue}>{courseTitle}</td>
+                    </tr>
+                    <tr>
+                      <td style={infoKey}>Access Until</td>
+                      <td style={infoValue}>{formattedExpiry}</td>
+                    </tr>
+                    <tr>
+                      <td style={infoKey}>Duration</td>
+                      <td style={infoValue}>1 year from date of enrollment</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </Section>
+
+              {/* CTA */}
+              <Section style={ctaWrap}>
+                <Button style={ctaBtn} href={`${appUrl}/customer/my-course`}>
+                  Begin Learning
+                </Button>
+                <Text style={ctaHelp}>
+                  Or access your course at:
+                  <br />
+                  <a href={`${appUrl}/customer/my-course`} style={link}>
+                    {appUrl}/customer/my-course
+                  </a>
+                </Text>
+              </Section>
+
+              <Text style={divider}>— ◆ —</Text>
+
+              {/* Learning Tips */}
+              <Section style={sectionBlock}>
+                <Text style={sectionTitle}>Recommendations for Success</Text>
+                <Text style={sectionBody}>
+                  • Study consistently each day, even in short sessions of 15–30
+                  minutes.
+                  <br />• Complete lesson exercises and quizzes to reinforce
+                  what you learn.
+                  <br />• Keep a dedicated notebook for new vocabulary and
+                  grammar points.
+                  <br />• Apply new knowledge through practical, real-world
+                  exercises.
+                  <br />• Engage with the learning community to share progress
+                  and insights.
+                </Text>
+              </Section>
+
+              {/* Support Section */}
+              <Section style={sectionBlockMuted}>
+                <Text style={sectionTitle}>Academic Support</Text>
+                <Text style={sectionBody}>
+                  Should you have any questions during your studies, our
+                  academic support team is available to assist you. Please do
+                  not hesitate to reach out — we are committed to ensuring your
+                  success.
+                </Text>
+              </Section>
+
+              <Text style={signOff}>
+                Sincerely,
+                <br />
+                <span style={signOffInstitution}>
+                  The Torii Nihongo Gakuin Faculty
+                </span>
+              </Text>
             </Section>
-          )}
-
-          {/* Course Info */}
-          <Section style={courseInfoBox}>
-            <Text style={courseInfoTitle}>📚 Thông tin khóa học</Text>
-            <Text style={courseInfoText}>
-              <strong>Tên khóa học:</strong> {courseTitle}
-              <br />
-              <strong>Ngày hết hạn:</strong> {new Date(expiresAt).toLocaleDateString('vi-VN')}
-              <br />
-              <strong>Thời gian truy cập:</strong> 1 năm từ ngày đăng ký
-            </Text>
           </Section>
 
-          {/* CTA */}
-          <Section style={ctaWrap}>
-            <Button style={ctaBtn} href={`${appUrl}/customer/my-course`}>
-              Bắt đầu học ngay
-            </Button>
-            <Text style={ctaHelp}>
-              Hoặc truy cập vào trang khóa học tại: <br />
-              <a href={`${appUrl}/customer/my-course`} style={link}>
-                {appUrl}/customer/my-course
-              </a>
+          {/* Footer */}
+          <Section style={footer}>
+            <Text style={footerBrand}>TORII NIHONGO GAKUIN</Text>
+            <Text style={footerText}>
+              © 2025 Torii Nihongo Gakuin. All rights reserved.
+            </Text>
+            <Text style={footerSubtext}>
+              頑張ってください — We wish you great success in your studies.
             </Text>
           </Section>
-
-          {/* Learning Tips */}
-          <Section style={tipsBox}>
-            <Text style={tipsTitle}>💡 Lời khuyên để học hiệu quả</Text>
-            <Text style={tipsText}>
-              • Học đều đặn mỗi ngày, dù chỉ 15-30 phút
-              <br />
-              • Làm bài tập và quiz để củng cố kiến thức
-              <br />
-              • Ghi chú những từ vựng và ngữ pháp mới
-              <br />
-              • Thực hành với các bài tập thực tế
-              <br />• Tham gia cộng đồng học tập để trao đổi kinh nghiệm
-            </Text>
-          </Section>
-
-          {/* Support Section */}
-          <Section style={supportSection}>
-            <Text style={supportTitle}>🤝 Hỗ trợ học tập</Text>
-            <Text style={supportText}>
-              Nếu bạn có bất kỳ câu hỏi nào trong quá trình học, đừng ngần ngại liên hệ với chúng tôi. Team hỗ trợ của
-              Torii Nihongo Gakuin luôn sẵn sàng giúp đỡ bạn!
-            </Text>
-          </Section>
-        </Section>
-
-        {/* Footer */}
-        <Section style={footer}>
-          <Text style={footerText}>© 2025 Torii Nihongo Gakuin. Tất cả quyền được bảo lưu.</Text>
-          <Text style={footerSubtext}>Chúc bạn học tập hiệu quả và đạt được mục tiêu tiếng Nhật! がんばって！</Text>
-        </Section>
-      </Container>
-    </Body>
-  </Html>
-)
+        </Container>
+      </Body>
+    </Html>
+  );
+};
 
 CourseWelcomeEmail.PreviewProps = {
-  studentName: 'Nguyễn Văn A',
-  courseTitle: 'Tiếng Nhật Cơ Bản N5',
-  courseThumbnail: 'https://example.com/course-thumbnail.jpg',
-  expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year from now
+  studentName: "John Anderson",
+  courseTitle: "Japanese for Beginners — JLPT N5",
+  courseThumbnail: "https://example.com/course-thumbnail.jpg",
+  expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
   courseId: 1,
-} as EmailProps
+} as EmailProps;
 
-export default CourseWelcomeEmail
+export default CourseWelcomeEmail;
+
+// ===== Design Tokens =====
+const COLOR = {
+  navy: "#0f2744",
+  navyDeep: "#0a1c33",
+  gold: "#b08d3c",
+  goldSoft: "#d9bf7a",
+  ivory: "#fbfaf6",
+  ivoryDeep: "#f3efe4",
+  ink: "#0f172a",
+  slate: "#475569",
+  slateMuted: "#64748b",
+  line: "#e5e0d1",
+  paper: "#ffffff",
+  bg: "#eceae3",
+};
+
+const FONT_SERIF = 'Georgia, "Times New Roman", Times, serif';
+const FONT_SANS =
+  '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
 
 // ===== Styles =====
-const main = {
-  backgroundColor: '#f8fafc',
-  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-  padding: '20px 0',
-}
+const main: React.CSSProperties = {
+  backgroundColor: COLOR.bg,
+  fontFamily: FONT_SANS,
+  padding: "32px 0",
+  margin: 0,
+};
 
-const container = {
-  backgroundColor: '#ffffff',
-  border: '1px solid #e2e8f0',
-  borderRadius: '12px',
-  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-  margin: '0 auto',
-  maxWidth: '600px',
-  overflow: 'hidden',
-}
+const outerContainer: React.CSSProperties = {
+  backgroundColor: COLOR.paper,
+  margin: "0 auto",
+  maxWidth: "640px",
+  border: `1px solid ${COLOR.line}`,
+  borderTop: `4px solid ${COLOR.gold}`,
+};
 
-const header = {
-  backgroundColor: '#16a34a',
-  padding: '10px 0',
-  textAlign: 'center' as const,
-}
+const header: React.CSSProperties = {
+  backgroundColor: COLOR.navy,
+  padding: "36px 24px 28px",
+  textAlign: "center",
+  borderBottom: `1px solid ${COLOR.goldSoft}`,
+};
 
-const logo = {
-  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-  margin: '0 auto',
-}
+const logo: React.CSSProperties = {
+  margin: "0 auto",
+  display: "block",
+};
 
-const content = {
-  padding: '48px 40px',
-}
+const institutionName: React.CSSProperties = {
+  color: COLOR.ivory,
+  fontFamily: FONT_SERIF,
+  fontSize: "20px",
+  fontWeight: 700,
+  letterSpacing: "4px",
+  margin: "14px 0 4px",
+  textAlign: "center",
+};
 
-const greeting = {
-  color: '#64748b',
-  fontSize: '16px',
-  fontWeight: '500',
-  margin: '0 0 8px 0',
-  textAlign: 'left' as const,
-}
+const institutionTagline: React.CSSProperties = {
+  color: COLOR.goldSoft,
+  fontSize: "11px",
+  fontWeight: 500,
+  letterSpacing: "3px",
+  textTransform: "uppercase",
+  margin: 0,
+  textAlign: "center",
+};
 
-const titleCss = {
-  color: '#1e293b',
-  fontSize: '28px',
-  fontWeight: '700',
-  lineHeight: '1.3',
-  margin: '0 0 16px 0',
-  textAlign: 'left' as const,
-}
+const cardWrapper: React.CSSProperties = {
+  backgroundColor: COLOR.paper,
+  padding: "36px 28px 12px",
+};
 
-const description = {
-  color: '#475569',
-  fontSize: '16px',
-  lineHeight: '1.6',
-  margin: '0 0 24px 0',
-  textAlign: 'left' as const,
-}
+const card: React.CSSProperties = {
+  backgroundColor: COLOR.ivory,
+  border: `1px solid ${COLOR.line}`,
+  padding: "44px 40px",
+};
 
-const courseImageSection = {
-  margin: '24px 0',
-  textAlign: 'center' as const,
-}
+const eyebrow: React.CSSProperties = {
+  color: COLOR.gold,
+  fontSize: "11px",
+  fontWeight: 700,
+  letterSpacing: "4px",
+  textTransform: "uppercase",
+  margin: "0 0 12px",
+  textAlign: "center",
+};
 
-const courseImage = {
-  borderRadius: '12px',
-  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-  maxWidth: '100%',
-  height: 'auto',
-}
+const title: React.CSSProperties = {
+  color: COLOR.navy,
+  fontFamily: FONT_SERIF,
+  fontSize: "30px",
+  fontWeight: 700,
+  lineHeight: 1.25,
+  margin: "0 0 8px",
+  textAlign: "center",
+};
 
-const courseInfoBox = {
-  backgroundColor: '#f0f9ff',
-  border: '1px solid #0ea5e9',
-  borderRadius: '10px',
-  padding: '20px',
-  margin: '24px 0',
-}
+const ornament: React.CSSProperties = {
+  color: COLOR.gold,
+  fontSize: "14px",
+  letterSpacing: "6px",
+  textAlign: "center",
+  margin: "4px 0 28px",
+};
 
-const courseInfoTitle = {
-  color: '#0c4a6e',
-  fontSize: '18px',
-  fontWeight: '700',
-  margin: '0 0 12px 0',
-}
+const greeting: React.CSSProperties = {
+  color: COLOR.ink,
+  fontFamily: FONT_SERIF,
+  fontSize: "17px",
+  fontWeight: 600,
+  margin: "0 0 12px",
+};
 
-const courseInfoText = {
-  color: '#075985',
-  fontSize: '14px',
-  lineHeight: '1.6',
-  margin: '0',
-}
+const description: React.CSSProperties = {
+  color: COLOR.slate,
+  fontSize: "15px",
+  lineHeight: 1.7,
+  margin: "0 0 24px",
+};
 
-const ctaWrap = {
-  textAlign: 'center' as const,
-  margin: '32px 0',
-}
+const strong: React.CSSProperties = {
+  color: COLOR.navy,
+  fontWeight: 700,
+};
 
-const ctaBtn = {
-  display: 'inline-block',
-  padding: '16px 32px',
-  fontSize: '16px',
-  fontWeight: '700',
-  textDecoration: 'none',
-  borderRadius: '10px',
-  backgroundColor: '#16a34a',
-  color: '#ffffff',
-  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-}
+const courseImageSection: React.CSSProperties = {
+  margin: "8px 0 28px",
+  textAlign: "center",
+};
 
-const link = {
-  color: '#16a34a',
-  textDecoration: 'underline',
-  wordBreak: 'break-all' as const,
-}
+const courseImage: React.CSSProperties = {
+  border: `1px solid ${COLOR.line}`,
+  maxWidth: "100%",
+  height: "auto",
+  display: "block",
+  margin: "0 auto",
+};
 
-const ctaHelp = {
-  marginTop: '16px',
-  fontSize: '14px',
-  color: '#475569',
-  textAlign: 'center' as const,
-}
+const infoBox: React.CSSProperties = {
+  backgroundColor: COLOR.paper,
+  border: `1px solid ${COLOR.line}`,
+  borderLeft: `3px solid ${COLOR.gold}`,
+  padding: "20px 22px",
+  margin: "8px 0 28px",
+};
 
-const tipsBox = {
-  backgroundColor: '#fefce8',
-  border: '1px solid #eab308',
-  borderRadius: '10px',
-  padding: '20px',
-  margin: '24px 0',
-}
+const infoLabel: React.CSSProperties = {
+  color: COLOR.gold,
+  fontSize: "11px",
+  fontWeight: 700,
+  letterSpacing: "3px",
+  textTransform: "uppercase",
+  margin: "0 0 12px",
+};
 
-const tipsTitle = {
-  color: '#a16207',
-  fontSize: '16px',
-  fontWeight: '700',
-  margin: '0 0 12px 0',
-}
+const infoTable: React.CSSProperties = {
+  width: "100%",
+  borderCollapse: "collapse",
+};
 
-const tipsText = {
-  color: '#a16207',
-  fontSize: '14px',
-  lineHeight: '1.6',
-  margin: '0',
-}
+const infoKey: React.CSSProperties = {
+  color: COLOR.slateMuted,
+  fontSize: "12px",
+  fontWeight: 600,
+  letterSpacing: "1px",
+  textTransform: "uppercase",
+  padding: "8px 16px 8px 0",
+  verticalAlign: "top",
+  width: "38%",
+  borderBottom: `1px solid ${COLOR.ivoryDeep}`,
+};
 
-const supportSection = {
-  backgroundColor: '#f0fdf4',
-  border: '1px solid #22c55e',
-  borderRadius: '10px',
-  padding: '20px',
-  margin: '24px 0',
-}
+const infoValue: React.CSSProperties = {
+  color: COLOR.ink,
+  fontFamily: FONT_SERIF,
+  fontSize: "15px",
+  fontWeight: 500,
+  padding: "8px 0",
+  verticalAlign: "top",
+  borderBottom: `1px solid ${COLOR.ivoryDeep}`,
+};
 
-const supportTitle = {
-  color: '#15803d',
-  fontSize: '16px',
-  fontWeight: '700',
-  margin: '0 0 12px 0',
-}
+const ctaWrap: React.CSSProperties = {
+  textAlign: "center",
+  margin: "8px 0 24px",
+};
 
-const supportText = {
-  color: '#15803d',
-  fontSize: '14px',
-  lineHeight: '1.6',
-  margin: '0',
-}
+const ctaBtn: React.CSSProperties = {
+  display: "inline-block",
+  padding: "14px 36px",
+  fontSize: "13px",
+  fontWeight: 700,
+  letterSpacing: "3px",
+  textTransform: "uppercase",
+  textDecoration: "none",
+  backgroundColor: COLOR.navy,
+  color: COLOR.ivory,
+  border: `1px solid ${COLOR.navyDeep}`,
+};
 
-const footer = {
-  backgroundColor: '#f8fafc',
-  borderTop: '1px solid #e2e8f0',
-  padding: '32px 40px',
-  textAlign: 'center' as const,
-}
+const ctaHelp: React.CSSProperties = {
+  marginTop: "18px",
+  fontSize: "12px",
+  color: COLOR.slateMuted,
+  textAlign: "center",
+  lineHeight: 1.6,
+};
 
-const footerText = {
-  color: '#64748b',
-  fontSize: '14px',
-  fontWeight: '500',
-  margin: '0 0 8px 0',
-}
+const link: React.CSSProperties = {
+  color: COLOR.navy,
+  textDecoration: "underline",
+  wordBreak: "break-all",
+};
 
-const footerSubtext = {
-  color: '#94a3b8',
-  fontSize: '12px',
-  margin: '0',
-}
+const divider: React.CSSProperties = {
+  color: COLOR.gold,
+  fontSize: "12px",
+  letterSpacing: "6px",
+  textAlign: "center",
+  margin: "12px 0 20px",
+};
+
+const sectionBlock: React.CSSProperties = {
+  borderTop: `1px solid ${COLOR.line}`,
+  padding: "20px 0 4px",
+  margin: 0,
+};
+
+const sectionBlockMuted: React.CSSProperties = {
+  borderTop: `1px solid ${COLOR.line}`,
+  padding: "20px 0 4px",
+  margin: 0,
+};
+
+const sectionTitle: React.CSSProperties = {
+  color: COLOR.navy,
+  fontFamily: FONT_SERIF,
+  fontSize: "17px",
+  fontWeight: 700,
+  margin: "0 0 10px",
+};
+
+const sectionBody: React.CSSProperties = {
+  color: COLOR.slate,
+  fontSize: "14px",
+  lineHeight: 1.75,
+  margin: 0,
+};
+
+const signOff: React.CSSProperties = {
+  color: COLOR.ink,
+  fontFamily: FONT_SERIF,
+  fontSize: "15px",
+  lineHeight: 1.6,
+  margin: "28px 0 0",
+  fontStyle: "italic",
+};
+
+const signOffInstitution: React.CSSProperties = {
+  fontStyle: "normal",
+  fontWeight: 700,
+  color: COLOR.navy,
+  letterSpacing: "1px",
+};
+
+const footer: React.CSSProperties = {
+  backgroundColor: COLOR.navyDeep,
+  padding: "28px 24px",
+  textAlign: "center",
+  borderTop: `4px solid ${COLOR.gold}`,
+};
+
+const footerBrand: React.CSSProperties = {
+  color: COLOR.goldSoft,
+  fontFamily: FONT_SERIF,
+  fontSize: "13px",
+  fontWeight: 700,
+  letterSpacing: "4px",
+  margin: "0 0 8px",
+};
+
+const footerText: React.CSSProperties = {
+  color: COLOR.ivory,
+  fontSize: "12px",
+  margin: "0 0 6px",
+};
+
+const footerSubtext: React.CSSProperties = {
+  color: "#8fa1bb",
+  fontSize: "11px",
+  margin: 0,
+  fontStyle: "italic",
+};

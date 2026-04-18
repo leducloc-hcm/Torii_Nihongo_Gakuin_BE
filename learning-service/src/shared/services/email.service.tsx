@@ -5,6 +5,7 @@ import { OTPEmail } from "emails/otp";
 import AccountCreatedEmail from "emails/accountCreated";
 import CourseWelcomeEmail from "emails/courseWelcome";
 import CalendarInviteEmail from "emails/calendarInvite";
+import CourseCertificateEmail from "emails/courseCertificate";
 
 @Injectable()
 export class EmailService {
@@ -117,6 +118,42 @@ export class EmailService {
           contentType: "text/calendar; method=REQUEST",
         },
       ],
+    });
+  }
+
+  async sendCourseCertificate(payload: {
+    email: string;
+    studentName: string;
+    courseTitle: string;
+    issuedAt: Date;
+    verifyUrl: string;
+    pdfBuffer?: Buffer;
+  }) {
+    const subject = `🎓 Chứng chỉ hoàn thành khóa học: ${payload.courseTitle}`;
+
+    const attachments = payload.pdfBuffer
+      ? [
+          {
+            filename: `Certificate_${payload.courseTitle.replace(/[^a-zA-Z0-9]/g, "_")}.pdf`,
+            content: payload.pdfBuffer,
+            contentType: "application/pdf",
+          },
+        ]
+      : undefined;
+
+    return await this.resend.emails.send({
+      from: process.env.RESEND_FROM_ADDRESS!,
+      to: [payload.email],
+      subject,
+      react: (
+        <CourseCertificateEmail
+          studentName={payload.studentName}
+          courseTitle={payload.courseTitle}
+          issuedAt={payload.issuedAt}
+          verifyUrl={payload.verifyUrl}
+        />
+      ),
+      attachments,
     });
   }
 }

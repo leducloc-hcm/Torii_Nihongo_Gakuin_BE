@@ -29,6 +29,7 @@ import { RabbitMQModule } from "./shared/rabbitmq/rabbitmq.module";
 import { ReviewModule } from "./routes/review/review.module";
 import { AssessmentAIModule } from "./routes/assessment-ai/assessment-ai.module";
 import { MultiAgentModule } from "./routes/multi-agent/multi-agent.module";
+import { CertificateModule } from "./routes/certificate/certificate.module";
 
 @Module({
   imports: [
@@ -74,6 +75,7 @@ import { MultiAgentModule } from "./routes/multi-agent/multi-agent.module";
     ReviewModule,
     AssessmentAIModule,
     MultiAgentModule,
+    CertificateModule,
   ],
   controllers: [AppController],
   providers: [AppService],

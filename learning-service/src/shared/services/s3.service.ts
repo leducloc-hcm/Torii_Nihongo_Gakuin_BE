@@ -17,14 +17,13 @@ export class S3Service {
   constructor() {
     // If AWS_ACCESS_KEY_ID isn't set, it will automatically use ECS Task Role credentials
     const hasAwsConfig =
-      process.env.AWS_REGION &&
-      process.env.AWS_S3_BUCKET_NAME;
+      process.env.AWS_REGION && process.env.AWS_S3_BUCKET_NAME;
 
     if (hasAwsConfig) {
       this.BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME!;
-      
+
       const s3Config: any = { region: process.env.AWS_REGION };
-      
+
       // Use explicit credentials if provided (e.g. for local development)
       if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
         s3Config.credentials = {
@@ -34,7 +33,12 @@ export class S3Service {
       }
 
       this.s3 = new S3(s3Config);
-      this.logger.log("S3 service initialized" + (s3Config.credentials ? " with explicit credentials" : " with IAM role credentials"));
+      this.logger.log(
+        "S3 service initialized" +
+          (s3Config.credentials
+            ? " with explicit credentials"
+            : " with IAM role credentials"),
+      );
     } else {
       this.BUCKET_NAME = "default-bucket";
       // Create a dummy S3 instance to avoid null errors
@@ -398,6 +402,27 @@ export class S3Service {
       mimeType: file.mimetype,
       originalName: file.originalname,
     };
+  };
+
+  /**
+   * Upload a raw buffer to S3 with a given key.
+   */
+  uploadBuffer = async (
+    buffer: Buffer,
+    key: string,
+    contentType: string,
+  ): Promise<{ key: string; url: string }> => {
+    const command = new PutObjectCommand({
+      Bucket: this.BUCKET_NAME,
+      Key: key,
+      Body: buffer,
+      ContentType: contentType,
+    });
+
+    await this.s3.send(command);
+
+    const url = `https://${this.BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
+    return { key, url };
   };
 
   // Recording-specific methods for WebRTC classes

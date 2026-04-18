@@ -82,6 +82,7 @@ model User {
   couponAuditLogs    CouponAuditLog[] @relation("CouponAuditor")
   reviewVotes        ReviewVote[]
   substituteSessions LiveSession[] @relation("SubstituteLecturer")
+  certificates       Certificate[]
   
   
   
@@ -283,6 +284,7 @@ model Course {
   reviews     Review[]
   orderItems  OrderItem[]
   cartItems   CartItem[]
+  certificates Certificate[]
 
   Class Class[]
   coupons CouponCourse[] @relation("CouponCourses")
@@ -426,6 +428,22 @@ model ClassMember {
   user  User  @relation(fields: [userId], references: [id])
 
   @@unique([classId, userId])
+@@schema("learning")
+}
+
+model Certificate {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  courseId   Int
+  issuedAt   DateTime @default(now())
+  verifyCode String   @unique
+  pdfUrl     String?
+
+  user   User   @relation(fields: [userId], references: [id])
+  course Course @relation(fields: [courseId], references: [id])
+
+  @@unique([userId, courseId])
+  @@map("certificates")
 @@schema("learning")
 }
 

@@ -5,7 +5,12 @@
   "compilerOptions": {
     "deleteOutDir": true,
     "webpack": false,
-    "tsConfigPath": "tsconfig.json"
+    "tsConfigPath": "tsconfig.json",
+    "assets": [
+      {
+        "include": "routes/certificate/fonts/**/*",
+        "outDir": "dist/src"
+      }
+    ]
   }
 }
-
