@@ -26,6 +26,7 @@ import { LectureProfileRepository } from "src/routes/profile/profile.repo";
 import { EnrollmentService } from "../enrollment/enrollment.service";
 import { S3Service } from "src/shared/services/s3.service";
 import { PrismaService } from "src/shared/services/prisma.service";
+import { ActivityLogService } from "../activity-log/activity-log.service";
 
 @Injectable()
 export class CourseService {
@@ -37,6 +38,7 @@ export class CourseService {
     private readonly classFolderService: ClassFolderService,
     private readonly s3Service: S3Service,
     private readonly prisma: PrismaService,
+    private readonly activityLogService: ActivityLogService,
   ) {}
 
   /** Guest-facing lecturer profile URL path (Next.js `/lecturers/[profileId]`). */
@@ -297,7 +299,7 @@ export class CourseService {
       }
     }
 
-    return this.courseRepository.create({
+    const course = await this.courseRepository.create({
       slug,
       title: courseData.title || "",
       description: courseData.description,
@@ -310,6 +312,17 @@ export class CourseService {
       lecturerIds: lecturerIds.map((id) => Number(id)),
       createdBy: userId,
     });
+
+    this.activityLogService.log({
+      userId,
+      action: "COURSE_CREATED",
+      entity: "COURSE",
+      entityId: course.id,
+      description: `Course "${courseData.title}" created`,
+      metadata: { title: courseData.title, slug, level: courseData.level },
+    });
+
+    return course;
   }
 
   async findAll(queryDto: QueryCourseDTO) {
@@ -1036,6 +1049,15 @@ export class CourseService {
         `Course with ID ${id} not found after update`,
       );
     }
+
+    this.activityLogService.log({
+      action: "COURSE_PUBLISHED",
+      entity: "COURSE",
+      entityId: id,
+      description: `Course "${existingCourse.title}" published`,
+      metadata: { title: existingCourse.title },
+    });
+
     return updatedCourse;
   }
   async pendingReview(id: number): Promise<CourseWithRelations> {

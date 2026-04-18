@@ -1,15 +1,23 @@
 // Enhanced Payment Service with Coupon Integration
 
-import { BadRequestException, Injectable, Logger, NotFoundException, Inject, forwardRef } from '@nestjs/common'
-import { PrismaService } from 'src/shared/services/prisma.service'
-import { CartService } from '../cart/cart.service'
-import { CouponService } from '../coupon/coupon.service'
-import { SepayService } from './sepay.service'
-import { PaymentTransactionService } from './payment-transaction.service'
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  Inject,
+  forwardRef,
+} from "@nestjs/common";
+import { PrismaService } from "src/shared/services/prisma.service";
+import { CartService } from "../cart/cart.service";
+import { CouponService } from "../coupon/coupon.service";
+import { SepayService } from "./sepay.service";
+import { PaymentTransactionService } from "./payment-transaction.service";
+import { ActivityLogService } from "../activity-log/activity-log.service";
 
 @Injectable()
 export class PaymentService {
-  private readonly logger = new Logger(PaymentService.name)
+  private readonly logger = new Logger(PaymentService.name);
 
   constructor(
     private readonly prisma: PrismaService,
@@ -19,6 +27,7 @@ export class PaymentService {
     private readonly couponService: CouponService,
     private readonly sepayService: SepayService,
     private readonly paymentTransactionService: PaymentTransactionService,
+    private readonly activityLogService: ActivityLogService,
   ) {}
 
   async getOrderStatus(orderId: number, userId: number) {
@@ -55,18 +64,21 @@ export class PaymentService {
           },
         },
       },
-    })
+    });
 
     if (!order) {
-      throw new NotFoundException('Order not found')
+      throw new NotFoundException("Order not found");
     }
 
-    return order
+    return order;
   }
 
-  async getUserOrders(userId: number, params: { page?: number; limit?: number } = {}) {
-    const { page = 1, limit = 10 } = params
-    const skip = (page - 1) * limit
+  async getUserOrders(
+    userId: number,
+    params: { page?: number; limit?: number } = {},
+  ) {
+    const { page = 1, limit = 10 } = params;
+    const skip = (page - 1) * limit;
 
     const [orders, total] = await Promise.all([
       this.prisma.order.findMany({
@@ -92,12 +104,12 @@ export class PaymentService {
             },
           },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         skip,
         take: limit,
       }),
       this.prisma.order.count({ where: { userId } }),
-    ])
+    ]);
 
     return {
       orders,
@@ -105,19 +117,26 @@ export class PaymentService {
       page,
       limit,
       totalPages: Math.ceil(total / limit),
-    }
+    };
   }
 
-  async getAllOrders(params: { page?: number; limit?: number; status?: string; userId?: number } = {}) {
-    const { page = 1, limit = 10, status, userId } = params
-    const skip = (page - 1) * limit
+  async getAllOrders(
+    params: {
+      page?: number;
+      limit?: number;
+      status?: string;
+      userId?: number;
+    } = {},
+  ) {
+    const { page = 1, limit = 10, status, userId } = params;
+    const skip = (page - 1) * limit;
 
-    const where: any = {}
+    const where: any = {};
     if (status) {
-      where.status = status
+      where.status = status;
     }
     if (userId) {
-      where.userId = userId
+      where.userId = userId;
     }
 
     const [orders, total] = await Promise.all([
@@ -151,12 +170,12 @@ export class PaymentService {
             },
           },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         skip,
         take: limit,
       }),
       this.prisma.order.count({ where }),
-    ])
+    ]);
 
     return {
       orders,
@@ -164,65 +183,73 @@ export class PaymentService {
       page,
       limit,
       totalPages: Math.ceil(total / limit),
-    }
+    };
   }
 
   async createSepayPaymentWithCoupon(
     userId: number,
     couponCode?: string,
   ): Promise<{
-    success: boolean
-    message: string
-    qrUrl: string
-    orderId: number
-    amount: number
-    content: string
+    success: boolean;
+    message: string;
+    qrUrl: string;
+    orderId: number;
+    amount: number;
+    content: string;
     couponApplied?: {
-      code: string
-      discountAmount: number
-      originalAmount: number
-    }
+      code: string;
+      discountAmount: number;
+      originalAmount: number;
+    };
   }> {
-    const cartValidation = await this.cartService.validateCartForCheckout(userId, couponCode)
+    const cartValidation = await this.cartService.validateCartForCheckout(
+      userId,
+      couponCode,
+    );
     if (!cartValidation.isValid) {
-      throw new BadRequestException(`Cart validation failed: ${cartValidation.errors.join(', ')}`)
+      throw new BadRequestException(
+        `Cart validation failed: ${cartValidation.errors.join(", ")}`,
+      );
     }
 
     // Calculate final amount with coupon
-    const checkoutCalculation = await this.cartService.calculateCheckoutAmount(userId, couponCode)
+    const checkoutCalculation = await this.cartService.calculateCheckoutAmount(
+      userId,
+      couponCode,
+    );
 
     if (checkoutCalculation.finalAmount === 0) {
-      throw new BadRequestException('Cannot create payment for zero amount')
+      throw new BadRequestException("Cannot create payment for zero amount");
     }
 
-    const cartSummary = await this.cartService.getCartSummary(userId)
+    const cartSummary = await this.cartService.getCartSummary(userId);
     if (!cartSummary || cartSummary.totalAmount === 0) {
-      throw new BadRequestException('Cart is empty or has no amount to pay')
+      throw new BadRequestException("Cart is empty or has no amount to pay");
     }
 
     // Create order with coupon support
     const orderData: any = {
       userId,
       totalAmount: checkoutCalculation.finalAmount,
-      status: 'PENDING',
+      status: "PENDING",
       items: {
         create: cartSummary.items.map((item) => ({
-          type: 'COURSE',
+          type: "COURSE",
           courseId: item.courseId,
           unitPrice: item.course?.price || 0,
           classId: item.classId,
         })),
       },
-    }
+    };
 
-    let coupon: any = null
+    let coupon: any = null;
     if (couponCode) {
       coupon = await this.prisma.coupon.findUnique({
         where: { code: couponCode },
-      })
+      });
 
       if (coupon) {
-        orderData.couponId = coupon.id
+        orderData.couponId = coupon.id;
       }
     }
 
@@ -242,10 +269,10 @@ export class PaymentService {
         },
         coupon: true,
       },
-    })
+    });
 
     // Create or update coupon redemption in PENDING status (will be updated to COMPLETED by webhook)
-    if (coupon && coupon.type !== 'GIFT') {
+    if (coupon && coupon.type !== "GIFT") {
       // Use upsert since there's a unique constraint on couponId+userId
       // This handles the case where user previously used the same coupon
       await this.prisma.couponRedemption.upsert({
@@ -260,57 +287,71 @@ export class PaymentService {
           userId,
           orderId: order.id,
           discountApplied: checkoutCalculation.discountAmount,
-          status: 'PENDING',
+          status: "PENDING",
         },
         update: {
           orderId: order.id,
           discountApplied: checkoutCalculation.discountAmount,
-          status: 'PENDING',
+          status: "PENDING",
           redeemedAt: new Date(),
           completedAt: null,
         },
-      })
+      });
     }
 
-    const orderInfo = `Thanh toán khóa học${couponCode ? ` (${couponCode})` : ''} - Đơn hàng ${order.id}`
+    const orderInfo = `Thanh toán khóa học${couponCode ? ` (${couponCode})` : ""} - Đơn hàng ${order.id}`;
     const paymentData = await this.sepayService.createPaymentUrl({
       orderId: order.id,
       amount: checkoutCalculation.finalAmount,
       orderInfo,
       userId,
-    })
+    });
 
     this.logger.log(
-      `Created SePay payment for order ${order.id}, amount: ${checkoutCalculation.finalAmount}${couponCode ? `, coupon: ${couponCode}` : ''}`,
-    )
+      `Created SePay payment for order ${order.id}, amount: ${checkoutCalculation.finalAmount}${couponCode ? `, coupon: ${couponCode}` : ""}`,
+    );
 
     const response: any = {
       success: true,
-      message: 'SePay QR code created successfully',
+      message: "SePay QR code created successfully",
       ...paymentData,
-    }
+    };
 
     if (couponCode && checkoutCalculation.discountAmount > 0) {
       response.couponApplied = {
         code: couponCode,
         discountAmount: checkoutCalculation.discountAmount,
         originalAmount: checkoutCalculation.subtotal,
-      }
+      };
+
+      this.activityLogService.log({
+        userId,
+        action: "COUPON_APPLIED",
+        entity: "COUPON",
+        entityId: order.couponId ?? undefined,
+        description: `Coupon "${couponCode}" applied to order #${order.id} — discount: ${checkoutCalculation.discountAmount}`,
+        metadata: {
+          couponCode,
+          orderId: order.id,
+          discountAmount: checkoutCalculation.discountAmount,
+          originalAmount: checkoutCalculation.subtotal,
+        },
+      });
     }
 
-    return response
+    return response;
   }
 
   async handleSepayWebhook(webhookData: any) {
-    return await this.sepayService.handleWebhook(webhookData)
+    return await this.sepayService.handleWebhook(webhookData);
   }
 
   async checkSepayPaymentStatus(paymentCode: string) {
-    return await this.sepayService.checkPaymentStatus(paymentCode)
+    return await this.sepayService.checkPaymentStatus(paymentCode);
   }
 
   async getOrderByPaymentCode(paymentCode: string) {
-    return await this.sepayService.getOrderByPaymentCode(paymentCode)
+    return await this.sepayService.getOrderByPaymentCode(paymentCode);
   }
 
   // ===== Payment Management Methods =====
@@ -319,26 +360,26 @@ export class PaymentService {
     // Verify user owns the order
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, userId },
-    })
+    });
 
     if (!order) {
-      throw new NotFoundException('Order not found')
+      throw new NotFoundException("Order not found");
     }
 
-    return await this.paymentTransactionService.getOrderPayments(orderId)
+    return await this.paymentTransactionService.getOrderPayments(orderId);
   }
 
   async getOrderPaymentSummary(orderId: number, userId: number) {
     // Verify user owns the order
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, userId },
-    })
+    });
 
     if (!order) {
-      throw new NotFoundException('Order not found')
+      throw new NotFoundException("Order not found");
     }
 
-    return await this.paymentTransactionService.getOrderPaymentSummary(orderId)
+    return await this.paymentTransactionService.getOrderPaymentSummary(orderId);
   }
 
   async getPaymentById(paymentId: number, userId: number) {
@@ -357,41 +398,41 @@ export class PaymentService {
           },
         },
       },
-    })
+    });
 
     if (!payment) {
-      throw new NotFoundException('Payment not found')
+      throw new NotFoundException("Payment not found");
     }
 
-    return payment
+    return payment;
   }
 
   // Admin methods
   async getAllPayments(
     params: {
-      page?: number
-      limit?: number
-      status?: string
-      method?: string
-      orderId?: number
-      userId?: number
+      page?: number;
+      limit?: number;
+      status?: string;
+      method?: string;
+      orderId?: number;
+      userId?: number;
     } = {},
   ) {
-    const { page = 1, limit = 10, status, method, orderId, userId } = params
-    const skip = (page - 1) * limit
+    const { page = 1, limit = 10, status, method, orderId, userId } = params;
+    const skip = (page - 1) * limit;
 
-    const where: any = {}
+    const where: any = {};
     if (status) {
-      where.status = status
+      where.status = status;
     }
     if (method) {
-      where.method = method
+      where.method = method;
     }
     if (orderId) {
-      where.orderId = orderId
+      where.orderId = orderId;
     }
     if (userId) {
-      where.order = { userId }
+      where.order = { userId };
     }
 
     const [payments, total] = await Promise.all([
@@ -413,12 +454,12 @@ export class PaymentService {
             },
           },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         skip,
         take: limit,
       }),
       this.prisma.payment.count({ where }),
-    ])
+    ]);
 
     return {
       payments,
@@ -426,11 +467,15 @@ export class PaymentService {
       page,
       limit,
       totalPages: Math.ceil(total / limit),
-    }
+    };
   }
 
   async createRefund(paymentId: number, refundAmount: number, reason?: string) {
-    return await this.paymentTransactionService.createRefund(paymentId, refundAmount, reason)
+    return await this.paymentTransactionService.createRefund(
+      paymentId,
+      refundAmount,
+      reason,
+    );
   }
 
   // ===== Payment Retry Methods =====
@@ -439,13 +484,13 @@ export class PaymentService {
     orderId: number,
     userId: number,
   ): Promise<{
-    success: boolean
-    message: string
-    qrUrl?: string
-    orderId: number
-    amount: number
-    content?: string
-    paymentId?: number
+    success: boolean;
+    message: string;
+    qrUrl?: string;
+    orderId: number;
+    amount: number;
+    content?: string;
+    paymentId?: number;
   }> {
     // Verify user owns the order
     const order = await this.prisma.order.findFirst({
@@ -453,7 +498,7 @@ export class PaymentService {
         id: orderId,
         userId,
         status: {
-          in: ['PENDING', 'PROCESSING'], // Allow retry for these statuses
+          in: ["PENDING", "PROCESSING"], // Allow retry for these statuses
         },
       },
       include: {
@@ -475,55 +520,66 @@ export class PaymentService {
           },
         },
       },
-    })
+    });
 
     if (!order) {
-      throw new NotFoundException('Order not found or cannot be retried')
+      throw new NotFoundException("Order not found or cannot be retried");
     }
 
     // Check if there are any pending payments
-    const pendingPayments = order.payments.filter((p) => p.status === 'PENDING')
+    const pendingPayments = order.payments.filter(
+      (p) => p.status === "PENDING",
+    );
     if (pendingPayments.length > 0) {
-      throw new BadRequestException('Order already has pending payments')
+      throw new BadRequestException("Order already has pending payments");
     }
 
     // Calculate remaining amount to pay
-    const paidAmount = order.payments.filter((p) => p.status === 'PAID').reduce((sum, p) => sum + p.amount, 0)
+    const paidAmount = order.payments
+      .filter((p) => p.status === "PAID")
+      .reduce((sum, p) => sum + p.amount, 0);
 
-    const remainingAmount = order.totalAmount - paidAmount
+    const remainingAmount = order.totalAmount - paidAmount;
 
     if (remainingAmount <= 0) {
-      throw new BadRequestException('Order is already fully paid')
+      throw new BadRequestException("Order is already fully paid");
     }
 
     // Create new payment for retry
-    const courseNames = order.items.map((item) => item.course?.title || 'Unknown Course').join(', ')
-    const orderInfo = `Thanh toán lại - ${courseNames}${order.coupon?.code ? ` (${order.coupon.code})` : ''} - Đơn hàng ${order.id}`
+    const courseNames = order.items
+      .map((item) => item.course?.title || "Unknown Course")
+      .join(", ");
+    const orderInfo = `Thanh toán lại - ${courseNames}${order.coupon?.code ? ` (${order.coupon.code})` : ""} - Đơn hàng ${order.id}`;
 
     const paymentData = await this.sepayService.createPaymentUrl({
       orderId: order.id,
       amount: remainingAmount,
       orderInfo,
       userId,
-    })
+    });
 
-    this.logger.log(`Created retry payment for order ${order.id}, remaining amount: ${remainingAmount}`)
+    this.logger.log(
+      `Created retry payment for order ${order.id}, remaining amount: ${remainingAmount}`,
+    );
 
     return {
       success: true,
-      message: 'Payment retry created successfully',
+      message: "Payment retry created successfully",
       ...paymentData,
-    }
+    };
   }
 
-  async getFailedPayments(userId: number, params: { page?: number; limit?: number } = {}) {
-    const { page = 1, limit = 10 } = params
-    const skip = (page - 1) * limit
+  async getFailedPayments(
+    userId: number,
+    params: { page?: number; limit?: number } = {},
+  ) {
+    const { page = 1, limit = 10 } = params;
+    const skip = (page - 1) * limit;
 
     const [payments, total] = await Promise.all([
       this.prisma.payment.findMany({
         where: {
-          status: 'FAILED',
+          status: "FAILED",
           order: { userId },
         },
         include: {
@@ -549,17 +605,17 @@ export class PaymentService {
             },
           },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         skip,
         take: limit,
       }),
       this.prisma.payment.count({
         where: {
-          status: 'FAILED',
+          status: "FAILED",
           order: { userId },
         },
       }),
-    ])
+    ]);
 
     return {
       payments,
@@ -567,7 +623,7 @@ export class PaymentService {
       page,
       limit,
       totalPages: Math.ceil(total / limit),
-    }
+    };
   }
 
   async buyCourseDirectWithCoupon(
@@ -575,17 +631,17 @@ export class PaymentService {
     courseId: number,
     couponCode?: string,
   ): Promise<{
-    success: boolean
-    message: string
-    qrUrl: string
-    orderId: number
-    amount: number
-    content: string
+    success: boolean;
+    message: string;
+    qrUrl: string;
+    orderId: number;
+    amount: number;
+    content: string;
     couponApplied?: {
-      code: string
-      discountAmount: number
-      originalAmount: number
-    }
+      code: string;
+      discountAmount: number;
+      originalAmount: number;
+    };
   }> {
     const course = await this.prisma.course.findUnique({
       where: { id: courseId },
@@ -596,18 +652,20 @@ export class PaymentService {
         price: true,
         status: true,
       },
-    })
+    });
 
     if (!course) {
-      throw new NotFoundException(`Course with ID ${courseId} not found`)
+      throw new NotFoundException(`Course with ID ${courseId} not found`);
     }
 
-    if (course.status !== 'PUBLISHED') {
-      throw new BadRequestException('Course is not available for purchase')
+    if (course.status !== "PUBLISHED") {
+      throw new BadRequestException("Course is not available for purchase");
     }
 
     if (course.price === 0) {
-      throw new BadRequestException('Free courses cannot be purchased. Please enroll directly.')
+      throw new BadRequestException(
+        "Free courses cannot be purchased. Please enroll directly.",
+      );
     }
 
     const existingEnrollment = await this.prisma.enrollment.findUnique({
@@ -617,15 +675,15 @@ export class PaymentService {
           courseId,
         },
       },
-    })
+    });
 
     if (existingEnrollment) {
-      throw new BadRequestException('You are already enrolled in this course')
+      throw new BadRequestException("You are already enrolled in this course");
     }
 
-    let finalAmount = course.price
-    let discountAmount = 0
-    let appliedCoupon: any = null
+    let finalAmount = course.price;
+    let discountAmount = 0;
+    let appliedCoupon: any = null;
 
     if (couponCode) {
       const validation = await this.couponService.validateCoupon(
@@ -635,41 +693,43 @@ export class PaymentService {
           totalAmount: course.price,
         },
         userId,
-      )
+      );
 
       if (!validation.isValid) {
-        throw new BadRequestException(`Coupon validation failed: ${validation.errors.join(', ')}`)
+        throw new BadRequestException(
+          `Coupon validation failed: ${validation.errors.join(", ")}`,
+        );
       }
 
       if (validation.discount) {
-        discountAmount = validation.discount.appliedAmount
-        finalAmount = Math.max(0, course.price - discountAmount)
+        discountAmount = validation.discount.appliedAmount;
+        finalAmount = Math.max(0, course.price - discountAmount);
 
         appliedCoupon = await this.prisma.coupon.findUnique({
           where: { code: couponCode },
-        })
+        });
       }
     }
 
     if (finalAmount === 0) {
-      throw new BadRequestException('Cannot create payment for zero amount')
+      throw new BadRequestException("Cannot create payment for zero amount");
     }
 
     const orderData: any = {
       userId,
       totalAmount: finalAmount,
-      status: 'PENDING',
+      status: "PENDING",
       items: {
         create: {
-          type: 'COURSE',
+          type: "COURSE",
           courseId,
           unitPrice: course.price,
         },
       },
-    }
+    };
 
     if (appliedCoupon) {
-      orderData.couponId = appliedCoupon.id
+      orderData.couponId = appliedCoupon.id;
     }
 
     const order = await this.prisma.order.create({
@@ -688,10 +748,10 @@ export class PaymentService {
         },
         coupon: true,
       },
-    })
+    });
 
     // Create or update coupon redemption in PENDING status (will be updated to COMPLETED by webhook)
-    if (appliedCoupon && appliedCoupon.type !== 'GIFT') {
+    if (appliedCoupon && appliedCoupon.type !== "GIFT") {
       // Use upsert since there's a unique constraint on couponId+userId
       // This handles the case where user previously used the same coupon
       await this.prisma.couponRedemption.upsert({
@@ -706,46 +766,46 @@ export class PaymentService {
           userId,
           orderId: order.id,
           discountApplied: discountAmount,
-          status: 'PENDING',
+          status: "PENDING",
         },
         update: {
           orderId: order.id,
           discountApplied: discountAmount,
-          status: 'PENDING',
+          status: "PENDING",
           redeemedAt: new Date(),
           completedAt: null,
         },
-      })
+      });
     }
 
     // Generate SePay QR code
-    const orderInfo = `Mua khóa học: ${course.title}${couponCode ? ` (${couponCode})` : ''} - Đơn hàng ${order.id}`
+    const orderInfo = `Mua khóa học: ${course.title}${couponCode ? ` (${couponCode})` : ""} - Đơn hàng ${order.id}`;
     const paymentData = await this.sepayService.createPaymentUrl({
       orderId: order.id,
       amount: finalAmount,
       orderInfo,
       userId,
-    })
+    });
 
     this.logger.log(
-      `Created direct purchase for course ${courseId}, order ${order.id}, amount: ${finalAmount}${appliedCoupon ? ` (coupon: ${couponCode})` : ''}`,
-    )
+      `Created direct purchase for course ${courseId}, order ${order.id}, amount: ${finalAmount}${appliedCoupon ? ` (coupon: ${couponCode})` : ""}`,
+    );
 
     const response: any = {
       success: true,
       message: `SePay QR code created for ${course.title}`,
       ...paymentData,
-    }
+    };
 
     if (couponCode && discountAmount > 0) {
       response.couponApplied = {
         code: couponCode,
         discountAmount,
         originalAmount: course.price,
-      }
+      };
     }
 
-    return response
+    return response;
   }
 
   // ===== Gift Coupon Payment =====
@@ -756,27 +816,27 @@ export class PaymentService {
     totalAmount: number,
     courses: Array<{ id: number; title: string; price: number }>,
   ): Promise<{
-    success: boolean
-    message: string
-    qrUrl: string
-    orderId: number
-    amount: number
-    content: string
+    success: boolean;
+    message: string;
+    qrUrl: string;
+    orderId: number;
+    amount: number;
+    content: string;
   }> {
     // Create order for gift coupon purchase
     const orderData = {
       userId,
       totalAmount,
-      status: 'PENDING' as const,
+      status: "PENDING" as const,
       couponId, // Link to the gift coupon being purchased
       items: {
         create: courses.map((course) => ({
-          type: 'COURSE' as const,
+          type: "COURSE" as const,
           courseId: course.id,
           unitPrice: course.price,
         })),
       },
-    }
+    };
 
     const order = await this.prisma.order.create({
       data: orderData,
@@ -793,25 +853,27 @@ export class PaymentService {
           },
         },
       },
-    })
+    });
 
     // Generate payment QR code
-    const courseNames = courses.map((c) => c.title).join(', ')
-    const orderInfo = `Gift Coupon - ${courseNames} - Order ${order.id}`
+    const courseNames = courses.map((c) => c.title).join(", ");
+    const orderInfo = `Gift Coupon - ${courseNames} - Order ${order.id}`;
 
     const paymentData = await this.sepayService.createPaymentUrl({
       orderId: order.id,
       amount: totalAmount,
       orderInfo,
       userId,
-    })
+    });
 
-    this.logger.log(`Created gift coupon payment for order ${order.id}, amount: ${totalAmount}`)
+    this.logger.log(
+      `Created gift coupon payment for order ${order.id}, amount: ${totalAmount}`,
+    );
 
     return {
       success: true,
-      message: 'Gift coupon payment created successfully',
+      message: "Gift coupon payment created successfully",
       ...paymentData,
-    }
+    };
   }
 }

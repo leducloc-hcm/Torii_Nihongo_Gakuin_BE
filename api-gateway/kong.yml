@@ -340,6 +340,17 @@ services:
           - name: jwt-validator
             config:
               secret: nhatngutorii
+      - name: activity-logs-route
+        paths:
+          - /activity-logs
+        strip_path: false
+        methods:
+          - GET
+          - OPTIONS
+        plugins:
+          - name: jwt-validator
+            config:
+              secret: nhatngutorii
       - name: cart-route
         paths:
           - /cart

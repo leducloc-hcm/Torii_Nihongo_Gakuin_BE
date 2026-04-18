@@ -83,6 +83,7 @@ model User {
   reviewVotes        ReviewVote[]
   substituteSessions LiveSession[] @relation("SubstituteLecturer")
   certificates       Certificate[]
+  activityLogs       ActivityLog[]
   
   
   
@@ -1422,4 +1423,56 @@ enum ReviewStatus {
   VISIBLE
   HIDDEN
   FLAGGED
+}
+
+// ===== Activity Log =====
+model ActivityLog {
+  id          Int              @id @default(autoincrement())
+  userId      Int?
+  action      ActivityAction
+  entity      ActivityEntity
+  entityId    Int?
+  description String
+  metadata    Json?
+  ipAddress   String?
+  createdAt   DateTime         @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([action])
+  @@index([entity])
+  @@index([createdAt])
+  @@index([userId])
+  @@schema("learning")
+}
+
+enum ActivityAction {
+  @@schema("learning")
+  PAYMENT_COMPLETED
+  PAYMENT_FAILED
+  COURSE_ENROLLED
+  COUPON_APPLIED
+  COUPON_CREATED
+  COUPON_APPROVED
+  COUPON_REJECTED
+  BLOG_CREATED
+  BLOG_UPDATED
+  BLOG_DELETED
+  COURSE_CREATED
+  COURSE_UPDATED
+  COURSE_PUBLISHED
+  USER_REGISTERED
+  USER_LOGIN
+  CERTIFICATE_ISSUED
+}
+
+enum ActivityEntity {
+  @@schema("learning")
+  PAYMENT
+  ENROLLMENT
+  COUPON
+  BLOG
+  COURSE
+  USER
+  CERTIFICATE
 }

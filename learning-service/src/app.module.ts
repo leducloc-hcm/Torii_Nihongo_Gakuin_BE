@@ -30,6 +30,7 @@ import { ReviewModule } from "./routes/review/review.module";
 import { AssessmentAIModule } from "./routes/assessment-ai/assessment-ai.module";
 import { MultiAgentModule } from "./routes/multi-agent/multi-agent.module";
 import { CertificateModule } from "./routes/certificate/certificate.module";
+import { ActivityLogModule } from "./routes/activity-log/activity-log.module";
 
 @Module({
   imports: [
@@ -76,6 +77,7 @@ import { CertificateModule } from "./routes/certificate/certificate.module";
     AssessmentAIModule,
     MultiAgentModule,
     CertificateModule,
+    ActivityLogModule,
   ],
   controllers: [AppController],
   providers: [AppService],

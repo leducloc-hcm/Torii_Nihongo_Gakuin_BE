@@ -13,12 +13,14 @@ import {
 } from "./blog.model";
 import { TagRepository } from "../tag/tag.repo";
 import { S3Service } from "src/shared/services/s3.service";
+import { ActivityLogService } from "../activity-log/activity-log.service";
 
 @Injectable()
 export class BlogService {
   constructor(
     private readonly blogRepository: BlogRepository,
     private readonly s3Service: S3Service,
+    private readonly activityLogService: ActivityLogService,
   ) {}
 
   async generateImageUploadUrl(filename: string, contentType: string) {
@@ -53,8 +55,7 @@ export class BlogService {
     const finalTagIds = tagIds?.map((id) => Number(id)) ?? [];
 
     // Create the blog
-
-    return this.blogRepository.create(
+    const blog = await this.blogRepository.create(
       {
         title,
         content,
@@ -66,6 +67,18 @@ export class BlogService {
       },
       finalTagIds,
     );
+
+    // Activity log
+    this.activityLogService.log({
+      userId: authorId,
+      action: "BLOG_CREATED",
+      entity: "BLOG",
+      entityId: blog.id,
+      description: `Blog "${title}" created`,
+      metadata: { title, slug },
+    });
+
+    return blog;
   }
 
   async findAll(queryDto: QueryBlogsInput) {
