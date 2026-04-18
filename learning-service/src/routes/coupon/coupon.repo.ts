@@ -137,6 +137,9 @@ export class CouponRepository {
           approver: {
             select: { id: true, name: true, email: true },
           },
+          rejector: {
+            select: { id: true, name: true, email: true },
+          },
           courses: {
             include: {
               course: {

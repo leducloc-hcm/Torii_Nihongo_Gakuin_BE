@@ -178,7 +178,31 @@ export class CouponService {
   }
 
   async listCoupons(query: ListCouponsQueryDTO) {
-    return this.couponRepository.findMany(query);
+    const result = await this.couponRepository.findMany(query);
+
+    const couponsWithStats = result.coupons.map((coupon: any) => {
+      const totalRedemptions = coupon.redemptions?.length || 0;
+      const { redemptions, ...couponData } = coupon;
+
+      return {
+        ...couponData,
+        usageStats: {
+          totalRedemptions,
+          remainingUses: coupon.maxRedemptions
+            ? coupon.maxRedemptions - totalRedemptions
+            : undefined,
+          isExpired: coupon.endsAt
+            ? new Date() > new Date(coupon.endsAt)
+            : false,
+          isActive: coupon.status === CouponStatus.ACTIVE,
+        },
+      };
+    });
+
+    return {
+      ...result,
+      coupons: couponsWithStats,
+    };
   }
 
   async updateCoupon(

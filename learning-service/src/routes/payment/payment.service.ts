@@ -164,22 +164,9 @@ export class PaymentService {
           },
           coupon: {
             select: {
-              id: true,
               code: true,
               title: true,
               type: true,
-              discountType: true,
-              discountValue: true,
-              maxDiscountAmount: true,
-            },
-          },
-          redemption: {
-            select: {
-              id: true,
-              discountApplied: true,
-              status: true,
-              redeemedAt: true,
-              completedAt: true,
             },
           },
         },
@@ -324,35 +311,11 @@ export class PaymentService {
       `Created SePay payment for order ${order.id}, amount: ${checkoutCalculation.finalAmount}${couponCode ? `, coupon: ${couponCode}` : ""}`,
     );
 
-    const response: any = {
+    return {
       success: true,
       message: "SePay QR code created successfully",
       ...paymentData,
     };
-
-    if (couponCode && checkoutCalculation.discountAmount > 0) {
-      response.couponApplied = {
-        code: couponCode,
-        discountAmount: checkoutCalculation.discountAmount,
-        originalAmount: checkoutCalculation.subtotal,
-      };
-
-      this.activityLogService.log({
-        userId,
-        action: "COUPON_APPLIED",
-        entity: "COUPON",
-        entityId: order.couponId ?? undefined,
-        description: `Coupon "${couponCode}" applied to order #${order.id} — discount: ${checkoutCalculation.discountAmount}`,
-        metadata: {
-          couponCode,
-          orderId: order.id,
-          discountAmount: checkoutCalculation.discountAmount,
-          originalAmount: checkoutCalculation.subtotal,
-        },
-      });
-    }
-
-    return response;
   }
 
   async handleSepayWebhook(webhookData: any) {
@@ -804,21 +767,11 @@ export class PaymentService {
       `Created direct purchase for course ${courseId}, order ${order.id}, amount: ${finalAmount}${appliedCoupon ? ` (coupon: ${couponCode})` : ""}`,
     );
 
-    const response: any = {
+    return {
       success: true,
       message: `SePay QR code created for ${course.title}`,
       ...paymentData,
     };
-
-    if (couponCode && discountAmount > 0) {
-      response.couponApplied = {
-        code: couponCode,
-        discountAmount,
-        originalAmount: course.price,
-      };
-    }
-
-    return response;
   }
 
   // ===== Gift Coupon Payment =====

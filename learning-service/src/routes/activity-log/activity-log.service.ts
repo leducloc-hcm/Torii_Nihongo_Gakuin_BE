@@ -34,16 +34,9 @@ export class ActivityLogService {
   }
 
   async findAll(query: ActivityLogQueryParams) {
-    const {
-      page = 1,
-      limit = 20,
-      action,
-      entity,
-      userId,
-      startDate,
-      endDate,
-      search,
-    } = query;
+    const { action, entity, userId, startDate, endDate, search } = query;
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 20;
     const skip = (page - 1) * limit;
 
     const where: any = {};

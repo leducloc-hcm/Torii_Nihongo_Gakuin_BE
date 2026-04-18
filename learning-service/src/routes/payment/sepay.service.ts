@@ -235,17 +235,23 @@ export class SepayService {
       // Process payment in transaction with increased timeout
       const result = await this.prisma.$transaction(
         async (tx) => {
-          // Mark payment as paid
-          await this.paymentTransactionService.markPaymentPaid(
-            payment.id,
-            String(webhookData.id),
-            webhookData,
-          );
+          // Mark payment as paid using tx so the update is part of the atomic transaction
+          // (using this.prisma here would commit independently and not roll back on failure)
+          await tx.payment.update({
+            where: { id: payment.id },
+            data: {
+              status: "PAID",
+              providerTransactionId: String(webhookData.id),
+              providerResponse: webhookData as any,
+              processedAt: new Date(),
+            },
+          });
 
-          // Update order with transaction reference (for backward compatibility)
+          // Update order status to COMPLETED and store transaction reference
           await tx.order.update({
             where: { id: order.id },
             data: {
+              status: "COMPLETED",
               providerRef: `${paymentCode}:${String(webhookData.id)}`, // Include transaction ID
             },
           });
@@ -444,7 +450,7 @@ export class SepayService {
             );
           } catch (emailError) {
             this.logger.error(
-              `Failed to send welcome email for course ${enrollment.courseId}: ${emailError.message}`,
+              `Failed to send welcome email for course ${enrollment.courseId}: `,
             );
             // Don't throw error as email failure shouldn't break the payment process
           }
@@ -525,7 +531,7 @@ export class SepayService {
               }
             } catch (calendarError) {
               this.logger.error(
-                `Failed to send calendar invite for class ${enrollment.classId}: ${calendarError.message}`,
+                `Failed to send calendar invite for class ${enrollment.classId}: `,
               );
               // Don't throw error as calendar failure shouldn't break the payment process
             }
@@ -599,6 +605,33 @@ export class SepayService {
         }
       }
 
+      // Activity log: coupon applied (logged after payment success)
+      if (order.couponId && order.coupon) {
+        try {
+          const redemption = await this.prisma.couponRedemption.findFirst({
+            where: {
+              orderId: order.id,
+              couponId: order.couponId,
+              status: "COMPLETED",
+            },
+          });
+          this.activityLogService.log({
+            userId: order.userId,
+            action: "COUPON_APPLIED",
+            entity: "COUPON",
+            entityId: order.couponId,
+            description: `Coupon "${order.coupon.code}" applied to order #${order.id} — discount: ${redemption?.discountApplied ?? 0}`,
+            metadata: {
+              couponCode: order.coupon.code,
+              orderId: order.id,
+              discountAmount: redemption?.discountApplied ?? 0,
+            },
+          });
+        } catch (err) {
+          this.logger.warn(`Failed to log coupon applied activity: ${err}`);
+        }
+      }
+
       return {
         success: true,
         message: "Payment processed successfully",
@@ -606,7 +639,7 @@ export class SepayService {
         transactionId: String(webhookData.id),
       };
     } catch (error) {
-      this.logger.error(`SePay webhook error: ${error.message}`, error.stack);
+      this.logger.error(`SePay webhook error: `);
 
       // Try to send failure notification if we have order info
       if (error instanceof Error) {
@@ -631,6 +664,22 @@ export class SepayService {
               await this.prisma.order.update({
                 where: { id: order.id },
                 data: { status: "CANCELLED" },
+              });
+
+              // Mark any PENDING payments as FAILED so DB state matches the socket notification
+              await this.prisma.payment.updateMany({
+                where: {
+                  orderId: order.id,
+                  status: "PENDING",
+                },
+                data: {
+                  status: "FAILED",
+                  failureReason:
+                    error instanceof Error
+                      ? error.message
+                      : "Webhook processing error",
+                  processedAt: new Date(),
+                },
               });
 
               // Update coupon redemption to FAILED
@@ -663,9 +712,7 @@ export class SepayService {
             }
           }
         } catch (notifError) {
-          this.logger.error(
-            `Failed to send error notification: ${notifError.message}`,
-          );
+          this.logger.error(`Failed to send error notification:`);
         }
       }
 
@@ -714,10 +761,10 @@ export class SepayService {
         message: "Payment not found",
       };
     } catch (error) {
-      this.logger.error(`Check payment status error: ${error.message}`);
+      this.logger.error(`Check payment status error: `);
       return {
         success: false,
-        message: `Error: ${error.message}`,
+        message: `Error: `,
       };
     }
   }
@@ -759,9 +806,7 @@ export class SepayService {
 
       return staffAndAdminUsers.map((user) => user.id);
     } catch (error) {
-      this.logger.error(
-        `Failed to get staff and admin users: ${error.message}`,
-      );
+      this.logger.error(`Failed to get staff and admin users: `);
       return [];
     }
   }
@@ -866,9 +911,7 @@ export class SepayService {
         `Notified ${staffAndAdminIds.length} staff/admin users about ${paymentResult.toLowerCase()} payment for order ${order.id}`,
       );
     } catch (error) {
-      this.logger.error(
-        `Failed to notify staff/admin about payment: ${error.message}`,
-      );
+      this.logger.error(`Failed to notify staff/admin about payment: `);
       // Don't throw - notification failure shouldn't break payment processing
     }
   }
