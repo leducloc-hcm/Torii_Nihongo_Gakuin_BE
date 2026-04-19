@@ -372,7 +372,7 @@ resource "aws_ecs_task_definition" "learning_service" {
       { name = "FRONTEND_URL", value = var.frontend_url },
       { name = "AWS_REGION", value = var.aws_region },
       { name = "AWS_S3_BUCKET_NAME", value = var.s3_bucket_name },
-      { name = "CLAUDE_MODEL", value = "claude-sonnet-4-20250514" },
+      { name = "CLAUDE_MODEL", value = "claude-haiku-4-5" },
       { name = "CLAUDE_TEMPERATURE", value = "0.3" },
       { name = "CLAUDE_MAX_TOKENS", value = "4096" },
       { name = "MCP_ENABLED", value = "true" },

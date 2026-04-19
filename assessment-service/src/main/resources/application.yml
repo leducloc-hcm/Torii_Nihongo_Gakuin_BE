@@ -71,8 +71,8 @@ server:
 
 # AWS S3 Configuration
 aws:
-  access-key-id: ${AWS_ACCESS_KEY_ID:}
-  secret-access-key: ${AWS_SECRET_ACCESS_KEY:}
+  access-key-id: 'AKIA5SEU3U6XXXATV5CM'
+  secret-access-key: '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'
   region: ${AWS_REGION:ap-southeast-1}
   s3:
     bucket-name: ${AWS_S3_BUCKET_NAME:torii-assessment-bucket}

@@ -16,12 +16,11 @@ export class S3Service {
 
     const s3Config: any = { region: this.region };
 
-    if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
       s3Config.credentials = {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+        accessKeyId: 'AKIA5SEU3U6XXXATV5CM',
+        secretAccessKey: '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',
       };
-    }
+    
 
     this.s3 = new S3(s3Config);
 
