@@ -4,17 +4,22 @@ import {
   ConflictException,
   BadRequestException,
   ForbiddenException,
-} from '@nestjs/common'
-import { EnrollmentRepository } from './enrollment.repo'
-import { CreateEnrollmentDTO, UpdateEnrollmentDTO, QueryEnrollmentDTO } from './enrollment.dto'
+} from "@nestjs/common";
+import { EnrollmentRepository } from "./enrollment.repo";
+import {
+  CreateEnrollmentDTO,
+  UpdateEnrollmentDTO,
+  QueryEnrollmentDTO,
+} from "./enrollment.dto";
 import {
   EnrollmentWithRelations,
   EnrollmentWhereInput,
   EnrollmentOrderByInput,
   MyEnrollmentType,
-} from './enrollment.model'
-import { PrismaService } from 'src/shared/services/prisma.service'
-import { RabbitMQPublisher } from 'src/shared/rabbitmq/rabbitmq.publisher'
+} from "./enrollment.model";
+import { PrismaService } from "src/shared/services/prisma.service";
+import { RabbitMQPublisher } from "src/shared/rabbitmq/rabbitmq.publisher";
+import { ActivityLogService } from "../activity-log/activity-log.service";
 
 @Injectable()
 export class EnrollmentService {
@@ -22,32 +27,46 @@ export class EnrollmentService {
     private readonly enrollmentRepository: EnrollmentRepository,
     private readonly prisma: PrismaService,
     private readonly rabbitmqPublisher: RabbitMQPublisher,
+    private readonly activityLogService: ActivityLogService,
   ) {}
 
-  async create(createEnrollmentDto: CreateEnrollmentDTO, userId: number): Promise<EnrollmentWithRelations> {
-    const { courseId, courseType, expiresAt } = createEnrollmentDto
+  async create(
+    createEnrollmentDto: CreateEnrollmentDTO,
+    userId: number,
+  ): Promise<EnrollmentWithRelations> {
+    const { courseId, courseType, expiresAt } = createEnrollmentDto;
 
-    const userExists = await this.enrollmentRepository.checkUserExists(userId)
+    const userExists = await this.enrollmentRepository.checkUserExists(userId);
     if (!userExists) {
-      throw new BadRequestException('User does not exist or is not authorized to enroll in courses')
+      throw new BadRequestException(
+        "User does not exist or is not authorized to enroll in courses",
+      );
     }
 
-    const courseCheck = await this.enrollmentRepository.checkCourseExists(courseId)
+    const courseCheck =
+      await this.enrollmentRepository.checkCourseExists(courseId);
     if (!courseCheck.exists) {
-      throw new NotFoundException(`Course with ID ${courseId} not found`)
+      throw new NotFoundException(`Course with ID ${courseId} not found`);
     }
 
-    if (courseCheck.status !== 'PUBLISHED') {
-      throw new BadRequestException('Cannot enroll in a course that is not published')
+    if (courseCheck.status !== "PUBLISHED") {
+      throw new BadRequestException(
+        "Cannot enroll in a course that is not published",
+      );
     }
 
     if (courseCheck.courseType !== courseType) {
-      throw new BadRequestException(`Course type mismatch. Expected ${courseCheck.courseType}, got ${courseType}`)
+      throw new BadRequestException(
+        `Course type mismatch. Expected ${courseCheck.courseType}, got ${courseType}`,
+      );
     }
 
-    const existingEnrollment = await this.enrollmentRepository.checkEnrollmentExists(userId, courseId)
+    const existingEnrollment =
+      await this.enrollmentRepository.checkEnrollmentExists(userId, courseId);
     if (existingEnrollment) {
-      throw new ConflictException(`User is already enrolled in course with ID ${courseId}`)
+      throw new ConflictException(
+        `User is already enrolled in course with ID ${courseId}`,
+      );
     }
 
     const enrollment = await this.enrollmentRepository.create({
@@ -55,47 +74,66 @@ export class EnrollmentService {
       courseId,
       courseType,
       expiresAt: expiresAt ? new Date(expiresAt) : null,
-    })
+    });
 
     // Publish domain event for assessment-service gating/unlock
-    await this.rabbitmqPublisher.publishCourseEnrolled(userId, courseId)
+    await this.rabbitmqPublisher.publishCourseEnrolled(userId, courseId);
 
-    return enrollment
+    // Activity log
+    this.activityLogService.log({
+      userId,
+      action: "COURSE_ENROLLED",
+      entity: "ENROLLMENT",
+      entityId: enrollment.id,
+      description: `User enrolled in course #${courseId}`,
+      metadata: { courseId, courseType },
+    });
+
+    return enrollment;
   }
 
   async findAll(queryDto: QueryEnrollmentDTO) {
-    const { page, limit, userId, courseId, courseType, expired, sortBy, sortOrder } = queryDto
-    const skip = (page - 1) * limit
+    const {
+      page,
+      limit,
+      userId,
+      courseId,
+      courseType,
+      expired,
+      sortBy,
+      sortOrder,
+    } = queryDto;
+    const skip = (page - 1) * limit;
 
-    const where: EnrollmentWhereInput = {}
+    const where: EnrollmentWhereInput = {};
 
     if (userId) {
-      where.userId = userId
+      where.userId = userId;
     }
 
     if (courseId) {
-      where.courseId = courseId
+      where.courseId = courseId;
     }
 
     if (courseType) {
-      where.courseType = courseType
+      where.courseType = courseType;
     }
 
     if (expired !== undefined) {
       if (expired) {
         where.expiresAt = {
           lt: new Date(),
-        }
+        };
       } else {
-        where.OR = [{ expiresAt: null }, { expiresAt: { gt: new Date() } }]
+        where.OR = [{ expiresAt: null }, { expiresAt: { gt: new Date() } }];
       }
     }
 
-    const orderBy: EnrollmentOrderByInput = {}
-    if (sortBy === 'createdAt') {
-      orderBy.createdAt = sortOrder
-    } else if (sortBy === 'expiresAt') {
-      orderBy.expiresAt = sortOrder
+    const orderBy: EnrollmentOrderByInput = {};
+    if (sortBy === "createdAt") {
+      orderBy.createdAt = sortOrder;
+    } else if (sortBy === "expiresAt") {
+      orderBy.expiresAt = sortOrder;
     }
 
     const { enrollments, total } = await this.enrollmentRepository.findAll({
@@ -103,7 +141,7 @@ export class EnrollmentService {
       take: limit,
       where,
       orderBy,
-    })
+    });
 
     return {
       data: enrollments,
@@ -113,71 +151,90 @@ export class EnrollmentService {
         total,
         totalPages: Math.ceil(total / limit),
       },
-    }
+    };
   }
 
   async findOne(id: number): Promise<EnrollmentWithRelations> {
-    const enrollment = await this.enrollmentRepository.findOne({ id })
+    const enrollment = await this.enrollmentRepository.findOne({ id });
 
     if (!enrollment) {
-      throw new NotFoundException(`Enrollment with ID ${id} not found`)
+      throw new NotFoundException(`Enrollment with ID ${id} not found`);
     }
 
-    return enrollment
+    return enrollment;
   }
 
-  async findByUserAndCourse(userId: number, courseId: number): Promise<EnrollmentWithRelations> {
-    const enrollment = await this.enrollmentRepository.findByUserAndCourse(userId, courseId)
+  async findByUserAndCourse(
+    userId: number,
+    courseId: number,
+  ): Promise<EnrollmentWithRelations> {
+    const enrollment = await this.enrollmentRepository.findByUserAndCourse(
+      userId,
+      courseId,
+    );
 
     if (!enrollment) {
-      throw new NotFoundException(`Enrollment not found for user ${userId} and course ${courseId}`)
+      throw new NotFoundException(
+        `Enrollment not found for user ${userId} and course ${courseId}`,
+      );
     }
 
-    return enrollment
+    return enrollment;
   }
 
   async findMyEnrollments(
     userId: number,
     params: {
-      page?: number
-      limit?: number
-      expired?: boolean
-      courseType?: 'VIDEO_QUIZ' | 'VIDEO_QUIZ_LIVE' | 'LIVE_ONLY'
-      sortBy?: 'createdAt' | 'expiresAt'
-      sortOrder?: 'asc' | 'desc'
+      page?: number;
+      limit?: number;
+      expired?: boolean;
+      courseType?: "VIDEO_QUIZ" | "VIDEO_QUIZ_LIVE" | "LIVE_ONLY";
+      sortBy?: "createdAt" | "expiresAt";
+      sortOrder?: "asc" | "desc";
     } = {},
   ) {
-    const { page = 1, limit = 10, expired, courseType, sortBy = 'createdAt', sortOrder = 'desc' } = params
-
-    const skip = (page - 1) * Number(limit)
-
-    const orderBy: EnrollmentOrderByInput = {}
-    if (sortBy === 'createdAt') {
-      orderBy.createdAt = sortOrder
-    } else if (sortBy === 'expiresAt') {
-      orderBy.expiresAt = sortOrder
-    }
-
-    const { enrollments, total } = await this.enrollmentRepository.findMyEnrollments(userId, {
-      skip,
-      take: Number(limit),
+    const {
+      page = 1,
+      limit = 10,
       expired,
       courseType,
-      orderBy,
-    })
+      sortBy = "createdAt",
+      sortOrder = "desc",
+    } = params;
+
+    const skip = (page - 1) * Number(limit);
+
+    const orderBy: EnrollmentOrderByInput = {};
+    if (sortBy === "createdAt") {
+      orderBy.createdAt = sortOrder;
+    } else if (sortBy === "expiresAt") {
+      orderBy.expiresAt = sortOrder;
+    }
+
+    const { enrollments, total } =
+      await this.enrollmentRepository.findMyEnrollments(userId, {
+        skip,
+        take: Number(limit),
+        expired,
+        courseType,
+        orderBy,
+      });
 
     // Calculate progress for each enrollment
     const enrollmentsWithProgress = await Promise.all(
       enrollments.map(async (enrollment) => {
-        const progress = await this.calculateCourseProgress(userId, enrollment.courseId)
+        const progress = await this.calculateCourseProgress(
+          userId,
+          enrollment.courseId,
+        );
         return {
           ...enrollment,
           progressPercentage: progress.progressPercentage,
           totalLessons: progress.totalLessons,
           completedLessons: progress.completedLessons,
-        }
+        };
       }),
-    )
+    );
 
     return {
       data: enrollmentsWithProgress,
@@ -187,13 +244,17 @@ export class EnrollmentService {
         total,
         totalPages: Math.ceil(total / Number(limit)),
       },
-    }
+    };
   }
 
   private async calculateCourseProgress(
     userId: number,
     courseId: number,
-  ): Promise<{ progressPercentage: number; totalLessons: number; completedLessons: number }> {
+  ): Promise<{
+    progressPercentage: number;
+    totalLessons: number;
+    completedLessons: number;
+  }> {
     // Get total lessons count for the course
     const totalLessons = await this.prisma.lesson.count({
       where: {
@@ -201,7 +262,7 @@ export class EnrollmentService {
           courseId,
         },
       },
-    })
+    });
 
     // Get completed lessons count for the user in this course
     const completedLessons = await this.prisma.lessonProgress.count({
@@ -214,15 +275,18 @@ export class EnrollmentService {
           },
         },
       },
-    })
+    });
 
-    const progressPercentage = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0
+    const progressPercentage =
+      totalLessons > 0
+        ? Math.round((completedLessons / totalLessons) * 100)
+        : 0;
 
     return {
       progressPercentage,
       totalLessons,
       completedLessons,
-    }
+    };
   }
 
   async update(
@@ -230,31 +294,34 @@ export class EnrollmentService {
     updateEnrollmentDto: UpdateEnrollmentDTO,
     requestUserId: number,
   ): Promise<EnrollmentWithRelations> {
-    const existingEnrollment = await this.findOne(id)
+    const existingEnrollment = await this.findOne(id);
 
     if (existingEnrollment.userId !== requestUserId) {
-      throw new ForbiddenException('You can only update your own enrollments')
+      throw new ForbiddenException("You can only update your own enrollments");
     }
 
-    const { expiresAt } = updateEnrollmentDto
+    const { expiresAt } = updateEnrollmentDto;
 
     return this.enrollmentRepository.update({
       where: { id },
       data: {
         expiresAt: expiresAt ? new Date(expiresAt) : null,
       },
-    })
+    });
   }
 
-  async remove(id: number, requestUserId: number): Promise<EnrollmentWithRelations> {
-    const enrollment = await this.findOne(id)
+  async remove(
+    id: number,
+    requestUserId: number,
+  ): Promise<EnrollmentWithRelations> {
+    const enrollment = await this.findOne(id);
 
     if (enrollment.userId !== requestUserId) {
-      throw new ForbiddenException('You can only remove your own enrollments')
+      throw new ForbiddenException("You can only remove your own enrollments");
     }
-    await this.enrollmentRepository.delete({ id })
+    await this.enrollmentRepository.delete({ id });
 
-    return enrollment
+    return enrollment;
   }
 
   async removeByUserAndCourse(
@@ -262,10 +329,10 @@ export class EnrollmentService {
     courseId: number,
     requestUserId: number,
   ): Promise<EnrollmentWithRelations> {
-    const enrollment = await this.findByUserAndCourse(userId, courseId)
+    const enrollment = await this.findByUserAndCourse(userId, courseId);
 
     if (enrollment.userId !== requestUserId) {
-      throw new ForbiddenException('You can only remove your own enrollments')
+      throw new ForbiddenException("You can only remove your own enrollments");
     }
 
     await this.enrollmentRepository.delete({
@@ -273,35 +340,41 @@ export class EnrollmentService {
         userId,
         courseId,
       },
-    })
+    });
 
-    return enrollment
+    return enrollment;
   }
 
   async getExpiredEnrollments(
     params: {
-      page?: number
-      limit?: number
-      sortBy?: 'createdAt' | 'expiresAt'
-      sortOrder?: 'asc' | 'desc'
+      page?: number;
+      limit?: number;
+      sortBy?: "createdAt" | "expiresAt";
+      sortOrder?: "asc" | "desc";
     } = {},
   ) {
-    const { page = 1, limit = 10, sortBy = 'expiresAt', sortOrder = 'asc' } = params
+    const {
+      page = 1,
+      limit = 10,
+      sortBy = "expiresAt",
+      sortOrder = "asc",
+    } = params;
 
-    const skip = (page - 1) * limit
+    const skip = (page - 1) * limit;
 
-    const orderBy: EnrollmentOrderByInput = {}
-    if (sortBy === 'createdAt') {
-      orderBy.createdAt = sortOrder
-    } else if (sortBy === 'expiresAt') {
-      orderBy.expiresAt = sortOrder
+    const orderBy: EnrollmentOrderByInput = {};
+    if (sortBy === "createdAt") {
+      orderBy.createdAt = sortOrder;
+    } else if (sortBy === "expiresAt") {
+      orderBy.expiresAt = sortOrder;
     }
 
-    const { enrollments, total } = await this.enrollmentRepository.findExpiredEnrollments({
-      skip,
-      take: limit,
-      orderBy,
-    })
+    const { enrollments, total } =
+      await this.enrollmentRepository.findExpiredEnrollments({
+        skip,
+        take: limit,
+        orderBy,
+      });
 
     return {
       data: enrollments,
@@ -311,34 +384,40 @@ export class EnrollmentService {
         total,
         totalPages: Math.ceil(total / limit),
       },
-    }
+    };
   }
 
   async getActiveEnrollments(
     userId?: number,
     params: {
-      page?: number
-      limit?: number
-      sortBy?: 'createdAt' | 'expiresAt'
-      sortOrder?: 'asc' | 'desc'
+      page?: number;
+      limit?: number;
+      sortBy?: "createdAt" | "expiresAt";
+      sortOrder?: "asc" | "desc";
     } = {},
   ) {
-    const { page = 1, limit = 10, sortBy = 'createdAt', sortOrder = 'desc' } = params
+    const {
+      page = 1,
+      limit = 10,
+      sortBy = "createdAt",
+      sortOrder = "desc",
+    } = params;
 
-    const skip = (page - 1) * limit
+    const skip = (page - 1) * limit;
 
-    const orderBy: EnrollmentOrderByInput = {}
-    if (sortBy === 'createdAt') {
-      orderBy.createdAt = sortOrder
-    } else if (sortBy === 'expiresAt') {
-      orderBy.expiresAt = sortOrder
+    const orderBy: EnrollmentOrderByInput = {};
+    if (sortBy === "createdAt") {
+      orderBy.createdAt = sortOrder;
+    } else if (sortBy === "expiresAt") {
+      orderBy.expiresAt = sortOrder;
     }
 
-    const { enrollments, total } = await this.enrollmentRepository.findActiveEnrollments(userId, {
-      skip,
-      take: limit,
-      orderBy,
-    })
+    const { enrollments, total } =
+      await this.enrollmentRepository.findActiveEnrollments(userId, {
+        skip,
+        take: limit,
+        orderBy,
+      });
 
     return {
       data: enrollments,
@@ -348,25 +427,33 @@ export class EnrollmentService {
         total,
         totalPages: Math.ceil(total / limit),
       },
-    }
+    };
   }
 
   async getUserEnrollmentStats(userId: number) {
-    const totalCount = await this.enrollmentRepository.getUserEnrollmentCount(userId)
-    const { enrollments: activeEnrollments } = await this.enrollmentRepository.findActiveEnrollments(userId, {
-      take: 1000,
-    })
-    const { enrollments: expiredEnrollments } = await this.enrollmentRepository.findExpiredEnrollments({ take: 1000 })
+    const totalCount =
+      await this.enrollmentRepository.getUserEnrollmentCount(userId);
+    const { enrollments: activeEnrollments } =
+      await this.enrollmentRepository.findActiveEnrollments(userId, {
+        take: 1000,
+      });
+    const { enrollments: expiredEnrollments } =
+      await this.enrollmentRepository.findExpiredEnrollments({ take: 1000 });
 
-    const userExpiredCount = expiredEnrollments.filter((e) => e.userId === userId).length
+    const userExpiredCount = expiredEnrollments.filter(
+      (e) => e.userId === userId,
+    ).length;
 
     // Calculate completion stats
     const completedCoursesCount = await Promise.all(
       activeEnrollments.map(async (enrollment) => {
-        const progress = await this.calculateCourseProgress(userId, enrollment.courseId)
-        return progress.progressPercentage === 100
+        const progress = await this.calculateCourseProgress(
+          userId,
+          enrollment.courseId,
+        );
+        return progress.progressPercentage === 100;
       }),
-    ).then((results) => results.filter(Boolean).length)
+    ).then((results) => results.filter(Boolean).length);
 
     return {
       total: totalCount,
@@ -374,64 +461,86 @@ export class EnrollmentService {
       expired: userExpiredCount,
       completed: completedCoursesCount,
       inProgress: activeEnrollments.length - completedCoursesCount,
-    }
+    };
   }
 
   async getCourseEnrollmentStats(courseId: number) {
-    const totalCount = await this.enrollmentRepository.getCourseEnrollmentCount(courseId)
+    const totalCount =
+      await this.enrollmentRepository.getCourseEnrollmentCount(courseId);
 
     return {
       total: totalCount,
-    }
+    };
   }
 
-  async bulkExtendEnrollments(enrollmentIds: number[], expiresAt: Date): Promise<{ updatedCount: number }> {
-    const result = await this.enrollmentRepository.bulkUpdateExpirations(enrollmentIds, expiresAt)
-    return { updatedCount: result.count }
+  async bulkExtendEnrollments(
+    enrollmentIds: number[],
+    expiresAt: Date,
+  ): Promise<{ updatedCount: number }> {
+    const result = await this.enrollmentRepository.bulkUpdateExpirations(
+      enrollmentIds,
+      expiresAt,
+    );
+    return { updatedCount: result.count };
   }
 
-  async bulkRemoveExpirations(enrollmentIds: number[]): Promise<{ updatedCount: number }> {
-    const result = await this.enrollmentRepository.bulkUpdateExpirations(enrollmentIds, null)
-    return { updatedCount: result.count }
+  async bulkRemoveExpirations(
+    enrollmentIds: number[],
+  ): Promise<{ updatedCount: number }> {
+    const result = await this.enrollmentRepository.bulkUpdateExpirations(
+      enrollmentIds,
+      null,
+    );
+    return { updatedCount: result.count };
   }
 
   async isUserEnrolled(userId: number, courseId: number): Promise<boolean> {
     try {
-      const enrollment = await this.enrollmentRepository.findByUserAndCourse(userId, courseId)
+      const enrollment = await this.enrollmentRepository.findByUserAndCourse(
+        userId,
+        courseId,
+      );
 
       if (!enrollment) {
-        return false
+        return false;
       }
 
       if (enrollment.expiresAt && enrollment.expiresAt < new Date()) {
-        return false
+        return false;
       }
 
-      return true
+      return true;
     } catch {
-      return false
+      return false;
     }
   }
 
-  async checkUserEnrollments(userId: number, courseIds: number[]): Promise<number[]> {
+  async checkUserEnrollments(
+    userId: number,
+    courseIds: number[],
+  ): Promise<number[]> {
     if (courseIds.length === 0) {
-      return []
+      return [];
     }
 
     try {
-      const enrollments = await this.enrollmentRepository.findUserEnrollmentsByCourseIds(userId, courseIds)
+      const enrollments =
+        await this.enrollmentRepository.findUserEnrollmentsByCourseIds(
+          userId,
+          courseIds,
+        );
 
       // Filter out expired enrollments and return only active course IDs
       const activeEnrollments = enrollments.filter((enrollment) => {
         if (enrollment.expiresAt && enrollment.expiresAt < new Date()) {
-          return false
+          return false;
         }
-        return true
-      })
+        return true;
+      });
 
-      return activeEnrollments.map((enrollment) => enrollment.courseId)
+      return activeEnrollments.map((enrollment) => enrollment.courseId);
     } catch {
-      return []
+      return [];
     }
   }
 }

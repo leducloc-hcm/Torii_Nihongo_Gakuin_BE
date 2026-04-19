@@ -338,6 +338,45 @@ export class S3Service {
       duration,
     };
   };
+  // Generate presigned URL for refund evidence image upload
+  generatePresignedRefundEvidenceUploadUrl = async (
+    filename: string,
+    contentType: string,
+    expiresIn: number = 3600,
+  ) => {
+    try {
+      const fileExt = filename.split(".").pop();
+      const key = `refunds/evidence/${uuidv4()}.${fileExt}`;
+
+      const command = new PutObjectCommand({
+        Bucket: this.BUCKET_NAME,
+        Key: key,
+        ContentType: contentType,
+        Metadata: {
+          type: "refund-evidence",
+          originalName: filename,
+          uploadedAt: new Date().toISOString(),
+        },
+      });
+
+      const uploadUrl = await getSignedUrl(this.s3, command, { expiresIn });
+
+      const publicUrl = `https://${this.BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
+
+      return {
+        uploadUrl,
+        key,
+        publicUrl,
+        expiresIn,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Failed to generate refund evidence upload URL: ${error.message}`,
+      );
+      throw error;
+    }
+  };
+
   // Generate presigned URL for blog image upload
   generatePresignedBlogImageUploadUrl = async (
     filename: string,

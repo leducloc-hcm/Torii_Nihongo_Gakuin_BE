@@ -81,14 +81,19 @@ export class CourseRepository {
     take?: number;
     where?: CourseWhereInput;
     orderBy?: CourseOrderByInput;
+    includeReviews?: boolean;
   }): Promise<{ courses: CourseWithRelations[]; total: number }> {
-    const { skip, take, where, orderBy } = params;
+    const { skip, take, where, orderBy, includeReviews = false } = params;
+
+    const includeQuery = includeReviews
+      ? this.includeRelationsWithReviews
+      : this.includeRelations;
 
     const [courses, total] = await Promise.all([
       this.prisma.course.findMany({
         where: where as any,
         orderBy: orderBy as any,
-        include: this.includeRelations,
+        include: includeQuery,
       }) as unknown as Promise<CourseWithRelations[]>,
       this.prisma.course.count({ where: where as any }),
     ]);
@@ -262,12 +267,13 @@ export class CourseRepository {
     take?: number;
     where?: Omit<CourseWhereInput, "status">;
     orderBy?: CourseOrderByInput;
+    includeReviews?: boolean;
   }): Promise<{ courses: CourseWithRelations[]; total: number }> {
-    const { skip, take, where = {}, orderBy } = params;
+    const { skip, take, where = {}, orderBy, includeReviews = false } = params;
 
     const whereWithStatus = { ...where, status: "PUBLISHED" as const };
 
-    return this.findAll({ skip, take, where: whereWithStatus, orderBy });
+    return this.findAll({ skip, take, where: whereWithStatus, orderBy, includeReviews });
   }
 
   async findByIds(ids: number[]): Promise<Course[]> {
@@ -297,5 +303,20 @@ export class CourseRepository {
 
     const { courses } = await this.findAll({ where: whereWithStatus });
     return courses;
+  }
+
+  async getAvgRatingsForCourses(courseIds: number[]): Promise<Map<number, number>> {
+    if (courseIds.length === 0) return new Map();
+
+    const result = await this.prisma.review.groupBy({
+      by: ["courseId"],
+      where: {
+        courseId: { in: courseIds },
+        status: "VISIBLE",
+      },
+      _avg: { rating: true },
+    });
+
+    return new Map(result.map((r) => [r.courseId, r._avg.rating ?? 0]));
   }
 }

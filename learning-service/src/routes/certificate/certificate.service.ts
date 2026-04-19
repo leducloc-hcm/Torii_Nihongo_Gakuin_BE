@@ -4,6 +4,7 @@ import { EmailService } from "src/shared/services/email.service";
 import { S3Service } from "src/shared/services/s3.service";
 import { randomUUID } from "crypto";
 import { generateCertificatePDF } from "./generate-certificate-pdf";
+import { ActivityLogService } from "../activity-log/activity-log.service";
 
 const APP_URL =
   process.env.NEXT_PUBLIC_APP_URL ?? "https://torii-nihongo-gakuin.io.vn";
@@ -16,6 +17,7 @@ export class CertificateService {
     private readonly certificateRepo: CertificateRepository,
     private readonly emailService: EmailService,
     private readonly s3Service: S3Service,
+    private readonly activityLogService: ActivityLogService,
   ) {}
 
   async getMyCertificates(userId: number) {
@@ -66,6 +68,15 @@ export class CertificateService {
     this.logger.log(
       `Certificate issued for user ${userId}, course ${courseId} — code: ${verifyCode}`,
     );
+
+    this.activityLogService.log({
+      userId,
+      action: "CERTIFICATE_ISSUED",
+      entity: "CERTIFICATE",
+      entityId: cert.id,
+      description: `Certificate issued for course #${courseId}`,
+      metadata: { courseId, verifyCode },
+    });
   }
 
   private async generateAndUploadPdf(

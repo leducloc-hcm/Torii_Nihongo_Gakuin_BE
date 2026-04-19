@@ -31,6 +31,8 @@ import { AssessmentAIModule } from "./routes/assessment-ai/assessment-ai.module"
 import { BlogAIModule } from "./routes/blog-ai/blog-ai.module";
 import { MultiAgentModule } from "./routes/multi-agent/multi-agent.module";
 import { CertificateModule } from "./routes/certificate/certificate.module";
+import { ActivityLogModule } from "./routes/activity-log/activity-log.module";
+import { RefundModule } from "./routes/refund/refund.module";
 
 @Module({
   imports: [
@@ -78,6 +80,8 @@ import { CertificateModule } from "./routes/certificate/certificate.module";
     BlogAIModule,
     MultiAgentModule,
     CertificateModule,
+    ActivityLogModule,
+    RefundModule,
   ],
   controllers: [AppController],
   providers: [AppService],
