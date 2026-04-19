@@ -516,6 +516,7 @@ export class CourseService {
   async getPublishedCourses(
     queryDto: Omit<QueryCourseDTO, "status">,
     userId: number,
+    includeReviews = false,
   ) {
     const { page, limit, search, level, courseType, sortBy, sortOrder } =
       queryDto;
@@ -556,6 +557,7 @@ export class CourseService {
       take: Number(limit),
       where,
       orderBy,
+      includeReviews,
     });
     const lecturerArray =
       await this.lecturerRepository.findLectureProfileByUserIds(
@@ -564,10 +566,10 @@ export class CourseService {
 
     // Check enrollment status for each course
     const courseIds = courses.map((course) => course.id);
-    const userEnrollments = await this.enrollmentService.checkUserEnrollments(
-      userId,
-      courseIds,
-    );
+    const [userEnrollments, avgRatingMap] = await Promise.all([
+      this.enrollmentService.checkUserEnrollments(userId, courseIds),
+      this.courseRepository.getAvgRatingsForCourses(courseIds),
+    ]);
 
     return {
       data: courses.map((course) => ({
@@ -578,6 +580,7 @@ export class CourseService {
           ),
         ),
         isEnrolled: userEnrollments.includes(course.id),
+        avgRating: Number((avgRatingMap.get(course.id) ?? 0).toFixed(1)),
       })),
       meta: {
         pagination: {

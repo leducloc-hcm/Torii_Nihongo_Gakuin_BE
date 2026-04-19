@@ -170,8 +170,9 @@ export class CourseController {
   async findPublished(
     @ActiveUser("userId") userId: number,
     @Query() queryDto: Omit<QueryCourseDTO, "status">,
+    @Query("includeReviews") includeReviews?: string,
   ) {
-    return this.courseService.getPublishedCourses(queryDto, userId);
+    return this.courseService.getPublishedCourses(queryDto, userId, includeReviews === "true");
   }
 
   @Get("my-enrolled-courses")

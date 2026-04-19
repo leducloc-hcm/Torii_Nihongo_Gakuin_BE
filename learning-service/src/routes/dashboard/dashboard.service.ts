@@ -47,12 +47,12 @@ export class DashboardService {
       previousEnd,
     );
 
-    // Get revenue by period
-    const revenueByPeriod = await this.dashboardRepo.getRevenueByPeriod(
-      period,
-      start,
-      end,
-    );
+    // Get revenue by period and refund by period in parallel
+    const [revenueByPeriod, refundByPeriod, refundStats] = await Promise.all([
+      this.dashboardRepo.getRevenueByPeriod(period, start, end),
+      this.dashboardRepo.getRefundByPeriod(period, start, end),
+      this.dashboardRepo.getTotalRefunds(start, end),
+    ]);
 
     // Calculate growth rate
     const growthRate = this.calculateGrowthRate(
@@ -60,14 +60,24 @@ export class DashboardService {
       previousRevenue.totalRevenue,
     );
 
+    // Build refund lookup by period ISO string
+    const refundMap = new Map(
+      refundByPeriod.map((r) => [r.period.toISOString(), r]),
+    );
+
     // Format revenue by period
     const formattedRevenueByPeriod: RevenueByPeriodType[] = revenueByPeriod.map(
-      (item) => ({
-        period: item.period.toISOString(),
-        revenue: item.revenue,
-        orderCount: item.orderCount,
-        periodLabel: this.formatPeriodLabel(item.period, period),
-      }),
+      (item) => {
+        const refund = refundMap.get(item.period.toISOString());
+        return {
+          period: item.period.toISOString(),
+          revenue: item.revenue,
+          orderCount: item.orderCount,
+          periodLabel: this.formatPeriodLabel(item.period, period),
+          refundAmount: refund?.refundAmount ?? 0,
+          refundCount: refund?.refundCount ?? 0,
+        };
+      },
     );
 
     return {
@@ -79,6 +89,9 @@ export class DashboardService {
           : 0,
       revenueByPeriod: formattedRevenueByPeriod,
       growthRate,
+      totalRefunds: refundStats.totalRefunds,
+      totalRefundCount: refundStats.totalRefundCount,
+      netRevenue: currentRevenue.totalRevenue - refundStats.totalRefunds,
     };
   }
 

@@ -17,6 +17,8 @@ export const RevenueByPeriodSchema = z.object({
   revenue: z.number().nonnegative(),
   orderCount: z.number().int().nonnegative(),
   periodLabel: z.string(),
+  refundAmount: z.number().nonnegative(),
+  refundCount: z.number().int().nonnegative(),
 })
 
 export const RevenueOverviewSchema = z.object({
@@ -25,6 +27,9 @@ export const RevenueOverviewSchema = z.object({
   averageOrderValue: z.number().nonnegative(),
   revenueByPeriod: z.array(RevenueByPeriodSchema),
   growthRate: z.number(), // Percentage growth compared to previous period
+  totalRefunds: z.number().nonnegative(),
+  totalRefundCount: z.number().int().nonnegative(),
+  netRevenue: z.number(),
 })
 
 // User Growth Analytics Schemas

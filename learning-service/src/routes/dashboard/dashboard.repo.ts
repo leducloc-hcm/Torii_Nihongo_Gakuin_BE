@@ -92,6 +92,76 @@ export class DashboardRepository {
     }));
   }
 
+  // Refund related queries
+  async getTotalRefunds(startDate?: Date, endDate?: Date) {
+    const result = await this.prisma.$queryRaw<
+      Array<{ total_refund: bigint; refund_count: bigint }>
+    >`
+      SELECT
+        COALESCE(SUM(o."totalAmount"), 0) as total_refund,
+        COUNT(r.id) as refund_count
+      FROM learning."refund_requests" r
+      JOIN learning."Order" o ON r."orderId" = o.id
+      WHERE r.status = 'APPROVED'
+        ${startDate && endDate ? Prisma.sql`AND r."created_at" >= ${startDate} AND r."created_at" <= ${endDate}` : Prisma.sql``}
+    `;
+
+    return {
+      totalRefunds: Number(result[0]?.total_refund || 0),
+      totalRefundCount: Number(result[0]?.refund_count || 0),
+    };
+  }
+
+  async getRefundByPeriod(period: TimePeriod, startDate: Date, endDate: Date) {
+    let groupByFormat: string;
+
+    switch (period) {
+      case "day":
+        groupByFormat = 'DATE(r."created_at")';
+        break;
+      case "week":
+        groupByFormat = "DATE_TRUNC('week', r.\"created_at\")";
+        break;
+      case "month":
+        groupByFormat = "DATE_TRUNC('month', r.\"created_at\")";
+        break;
+      case "quarter":
+        groupByFormat = "DATE_TRUNC('quarter', r.\"created_at\")";
+        break;
+      case "year":
+        groupByFormat = "DATE_TRUNC('year', r.\"created_at\")";
+        break;
+      default:
+        groupByFormat = 'DATE(r."created_at")';
+    }
+
+    const result = await this.prisma.$queryRaw<
+      Array<{
+        period: Date;
+        refund_amount: bigint;
+        refund_count: bigint;
+      }>
+    >`
+      SELECT
+        ${Prisma.raw(groupByFormat)} as period,
+        COALESCE(SUM(o."totalAmount"), 0) as refund_amount,
+        COUNT(r.id) as refund_count
+      FROM learning."refund_requests" r
+      JOIN learning."Order" o ON r."orderId" = o.id
+      WHERE r.status = 'APPROVED'
+        AND r."created_at" >= ${startDate}
+        AND r."created_at" <= ${endDate}
+      GROUP BY ${Prisma.raw(groupByFormat)}
+      ORDER BY period ASC
+    `;
+
+    return result.map((row) => ({
+      period: row.period,
+      refundAmount: Number(row.refund_amount),
+      refundCount: Number(row.refund_count),
+    }));
+  }
+
   // User growth related queries
   async getTotalUsers() {
     return await this.prisma.user.count({
