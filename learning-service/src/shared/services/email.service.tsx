@@ -6,6 +6,8 @@ import AccountCreatedEmail from "emails/accountCreated";
 import CourseWelcomeEmail from "emails/courseWelcome";
 import CalendarInviteEmail from "emails/calendarInvite";
 import CourseCertificateEmail from "emails/courseCertificate";
+import RefundRejectedEmail from "emails/refundRejected";
+import RefundApprovedEmail from "emails/refundApproved";
 
 @Injectable()
 export class EmailService {
@@ -154,6 +156,58 @@ export class EmailService {
         />
       ),
       attachments,
+    });
+  }
+
+  async sendRefundApproved(payload: {
+    email: string;
+    studentName: string;
+    courseTitle: string;
+    approvalEvidence: string;
+    progressPercent: number;
+    refundId: number;
+  }) {
+    const subject = `Refund Request #${payload.refundId} Approved`;
+    return await this.resend.emails.send({
+      from: process.env.RESEND_FROM_ADDRESS!,
+      to: [payload.email],
+      subject,
+      react: (
+        <RefundApprovedEmail
+          studentName={payload.studentName}
+          courseTitle={payload.courseTitle}
+          approvalEvidence={payload.approvalEvidence}
+          progressPercent={payload.progressPercent}
+          refundId={payload.refundId}
+        />
+      ),
+    });
+  }
+
+  async sendRefundRejected(payload: {
+    email: string;
+    studentName: string;
+    courseTitle: string;
+    rejectionReason: string;
+    rejectionEvidence?: string;
+    progressPercent: number;
+    refundId: number;
+  }) {
+    const subject = `Yêu cầu hoàn tiền #${payload.refundId} bị từ chối`;
+    return await this.resend.emails.send({
+      from: process.env.RESEND_FROM_ADDRESS!,
+      to: [payload.email],
+      subject,
+      react: (
+        <RefundRejectedEmail
+          studentName={payload.studentName}
+          courseTitle={payload.courseTitle}
+          rejectionReason={payload.rejectionReason}
+          rejectionEvidence={payload.rejectionEvidence}
+          progressPercent={payload.progressPercent}
+          refundId={payload.refundId}
+        />
+      ),
     });
   }
 }

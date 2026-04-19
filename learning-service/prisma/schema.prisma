@@ -43,7 +43,6 @@ model User {
   liveHands    RaiseHand[]
   liveNotes    LiveNote[]
   attendances  Attendance[]
-  spinPicks    SpinWheelEvent[]  @relation("SpinPickUser")
 
   folders   Folder[]
   folderPermissions FolderPermission[]
@@ -51,9 +50,6 @@ model User {
   reactions Reaction[]
   comments  Comment[]
 
-  points      PointsLedger[]
-  streak      Streak?
-  redemptions RewardRedemption[]
   cart        Cart?
   orders      Order[]
   reviews     Review[]
@@ -84,6 +80,8 @@ model User {
   substituteSessions LiveSession[] @relation("SubstituteLecturer")
   certificates       Certificate[]
   activityLogs       ActivityLog[]
+  refundRequests     RefundRequest[] @relation("RefundRequester")
+  reviewedRefunds    RefundRequest[] @relation("RefundReviewer")
   
   
   
@@ -289,6 +287,7 @@ model Course {
 
   Class Class[]
   coupons CouponCourse[] @relation("CouponCourses")
+  refundRequests RefundRequest[]
 @@schema("learning")
 }
 
@@ -467,7 +466,6 @@ model LiveSession {
   chats      LiveChatMessage[]
   hands      RaiseHand[]
   attendance Attendance[]
-  spins      SpinWheelEvent[]
   notes      LiveNote[]
 
   mediaAssets LiveSessionMedia[]
@@ -535,17 +533,6 @@ model ResourcePing {
 @@schema("learning")
 }
 
-model SpinWheelEvent {
-  id           Int      @id @default(autoincrement())
-  sessionId    Int
-  seed         String
-  pickedUserId Int?
-  createdAt    DateTime @default(now())
-
-  session    LiveSession @relation(fields: [sessionId], references: [id])
-  pickedUser User?       @relation("SpinPickUser", fields: [pickedUserId], references: [id])
-@@schema("learning")
-}
 
 model LiveNote {
   id        Int      @id @default(autoincrement())
@@ -710,52 +697,6 @@ model FolderPermission {
 @@schema("learning")
 }
 
-// ===== Gamification (Points, Streaks, Rewards) =====
-model PointsLedger {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  delta     Int
-  reason    String
-  meta      Json?
-  createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id])
-@@schema("learning")
-}
-
-model Streak {
-  id        Int      @id @default(autoincrement())
-  userId    Int      @unique
-  startDate DateTime
-  lastDate  DateTime
-  longest   Int      @default(0)
-  current   Int      @default(0)
-
-  user User @relation(fields: [userId], references: [id])
-@@schema("learning")
-}
-
-model Reward {
-  id     Int        @id @default(autoincrement())
-  type   RewardType
-  name   String
-  points Int        @default(0)
-  stock  Int? 
-  redemptions RewardRedemption[]
-@@schema("learning")
-}
-
-model RewardRedemption {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  rewardId  Int
-  createdAt DateTime @default(now())
-
-  user   User   @relation(fields: [userId], references: [id])
-  reward Reward @relation(fields: [rewardId], references: [id])
-@@schema("learning")
-}
-
 // ===== Commerce, Cart, Orders, Coupons =====
 model Cart {
   id        Int      @id @default(autoincrement())
@@ -799,6 +740,7 @@ model Order {
   payments   Payment[]
   coupon     Coupon?     @relation("OrderCoupon", fields: [couponId], references: [id])
   redemption CouponRedemption? @relation("OrderRedemption")
+  refundRequests RefundRequest[]
 @@schema("learning")
 }
 
@@ -1217,6 +1159,7 @@ enum OrderStatus {
   PROCESSING
   COMPLETED
   CANCELLED
+  PARTIALLY_REFUNDED
   REFUNDED
 }
 
@@ -1246,12 +1189,8 @@ enum OrderItemType {
   PACKAGE
 }
 
-enum RewardType {
-  @@schema("learning")
-  POINTS
-  ITEM
-  BADGE
-}
+
+
 
 enum ReactionKind {
   @@schema("learning")
@@ -1310,6 +1249,10 @@ enum NotificationType {
   REMINDER
   ACHIEVEMENT
   REWARD
+  REFUND_REQUEST_CREATED
+  REFUND_APPROVED
+  REFUND_REJECTED
+  REFUND_COMPLETED
 }
 
 enum NotificationStatus {
@@ -1470,6 +1413,8 @@ enum ActivityAction {
   USER_REGISTERED
   USER_LOGIN
   CERTIFICATE_ISSUED
+  REFUND_REQUEST_CREATED
+  REFUND_REVIEWED
 }
 
 enum ActivityEntity {
@@ -1481,4 +1426,47 @@ enum ActivityEntity {
   COURSE
   USER
   CERTIFICATE
+  REFUND
+}
+
+// ===== Refund System =====
+model RefundRequest {
+  id              Int           @id @default(autoincrement())
+  userId          Int
+  orderId         Int
+  courseId        Int
+  fullName        String
+  email           String
+  reason          String        @db.Text
+  bankAccountName String        @map("bank_account_name")
+  bankAccountNumber String      @map("bank_account_number")
+  bankName        String        @map("bank_name")
+  status          RefundStatus  @default(PENDING)
+  rejectionReason String?       @map("rejection_reason") @db.Text
+  rejectionEvidence String?     @map("rejection_evidence") @db.Text
+  approvalEvidence  String?     @map("approval_evidence") @db.Text
+  progressAtRequest Float?      @map("progress_at_request")
+  progressAtReview  Float?      @map("progress_at_review")
+  reviewedBy      Int?          @map("reviewed_by")
+  reviewedAt      DateTime?     @map("reviewed_at")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  user            User          @relation("RefundRequester", fields: [userId], references: [id])
+  reviewer        User?         @relation("RefundReviewer", fields: [reviewedBy], references: [id])
+  order           Order         @relation(fields: [orderId], references: [id])
+  course          Course        @relation(fields: [courseId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@index([orderId])
+  @@map("refund_requests")
+  @@schema("learning")
+}
+
+enum RefundStatus {
+  @@schema("learning")
+  PENDING
+  APPROVED
+  REJECTED
 }
