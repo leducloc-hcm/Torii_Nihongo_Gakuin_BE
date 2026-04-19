@@ -27,7 +27,7 @@ variable "vpc_cidr" {
 variable "existing_rds_endpoint" {
   description = "Endpoint of the existing RDS instance (host:port)"
   type        = string
-  default     = "torii-nihongo.cd48o48cgxzd.ap-southeast-1.rds.amazonaws.com:5432"
+  default     = "database.czgcs6yqwtym.ap-southeast-1.rds.amazonaws.com:5432"
 }
 
 variable "existing_rds_db_name" {
@@ -48,18 +48,12 @@ variable "database_password" {
   sensitive   = true
 }
 
-# ===== Redis Configuration =====
+# ===== EC2 Configuration =====
 
-variable "redis_node_type" {
-  description = "ElastiCache Redis node type"
+variable "ec2_instance_type" {
+  description = "EC2 instance type for ECS container instances"
   type        = string
-  default     = "cache.t3.medium"
-}
-
-variable "redis_num_cache_nodes" {
-  description = "Number of Redis cache nodes"
-  type        = number
-  default     = 1
+  default     = "m7i-flex.large"
 }
 
 # ===== Networking =====
@@ -68,32 +62,6 @@ variable "allowed_cidr_blocks" {
   description = "CIDR blocks allowed to access services"
   type        = list(string)
   default     = ["0.0.0.0/0"] # Restrict in production
-}
-
-# ===== ECS Service Scaling =====
-
-variable "api_gateway_desired_count" {
-  description = "Desired count for API Gateway service"
-  type        = number
-  default     = 2
-}
-
-variable "learning_service_desired_count" {
-  description = "Desired count for Learning service"
-  type        = number
-  default     = 2
-}
-
-variable "assessment_service_desired_count" {
-  description = "Desired count for Assessment service"
-  type        = number
-  default     = 2
-}
-
-variable "gamification_service_desired_count" {
-  description = "Desired count for Gamification service"
-  type        = number
-  default     = 2
 }
 
 # ===== Application Secrets =====

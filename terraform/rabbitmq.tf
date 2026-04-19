@@ -1,60 +1,4 @@
-# RabbitMQ Security Group
-resource "aws_security_group" "rabbitmq" {
-  name        = "${var.project_name}-rabbitmq-sg"
-  description = "Security group for RabbitMQ"
-  vpc_id      = aws_vpc.main.id
-
-  ingress {
-    from_port       = 5671
-    to_port         = 5671
-    protocol        = "tcp"
-    security_groups = [aws_security_group.ecs.id]
-  }
-
-  ingress {
-    from_port       = 15672
-    to_port         = 15672
-    protocol        = "tcp"
-    security_groups = [aws_security_group.ecs.id]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name = "${var.project_name}-rabbitmq-sg"
-  }
-}
-
-# AWS MQ for RabbitMQ (Managed RabbitMQ)
-resource "aws_mq_broker" "main" {
-  broker_name        = "${var.project_name}-rabbitmq"
-  engine_type        = "RabbitMQ"
-  engine_version     = "3.13"
-  host_instance_type         = "mq.t3.micro" # Adjust based on needs
-  auto_minor_version_upgrade = true
-
-  security_groups = [aws_security_group.rabbitmq.id]
-  deployment_mode = "SINGLE_INSTANCE"
-  subnet_ids      = [aws_subnet.private[0].id]
-
-  user {
-    username = "admin"
-    password = random_password.rabbitmq_password.result
-  }
-
-  logs {
-    general = true
-  }
-
-  tags = {
-    Name = "${var.project_name}-rabbitmq"
-  }
-}
+# Self-hosted RabbitMQ on ECS EC2 (replaces Amazon MQ for cost savings)
 
 # Random password for RabbitMQ
 resource "random_password" "rabbitmq_password" {
@@ -71,5 +15,69 @@ resource "aws_secretsmanager_secret" "rabbitmq" {
 resource "aws_secretsmanager_secret_version" "rabbitmq" {
   secret_id     = aws_secretsmanager_secret.rabbitmq.id
   secret_string = random_password.rabbitmq_password.result
+}
+
+resource "aws_ecs_task_definition" "rabbitmq" {
+  family                   = "${var.project_name}-rabbitmq"
+  network_mode             = "host"
+  requires_compatibilities = ["EC2"]
+  execution_role_arn       = aws_iam_role.ecs_task_execution.arn
+
+  container_definitions = jsonencode([{
+    name      = "rabbitmq"
+    image     = "rabbitmq:3.13-management-alpine"
+    essential = true
+    memory    = 512
+
+    portMappings = [
+      {
+        containerPort = 5672
+        hostPort      = 5672
+        protocol      = "tcp"
+      },
+      {
+        containerPort = 15672
+        hostPort      = 15672
+        protocol      = "tcp"
+      }
+    ]
+
+    environment = [
+      { name = "RABBITMQ_DEFAULT_USER", value = "admin" },
+      { name = "RABBITMQ_DEFAULT_PASS", value = random_password.rabbitmq_password.result }
+    ]
+
+    logConfiguration = {
+      logDriver = "awslogs"
+      options = {
+        "awslogs-group"         = aws_cloudwatch_log_group.ecs.name
+        "awslogs-region"        = var.aws_region
+        "awslogs-stream-prefix" = "rabbitmq"
+      }
+    }
+
+    healthCheck = {
+      command     = ["CMD-SHELL", "rabbitmq-diagnostics -q check_running || exit 1"]
+      interval    = 30
+      timeout     = 10
+      retries     = 3
+      startPeriod = 60
+    }
+  }])
+}
+
+resource "aws_ecs_service" "rabbitmq" {
+  name            = "${var.project_name}-rabbitmq"
+  cluster         = aws_ecs_cluster.main.id
+  task_definition = aws_ecs_task_definition.rabbitmq.arn
+  desired_count   = 1
+
+  capacity_provider_strategy {
+    capacity_provider = aws_ecs_capacity_provider.ec2.name
+    weight            = 1
+    base              = 0
+  }
+
+  depends_on = [aws_ecs_cluster_capacity_providers.main]
 }
 

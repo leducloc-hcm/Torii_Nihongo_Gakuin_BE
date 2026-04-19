@@ -1,71 +1,55 @@
-# ElastiCache Subnet Group
-resource "aws_elasticache_subnet_group" "main" {
-  name       = "${var.project_name}-redis-subnet-group"
-  subnet_ids = aws_subnet.private[*].id
+# Self-hosted Redis on ECS EC2 (replaces ElastiCache for cost savings)
+
+resource "aws_ecs_task_definition" "redis" {
+  family                   = "${var.project_name}-redis"
+  network_mode             = "host"
+  requires_compatibilities = ["EC2"]
+  execution_role_arn       = aws_iam_role.ecs_task_execution.arn
+
+  container_definitions = jsonencode([{
+    name      = "redis"
+    image     = "redis:7-alpine"
+    essential = true
+    memory    = 512
+    command   = ["redis-server", "--maxmemory", "384mb", "--maxmemory-policy", "allkeys-lru", "--save", "60", "1000", "--appendonly", "yes"]
+
+    portMappings = [{
+      containerPort = 6379
+      hostPort      = 6379
+      protocol      = "tcp"
+    }]
+
+    logConfiguration = {
+      logDriver = "awslogs"
+      options = {
+        "awslogs-group"         = aws_cloudwatch_log_group.ecs.name
+        "awslogs-region"        = var.aws_region
+        "awslogs-stream-prefix" = "redis"
+      }
+    }
+
+    healthCheck = {
+      command     = ["CMD-SHELL", "redis-cli ping | grep -q PONG || exit 1"]
+      interval    = 30
+      timeout     = 5
+      retries     = 3
+      startPeriod = 10
+    }
+  }])
 }
 
-# ElastiCache Security Group
-resource "aws_security_group" "redis" {
-  name        = "${var.project_name}-redis-sg"
-  description = "Security group for ElastiCache Redis"
-  vpc_id      = aws_vpc.main.id
+resource "aws_ecs_service" "redis" {
+  name            = "${var.project_name}-redis"
+  cluster         = aws_ecs_cluster.main.id
+  task_definition = aws_ecs_task_definition.redis.arn
+  desired_count   = 1
 
-  ingress {
-    from_port       = 6379
-    to_port         = 6379
-    protocol        = "tcp"
-    security_groups = [aws_security_group.ecs.id]
+  capacity_provider_strategy {
+    capacity_provider = aws_ecs_capacity_provider.ec2.name
+    weight            = 1
+    base              = 0
   }
 
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name = "${var.project_name}-redis-sg"
-  }
-}
-
-# ElastiCache Parameter Group
-resource "aws_elasticache_parameter_group" "main" {
-  name   = "${var.project_name}-redis-params"
-  family = "redis7"
-
-  parameter {
-    name  = "maxmemory-policy"
-    value = "allkeys-lru"
-  }
-}
-
-# ElastiCache Redis Cluster
-resource "aws_elasticache_replication_group" "main" {
-  replication_group_id = "${var.project_name}-redis"
-  description          = "Redis cluster for Torii Nihongo Gakuin"
-
-  engine             = "redis"
-  engine_version     = "7.0"
-  node_type          = var.redis_node_type
-  num_cache_clusters = var.redis_num_cache_nodes
-
-  port                 = 6379
-  parameter_group_name = aws_elasticache_parameter_group.main.name
-  subnet_group_name    = aws_elasticache_subnet_group.main.name
-  security_group_ids   = [aws_security_group.redis.id]
-
-  at_rest_encryption_enabled = true
-  transit_encryption_enabled = false # Set to true if using auth_token
-
-  automatic_failover_enabled = var.redis_num_cache_nodes > 1
-  multi_az_enabled           = var.redis_num_cache_nodes > 1
-
-  snapshot_retention_limit = 5
-  snapshot_window          = "03:00-05:00"
-
-  tags = {
-    Name = "${var.project_name}-redis"
-  }
+  depends_on = [aws_ecs_cluster_capacity_providers.main]
 }
 

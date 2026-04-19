@@ -12,12 +12,15 @@ import { GqlAuthGuard } from "src/shared/guards/gql-auth.guard";
 import { GqlRolesGuard } from "src/shared/guards/gql-roles.guard";
 import { Roles } from "src/shared/decorators/roles.decorator";
 import { RoleName } from "src/shared/constants/role.constant";
+import { Auth } from "src/shared/decorators/auth.decorator";
+import { AuthType } from "src/shared/constants/auth.constant";
 
 @Resolver(() => TagObject)
 export class TagResolver {
   constructor(private readonly tagService: TagService) {}
 
   @Query(() => PaginatedTagsResponse, { name: "tags" })
+  @Auth([AuthType.None])
   async findAll(
     @Args("query", { nullable: true }) query?: QueryTagsGraphQLInput,
   ): Promise<PaginatedTagsResponse> {
@@ -36,6 +39,7 @@ export class TagResolver {
   }
 
   @Query(() => TagObject, { name: "tagBySlug" })
+  @Auth([AuthType.None])
   async findBySlug(@Args("slug") slug: string): Promise<TagObject> {
     return this.tagService.findBySlug(slug) as Promise<TagObject>;
   }

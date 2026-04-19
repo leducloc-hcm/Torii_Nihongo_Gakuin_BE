@@ -3,21 +3,6 @@ output "vpc_id" {
   value       = aws_vpc.main.id
 }
 
-output "redis_endpoint" {
-  description = "ElastiCache Redis endpoint"
-  value       = aws_elasticache_replication_group.main.primary_endpoint_address
-}
-
-output "rabbitmq_endpoint" {
-  description = "RabbitMQ broker endpoint"
-  value       = aws_mq_broker.main.instances[0].endpoints[0]
-}
-
-output "rabbitmq_amqp_endpoint" {
-  description = "RabbitMQ AMQP endpoint"
-  value       = aws_mq_broker.main.instances[0].endpoints[0]
-}
-
 output "alb_dns_name" {
   description = "Application Load Balancer DNS name"
   value       = aws_lb.main.dns_name
@@ -77,12 +62,12 @@ output "rabbitmq_password_arn" {
 output "connection_info" {
   description = "Quick reference for connection information"
   value = {
-    alb_url              = "http://${aws_lb.main.dns_name}"
-    database_host        = split(":", local.rds_endpoint)[0]
-    database_name        = local.rds_db_name
-    redis_host           = aws_elasticache_replication_group.main.primary_endpoint_address
-    rabbitmq_host        = split(":", aws_mq_broker.main.instances[0].endpoints[0])[0]
-    ecs_cluster          = aws_ecs_cluster.main.name
-    service_discovery_ns = "${var.project_name}.local"
+    alb_url       = "http://${aws_lb.main.dns_name}"
+    database_host = split(":", local.rds_endpoint)[0]
+    database_name = local.rds_db_name
+    redis_host    = "localhost (self-hosted on EC2)"
+    rabbitmq_host = "localhost (self-hosted on EC2)"
+    ecs_cluster   = aws_ecs_cluster.main.name
+    ec2_instance  = var.ec2_instance_type
   }
 }

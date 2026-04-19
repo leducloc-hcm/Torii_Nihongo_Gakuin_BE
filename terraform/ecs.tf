@@ -1,37 +1,18 @@
-# Service discovery for api-docs
-resource "aws_service_discovery_service" "api_docs" {
-  name = "api-docs"
-
-  dns_config {
-    namespace_id = aws_service_discovery_private_dns_namespace.main.id
-
-    dns_records {
-      ttl  = 10
-      type = "A"
-    }
-
-    routing_policy = "MULTIVALUE"
-  }
-
-  health_check_custom_config {
-    failure_threshold = 1
-  }
-}
 # ===== API DOCS SERVICE =====
 
 resource "aws_ecs_task_definition" "api_docs" {
   family                   = "${var.project_name}-api-docs"
-  network_mode             = "awsvpc"
-  requires_compatibilities = ["FARGATE"]
-  cpu                      = "256"
-  memory                   = "512"
+  network_mode             = "host"
+  requires_compatibilities = ["EC2"]
   execution_role_arn       = aws_iam_role.ecs_task_execution.arn
   task_role_arn            = aws_iam_role.ecs_task.arn
 
   container_definitions = jsonencode([{
-    name      = "api-docs"
-    image     = "${aws_ecr_repository.api_docs.repository_url}:latest"
-    essential = true
+    name              = "api-docs"
+    image             = "${aws_ecr_repository.api_docs.repository_url}:latest"
+    essential         = true
+    memory            = 256
+    memoryReservation = 128
     portMappings = [{
       containerPort = 80
       protocol      = "tcp"
@@ -59,19 +40,17 @@ resource "aws_ecs_service" "api_docs" {
   cluster         = aws_ecs_cluster.main.id
   task_definition = aws_ecs_task_definition.api_docs.arn
   desired_count   = 1
-  launch_type     = "FARGATE"
 
-  network_configuration {
-    subnets          = aws_subnet.private[*].id
-    security_groups  = [aws_security_group.ecs.id]
-    assign_public_ip = false
+  capacity_provider_strategy {
+    capacity_provider = aws_ecs_capacity_provider.ec2.name
+    weight            = 1
+    base              = 0
   }
 
-  service_registries {
-    registry_arn = aws_service_discovery_service.api_docs.arn
-  }
-
-  depends_on = [aws_iam_role_policy_attachment.ecs_task_execution]
+  depends_on = [
+    aws_iam_role_policy_attachment.ecs_task_execution,
+    aws_ecs_cluster_capacity_providers.main
+  ]
 }
 # ECS Cluster
 resource "aws_ecs_cluster" "main" {
@@ -79,7 +58,7 @@ resource "aws_ecs_cluster" "main" {
 
   setting {
     name  = "containerInsights"
-    value = "enabled"
+    value = "disabled"
   }
 
   tags = {
@@ -253,20 +232,21 @@ resource "aws_secretsmanager_secret_version" "app_secrets" {
 
 resource "aws_ecs_task_definition" "api_gateway" {
   family                   = "${var.project_name}-api-gateway"
-  network_mode             = "awsvpc"
-  requires_compatibilities = ["FARGATE"]
-  cpu                      = "512"
-  memory                   = "1024"
+  network_mode             = "host"
+  requires_compatibilities = ["EC2"]
   execution_role_arn       = aws_iam_role.ecs_task_execution.arn
   task_role_arn            = aws_iam_role.ecs_task.arn
 
   container_definitions = jsonencode([{
-    name      = "api-gateway"
-    image     = "${aws_ecr_repository.api_gateway.repository_url}:latest"
-    essential = true
+    name              = "api-gateway"
+    image             = "${aws_ecr_repository.api_gateway.repository_url}:latest"
+    essential         = true
+    memory            = 512
+    memoryReservation = 256
 
     portMappings = [{
       containerPort = 8000
+      hostPort      = 8000
       protocol      = "tcp"
     }]
 
@@ -280,15 +260,15 @@ resource "aws_ecs_task_definition" "api_gateway" {
       { name = "KONG_ADMIN_LISTEN", value = "0.0.0.0:8001" },
       { name = "KONG_PROXY_LISTEN", value = "0.0.0.0:8000" },
       { name = "KONG_PLUGINS", value = "bundled,jwt-validator" },
-      { name = "REDIS_HOST", value = aws_elasticache_replication_group.main.primary_endpoint_address },
+      { name = "REDIS_HOST", value = "localhost" },
       { name = "REDIS_PORT", value = "6379" },
       { name = "REDIS_PASSWORD", value = "" },
-      # Dynamic service discovery hostnames for entrypoint.sh to inject into kong.yml
-      { name = "LEARNING_SERVICE_HOST", value = "learning-service.${var.project_name}.local" },
-      { name = "ASSESSMENT_SERVICE_HOST", value = "assessment-service.${var.project_name}.local" },
-      { name = "GAMIFICATION_SERVICE_HOST", value = "gamification-service.${var.project_name}.local" },
-      { name = "API_DOCS_HOST", value = "api-docs.${var.project_name}.local" },
-      { name = "REDIS_ECS_HOST", value = aws_elasticache_replication_group.main.primary_endpoint_address }
+      # Host network mode: all services on localhost
+      { name = "LEARNING_SERVICE_HOST", value = "localhost" },
+      { name = "ASSESSMENT_SERVICE_HOST", value = "localhost" },
+      { name = "GAMIFICATION_SERVICE_HOST", value = "localhost" },
+      { name = "API_DOCS_HOST", value = "localhost" },
+      { name = "REDIS_ECS_HOST", value = "localhost" }
     ]
 
     secrets = [{
@@ -319,13 +299,12 @@ resource "aws_ecs_service" "api_gateway" {
   name            = "${var.project_name}-api-gateway"
   cluster         = aws_ecs_cluster.main.id
   task_definition = aws_ecs_task_definition.api_gateway.arn
-  desired_count   = var.api_gateway_desired_count
-  launch_type     = "FARGATE"
+  desired_count   = 1
 
-  network_configuration {
-    subnets          = aws_subnet.private[*].id
-    security_groups  = [aws_security_group.ecs.id]
-    assign_public_ip = false
+  capacity_provider_strategy {
+    capacity_provider = aws_ecs_capacity_provider.ec2.name
+    weight            = 1
+    base              = 0
   }
 
   load_balancer {
@@ -334,13 +313,10 @@ resource "aws_ecs_service" "api_gateway" {
     container_port   = 8000
   }
 
-  service_registries {
-    registry_arn = aws_service_discovery_service.api_gateway.arn
-  }
-
   depends_on = [
     aws_lb_listener.http,
-    aws_iam_role_policy_attachment.ecs_task_execution
+    aws_iam_role_policy_attachment.ecs_task_execution,
+    aws_ecs_cluster_capacity_providers.main
   ]
 }
 
@@ -348,20 +324,21 @@ resource "aws_ecs_service" "api_gateway" {
 
 resource "aws_ecs_task_definition" "learning_service" {
   family                   = "${var.project_name}-learning-service"
-  network_mode             = "awsvpc"
-  requires_compatibilities = ["FARGATE"]
-  cpu                      = "1024"
-  memory                   = "2048"
+  network_mode             = "host"
+  requires_compatibilities = ["EC2"]
   execution_role_arn       = aws_iam_role.ecs_task_execution.arn
   task_role_arn            = aws_iam_role.ecs_task.arn
 
   container_definitions = jsonencode([{
-    name      = "learning-service"
-    image     = "${aws_ecr_repository.learning_service.repository_url}:latest"
-    essential = true
+    name              = "learning-service"
+    image             = "${aws_ecr_repository.learning_service.repository_url}:latest"
+    essential         = true
+    memory            = 2048
+    memoryReservation = 1024
 
     portMappings = [{
       containerPort = 4001
+      hostPort      = 4001
       protocol      = "tcp"
     }]
 
@@ -369,17 +346,17 @@ resource "aws_ecs_task_definition" "learning_service" {
       { name = "NODE_ENV", value = var.environment },
       { name = "PORT", value = "4001" },
       { name = "DATABASE_URL", value = "postgresql://${var.database_username}:${var.database_password}@${local.rds_endpoint}/${local.rds_db_name}?schema=learning&sslmode=no-verify" },
-      { name = "REDIS_URL", value = "redis://${aws_elasticache_replication_group.main.primary_endpoint_address}:6379" },
-      { name = "REDIS_HOST", value = aws_elasticache_replication_group.main.primary_endpoint_address },
+      { name = "REDIS_URL", value = "redis://localhost:6379" },
+      { name = "REDIS_HOST", value = "localhost" },
       { name = "REDIS_PORT", value = "6379" },
       { name = "REDIS_USERNAME", value = "" },
       { name = "REDIS_PASSWORD", value = "" },
       { name = "REDIS_DB", value = "0" },
       { name = "REDIS_TLS", value = "false" },
       { name = "REDIS_TTL", value = "3600" },
-      { name = "RABBITMQ_URL", value = "amqps://admin:${random_password.rabbitmq_password.result}@${split("//", aws_mq_broker.main.instances[0].endpoints[0])[1]}" },
-      { name = "RABBITMQ_HOST", value = split(":", split("//", aws_mq_broker.main.instances[0].endpoints[0])[1])[0] },
-      { name = "RABBITMQ_PORT", value = "5671" },
+      { name = "RABBITMQ_URL", value = "amqp://admin:${random_password.rabbitmq_password.result}@localhost:5672" },
+      { name = "RABBITMQ_HOST", value = "localhost" },
+      { name = "RABBITMQ_PORT", value = "5672" },
       { name = "RABBITMQ_USERNAME", value = "admin" },
       { name = "ACCESS_TOKEN_EXPIRES_IN", value = "1h" },
       { name = "REFRESH_TOKEN_EXPIRES_IN", value = "1d" },
@@ -476,23 +453,19 @@ resource "aws_ecs_service" "learning_service" {
   name            = "${var.project_name}-learning-service"
   cluster         = aws_ecs_cluster.main.id
   task_definition = aws_ecs_task_definition.learning_service.arn
-  desired_count   = var.learning_service_desired_count
-  launch_type     = "FARGATE"
+  desired_count   = 1
 
-  network_configuration {
-    subnets          = aws_subnet.private[*].id
-    security_groups  = [aws_security_group.ecs.id]
-    assign_public_ip = false
-  }
-
-  service_registries {
-    registry_arn = aws_service_discovery_service.learning_service.arn
+  capacity_provider_strategy {
+    capacity_provider = aws_ecs_capacity_provider.ec2.name
+    weight            = 1
+    base              = 0
   }
 
   depends_on = [
-    aws_elasticache_replication_group.main,
-    aws_mq_broker.main,
-    aws_iam_role_policy_attachment.ecs_task_execution
+    aws_iam_role_policy_attachment.ecs_task_execution,
+    aws_ecs_cluster_capacity_providers.main,
+    aws_ecs_service.redis,
+    aws_ecs_service.rabbitmq
   ]
 }
 
@@ -500,20 +473,21 @@ resource "aws_ecs_service" "learning_service" {
 
 resource "aws_ecs_task_definition" "assessment_service" {
   family                   = "${var.project_name}-assessment-service"
-  network_mode             = "awsvpc"
-  requires_compatibilities = ["FARGATE"]
-  cpu                      = "512"
-  memory                   = "1024"
+  network_mode             = "host"
+  requires_compatibilities = ["EC2"]
   execution_role_arn       = aws_iam_role.ecs_task_execution.arn
   task_role_arn            = aws_iam_role.ecs_task.arn
 
   container_definitions = jsonencode([{
-    name      = "assessment-service"
-    image     = "${aws_ecr_repository.assessment_service.repository_url}:latest"
-    essential = true
+    name              = "assessment-service"
+    image             = "${aws_ecr_repository.assessment_service.repository_url}:latest"
+    essential         = true
+    memory            = 1024
+    memoryReservation = 512
 
     portMappings = [{
       containerPort = 4002
+      hostPort      = 4002
       protocol      = "tcp"
     }]
 
@@ -533,16 +507,16 @@ resource "aws_ecs_task_definition" "assessment_service" {
       { name = "SPRING_FLYWAY_SCHEMAS", value = "assessment" },
       { name = "SPRING_FLYWAY_LOCATIONS", value = "classpath:db/migration" },
       { name = "SPRING_FLYWAY_BASELINE_ON_MIGRATE", value = "true" },
-      { name = "SPRING_REDIS_HOST", value = aws_elasticache_replication_group.main.primary_endpoint_address },
+      { name = "SPRING_REDIS_HOST", value = "localhost" },
       { name = "SPRING_REDIS_PORT", value = "6379" },
       { name = "SPRING_REDIS_USERNAME", value = "" },
       { name = "SPRING_REDIS_PASSWORD", value = "" },
       { name = "SPRING_REDIS_DB", value = "0" },
       { name = "SPRING_REDIS_TIMEOUT", value = "2000" },
-      { name = "SPRING_RABBITMQ_HOST", value = split(":", split("//", aws_mq_broker.main.instances[0].endpoints[0])[1])[0] },
-      { name = "SPRING_RABBITMQ_PORT", value = "5671" },
+      { name = "SPRING_RABBITMQ_HOST", value = "localhost" },
+      { name = "SPRING_RABBITMQ_PORT", value = "5672" },
       { name = "SPRING_RABBITMQ_USERNAME", value = "admin" },
-      { name = "SPRING_RABBITMQ_SSL_ENABLED", value = "true" },
+      { name = "SPRING_RABBITMQ_SSL_ENABLED", value = "false" },
       { name = "SPRING_RABBITMQ_VIRTUAL_HOST", value = "/" },
       { name = "SPRING_RABBITMQ_LISTENER_SIMPLE_ACKNOWLEDGE_MODE", value = "auto" },
       { name = "SPRING_RABBITMQ_LISTENER_SIMPLE_RETRY_ENABLED", value = "true" },
@@ -577,23 +551,19 @@ resource "aws_ecs_service" "assessment_service" {
   name            = "${var.project_name}-assessment-service"
   cluster         = aws_ecs_cluster.main.id
   task_definition = aws_ecs_task_definition.assessment_service.arn
-  desired_count   = var.assessment_service_desired_count
-  launch_type     = "FARGATE"
+  desired_count   = 1
 
-  network_configuration {
-    subnets          = aws_subnet.private[*].id
-    security_groups  = [aws_security_group.ecs.id]
-    assign_public_ip = false
-  }
-
-  service_registries {
-    registry_arn = aws_service_discovery_service.assessment_service.arn
+  capacity_provider_strategy {
+    capacity_provider = aws_ecs_capacity_provider.ec2.name
+    weight            = 1
+    base              = 0
   }
 
   depends_on = [
-    aws_elasticache_replication_group.main,
-    aws_mq_broker.main,
-    aws_iam_role_policy_attachment.ecs_task_execution
+    aws_iam_role_policy_attachment.ecs_task_execution,
+    aws_ecs_cluster_capacity_providers.main,
+    aws_ecs_service.redis,
+    aws_ecs_service.rabbitmq
   ]
 }
 
@@ -601,20 +571,21 @@ resource "aws_ecs_service" "assessment_service" {
 
 resource "aws_ecs_task_definition" "gamification_service" {
   family                   = "${var.project_name}-gamification-service"
-  network_mode             = "awsvpc"
-  requires_compatibilities = ["FARGATE"]
-  cpu                      = "512"
-  memory                   = "1024"
+  network_mode             = "host"
+  requires_compatibilities = ["EC2"]
   execution_role_arn       = aws_iam_role.ecs_task_execution.arn
   task_role_arn            = aws_iam_role.ecs_task.arn
 
   container_definitions = jsonencode([{
-    name      = "gamification-service"
-    image     = "${aws_ecr_repository.gamification_service.repository_url}:latest"
-    essential = true
+    name              = "gamification-service"
+    image             = "${aws_ecr_repository.gamification_service.repository_url}:latest"
+    essential         = true
+    memory            = 1024
+    memoryReservation = 512
 
     portMappings = [{
       containerPort = 4003
+      hostPort      = 4003
       protocol      = "tcp"
     }]
 
@@ -622,16 +593,16 @@ resource "aws_ecs_task_definition" "gamification_service" {
       { name = "NODE_ENV", value = var.environment },
       { name = "PORT", value = "4003" },
       { name = "DATABASE_URL", value = "postgresql://${var.database_username}:${var.database_password}@${local.rds_endpoint}/${local.rds_db_name}?schema=gamification&sslmode=no-verify" },
-      { name = "REDIS_URL", value = "redis://${aws_elasticache_replication_group.main.primary_endpoint_address}:6379" },
-      { name = "REDIS_HOST", value = aws_elasticache_replication_group.main.primary_endpoint_address },
+      { name = "REDIS_URL", value = "redis://localhost:6379" },
+      { name = "REDIS_HOST", value = "localhost" },
       { name = "REDIS_PORT", value = "6379" },
       { name = "REDIS_USERNAME", value = "" },
       { name = "REDIS_PASSWORD", value = "" },
       { name = "REDIS_DB", value = "0" },
       { name = "REDIS_TLS", value = "false" },
-      { name = "RABBITMQ_URL", value = "amqps://admin:${random_password.rabbitmq_password.result}@${split("//", aws_mq_broker.main.instances[0].endpoints[0])[1]}" },
-      { name = "RABBITMQ_HOST", value = split(":", split("//", aws_mq_broker.main.instances[0].endpoints[0])[1])[0] },
-      { name = "RABBITMQ_PORT", value = "5671" },
+      { name = "RABBITMQ_URL", value = "amqp://admin:${random_password.rabbitmq_password.result}@localhost:5672" },
+      { name = "RABBITMQ_HOST", value = "localhost" },
+      { name = "RABBITMQ_PORT", value = "5672" },
       { name = "RABBITMQ_USERNAME", value = "admin" }
     ]
 
@@ -664,105 +635,18 @@ resource "aws_ecs_service" "gamification_service" {
   name            = "${var.project_name}-gamification-service"
   cluster         = aws_ecs_cluster.main.id
   task_definition = aws_ecs_task_definition.gamification_service.arn
-  desired_count   = var.gamification_service_desired_count
-  launch_type     = "FARGATE"
+  desired_count   = 1
 
-  network_configuration {
-    subnets          = aws_subnet.private[*].id
-    security_groups  = [aws_security_group.ecs.id]
-    assign_public_ip = false
-  }
-
-  service_registries {
-    registry_arn = aws_service_discovery_service.gamification_service.arn
+  capacity_provider_strategy {
+    capacity_provider = aws_ecs_capacity_provider.ec2.name
+    weight            = 1
+    base              = 0
   }
 
   depends_on = [
-    aws_elasticache_replication_group.main,
-    aws_mq_broker.main,
-    aws_iam_role_policy_attachment.ecs_task_execution
+    aws_iam_role_policy_attachment.ecs_task_execution,
+    aws_ecs_cluster_capacity_providers.main,
+    aws_ecs_service.redis,
+    aws_ecs_service.rabbitmq
   ]
-}
-
-# ===== SERVICE DISCOVERY =====
-
-resource "aws_service_discovery_private_dns_namespace" "main" {
-  name = "${var.project_name}.local"
-  vpc  = aws_vpc.main.id
-}
-
-resource "aws_service_discovery_service" "api_gateway" {
-  name = "api-gateway"
-
-  dns_config {
-    namespace_id = aws_service_discovery_private_dns_namespace.main.id
-
-    dns_records {
-      ttl  = 10
-      type = "A"
-    }
-
-    routing_policy = "MULTIVALUE"
-  }
-
-  health_check_custom_config {
-    failure_threshold = 1
-  }
-}
-
-resource "aws_service_discovery_service" "learning_service" {
-  name = "learning-service"
-
-  dns_config {
-    namespace_id = aws_service_discovery_private_dns_namespace.main.id
-
-    dns_records {
-      ttl  = 10
-      type = "A"
-    }
-
-    routing_policy = "MULTIVALUE"
-  }
-
-  health_check_custom_config {
-    failure_threshold = 1
-  }
-}
-
-resource "aws_service_discovery_service" "assessment_service" {
-  name = "assessment-service"
-
-  dns_config {
-    namespace_id = aws_service_discovery_private_dns_namespace.main.id
-
-    dns_records {
-      ttl  = 10
-      type = "A"
-    }
-
-    routing_policy = "MULTIVALUE"
-  }
-
-  health_check_custom_config {
-    failure_threshold = 1
-  }
-}
-
-resource "aws_service_discovery_service" "gamification_service" {
-  name = "gamification-service"
-
-  dns_config {
-    namespace_id = aws_service_discovery_private_dns_namespace.main.id
-
-    dns_records {
-      ttl  = 10
-      type = "A"
-    }
-
-    routing_policy = "MULTIVALUE"
-  }
-
-  health_check_custom_config {
-    failure_threshold = 1
-  }
 }
