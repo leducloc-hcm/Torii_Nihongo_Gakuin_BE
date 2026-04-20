@@ -209,6 +209,15 @@ export class CourseController {
     return await this.courseService.getMyCourseDetail(userId, courseId);
   }
 
+
+  @Get("manage/:courseId")
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Admin, RoleName.Staff)
+  @HttpCode(HttpStatus.OK)
+  async findByCourseIDForManager(@Param("courseId", ParseIntPipe) courseId: number,) {
+    return this.courseService.findByCourseIDManagement(courseId);
+  }
+
   @Get(":slug")
   @HttpCode(HttpStatus.OK)
   @Auth([AuthType.Bearer])

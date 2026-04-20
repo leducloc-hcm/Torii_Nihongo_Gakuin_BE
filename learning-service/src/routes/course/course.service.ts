@@ -1151,4 +1151,16 @@ export class CourseService {
 
     return updatedCourse;
   }
+
+  async findByCourseIDManagement(courseId: number) {
+    const course = await this.courseRepository.findByCourseIDManagement(
+      { id: courseId }
+    );
+
+    if (!course) {
+      throw new NotFoundException(`Course with ID '${courseId}' not found`);
+    }
+
+    return course;
+  }
 }

@@ -319,4 +319,48 @@ export class CourseRepository {
 
     return new Map(result.map((r) => [r.courseId, r._avg.rating ?? 0]));
   }
+  async findByCourseIDManagement(where: CourseWhereUniqueInput): Promise<any> {
+    return this.prisma.course.findUnique({
+      where: where as any,
+      include: {
+        modules: {
+          select: {
+            id: true,
+            title: true,
+            order: true,
+            lessons: {
+              select: {
+                id: true,
+                title: true,
+                kind: true,
+                content: true,
+                order: true,
+                status: true,
+                durationSec: true,
+                createdAt: true,
+                updatedAt: true,
+                media: {
+                  select: {
+                    id: true,
+                    url: true,
+                    kind: true,
+                    createdAt: true,
+                  },
+                },
+              },
+              orderBy: { order: "asc" as const },
+            },
+          },
+          orderBy: { order: "asc" as const },
+        },
+        _count: {
+          select: {
+            modules: true,
+            enrollments: true,
+            reviews: true,
+          },
+        },
+      },
+    });
+  }
 }
