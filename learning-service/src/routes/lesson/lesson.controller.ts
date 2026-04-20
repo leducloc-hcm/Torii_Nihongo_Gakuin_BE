@@ -94,4 +94,11 @@ export class LessonController {
   async getPublicStreamUrl(@Param('lessonId', ParseIntPipe) lessonId: number) {
     return this.lessonService.getPublicStreamUrl(lessonId)
   }
+  @Get('manage/:lessonId/stream')
+  @HttpCode(HttpStatus.OK)
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Admin, RoleName.Staff)
+  async getPublicStreamUrlForManager(@Param('lessonId', ParseIntPipe) lessonId: number) {
+    return this.lessonService.getStreamForManager(lessonId)
+  }
 }

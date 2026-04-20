@@ -82,13 +82,15 @@ export class LessonService {
     if (!lesson) {
       throw new NotFoundException('Lesson not found')
     }
-    const enrollment = await this.enrollmentRepository.findByUserAndCourse(userId, lesson.module.course.id)
-    if (!enrollment) {
-      throw new BadRequestException('User is not enrolled in the course for this lesson')
-    }
-    if (lesson.status !== LessonStatus.PUBLISHED && lesson.status !== LessonStatus.GLOBAL_PUBLIC) {
-      throw new BadRequestException('Lesson is not published')
-    }
+    if(user.role === 'customer') {
+      const enrollment = await this.enrollmentRepository.findByUserAndCourse(userId, lesson.module.course.id)
+      if (!enrollment) {
+        throw new BadRequestException('User is not enrolled in the course for this lesson')
+      }
+      if (lesson.status !== LessonStatus.PUBLISHED && lesson.status !== LessonStatus.GLOBAL_PUBLIC) {
+        throw new BadRequestException('Lesson is not published')
+      }
+    } 
     const streamInfo = await this.lessonRepository.generatePublicStreamUrl(lessonId)
     return streamInfo
   }
@@ -131,6 +133,15 @@ export class LessonService {
     }
     if (lesson.status !== LessonStatus.GLOBAL_PUBLIC) {
       throw new BadRequestException('Lesson is not public for global access')
+    }
+    const streamInfo = await this.lessonRepository.generatePublicStreamUrl(lessonId)
+    return streamInfo
+  }
+
+  async getStreamForManager(lessonId: number) {
+    const lesson = await this.lessonRepository.findOne({ id: lessonId })
+    if (!lesson) {
+      throw new NotFoundException('Lesson not found')
     }
     const streamInfo = await this.lessonRepository.generatePublicStreamUrl(lessonId)
     return streamInfo
