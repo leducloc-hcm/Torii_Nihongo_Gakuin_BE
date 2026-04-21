@@ -427,7 +427,7 @@ resource "aws_ecs_task_definition" "learning_service" {
     }
 
     healthCheck = {
-      command     = ["CMD-SHELL", "curl -f http://localhost:4001/health || exit 1"]
+      command     = ["CMD-SHELL", "wget -qO- http://localhost:4001/health || exit 1"]
       interval    = 30
       timeout     = 5
       retries     = 3
@@ -599,7 +599,7 @@ resource "aws_ecs_task_definition" "gamification_service" {
     }
 
     healthCheck = {
-      command     = ["CMD-SHELL", "curl -f http://localhost:4003/health || exit 1"]
+      command     = ["CMD-SHELL", "wget -qO- http://localhost:4003/health || exit 1"]
       interval    = 30
       timeout     = 5
       retries     = 3
