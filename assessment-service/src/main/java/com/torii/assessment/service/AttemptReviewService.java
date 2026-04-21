@@ -13,6 +13,8 @@ import com.torii.assessment.entity.AssessmentSection;
 import com.torii.assessment.entity.Attempt;
 import com.torii.assessment.entity.ItemAssessmentGroup;
 import com.torii.assessment.entity.ItemAssessmentQuestion;
+import com.torii.assessment.entity.WrongAnswerMastery;
+import com.torii.assessment.entity.AiGeneratedQuestion;
 import com.torii.assessment.repository.AssessmentAnswerRepository;
 import com.torii.assessment.repository.AssessmentGroupQuestionRepository;
 import com.torii.assessment.repository.AssessmentItemRepository;
@@ -23,6 +25,10 @@ import com.torii.assessment.repository.AssessmentSectionRepository;
 import com.torii.assessment.repository.AttemptRepository;
 import com.torii.assessment.repository.ItemAssessmentGroupRepository;
 import com.torii.assessment.repository.ItemAssessmentQuestionRepository;
+import com.torii.assessment.repository.WrongAnswerMasteryRepository;
+import com.torii.assessment.repository.AiGeneratedQuestionRepository;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -56,6 +62,9 @@ public class AttemptReviewService {
     private final AssessmentQuestionRepository assessmentQuestionRepository;
     private final AssessmentOptionRepository assessmentOptionRepository;
     private final LearningUserLookupService learningUserLookupService;
+    private final WrongAnswerMasteryRepository wrongAnswerMasteryRepository;
+    private final AiGeneratedQuestionRepository aiGeneratedQuestionRepository;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public AttemptedAssessmentListResponseDTO getAttemptedAssessments(
         Integer userId,
@@ -355,45 +364,86 @@ public class AttemptReviewService {
             }
         }
 
-        Map<String, List<Map<String, Object>>> groupedByFocus = new LinkedHashMap<>();
+        // Exclude mastered questions (previously answered correctly in drill mode)
+        Set<Long> masteredQuestionIds = wrongAnswerMasteryRepository.findByUserId(userId)
+            .stream()
+            .map(WrongAnswerMastery::getQuestionId)
+            .collect(Collectors.toSet());
+        uniqueWrongQuestions.keySet().removeAll(masteredQuestionIds);
+
+        // Group by assessmentId → sectionType
+        Map<Long, Map<String, List<Map<String, Object>>>> groupedByAssessmentAndSection = new LinkedHashMap<>();
+        Map<Long, Map<String, Object>> assessmentMeta = new LinkedHashMap<>();
+
         for (Map<String, Object> question : uniqueWrongQuestions.values()) {
-            String focus = String.valueOf(question.get("focus"));
-            groupedByFocus.computeIfAbsent(focus, k -> new ArrayList<>()).add(question);
+            Long assessmentId = (Long) question.get("assessmentId");
+            String sectionType = String.valueOf(question.get("sectionType"));
+
+            groupedByAssessmentAndSection
+                .computeIfAbsent(assessmentId, k -> new LinkedHashMap<>())
+                .computeIfAbsent(sectionType, k -> new ArrayList<>())
+                .add(question);
+
+            assessmentMeta.putIfAbsent(assessmentId, Map.of(
+                "assessmentTitle", question.getOrDefault("assessmentTitle", ""),
+                "assessmentType", question.getOrDefault("assessmentType", "")
+            ));
         }
 
-        List<Map<String, Object>> drills = new ArrayList<>();
-        for (Map.Entry<String, List<Map<String, Object>>> entry : groupedByFocus.entrySet()) {
-            String focus = entry.getKey();
-            List<Map<String, Object>> questions = entry.getValue();
-            List<Map<String, Object>> limitedQuestions = questions.size() > safeMaxQuestions
-                ? questions.subList(0, safeMaxQuestions)
-                : questions;
+        // Build assessment-grouped response
+        List<Map<String, Object>> assessments = new ArrayList<>();
+        for (Map.Entry<Long, Map<String, List<Map<String, Object>>>> assessmentEntry : groupedByAssessmentAndSection.entrySet()) {
+            Long assessmentId = assessmentEntry.getKey();
+            Map<String, List<Map<String, Object>>> sectionMap = assessmentEntry.getValue();
+            Map<String, Object> meta = assessmentMeta.getOrDefault(assessmentId, Map.of());
 
-            Map<String, Object> drill = new LinkedHashMap<>();
-            drill.put("id", "drill-" + focus.toLowerCase());
-            drill.put("focus", focus);
-            drill.put("title", focus + " Wrong Answer Retry");
-            drill.put("questionCount", limitedQuestions.size());
-            drill.put("questions", limitedQuestions);
-            drills.add(drill);
+            Assessment assessment = assessmentMap.get(assessmentId);
+            String level = assessment != null && assessment.getLevel() != null ? assessment.getLevel().name() : null;
+
+            List<Map<String, Object>> sections = new ArrayList<>();
+            int totalUnresolved = 0;
+
+            for (Map.Entry<String, List<Map<String, Object>>> sectionEntry : sectionMap.entrySet()) {
+                String sectionType = sectionEntry.getKey();
+                List<Map<String, Object>> questions = sectionEntry.getValue();
+                totalUnresolved += questions.size();
+
+                Map<String, Object> sectionData = new LinkedHashMap<>();
+                sectionData.put("sectionType", sectionType);
+                sectionData.put("questionCount", questions.size());
+                sectionData.put("questions", questions);
+                sections.add(sectionData);
+            }
+
+            Map<String, Object> assessmentData = new LinkedHashMap<>();
+            assessmentData.put("assessmentId", assessmentId);
+            assessmentData.put("assessmentTitle", meta.getOrDefault("assessmentTitle", ""));
+            assessmentData.put("type", meta.getOrDefault("assessmentType", ""));
+            assessmentData.put("level", level);
+            assessmentData.put("unresolvedCount", totalUnresolved);
+            assessmentData.put("sections", sections);
+            assessments.add(assessmentData);
         }
 
-        drills.sort((a, b) -> Integer.compare((Integer) b.get("questionCount"), (Integer) a.get("questionCount")));
+        // Sort by unresolvedCount descending
+        assessments.sort((a, b) -> Integer.compare(
+            (Integer) b.get("unresolvedCount"), (Integer) a.get("unresolvedCount")
+        ));
 
         Map<String, Object> summary = new LinkedHashMap<>();
         summary.put("attemptsAnalyzed", slicedAttempts.size());
-        summary.put("wrongQuestionCount", uniqueWrongQuestions.size());
-        summary.put("drillCount", drills.size());
+        summary.put("totalWrongQuestions", uniqueWrongQuestions.size());
+        summary.put("assessmentCount", assessments.size());
         summary.put("sourceTypeCounts", sourceTypeCounts);
         summary.put("includeListening", allowListening);
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("summary", summary);
-        response.put("drills", drills);
+        response.put("assessments", assessments);
         return response;
     }
 
-    public Map<String, Object> gradeWrongAnswerLab(List<com.torii.assessment.dto.attempt.WrongAnswerLabGradeRequestDTO.AnswerDTO> answers) {
+    public Map<String, Object> gradeWrongAnswerLab(Integer userId, List<com.torii.assessment.dto.attempt.WrongAnswerLabGradeRequestDTO.AnswerDTO> answers) {
         if (answers == null || answers.isEmpty()) {
             return Map.of(
                 "total", 0,
@@ -405,6 +455,7 @@ public class AttemptReviewService {
 
         List<Map<String, Object>> results = new ArrayList<>();
         int correctCount = 0;
+        List<Long> newlyMasteredIds = new ArrayList<>();
 
         for (com.torii.assessment.dto.attempt.WrongAnswerLabGradeRequestDTO.AnswerDTO answer : answers) {
             Long questionId = answer.getQuestionId();
@@ -420,6 +471,7 @@ public class AttemptReviewService {
             boolean isCorrect = correctOptionId != null && correctOptionId.equals(selectedOptionId);
             if (isCorrect) {
                 correctCount++;
+                newlyMasteredIds.add(questionId);
             }
 
             Map<String, Object> item = new LinkedHashMap<>();
@@ -430,6 +482,22 @@ public class AttemptReviewService {
             results.add(item);
         }
 
+        // Save mastered questions (answered correctly in drill mode)
+        if (userId != null && !newlyMasteredIds.isEmpty()) {
+            for (Long questionId : newlyMasteredIds) {
+                try {
+                    if (!wrongAnswerMasteryRepository.existsByUserIdAndQuestionId(userId, questionId)) {
+                        wrongAnswerMasteryRepository.save(WrongAnswerMastery.builder()
+                            .userId(userId)
+                            .questionId(questionId)
+                            .build());
+                    }
+                } catch (Exception ignored) {
+                    // Unique constraint may fire on race condition - safe to ignore
+                }
+            }
+        }
+
         int total = answers.size();
         double accuracy = total == 0 ? 0d : (correctCount * 100.0) / total;
 
@@ -437,8 +505,86 @@ public class AttemptReviewService {
         payload.put("total", total);
         payload.put("correct", correctCount);
         payload.put("accuracy", Math.round(accuracy * 10.0) / 10.0);
+        payload.put("mastered", newlyMasteredIds.size());
         payload.put("results", results);
         return payload;
+    }
+
+    public Map<String, Object> saveAiGeneratedQuestion(
+        Integer userIdInt, Long assessmentId, Long sourceQuestionId,
+        String sectionType, String stem, String optionsJson,
+        String correctAnswer, String explanation
+    ) {
+        Long userId = userIdInt.longValue();
+        AiGeneratedQuestion entity = AiGeneratedQuestion.builder()
+            .userId(userId)
+            .sourceQuestionId(sourceQuestionId)
+            .assessmentId(assessmentId)
+            .sectionType(sectionType)
+            .stem(stem)
+            .options(optionsJson)
+            .correctAnswer(correctAnswer)
+            .explanation(explanation)
+            .isResolved(false)
+            .build();
+        AiGeneratedQuestion saved = aiGeneratedQuestionRepository.save(entity);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("id", saved.getId());
+        result.put("sourceQuestionId", saved.getSourceQuestionId());
+        result.put("assessmentId", saved.getAssessmentId());
+        result.put("sectionType", saved.getSectionType());
+        result.put("stem", saved.getStem());
+        result.put("correctAnswer", saved.getCorrectAnswer());
+        return result;
+    }
+
+    public List<Map<String, Object>> getAiQuestionsForAssessment(Integer userId, Long assessmentId) {
+        List<AiGeneratedQuestion> questions = aiGeneratedQuestionRepository
+            .findByUserIdAndAssessmentIdAndIsResolvedFalse(userId.longValue(), assessmentId);
+        return questions.stream().map(this::mapAiQuestion).collect(Collectors.toList());
+    }
+
+    public Map<String, Object> gradeAiQuestion(Integer userIdParam, Long aiQuestionId, String selectedAnswer) {
+        AiGeneratedQuestion question = aiGeneratedQuestionRepository.findById(aiQuestionId)
+            .orElseThrow(() -> new RuntimeException("AI question not found: " + aiQuestionId));
+
+        if (!question.getUserId().equals(userIdParam.longValue())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot grade another user's AI question");
+        }
+
+        boolean isCorrect = question.getCorrectAnswer().equalsIgnoreCase(selectedAnswer.trim());
+
+        if (isCorrect) {
+            question.setIsResolved(true);
+            aiGeneratedQuestionRepository.save(question);
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("aiQuestionId", aiQuestionId);
+        result.put("isCorrect", isCorrect);
+        result.put("correctAnswer", question.getCorrectAnswer());
+        result.put("explanation", question.getExplanation());
+        result.put("isResolved", question.getIsResolved());
+        return result;
+    }
+
+    private Map<String, Object> mapAiQuestion(AiGeneratedQuestion q) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("id", q.getId());
+        map.put("sourceQuestionId", q.getSourceQuestionId());
+        map.put("assessmentId", q.getAssessmentId());
+        map.put("sectionType", q.getSectionType());
+        map.put("stem", q.getStem());
+        map.put("correctAnswer", q.getCorrectAnswer());
+        map.put("explanation", q.getExplanation());
+        map.put("isResolved", q.getIsResolved());
+        try {
+            map.put("options", objectMapper.readValue(q.getOptions(), new TypeReference<List<Map<String, Object>>>() {}));
+        } catch (Exception e) {
+            map.put("options", List.of());
+        }
+        return map;
     }
 
     private String mapSectionTypeToFocus(String sectionType) {

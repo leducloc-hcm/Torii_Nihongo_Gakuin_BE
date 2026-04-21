@@ -395,6 +395,7 @@ public class AssessmentService {
 
     private AssessmentDTO mapToDTO(Assessment assessment, AssessmentDTO.CreatorInfoDTO creator) {
         long sectionCount = assessmentSectionRepository.countByAssessmentId(assessment.getId());
+        Integer timeLimitSec = assessmentSectionRepository.sumTimeLimitSecByAssessmentId(assessment.getId());
         long submittedAttemptCount = attemptRepository.countByAssessmentIdAndSubmittedAtIsNotNull(assessment.getId());
         long studentCount = attemptRepository.countDistinctUserIdByAssessmentIdAndSubmittedAtIsNotNull(assessment.getId());
 
@@ -416,6 +417,7 @@ public class AssessmentService {
             .lockAfterDue(assessment.getLockAfterDue())
             .maxAttempts(assessment.getMaxAttempts())
             .sectionCount(sectionCount)
+            .timeLimitSec(timeLimitSec)
             .attemptCount(submittedAttemptCount)
             .studentCount(studentCount)
             .averageAttemptsPerStudent((double) submittedAttemptCount)

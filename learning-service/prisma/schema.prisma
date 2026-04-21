@@ -431,7 +431,7 @@ model ClassMember {
 @@schema("learning")
 }
 
-model Certificate {
+model  Certificate {
   id         Int      @id @default(autoincrement())
   userId     Int
   courseId   Int

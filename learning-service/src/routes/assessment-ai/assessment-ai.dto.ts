@@ -1,5 +1,6 @@
 import {
   IsArray,
+  IsBoolean,
   IsIn,
   IsInt,
   IsNotEmpty,
@@ -81,6 +82,10 @@ export class EvaluateWrongAnswersDto {
   @Min(1)
   @Max(20)
   maxQuestions?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  forceRegenerate?: boolean;
 }
 
 export class GenerateQuestionBankDto {
@@ -149,4 +154,40 @@ export class GenerateFlashcardsFromWrongAnswersDto {
   @IsString()
   @IsIn(["vi", "en", "ja"])
   language?: "vi" | "en" | "ja";
+}
+
+export class GenerateSimilarQuestionDto {
+  @IsString()
+  @IsNotEmpty()
+  sourceStem: string;
+
+  @IsString()
+  @IsNotEmpty()
+  sourceCorrectAnswer: string;
+
+  @IsString()
+  @IsNotEmpty()
+  sourceSelectedAnswer: string;
+
+  @IsString()
+  @IsNotEmpty()
+  sourceOptions: string;
+
+  @IsString()
+  @IsIn(["VOCAB", "KANJI", "GRAMMAR", "READING", "LISTENING"])
+  sectionType: string;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(["N5", "N4", "N3", "N2", "N1"])
+  level?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(["vi", "en", "ja"])
+  language?: string;
+
+  @IsOptional()
+  @IsString()
+  existingStems?: string;
 }

@@ -10,6 +10,7 @@ import {
   GenerateAssessmentByAIDto,
   GenerateFlashcardsFromWrongAnswersDto,
   GenerateQuestionBankDto,
+  GenerateSimilarQuestionDto,
 } from "./assessment-ai.dto";
 
 @Injectable()
@@ -57,6 +58,7 @@ export class AssessmentAIService {
       attemptId: dto.attemptId,
       language: dto.language ?? "vi",
       maxQuestions: dto.maxQuestions ?? 10,
+      forceRegenerate: dto.forceRegenerate ?? false,
     });
 
     if (!result.success) {
@@ -64,6 +66,21 @@ export class AssessmentAIService {
         result.error || "Failed to evaluate wrong answers via MCP",
       );
     }
+
+    return {
+      success: true,
+      data: result.data,
+    };
+  }
+
+  async getCachedAnalysis(
+    attemptId: number,
+    language: "vi" | "en" | "ja" = "vi",
+  ) {
+    const result = await this.historyMcpClient.getCachedAnalysis({
+      attemptId,
+      language,
+    });
 
     return {
       success: true,
@@ -108,6 +125,30 @@ export class AssessmentAIService {
     if (!result.success) {
       throw new ServiceUnavailableException(
         result.error || "Failed to generate flashcards via MCP",
+      );
+    }
+
+    return {
+      success: true,
+      data: result.data,
+    };
+  }
+
+  async generateSimilarQuestion(dto: GenerateSimilarQuestionDto) {
+    const result = await this.historyMcpClient.generateSimilarQuestion({
+      sourceStem: dto.sourceStem,
+      sourceCorrectAnswer: dto.sourceCorrectAnswer,
+      sourceSelectedAnswer: dto.sourceSelectedAnswer,
+      sourceOptions: dto.sourceOptions,
+      sectionType: dto.sectionType,
+      level: dto.level ?? "N5",
+      language: dto.language ?? "vi",
+      existingStems: dto.existingStems,
+    });
+
+    if (!result.success) {
+      throw new ServiceUnavailableException(
+        result.error || "Failed to generate similar question via MCP",
       );
     }
 

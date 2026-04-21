@@ -103,6 +103,8 @@ export function routeAgentForQuery(
     queryType === QueryType.ASSESSMENT_HISTORY ||
     queryType === QueryType.ENROLLMENT ||
     queryType === QueryType.PROGRESS ||
+    queryType === QueryType.GRAMMAR ||
+    queryType === QueryType.TRANSLATION ||
     (queryType === QueryType.FLASHCARD &&
       /tạo|create|generate|make|作成|生成/i.test(query));
 

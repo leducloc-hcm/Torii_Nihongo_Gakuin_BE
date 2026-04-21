@@ -159,16 +159,22 @@ Response format - MUST return JSON code block:
   "assessment_title": "...",
   "assessment_level": "N5",
   "score": number,
-  "analyses": [
+  "sections": [
     {
-      "question_content": "問題文...",
       "section_type": "GRAMMAR|VOCAB|KANJI|READING",
-      "section_title": "Section title",
-      "selected_answer": "User's wrong answer",
-      "correct_answer": "Correct answer",
-      "why_wrong": "Explanation of why the user's answer is incorrect",
-      "concept": "Grammar/vocab concept being tested",
-      "study_tip": "Actionable study advice"
+      "section_label": "Ngữ pháp",
+      "count": 3,
+      "section_feedback": "Summary of weakness in this section",
+      "analyses": [
+        {
+          "question_content": "問題文...",
+          "selected_answer": "User's wrong answer",
+          "correct_answer": "Correct answer",
+          "why_wrong": "Explanation of why the user's answer is incorrect",
+          "concept": "Grammar/vocab concept being tested",
+          "study_tip": "Actionable study advice"
+        }
+      ]
     }
   ],
   "overall_feedback": "Summary of weak areas and study priorities",
@@ -600,15 +606,22 @@ Response with JSON:
   "assessment_title": "N5 Exam JLPT",
   "assessment_level": "N5",
   "score": 39.08,
-  "analyses": [
+  "sections": [
     {
-      "question_content": "「明日」の読み方は？",
       "section_type": "KANJI",
-      "selected_answer": "みょうにち",
-      "correct_answer": "あした",
-      "why_wrong": "「みょうにち」là cách đọc Hán-Việt (on'yomi), thường dùng trong văn viết trang trọng. Trong ngữ cảnh hội thoại hàng ngày, 「あした」(kun'yomi) là cách đọc phổ biến nhất.",
-      "concept": "Kanji đọc theo kun'yomi vs on'yomi - 明日(あした/みょうにち)",
-      "study_tip": "Ghi nhớ: あした dùng trong hội thoại, みょうにち dùng trong văn viết trang trọng."
+      "section_label": "Hán tự",
+      "count": 1,
+      "section_feedback": "Bạn cần phân biệt rõ cách đọc kun'yomi và on'yomi của Kanji thường gặp.",
+      "analyses": [
+        {
+          "question_content": "「明日」の読み方は？",
+          "selected_answer": "みょうにち",
+          "correct_answer": "あした",
+          "why_wrong": "「みょうにち」là cách đọc Hán-Việt (on'yomi), thường dùng trong văn viết trang trọng. Trong ngữ cảnh hội thoại hàng ngày, 「あした」(kun'yomi) là cách đọc phổ biến nhất.",
+          "concept": "Kanji đọc theo kun'yomi vs on'yomi - 明日(あした/みょうにち)",
+          "study_tip": "Ghi nhớ: あした dùng trong hội thoại, みょうにち dùng trong văn viết trang trọng."
+        }
+      ]
     }
   ],
   "overall_feedback": "Bạn cần ôn lại cách đọc kun'yomi của các Kanji thường gặp. Tập trung vào bối cảnh sử dụng.",
