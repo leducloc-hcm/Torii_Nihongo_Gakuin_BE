@@ -19,6 +19,15 @@ export class RabbitMQConsumer implements OnModuleInit {
     private leaderboardService: LeaderboardService,
   ) {}
 
+  /**
+   * Check if a user is a CUSTOMER (eligible for gamification).
+   * Strict mode: only users with explicit CUSTOMER role are eligible.
+   */
+  private async isCustomer(userId: number): Promise<boolean> {
+    const role = await this.pointsService.getUserRole(userId);
+    return role === "CUSTOMER";
+  }
+
   async onModuleInit() {
     await this.waitForRabbitMQReady();
     await this.setupConsumers();
@@ -56,6 +65,11 @@ export class RabbitMQConsumer implements OnModuleInit {
           `Lesson progressed: user=${userId}, lesson=${lessonId}`,
         );
 
+        if (!(await this.isCustomer(userId))) {
+          this.logger.log(`Skipping gamification for non-customer user=${userId}`);
+          return;
+        }
+
         await this.activityLogService.logActivity(
           userId,
           "LESSON_COMPLETED",
@@ -81,6 +95,11 @@ export class RabbitMQConsumer implements OnModuleInit {
         const { userId, courseId } = data.payload;
         this.logger.log(`Course enrolled: user=${userId}, course=${courseId}`);
 
+        if (!(await this.isCustomer(userId))) {
+          this.logger.log(`Skipping gamification for non-customer user=${userId}`);
+          return;
+        }
+
         await this.activityLogService.logActivity(
           userId,
           "COURSE_ENROLLED",
@@ -102,30 +121,47 @@ export class RabbitMQConsumer implements OnModuleInit {
       "attempt.graded",
       "gamification.attempt.graded",
       async (data) => {
-        const { userId, score, paperId, totalQuestions } = data.payload;
-        this.logger.log(`Attempt graded: user=${userId}, score=${score}`);
+        const payload = data?.payload ?? data;
+        if (!payload || payload.userId === undefined || payload.userId === null) {
+          this.logger.warn("Skipping attempt.graded event with invalid payload");
+          return;
+        }
 
-        // Base points + score-based bonus coins
-        const basePoints = 20;
+        const {
+          userId,
+          score,
+          assessmentId,
+          paperId,
+          totalQuestions,
+          assessmentType,
+        } = payload;
+        const resolvedAssessmentId = assessmentId ?? paperId;
+        this.logger.log(`Attempt graded: user=${userId}, score=${score}, type=${assessmentType}`);
+
+        if (!(await this.isCustomer(userId))) {
+          this.logger.log(`Skipping gamification for non-customer user=${userId}`);
+          return;
+        }
+
+        const isQuiz = assessmentType === "QUIZ";
+        const basePoints = isQuiz ? 15 : 20;
+        const activityType = isQuiz ? "QUIZ_COMPLETED" : "MOCK_TEST";
         const scorePercent =
           totalQuestions > 0 ? (score / totalQuestions) * 100 : 0;
-        const bonusCoins =
-          scorePercent === 100
-            ? 20 // Perfect score — big bonus
-            : scorePercent >= 90
-              ? 10 // Excellent
-              : scorePercent >= 80
-                ? 5 // High score
-                : 0;
+
+        const bonusCoins = isQuiz
+          ? (scorePercent === 100 ? 10 : scorePercent >= 90 ? 5 : 0)
+          : (scorePercent === 100 ? 20 : scorePercent >= 90 ? 10 : scorePercent >= 80 ? 5 : 0);
 
         await this.activityLogService.logActivity(
           userId,
-          "MOCK_TEST",
+          activityType,
           basePoints,
           {
             score,
-            paperId,
+            assessmentId: resolvedAssessmentId,
             totalQuestions,
+            assessmentType,
             scorePercent: Math.round(scorePercent),
             bonusCoins,
           },
@@ -133,8 +169,8 @@ export class RabbitMQConsumer implements OnModuleInit {
         await this.pointsService.addPoints(
           userId,
           basePoints,
-          `Mock test completed (score: ${score}/${totalQuestions})`,
-          { score, paperId },
+          `${isQuiz ? "Quiz" : "Mock test"} completed (score: ${score}/${totalQuestions})`,
+          { score, assessmentId: resolvedAssessmentId, assessmentType },
           basePoints + bonusCoins,
         );
         await this.streakService.recordActivity(userId);
@@ -152,6 +188,11 @@ export class RabbitMQConsumer implements OnModuleInit {
       async (data) => {
         const { userId, orderId, amount } = data.payload;
         this.logger.log(`Payment completed: user=${userId}, order=${orderId}`);
+
+        if (!(await this.isCustomer(userId))) {
+          this.logger.log(`Skipping gamification for non-customer user=${userId}`);
+          return;
+        }
 
         await this.pointsService.addPoints(
           userId,
@@ -174,6 +215,11 @@ export class RabbitMQConsumer implements OnModuleInit {
         const { userId, deckId, cardCount } = data.payload;
         this.logger.log(`Flashcard generated: user=${userId}, deck=${deckId}`);
 
+        if (!(await this.isCustomer(userId))) {
+          this.logger.log(`Skipping gamification for non-customer user=${userId}`);
+          return;
+        }
+
         await this.activityLogService.logActivity(
           userId,
           "FLASHCARD_GENERATED",
@@ -189,51 +235,6 @@ export class RabbitMQConsumer implements OnModuleInit {
       },
     );
 
-    // Consume quiz completed events from learning-service
-    await this.consumeEvent(
-      channel,
-      exchangeName,
-      "quiz.completed",
-      "gamification.quiz.completed",
-      async (data) => {
-        const { userId, quizId, score, totalQuestions } = data.payload;
-        this.logger.log(`Quiz completed: user=${userId}, quiz=${quizId}`);
-
-        const basePoints = 15;
-        const scorePercent =
-          totalQuestions > 0 ? (score / totalQuestions) * 100 : 0;
-        const bonusCoins =
-          scorePercent === 100
-            ? 10 // Perfect
-            : scorePercent >= 90
-              ? 5 // Excellent
-              : 0;
-
-        await this.activityLogService.logActivity(
-          userId,
-          "QUIZ_COMPLETED",
-          basePoints,
-          {
-            quizId,
-            score,
-            totalQuestions,
-            scorePercent: Math.round(scorePercent),
-            bonusCoins,
-          },
-        );
-        await this.pointsService.addPoints(
-          userId,
-          basePoints,
-          `Quiz completed (score: ${score}/${totalQuestions ?? "?"})`,
-          { quizId, score },
-          basePoints + bonusCoins,
-        );
-        await this.streakService.recordActivity(userId);
-        await this.leaderboardService.addXp(userId, basePoints);
-        await this.achievementService.checkAndUnlock(userId);
-      },
-    );
-
     // Consume user login events from learning-service
     await this.consumeEvent(
       channel,
@@ -241,12 +242,22 @@ export class RabbitMQConsumer implements OnModuleInit {
       "user.login",
       "gamification.user.login",
       async (data) => {
-        const { userId, userName } = data.payload;
-        this.logger.log(`User login: user=${userId}`);
+        const { userId, userName, role } = data.payload;
+        this.logger.log(`User login: user=${userId}, role=${role}`);
 
         if (userName) {
           await this.pointsService.updateUserName(userId, userName);
         }
+        if (role) {
+          await this.pointsService.updateUserRole(userId, role);
+        }
+
+        // Strictly process gamification only for CUSTOMER role
+        if (role !== "CUSTOMER") {
+          this.logger.log(`Skipping gamification for non-customer user=${userId}, role=${role}`);
+          return;
+        }
+
         await this.activityLogService.logActivity(userId, "LOGIN", 0, {});
         await this.streakService.recordActivity(userId);
         await this.achievementService.checkAndUnlock(userId);

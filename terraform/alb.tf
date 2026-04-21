@@ -39,6 +39,7 @@ resource "aws_lb" "main" {
   subnets            = aws_subnet.public[*].id
 
   enable_deletion_protection = var.environment == "prod"
+  idle_timeout               = 3600
 
   tags = {
     Name = "${var.project_name}-alb"

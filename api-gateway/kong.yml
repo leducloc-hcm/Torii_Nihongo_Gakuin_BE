@@ -372,17 +372,14 @@ services:
         paths:
           - /notification
         strip_path: false
-        methods:
-          - GET
-          - POST
-          - PUT
-          - DELETE
-          - PATCH
-          - OPTIONS
         plugins:
           - name: jwt-validator
             config:
               secret: nhatngutorii
+      - name: webrtc-route
+        paths:
+          - /webrtc
+        strip_path: false
       - name: coupons-route
         paths:
           - /coupons

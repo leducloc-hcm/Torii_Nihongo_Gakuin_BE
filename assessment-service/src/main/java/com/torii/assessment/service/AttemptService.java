@@ -144,9 +144,13 @@ public class AttemptService {
         
         Attempt saved = attemptRepository.save(attempt);
         
+        // Fetch assessment type for gamification routing
+        Assessment assessment = assessmentRepository.findById(saved.getAssessmentId()).orElse(null);
+        String assessmentType = assessment != null && assessment.getType() != null ? assessment.getType().name() : null;
+
         // Publish events
         eventPublisher.publishAttemptSubmitted(saved.getId(), saved.getUserId().longValue(), saved.getAssessmentId());
-        eventPublisher.publishAttemptGraded(saved.getId(), saved.getUserId().longValue(), saved.getAssessmentId(), score);
+        eventPublisher.publishAttemptGraded(saved.getId(), saved.getUserId().longValue(), saved.getAssessmentId(), score, gradeResult.getTotalQuestions(), assessmentType);
         
         log.info("Submitted and graded attempt: {}, score: {}", saved.getId(), score);
         

@@ -42,6 +42,7 @@ public class GradingService {
         private Double score;
         private Double earnedScore;
         private String levelSuggestion;
+        private Integer totalQuestions;
     }
     
     public GradeResult gradeAttempt(Long attemptId) {
@@ -52,7 +53,7 @@ public class GradingService {
 
         if (answers.isEmpty()) {
             log.info("Attempt {} has no answers. Score = 0", attemptId);
-            return new GradeResult(0.0, 0.0, null);
+            return new GradeResult(0.0, 0.0, null, 0);
         }
 
         Map<Long, AssessmentQuestion> questionById = assessmentQuestionRepository
@@ -94,14 +95,14 @@ public class GradingService {
         if (scoreProfile == null) {
             double score = ((double) correctCount / answers.size()) * 100.0;
             log.info("Graded attempt {} without score profile, correct={}/{}, score={}", attemptId, correctCount, answers.size(), score);
-            return new GradeResult(score, (double) correctCount, null);
+            return new GradeResult(score, (double) correctCount, null, answers.size());
         }
 
         List<ScoreProfileSection> sections = scoreProfileSectionRepository.findByProfileId(scoreProfile.getId());
         if (sections.isEmpty()) {
             double score = ((double) correctCount / answers.size()) * 100.0;
             log.info("Graded attempt {} with empty profile sections, correct={}/{}, score={}", attemptId, correctCount, answers.size(), score);
-            return new GradeResult(score, (double) correctCount, null);
+            return new GradeResult(score, (double) correctCount, null, answers.size());
         }
 
         double earnedScore = 0.0;
@@ -168,7 +169,7 @@ public class GradingService {
         
         log.info("Graded attempt {} with profile {}, correct={}/{}, earnedScore={}, maxTotal={}, score={}%, levelSuggestion={}",
             attemptId, scoreProfile.getId(), correctCount, answers.size(), earnedScore, maxTotal, score, levelSuggestion);
-        return new GradeResult(score, earnedScore, levelSuggestion);
+        return new GradeResult(score, earnedScore, levelSuggestion, answers.size());
     }
 
     private String mapQuestionTypeToSectionType(String questionType) {

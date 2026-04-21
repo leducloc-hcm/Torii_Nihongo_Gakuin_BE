@@ -35,15 +35,19 @@ public class EventPublisher {
         log.info("Published attempt.submitted event: attemptId={}, userId={}", attemptId, userId);
     }
     
-    public void publishAttemptGraded(Long attemptId, Long userId, Long assessmentId, Double score) {
-        Map<String, Object> event = Map.of(
-            "type", "attempt.graded",
-            "attemptId", attemptId,
-            "userId", userId,
-            "assessmentId", assessmentId,
-            "score", score,
-            "timestamp", Instant.now().toString()
-        );
+    public void publishAttemptGraded(Long attemptId, Long userId, Long assessmentId, Double score, Integer totalQuestions, String assessmentType) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("userId", userId);
+        payload.put("attemptId", attemptId);
+        payload.put("assessmentId", assessmentId);
+        payload.put("score", score);
+        payload.put("totalQuestions", totalQuestions);
+        payload.put("assessmentType", assessmentType);
+
+        Map<String, Object> event = new HashMap<>();
+        event.put("type", "attempt.graded");
+        event.put("payload", payload);
+        event.put("timestamp", Instant.now().toString());
         
         rabbitTemplate.convertAndSend(
             RabbitMQConfig.EXCHANGE_NAME,
@@ -51,7 +55,7 @@ public class EventPublisher {
             event
         );
         
-        log.info("Published attempt.graded event: attemptId={}, userId={}, score={}", attemptId, userId, score);
+        log.info("Published attempt.graded event: attemptId={}, userId={}, score={}, totalQuestions={}, assessmentType={}", attemptId, userId, score, totalQuestions, assessmentType);
     }
 
     /**

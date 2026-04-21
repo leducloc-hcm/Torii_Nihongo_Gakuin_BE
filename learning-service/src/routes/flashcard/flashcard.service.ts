@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { FlashcardRepository } from "./flashcard.repo";
 import { FlashcardGenerationService } from "./flashcard-generation.service";
+import { RabbitMQPublisher } from "../../shared/rabbitmq/rabbitmq.publisher";
 import {
   CreateFlashcardDeckInput,
   UpdateFlashcardDeckInput,
@@ -22,6 +23,7 @@ export class FlashcardService {
   constructor(
     private readonly flashcardRepository: FlashcardRepository,
     private readonly flashcardGenerationService: FlashcardGenerationService,
+    private readonly rabbitMQPublisher: RabbitMQPublisher,
   ) {}
 
   // Deck operations
@@ -107,6 +109,16 @@ export class FlashcardService {
     await Promise.all(
       data?.map((card) => this.flashcardRepository.createCard(card)),
     );
+
+    // Publish flashcard.generated event for gamification
+    if (data.length > 0) {
+      this.rabbitMQPublisher
+        .publishFlashcardGenerated(userId, data[0].deckId, data.length)
+        .catch((err) => {
+          console.error("Failed to publish flashcard.generated event:", err);
+        });
+    }
+
     return "Cards created successfully";
   }
 

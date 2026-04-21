@@ -92,4 +92,12 @@ export class PointsService {
   async updateUserName(userId: number, name: string) {
     return this.pointsRepo.updateUserName(userId, name);
   }
+
+  async updateUserRole(userId: number, role: string) {
+    return this.pointsRepo.updateUserRole(userId, role);
+  }
+
+  async getUserRole(userId: number): Promise<string | null> {
+    return this.pointsRepo.getUserRole(userId);
+  }
 }

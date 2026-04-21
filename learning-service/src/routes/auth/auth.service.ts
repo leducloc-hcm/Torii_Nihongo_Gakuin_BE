@@ -283,7 +283,7 @@ export class AuthService {
     });
 
     // 6. Publish login event for gamification
-    this.rabbitMQPublisher.publishUserLogin(user.id, user.name).catch((err) => {
+    this.rabbitMQPublisher.publishUserLogin(user.id, user.name, user.role).catch((err) => {
       // Non-blocking: don't fail login if event publish fails
       console.error("Failed to publish user.login event:", err);
     });

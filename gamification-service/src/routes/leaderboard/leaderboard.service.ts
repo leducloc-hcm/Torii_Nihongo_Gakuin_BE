@@ -1,12 +1,8 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
-import { RedisService } from "src/shared/redis/redis.service";
 import { LeaderboardRepository } from "./leaderboard.repo";
 import { PointsRepository } from "../points/points.repo";
-import {
-  getCurrentPeriodKey,
-  getRedisLeaderboardKey,
-} from "./leaderboard.model";
+import { getCurrentPeriodKey } from "./leaderboard.model";
 
 @Injectable()
 export class LeaderboardService {
@@ -14,65 +10,29 @@ export class LeaderboardService {
 
   constructor(
     private readonly leaderboardRepo: LeaderboardRepository,
-    private readonly redisService: RedisService,
     private readonly pointsRepo: PointsRepository,
   ) {}
 
-  async addXp(userId: number, xp: number) {
-    const weeklyKey = getRedisLeaderboardKey(
-      "WEEKLY",
-      getCurrentPeriodKey("WEEKLY"),
-    );
-    const monthlyKey = getRedisLeaderboardKey(
-      "MONTHLY",
-      getCurrentPeriodKey("MONTHLY"),
-    );
+  // No-op: XP totals are maintained in user_stats by the points service.
+  // The leaderboard reads directly from user_stats, so nothing extra is needed here.
+  async addXp(_userId: number, _xp: number) {}
 
-    await Promise.all([
-      this.redisService.zincrby(weeklyKey, xp, String(userId)),
-      this.redisService.zincrby(monthlyKey, xp, String(userId)),
-    ]);
+  async getLeaderboard(_period: "WEEKLY" | "MONTHLY", limit: number) {
+    const top = await this.pointsRepo.getTopCustomersByXp(limit);
+    return top.map((user, index) => ({
+      userId: user.userId,
+      xp: user.totalXp,
+      rank: index + 1,
+      name: user.name ?? null,
+    }));
   }
 
-  async getLeaderboard(period: "WEEKLY" | "MONTHLY", limit: number) {
-    const periodKey = getCurrentPeriodKey(period);
-    const redisKey = getRedisLeaderboardKey(period, periodKey);
-
-    const entries = await this.redisService.zrevrangeWithScores(
-      redisKey,
-      0,
-      limit - 1,
-    );
-
-    const userIds = entries.map((e) => parseInt(e.member, 10));
-    const userNames = await this.pointsRepo.getUserNamesByIds(userIds);
-    const nameMap = new Map(userNames.map((u) => [u.userId, u.name]));
-
-    return entries.map((entry, index) => {
-      const userId = parseInt(entry.member, 10);
-      return {
-        userId,
-        xp: entry.score,
-        rank: index + 1,
-        name: nameMap.get(userId) ?? null,
-      };
-    });
-  }
-
-  async getMyRank(userId: number, period: "WEEKLY" | "MONTHLY") {
-    const periodKey = getCurrentPeriodKey(period);
-    const redisKey = getRedisLeaderboardKey(period, periodKey);
-
-    const [rank, score] = await Promise.all([
-      this.redisService.zrevrank(redisKey, String(userId)),
-      this.redisService.zscore(redisKey, String(userId)),
-    ]);
-
-    return {
-      userId,
-      rank: rank !== null ? rank + 1 : null,
-      xp: score ? parseInt(score, 10) : 0,
-    };
+  async getMyRank(userId: number, _period: "WEEKLY" | "MONTHLY") {
+    const result = await this.pointsRepo.getCustomerRank(userId);
+    if (!result) {
+      return { userId, rank: null, xp: 0, name: null };
+    }
+    return result;
   }
 
   @Cron(CronExpression.EVERY_WEEK)
@@ -87,24 +47,16 @@ export class LeaderboardService {
 
   private async snapshotLeaderboard(period: "WEEKLY" | "MONTHLY") {
     const periodKey = getCurrentPeriodKey(period);
-    const redisKey = getRedisLeaderboardKey(period, periodKey);
+    const top = await this.pointsRepo.getTopCustomersByXp(1000);
 
-    const entries = await this.redisService.zrevrangeWithScores(
-      redisKey,
-      0,
-      -1,
-    );
-    this.logger.log(
-      `Snapshot ${period} leaderboard (${periodKey}): ${entries.length} entries`,
-    );
+    this.logger.log(`Snapshot ${period} (${periodKey}): ${top.length} entries`);
 
-    for (let i = 0; i < entries.length; i++) {
-      const entry = entries[i];
+    for (let i = 0; i < top.length; i++) {
       await this.leaderboardRepo.upsertEntry(
-        parseInt(entry.member, 10),
+        top[i].userId,
         period,
         periodKey,
-        entry.score,
+        top[i].totalXp,
         i + 1,
       );
     }
