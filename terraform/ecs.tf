@@ -349,7 +349,7 @@ resource "aws_ecs_task_definition" "learning_service" {
       { name = "RABBITMQ_HOST", value = "localhost" },
       { name = "RABBITMQ_PORT", value = "5672" },
       { name = "RABBITMQ_USERNAME", value = "admin" },
-      { name = "ACCESS_TOKEN_EXPIRES_IN", value = "1h" },
+      { name = "ACCESS_TOKEN_EXPIRES_IN", value = "1d" },
       { name = "REFRESH_TOKEN_EXPIRES_IN", value = "1d" },
       { name = "ADMIN_NAME", value = var.admin_name },
       { name = "ADMIN_EMAIL", value = var.admin_email },

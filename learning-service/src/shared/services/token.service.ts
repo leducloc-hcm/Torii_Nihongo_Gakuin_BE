@@ -26,7 +26,7 @@ export class TokenService implements OnModuleInit {
   }
 
   signAccessToken(payload: AccessTokenPayloadCreate) {
-    const expiresIn: StringValue | number = (process.env.ACCESS_TOKEN_EXPIRES_IN || '1h') as StringValue
+    const expiresIn: StringValue | number = (process.env.ACCESS_TOKEN_EXPIRES_IN || '1d') as StringValue
     const { email, ...rest } = payload
     return this.jwtService.sign(
       { ...rest, uuid: uuidv4(), sub: email },
