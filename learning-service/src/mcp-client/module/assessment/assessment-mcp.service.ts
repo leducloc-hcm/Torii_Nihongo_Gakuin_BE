@@ -89,4 +89,36 @@ export class AssessmentMcpClient {
       reading_group_type: payload.readingGroupType,
     });
   }
+
+  async previewAssessmentContent(payload: {
+    sectionType: "VOCAB" | "KANJI" | "GRAMMAR" | "READING";
+    level: "N5" | "N4" | "N3" | "N2" | "N1";
+    difficulty?: "EASY" | "MEDIUM" | "HARD";
+    topic: string;
+    itemCount?: number;
+    questionsPerItem?: number;
+    readingGroupType?: "READING_SHORT" | "READING_MEDIUM" | "READING_LONG";
+  }): Promise<FastMCPResult> {
+    if (!MCP_SERVERS.assessment.enabled) {
+      return {
+        success: false,
+        error: "Assessment MCP server is disabled",
+        data: null,
+      };
+    }
+
+    return this.mcpBase.executeTool(
+      this.serverUrl,
+      "preview_assessment_content",
+      {
+        section_type: payload.sectionType,
+        level: payload.level,
+        difficulty: payload.difficulty || "MEDIUM",
+        topic: payload.topic,
+        item_count: payload.itemCount || 1,
+        questions_per_item: payload.questionsPerItem || 1,
+        reading_group_type: payload.readingGroupType,
+      },
+    );
+  }
 }

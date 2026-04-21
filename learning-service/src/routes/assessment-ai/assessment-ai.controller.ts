@@ -20,6 +20,7 @@ import {
   GenerateFlashcardsFromWrongAnswersDto,
   GenerateQuestionBankDto,
   GenerateSimilarQuestionDto,
+  PreviewAssessmentByAIDto,
 } from "./assessment-ai.dto";
 import { AssessmentAIService } from "./assessment-ai.service";
 
@@ -33,6 +34,13 @@ export class AssessmentAIController {
   @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
   async generate(@Body() dto: GenerateAssessmentByAIDto) {
     return this.assessmentAIService.generateByAI(dto);
+  }
+
+  @Post("preview")
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
+  async preview(@Body() dto: PreviewAssessmentByAIDto) {
+    return this.assessmentAIService.previewGenerate(dto);
   }
 
   @Post("evaluate-wrong-answers")

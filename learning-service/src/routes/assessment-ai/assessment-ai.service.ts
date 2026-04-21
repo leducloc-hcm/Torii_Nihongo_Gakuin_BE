@@ -11,6 +11,7 @@ import {
   GenerateFlashcardsFromWrongAnswersDto,
   GenerateQuestionBankDto,
   GenerateSimilarQuestionDto,
+  PreviewAssessmentByAIDto,
 } from "./assessment-ai.dto";
 
 @Injectable()
@@ -101,6 +102,35 @@ export class AssessmentAIService {
     if (!result.success) {
       throw new ServiceUnavailableException(
         result.error || "Failed to generate question bank via MCP",
+      );
+    }
+
+    return {
+      success: true,
+      data: result.data,
+    };
+  }
+
+  async previewGenerate(dto: PreviewAssessmentByAIDto) {
+    if (dto.sectionType !== "READING" && dto.readingGroupType) {
+      throw new BadRequestException(
+        "readingGroupType is only valid for READING sections",
+      );
+    }
+
+    const result = await this.assessmentMcpClient.previewAssessmentContent({
+      sectionType: dto.sectionType,
+      level: dto.level,
+      difficulty: dto.difficulty || "MEDIUM",
+      topic: dto.topic,
+      itemCount: dto.itemCount || 1,
+      questionsPerItem: dto.questionsPerItem || 1,
+      readingGroupType: dto.readingGroupType,
+    });
+
+    if (!result.success) {
+      throw new ServiceUnavailableException(
+        result.error || "Failed to preview assessment content via MCP",
       );
     }
 

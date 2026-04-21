@@ -118,6 +118,42 @@ export class GenerateQuestionBankDto {
   readingGroupType?: "READING_SHORT" | "READING_MEDIUM" | "READING_LONG";
 }
 
+export class PreviewAssessmentByAIDto {
+  @IsString()
+  @IsIn(["VOCAB", "KANJI", "GRAMMAR", "READING"])
+  sectionType: "VOCAB" | "KANJI" | "GRAMMAR" | "READING";
+
+  @IsString()
+  @IsIn(["N5", "N4", "N3", "N2", "N1"])
+  level: "N5" | "N4" | "N3" | "N2" | "N1";
+
+  @IsOptional()
+  @IsString()
+  @IsIn(["EASY", "MEDIUM", "HARD"])
+  difficulty?: "EASY" | "MEDIUM" | "HARD";
+
+  @IsString()
+  @IsNotEmpty()
+  topic: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(20)
+  itemCount?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(20)
+  questionsPerItem?: number;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(["READING_SHORT", "READING_MEDIUM", "READING_LONG"])
+  readingGroupType?: "READING_SHORT" | "READING_MEDIUM" | "READING_LONG";
+}
+
 export class WrongQuestionItemDto {
   @IsString()
   stem: string;
