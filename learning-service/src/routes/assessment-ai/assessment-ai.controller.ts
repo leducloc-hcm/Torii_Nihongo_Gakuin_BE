@@ -1,4 +1,13 @@
-import { Body, Controller, Post, UseGuards } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseIntPipe,
+  Post,
+  Query,
+  UseGuards,
+} from "@nestjs/common";
 import { Auth } from "src/shared/decorators/auth.decorator";
 import { Roles } from "src/shared/decorators/roles.decorator";
 import { AuthType } from "src/shared/constants/auth.constant";
@@ -10,6 +19,7 @@ import {
   GenerateAssessmentByAIDto,
   GenerateFlashcardsFromWrongAnswersDto,
   GenerateQuestionBankDto,
+  GenerateSimilarQuestionDto,
 } from "./assessment-ai.dto";
 import { AssessmentAIService } from "./assessment-ai.service";
 
@@ -35,6 +45,19 @@ export class AssessmentAIController {
     return this.assessmentAIService.evaluateWrongAnswers(userId, dto);
   }
 
+  @Get("cached-analysis/:attemptId")
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Customer, RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
+  async getCachedAnalysis(
+    @Param("attemptId", ParseIntPipe) attemptId: number,
+    @Query("language") language: string = "vi",
+  ) {
+    return this.assessmentAIService.getCachedAnalysis(
+      attemptId,
+      language as any,
+    );
+  }
+
   @Post("generate-question-bank")
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
@@ -49,5 +72,12 @@ export class AssessmentAIController {
     @Body() dto: GenerateFlashcardsFromWrongAnswersDto,
   ) {
     return this.assessmentAIService.generateFlashcardsFromWrongAnswers(dto);
+  }
+
+  @Post("generate-similar-question")
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Customer, RoleName.Staff, RoleName.Lecturer, RoleName.Admin)
+  async generateSimilarQuestion(@Body() dto: GenerateSimilarQuestionDto) {
+    return this.assessmentAIService.generateSimilarQuestion(dto);
   }
 }

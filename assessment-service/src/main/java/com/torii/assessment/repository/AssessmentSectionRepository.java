@@ -27,4 +27,7 @@ public interface AssessmentSectionRepository extends JpaRepository<AssessmentSec
 
     @Query(value = "SELECT COUNT(*) FROM assessment.items WHERE section_id = :sectionId", nativeQuery = true)
     long countItemsBySectionId(@Param("sectionId") Long sectionId);
+
+    @Query("SELECT COALESCE(SUM(s.timeLimitSec), 0) FROM AssessmentSection s WHERE s.assessmentId = :assessmentId")
+    Integer sumTimeLimitSecByAssessmentId(@Param("assessmentId") Long assessmentId);
 }

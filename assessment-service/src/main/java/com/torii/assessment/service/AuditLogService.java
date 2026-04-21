@@ -56,9 +56,37 @@ public class AuditLogService {
                           Map<String, Object> metadata) {
         try {
             String userName = resolveUserName(updatedBy);
-            String metadataJson = null;
-            if (metadata != null && !metadata.isEmpty()) {
-                metadataJson = objectMapper.writeValueAsString(metadata);
+
+            // Build enriched metadata with structured event info
+            Map<String, Object> enrichedMeta = new LinkedHashMap<>();
+            if (metadata != null) {
+                enrichedMeta.putAll(metadata);
+            }
+            enrichedMeta.put("user", userName != null ? userName : "Unknown");
+            enrichedMeta.put("userId", updatedBy);
+            enrichedMeta.put("action", action);
+            enrichedMeta.put("entityType", entityType);
+            enrichedMeta.put("entityId", entityId);
+            if (fieldName != null) {
+                enrichedMeta.put("field", fieldName);
+            }
+            if (oldValue != null) {
+                enrichedMeta.put("oldValue", truncate(oldValue.toString(), 500));
+            }
+            if (newValue != null) {
+                enrichedMeta.put("newValue", truncate(newValue.toString(), 500));
+            }
+
+            String metadataJson = objectMapper.writeValueAsString(enrichedMeta);
+
+            // Auto-generate readable summary if not provided
+            String readableSummary = changeSummary;
+            if (readableSummary == null || readableSummary.isBlank()) {
+                String displayName = userName != null ? userName : "User #" + updatedBy;
+                String entityLabel = entityType.toLowerCase().replace("_", " ");
+                readableSummary = String.format("%s %s %s #%d",
+                        displayName, action.toLowerCase(), entityLabel,
+                        entityId != null ? entityId : 0);
             }
 
             AssessmentLog entry = AssessmentLog.builder()
@@ -71,7 +99,7 @@ public class AuditLogService {
                     .newValue(newValue != null ? truncate(newValue.toString(), 5000) : null)
                     .updatedBy(updatedBy)
                     .updatedByName(userName)
-                    .changeSummary(truncate(changeSummary, 500))
+                    .changeSummary(truncate(readableSummary, 500))
                     .metadata(metadataJson)
                     .build();
 
@@ -109,7 +137,7 @@ public class AuditLogService {
                 newValue != null ? newValue.toString() : null)) {
             return;
         }
-        String summary = String.format("UPDATE_%s.%s", entityType, fieldName);
+        String summary = String.format("Updated %s.%s", entityType.toLowerCase().replace("_", " "), fieldName);
         logAction(assessmentId, entityType, entityId, ACTION_UPDATE, fieldName, oldValue, newValue, updatedBy, summary, null);
     }
 

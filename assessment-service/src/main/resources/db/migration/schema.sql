@@ -83,6 +83,37 @@ CREATE INDEX IF NOT EXISTS idx_assessment_logs_assessment_id ON assessment_logs(
 CREATE INDEX IF NOT EXISTS idx_assessment_logs_entity ON assessment_logs(entity_type, entity_id);
 CREATE INDEX IF NOT EXISTS idx_assessment_logs_created_at ON assessment_logs(created_at);
 
+-- WEAKNESS ANALYSIS (AI-generated, persisted for later review)
+
+CREATE TABLE IF NOT EXISTS weakness_analysis (
+    id BIGSERIAL PRIMARY KEY,
+    attempt_id BIGINT NOT NULL,
+    user_id INTEGER NOT NULL,
+    assessment_id BIGINT,
+    language VARCHAR(5) DEFAULT 'vi',
+    overall_feedback TEXT,
+    analyses JSONB NOT NULL DEFAULT '[]',
+    metadata JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_weakness_analysis_attempt ON weakness_analysis(attempt_id);
+CREATE INDEX IF NOT EXISTS idx_weakness_analysis_user ON weakness_analysis(user_id);
+
+-- WRONG ANSWER MASTERY (tracks questions answered correctly in drill mode)
+
+CREATE TABLE IF NOT EXISTS wrong_answer_mastery (
+    id BIGSERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    question_id BIGINT NOT NULL,
+    attempt_id BIGINT,
+    mastered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, question_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_wrong_answer_mastery_user ON wrong_answer_mastery(user_id);
+CREATE INDEX IF NOT EXISTS idx_wrong_answer_mastery_user_question ON wrong_answer_mastery(user_id, question_id);
+
 -- STRUCTURE
 
 CREATE TABLE IF NOT EXISTS sections (
@@ -398,3 +429,23 @@ CREATE INDEX IF NOT EXISTS idx_attempt_user ON attempts(user_id);
 CREATE INDEX IF NOT EXISTS idx_questions_type ON questions(type);
 CREATE INDEX IF NOT EXISTS idx_questions_level ON questions(level);
 CREATE INDEX IF NOT EXISTS idx_options_question ON options(question_id);
+
+-- AI GENERATED PRACTICE QUESTIONS (Wrong Answer Lab)
+
+CREATE TABLE IF NOT EXISTS ai_generated_questions (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    source_question_id BIGINT NOT NULL REFERENCES assessment_questions(id) ON DELETE CASCADE,
+    assessment_id BIGINT NOT NULL REFERENCES assessments(id) ON DELETE CASCADE,
+    section_type VARCHAR(20) NOT NULL,
+    stem TEXT NOT NULL,
+    options JSONB NOT NULL DEFAULT '[]',
+    correct_answer TEXT NOT NULL,
+    explanation TEXT,
+    is_resolved BOOLEAN DEFAULT false,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_questions_user ON ai_generated_questions(user_id);
+CREATE INDEX IF NOT EXISTS idx_ai_questions_assessment ON ai_generated_questions(user_id, assessment_id);
+CREATE INDEX IF NOT EXISTS idx_ai_questions_source ON ai_generated_questions(source_question_id);

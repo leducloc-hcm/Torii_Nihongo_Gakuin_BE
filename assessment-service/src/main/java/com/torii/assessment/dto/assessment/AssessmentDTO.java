@@ -27,6 +27,7 @@ public class AssessmentDTO {
     private Boolean lockAfterDue;
     private Integer maxAttempts;
     private Long sectionCount;
+    private Integer timeLimitSec;
     private Long attemptCount;
     private Long studentCount;
     private Double averageAttemptsPerStudent;

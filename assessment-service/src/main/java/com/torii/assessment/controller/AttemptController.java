@@ -7,6 +7,8 @@ import com.torii.assessment.dto.attempt.CreateAttemptDTO;
 import com.torii.assessment.dto.attempt.SubmitAnswerDTO;
 import com.torii.assessment.dto.attempt.SubmitAttemptRequestDTO;
 import com.torii.assessment.dto.attempt.WrongAnswerLabGradeRequestDTO;
+import com.torii.assessment.dto.attempt.SaveAiQuestionDTO;
+import com.torii.assessment.dto.attempt.GradeAiQuestionDTO;
 import com.torii.assessment.entity.Assessment;
 import com.torii.assessment.service.AttemptService;
 import com.torii.assessment.service.AttemptReviewService;
@@ -165,7 +167,39 @@ public class AttemptController {
     public ResponseEntity<Map<String, Object>> gradeWrongAnswerLab(
             @Valid @RequestBody WrongAnswerLabGradeRequestDTO dto,
             HttpServletRequest request) {
-        RequestAuthUtil.getAuthUser(request);
-        return ResponseEntity.ok(attemptReviewService.gradeWrongAnswerLab(dto.getAnswers()));
+        RequestAuthUtil.AuthUser authUser = RequestAuthUtil.getAuthUser(request);
+        return ResponseEntity.ok(attemptReviewService.gradeWrongAnswerLab(authUser.userId(), dto.getAnswers()));
+    }
+
+    @GetMapping("/attempted/wrong-answer-lab/{assessmentId}/ai-questions")
+    public ResponseEntity<List<Map<String, Object>>> getAiQuestionsForAssessment(
+            @PathVariable Long assessmentId,
+            HttpServletRequest request) {
+        RequestAuthUtil.AuthUser authUser = RequestAuthUtil.getAuthUser(request);
+        return ResponseEntity.ok(attemptReviewService.getAiQuestionsForAssessment(authUser.userId(), assessmentId));
+    }
+
+    @PostMapping("/attempted/wrong-answer-lab/ai-questions")
+    public ResponseEntity<Map<String, Object>> saveAiQuestion(
+            @Valid @RequestBody SaveAiQuestionDTO dto,
+            HttpServletRequest request) {
+        RequestAuthUtil.AuthUser authUser = RequestAuthUtil.getAuthUser(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+            attemptReviewService.saveAiGeneratedQuestion(
+                authUser.userId(), dto.getAssessmentId(), dto.getSourceQuestionId(),
+                dto.getSectionType(), dto.getStem(), dto.getOptions(),
+                dto.getCorrectAnswer(), dto.getExplanation()
+            )
+        );
+    }
+
+    @PostMapping("/attempted/wrong-answer-lab/ai-questions/grade")
+    public ResponseEntity<Map<String, Object>> gradeAiQuestion(
+            @Valid @RequestBody GradeAiQuestionDTO dto,
+            HttpServletRequest request) {
+        RequestAuthUtil.AuthUser authUser = RequestAuthUtil.getAuthUser(request);
+        return ResponseEntity.ok(attemptReviewService.gradeAiQuestion(
+            authUser.userId(), dto.getAiQuestionId(), dto.getSelectedAnswer()
+        ));
     }
 }
