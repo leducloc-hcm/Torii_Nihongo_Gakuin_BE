@@ -54,7 +54,7 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       PORT: ${LEARNING_SERVICE_PORT:-4001}
-      DATABASE_URL: "postgresql://postgres:nhatngutorii@database.czgcs6yqwtym.ap-southeast-1.rds.amazonaws.com:5432/postgres?schema=learning&sslmode=no-verify"
+      DATABASE_URL: "postgresql://postgres:nhatngutorii@database-1.cjo8kkoui65a.ap-southeast-1.rds.amazonaws.com:5432/postgres?schema=learning&sslmode=no-verify"
       REDIS_URL: redis://${REDIS_USERNAME:-}${REDIS_PASSWORD:+:${REDIS_PASSWORD}}@redis:6379
       RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-admin}:${RABBITMQ_DEFAULT_PASS:-admin}@rabbitmq:5672
       RABBITMQ_HOST: rabbitmq
@@ -111,19 +111,19 @@ services:
       MCP_ENABLED: ${MCP_ENABLED:-true}
       MCP_TOOL_APPROVAL_REQUIRED: ${MCP_TOOL_APPROVAL_REQUIRED:-false}
       MCP_MAX_TOOL_EXECUTIONS: ${MCP_MAX_TOOL_EXECUTIONS:-10}
-      MCP_COURSE_SERVER_URL: http://host.docker.internal:8002/course/mcp
+      MCP_COURSE_SERVER_URL: https://agent.torii-nihongo-gakuin.io.vn/course/mcp
       MCP_COURSE_ENABLED: ${MCP_COURSE_ENABLED:-true}
-      MCP_ENROLLMENT_SERVER_URL: http://host.docker.internal:8002/enrollment/mcp
+      MCP_ENROLLMENT_SERVER_URL: https://agent.torii-nihongo-gakuin.io.vn/enrollment/mcp
       MCP_ENROLLMENT_ENABLED: ${MCP_ENROLLMENT_ENABLED:-true}
-      MCP_FLASHCARD_SERVER_URL: http://host.docker.internal:8002/flashcard/mcp
+      MCP_FLASHCARD_SERVER_URL: https://agent.torii-nihongo-gakuin.io.vn/flashcard/mcp
       MCP_FLASHCARD_ENABLED: ${MCP_FLASHCARD_ENABLED:-true}
-      MCP_BLOG_SERVER_URL: http://host.docker.internal:8002/blog/mcp
+      MCP_BLOG_SERVER_URL: https://agent.torii-nihongo-gakuin.io.vn/blog/mcp
       MCP_BLOG_ENABLED: ${MCP_BLOG_ENABLED:-true}
-      MCP_ASSESSMENT_SERVER_URL: http://host.docker.internal:8002/assessment/mcp
+      MCP_ASSESSMENT_SERVER_URL: https://agent.torii-nihongo-gakuin.io.vn/assessment/mcp
       MCP_ASSESSMENT_ENABLED: ${MCP_ASSESSMENT_ENABLED:-true}
-      MCP_ASSESSMENT_HISTORY_SERVER_URL: http://host.docker.internal:8002/assessment-history/mcp
+      MCP_ASSESSMENT_HISTORY_SERVER_URL: https://agent.torii-nihongo-gakuin.io.vn/assessment-history/mcp
       MCP_ASSESSMENT_HISTORY_ENABLED: ${MCP_ASSESSMENT_HISTORY_ENABLED:-true}
-      MCP_ANALYTICS_SERVER_URL: http://host.docker.internal:8002/analytics/mcp
+      MCP_ANALYTICS_SERVER_URL: https://agent.torii-nihongo-gakuin.io.vn/analytics/mcp
       MCP_ANALYTICS_ENABLED: ${MCP_ANALYTICS_ENABLED:-true}
       FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
       FIREBASE_PRIVATE_KEY: ${FIREBASE_PRIVATE_KEY:-}
@@ -149,7 +149,7 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       SERVER_PORT: ${ASSESSMENT_SERVICE_PORT:-4002}
-      SPRING_DATASOURCE_URL: jdbc:postgresql://database.czgcs6yqwtym.ap-southeast-1.rds.amazonaws.com:5432/postgres?currentSchema=assessment
+      SPRING_DATASOURCE_URL: jdbc:postgresql://database-1.cjo8kkoui65a.ap-southeast-1.rds.amazonaws.com:5432/postgres?currentSchema=assessment
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: nhatngutorii
       SPRING_DATASOURCE_DRIVER_CLASS_NAME: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:-org.postgresql.Driver}
@@ -198,7 +198,7 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       PORT: ${GAMIFICATION_SERVICE_PORT:-4003}
-      DATABASE_URL: "postgresql://postgres:nhatngutorii@database.czgcs6yqwtym.ap-southeast-1.rds.amazonaws.com:5432/postgres?schema=gamification&sslmode=no-verify"
+      DATABASE_URL: "postgresql://postgres:nhatngutorii@database-1.cjo8kkoui65a.ap-southeast-1.rds.amazonaws.com:5432/postgres?schema=gamification&sslmode=no-verify"
       REDIS_URL: redis://${REDIS_USERNAME:-}${REDIS_PASSWORD:+:${REDIS_PASSWORD}}@redis:6379
       REDIS_HOST: redis
       REDIS_PORT: 6379

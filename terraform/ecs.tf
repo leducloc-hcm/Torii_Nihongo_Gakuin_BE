@@ -18,12 +18,7 @@ resource "aws_ecs_task_definition" "api_docs" {
       protocol      = "tcp"
     }]
     logConfiguration = {
-      logDriver = "awslogs"
-      options = {
-        "awslogs-group"         = aws_cloudwatch_log_group.ecs.name
-        "awslogs-region"        = var.aws_region
-        "awslogs-stream-prefix" = "api-docs"
-      }
+      logDriver = "none"
     }
     healthCheck = {
       command     = ["CMD-SHELL", "curl -f http://localhost/ || exit 1"]
@@ -277,12 +272,8 @@ resource "aws_ecs_task_definition" "api_gateway" {
     }]
 
     logConfiguration = {
-      logDriver = "awslogs"
-      options = {
-        "awslogs-group"         = aws_cloudwatch_log_group.ecs.name
-        "awslogs-region"        = var.aws_region
-        "awslogs-stream-prefix" = "api-gateway"
-      }
+      logDriver = "none"
+    
     }
 
     healthCheck = {
@@ -431,12 +422,8 @@ resource "aws_ecs_task_definition" "learning_service" {
     ]
 
     logConfiguration = {
-      logDriver = "awslogs"
-      options = {
-        "awslogs-group"         = aws_cloudwatch_log_group.ecs.name
-        "awslogs-region"        = var.aws_region
-        "awslogs-stream-prefix" = "learning-service"
-      }
+      logDriver = "none"
+
     }
 
     healthCheck = {
@@ -529,12 +516,7 @@ resource "aws_ecs_task_definition" "assessment_service" {
     }]
 
     logConfiguration = {
-      logDriver = "awslogs"
-      options = {
-        "awslogs-group"         = aws_cloudwatch_log_group.ecs.name
-        "awslogs-region"        = var.aws_region
-        "awslogs-stream-prefix" = "assessment-service"
-      }
+      logDriver = "none"
     }
 
     healthCheck = {
@@ -613,12 +595,7 @@ resource "aws_ecs_task_definition" "gamification_service" {
     ]
 
     logConfiguration = {
-      logDriver = "awslogs"
-      options = {
-        "awslogs-group"         = aws_cloudwatch_log_group.ecs.name
-        "awslogs-region"        = var.aws_region
-        "awslogs-stream-prefix" = "gamification-service"
-      }
+      logDriver = "none"
     }
 
     healthCheck = {

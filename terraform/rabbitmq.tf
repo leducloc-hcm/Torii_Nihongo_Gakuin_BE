@@ -48,12 +48,7 @@ resource "aws_ecs_task_definition" "rabbitmq" {
     ]
 
     logConfiguration = {
-      logDriver = "awslogs"
-      options = {
-        "awslogs-group"         = aws_cloudwatch_log_group.ecs.name
-        "awslogs-region"        = var.aws_region
-        "awslogs-stream-prefix" = "rabbitmq"
-      }
+      logDriver = "none"
     }
 
     healthCheck = {

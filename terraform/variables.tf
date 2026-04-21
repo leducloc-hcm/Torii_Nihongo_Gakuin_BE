@@ -27,7 +27,7 @@ variable "vpc_cidr" {
 variable "existing_rds_endpoint" {
   description = "Endpoint of the existing RDS instance (host:port)"
   type        = string
-  default     = "database.czgcs6yqwtym.ap-southeast-1.rds.amazonaws.com:5432"
+  default     = "database-1.cjo8kkoui65a.ap-southeast-1.rds.amazonaws.com:5432"
 }
 
 variable "existing_rds_db_name" {

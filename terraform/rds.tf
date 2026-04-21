@@ -24,7 +24,7 @@ resource "aws_security_group" "rds" {
 }
 
 # Use existing RDS instance (already provisioned outside Terraform)
-# Endpoint: database.czgcs6yqwtym.ap-southeast-1.rds.amazonaws.com
+# Endpoint: database-1.cjo8kkoui65a.ap-southeast-1.rds.amazonaws.com
 # Database: postgres
 locals {
   rds_endpoint = var.existing_rds_endpoint

@@ -3,7 +3,7 @@ spring:
     name: assessment-service
 
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://database.czgcs6yqwtym.ap-southeast-1.rds.amazonaws.com:5432/postgres?currentSchema=assessment}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://database-1.cjo8kkoui65a.ap-southeast-1.rds.amazonaws.com:5432/postgres?currentSchema=assessment}
     username: ${SPRING_DATASOURCE_USERNAME:postgres}
     password: ${SPRING_DATASOURCE_PASSWORD:nhatngutorii}
     driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:org.postgresql.Driver}
