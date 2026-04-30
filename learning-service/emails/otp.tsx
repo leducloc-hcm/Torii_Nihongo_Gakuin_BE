@@ -5,7 +5,7 @@ interface OTPEmailProps {
   title: string
 }
 
-const logoUrl = 'https://torii-nihongo-storage-v2.s3.ap-southeast-1.amazonaws.com/logoTori.png'
+const logoUrl = 'https://torii-nihongo-storage-v3.s3.ap-southeast-1.amazonaws.com/logoTori.png'
 
 export const OTPEmail = ({ otpCode, title }: OTPEmailProps) => (
   <Html>

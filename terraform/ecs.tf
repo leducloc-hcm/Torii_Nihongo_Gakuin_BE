@@ -345,7 +345,7 @@ resource "aws_ecs_task_definition" "learning_service" {
       { name = "REDIS_DB", value = "0" },
       { name = "REDIS_TLS", value = "false" },
       { name = "REDIS_TTL", value = "3600" },
-      { name = "RABBITMQ_URL", value = "amqp://admin:${random_password.rabbitmq_password.result}@localhost:5672" },
+      { name = "RABBITMQ_URL", value = "amqp://admin:${urlencode(random_password.rabbitmq_password.result)}@localhost:5672" },
       { name = "RABBITMQ_HOST", value = "localhost" },
       { name = "RABBITMQ_PORT", value = "5672" },
       { name = "RABBITMQ_USERNAME", value = "admin" },
@@ -520,7 +520,7 @@ resource "aws_ecs_task_definition" "assessment_service" {
     }
 
     healthCheck = {
-      command     = ["CMD-SHELL", "curl -f http://localhost:4002/actuator/health || exit 1"]
+      command     = ["CMD-SHELL", "wget -qO- http://localhost:4002/actuator/health || exit 1"]
       interval    = 30
       timeout     = 5
       retries     = 3
@@ -582,7 +582,7 @@ resource "aws_ecs_task_definition" "gamification_service" {
       { name = "REDIS_PASSWORD", value = "" },
       { name = "REDIS_DB", value = "0" },
       { name = "REDIS_TLS", value = "false" },
-      { name = "RABBITMQ_URL", value = "amqp://admin:${random_password.rabbitmq_password.result}@localhost:5672" },
+      { name = "RABBITMQ_URL", value = "amqp://admin:${urlencode(random_password.rabbitmq_password.result)}@localhost:5672" },
       { name = "RABBITMQ_HOST", value = "localhost" },
       { name = "RABBITMQ_PORT", value = "5672" },
       { name = "RABBITMQ_USERNAME", value = "admin" }

@@ -3,7 +3,7 @@ spring:
     name: assessment-service
 
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://database-1.cjo8kkoui65a.ap-southeast-1.rds.amazonaws.com:5432/postgres?currentSchema=assessment}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://database-1.cdy0eccyu25d.ap-southeast-1.rds.amazonaws.com:5432/postgres?currentSchema=assessment}
     username: ${SPRING_DATASOURCE_USERNAME:postgres}
     password: ${SPRING_DATASOURCE_PASSWORD:nhatngutorii}
     driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:org.postgresql.Driver}
@@ -71,11 +71,11 @@ server:
 
 # AWS S3 Configuration
 aws:
-  access-key-id: ${AWS_ACCESS_KEY_ID:AKIA5SEU3U6XXXATV5CM}
-  secret-access-key: ${AWS_SECRET_ACCESS_KEY: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}
+  access-key-id: ${AWS_ACCESS_KEY_ID:AKIA5W5CC5ODVB7ZBMOS}
+  secret-access-key: ${AWS_SECRET_ACCESS_KEY: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}
   region: ${AWS_REGION:ap-southeast-1}
   s3:
-    bucket-name: ${AWS_S3_BUCKET_NAME:torii-nihongo-storage-v2}
+    bucket-name: ${AWS_S3_BUCKET_NAME:torii-nihongo-storage-v3}
 
 springdoc:
   api-docs:

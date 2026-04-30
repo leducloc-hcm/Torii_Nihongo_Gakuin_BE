@@ -27,7 +27,7 @@ variable "vpc_cidr" {
 variable "existing_rds_endpoint" {
   description = "Endpoint of the existing RDS instance (host:port)"
   type        = string
-  default     = "database-1.cjo8kkoui65a.ap-southeast-1.rds.amazonaws.com:5432"
+  default     = "database-1.cdy0eccyu25d.ap-southeast-1.rds.amazonaws.com:5432"
 }
 
 variable "existing_rds_db_name" {
@@ -122,7 +122,7 @@ variable "admin_phone_number" {
 variable "s3_bucket_name" {
   description = "S3 bucket name for file storage"
   type        = string
-  default     = "torii-nihongo-storage-v2"
+  default     = "torii-nihongo-storage-v3"
 }
 
 variable "aws_access_key_id" {

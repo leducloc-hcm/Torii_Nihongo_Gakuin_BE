@@ -54,7 +54,7 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       PORT: ${LEARNING_SERVICE_PORT:-4001}
-      DATABASE_URL: "postgresql://postgres:nhatngutorii@database-1.cjo8kkoui65a.ap-southeast-1.rds.amazonaws.com:5432/postgres?schema=learning&sslmode=no-verify"
+      DATABASE_URL: "postgresql://postgres:nhatngutorii@database-1.cdy0eccyu25d.ap-southeast-1.rds.amazonaws.com:5432/postgres?schema=learning&sslmode=no-verify"
       REDIS_URL: redis://${REDIS_USERNAME:-}${REDIS_PASSWORD:+:${REDIS_PASSWORD}}@redis:6379
       RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-admin}:${RABBITMQ_DEFAULT_PASS:-admin}@rabbitmq:5672
       RABBITMQ_HOST: rabbitmq
@@ -81,10 +81,10 @@ services:
       GOOGLE_CLIENT_REDIRECT_URI: ${GOOGLE_CLIENT_REDIRECT_URI:-}
       APP_NAME: ${APP_NAME:-Torii Nihongo Gakuin}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-AKIA5SEU3U6XXXATV5CM}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-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}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-AKIA5W5CC5ODVB7ZBMOS}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-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}
       AWS_REGION: ${AWS_REGION:-ap-southeast-1}
-      AWS_S3_BUCKET_NAME: ${AWS_S3_BUCKET_NAME:-torii-nihongo-storage-v2}
+      AWS_S3_BUCKET_NAME: ${AWS_S3_BUCKET_NAME:-torii-nihongo-storage-v3}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_USERNAME: ${REDIS_USERNAME:-}
@@ -149,7 +149,7 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       SERVER_PORT: ${ASSESSMENT_SERVICE_PORT:-4002}
-      SPRING_DATASOURCE_URL: jdbc:postgresql://database-1.cjo8kkoui65a.ap-southeast-1.rds.amazonaws.com:5432/postgres?currentSchema=assessment
+      SPRING_DATASOURCE_URL: jdbc:postgresql://database-1.cdy0eccyu25d.ap-southeast-1.rds.amazonaws.com:5432/postgres?currentSchema=assessment
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: nhatngutorii
       SPRING_DATASOURCE_DRIVER_CLASS_NAME: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:-org.postgresql.Driver}
@@ -176,10 +176,10 @@ services:
       SPRING_RABBITMQ_LISTENER_SIMPLE_ACKNOWLEDGE_MODE: ${SPRING_RABBITMQ_LISTENER_SIMPLE_ACKNOWLEDGE_MODE:-auto}
       SPRING_RABBITMQ_LISTENER_SIMPLE_RETRY_ENABLED: ${SPRING_RABBITMQ_LISTENER_SIMPLE_RETRY_ENABLED:-true}
       SPRING_RABBITMQ_LISTENER_SIMPLE_RETRY_MAX_ATTEMPTS: ${SPRING_RABBITMQ_LISTENER_SIMPLE_RETRY_MAX_ATTEMPTS:-3}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-AKIA5SEU3U6XXXATV5CM}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-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}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-AKIA5W5CC5ODVB7ZBMOS}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-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}
       AWS_REGION: ${AWS_REGION:-ap-southeast-1}
-      AWS_S3_BUCKET_NAME: ${AWS_S3_BUCKET_NAME:-torii-nihongo-storage-v2}
+      AWS_S3_BUCKET_NAME: ${AWS_S3_BUCKET_NAME:-torii-nihongo-storage-v3}
     depends_on:
       redis:
         condition: service_healthy
@@ -198,7 +198,7 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       PORT: ${GAMIFICATION_SERVICE_PORT:-4003}
-      DATABASE_URL: "postgresql://postgres:nhatngutorii@database-1.cjo8kkoui65a.ap-southeast-1.rds.amazonaws.com:5432/postgres?schema=gamification&sslmode=no-verify"
+      DATABASE_URL: "postgresql://postgres:nhatngutorii@database-1.cdy0eccyu25d.ap-southeast-1.rds.amazonaws.com:5432/postgres?schema=gamification&sslmode=no-verify"
       REDIS_URL: redis://${REDIS_USERNAME:-}${REDIS_PASSWORD:+:${REDIS_PASSWORD}}@redis:6379
       REDIS_HOST: redis
       REDIS_PORT: 6379

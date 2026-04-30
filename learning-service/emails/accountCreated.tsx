@@ -7,7 +7,7 @@ interface EmailProps {
   role: 'Nhân viên' | 'Giảng viên'
 }
 
-const logoUrl = 'https://torii-nihongo-storage-v2.s3.ap-southeast-1.amazonaws.com/logoTori.png'
+const logoUrl = 'https://torii-nihongo-storage-v3.s3.ap-southeast-1.amazonaws.com/logoTori.png'
 
 const resetPasswordUrl = 'https://torii-nihongo-gakuin.io.vn/account/change-password'
 

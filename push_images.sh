@@ -2,7 +2,7 @@
 set -e
 
 REGION="ap-southeast-1"
-ACCOUNT_ID="932320094127"
+ACCOUNT_ID="942548380551"
 REPO_PREFIX="$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com"
 PROJECT="torii-nihongo-gakuin"
 

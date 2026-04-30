@@ -26,8 +26,8 @@ export class S3Service {
 
       // Use explicit credentials if provided (e.g. for local development)
         s3Config.credentials = {
-          accessKeyId: 'AKIA5SEU3U6XXXATV5CM',
-          secretAccessKey: 'OW6LAfto3m50GNV49NtyfzgQnCe4g0KtreKMQy6A',
+          accessKeyId: 'AKIA5W5CC5ODVB7ZBMOS',
+          secretAccessKey: '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',
         };
       
 

@@ -20,7 +20,7 @@ interface EmailProps {
 }
 
 const logoUrl =
-  "https://torii-nihongo-storage-v2.s3.ap-southeast-1.amazonaws.com/logoTori.png";
+  "https://torii-nihongo-storage-v3.s3.ap-southeast-1.amazonaws.com/logoTori.png";
 const appUrl = "https://torii-nihongo-gakuin.io.vn";
 
 export const CourseWelcomeEmail = ({
