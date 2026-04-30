@@ -34,6 +34,43 @@ export class BossBattleService {
   ) {}
 
   // ─────────────────────────────────────────────
+  // Maps with user progress
+  // ─────────────────────────────────────────────
+  async getMapsWithProgress(userId: number) {
+    // Ensure the first boss is unlocked for new users
+    await this.repo.ensureFirstBossUnlocked(userId);
+
+    const [maps, userProgress] = await Promise.all([
+      this.repo.findAllMaps(true),
+      this.repo.getUserProgress(userId),
+    ]);
+
+    const progressMap = new Map(userProgress.map((p) => [p.bossConfigId, p]));
+
+    return maps.map((m) => ({
+      id: m.id,
+      name: m.name,
+      jlptLevel: m.jlptLevel,
+      orderIndex: m.orderIndex,
+      description: m.description,
+      emoji: m.emoji,
+      bosses: m.configs.map((c) => {
+        const prog = progressMap.get(c.id);
+        return {
+          ...c,
+          progress: {
+            isUnlocked: prog?.isUnlocked ?? false,
+            isCompleted: prog?.isCompleted ?? false,
+            stars: prog?.stars ?? 0,
+            bestScore: prog?.bestScore ?? 0,
+            completedAt: prog?.completedAt ?? null,
+          },
+        };
+      }),
+    }));
+  }
+
+  // ─────────────────────────────────────────────
   // Boss Config (admin)
   // ─────────────────────────────────────────────
   async getAllConfigs(activeOnly = true) {
@@ -96,6 +133,14 @@ export class BossBattleService {
     const config = await this.repo.findConfigById(bossConfigId);
     if (!config || !config.isActive) {
       throw new NotFoundException("Boss not found or inactive");
+    }
+
+    // Check unlock status if boss belongs to a map
+    if (config.mapId !== null) {
+      const prog = await this.repo.getUserProgressForBoss(userId, bossConfigId);
+      if (!prog?.isUnlocked) {
+        throw new ConflictException("This boss is still locked. Defeat the previous boss first!");
+      }
     }
 
     const session = await this.repo.createSession(userId, bossConfigId, config.hp);
@@ -285,6 +330,15 @@ export class BossBattleService {
 
         // Check achievements (BOSS_DEFEATED, BOSS_N1_DEFEATED, etc.)
         await this.achievementService.checkAndUnlock(userId);
+
+        // Stars + progress + next boss unlock
+        await this.updateProgressOnWin(
+          userId,
+          config,
+          roundsAfter,
+          session.correctStreak + (isCorrect ? 1 : 0),
+          xpEarned,
+        );
       }
     }
 
@@ -457,6 +511,61 @@ export class BossBattleService {
       isEnraged: state.enraged,
       expiresAt: Date.now() + effectiveTime * 1000,
     };
+  }
+
+  private async updateProgressOnWin(
+    userId: number,
+    config: any,
+    roundsPlayed: number,
+    finalStreak: number,
+    xpEarned: number,
+  ) {
+    const accuracy = roundsPlayed > 0 ? finalStreak / roundsPlayed : 0;
+    const stars = accuracy >= 0.9 ? 3 : accuracy >= 0.7 ? 2 : 1;
+    const bestScore = xpEarned;
+
+    // Get existing progress for best-score comparison
+    const existing = await this.repo.getUserProgressForBoss(userId, config.id);
+    const updatedStars = Math.max(stars, existing?.stars ?? 0);
+    const updatedBestScore = Math.max(bestScore, existing?.bestScore ?? 0);
+
+    await this.repo.upsertUserProgress({
+      userId,
+      bossConfigId: config.id,
+      isUnlocked: true,
+      isCompleted: true,
+      stars: updatedStars,
+      bestScore: updatedBestScore,
+      completedAt: existing?.completedAt ?? new Date(),
+    });
+
+    // Unlock next boss in the same map
+    if (config.mapId !== null) {
+      const nextBoss = await this.repo.getNextBossInMap(config.mapId, config.orderIndex);
+      if (nextBoss) {
+        await this.repo.upsertUserProgress({
+          userId,
+          bossConfigId: nextBoss.id,
+          isUnlocked: true,
+        });
+      } else {
+        // This was the last boss — unlock first boss of next map
+        const map = await this.repo.findMapById(config.mapId);
+        if (map) {
+          const firstNextBoss = await this.repo.getFirstBossOfNextMap(map.orderIndex);
+          if (firstNextBoss) {
+            await this.repo.upsertUserProgress({
+              userId,
+              bossConfigId: firstNextBoss.id,
+              isUnlocked: true,
+            });
+          }
+        }
+      }
+    }
+
+    // Invalidate Redis cache for maps
+    await this.redisService.del(`boss:maps:${userId}`);
   }
 
   // Called by AchievementService for new condition types

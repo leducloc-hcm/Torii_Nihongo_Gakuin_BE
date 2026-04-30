@@ -236,8 +236,25 @@ model SeasonalEvent {
 
 // ===== Boss Battle =====
 
+model BossMap {
+  id          Int      @id @default(autoincrement())
+  name        String
+  jlptLevel   String   @map("jlpt_level") // "N5" | "N4" | "N3" | "N2" | "N1"
+  orderIndex  Int      @map("order_index")
+  description String?
+  emoji       String   @default("👹")
+  isActive    Boolean  @default(true) @map("is_active")
+
+  configs BossConfig[]
+
+  @@map("boss_maps")
+  @@schema("gamification")
+}
+
 model BossConfig {
   id                   Int      @id @default(autoincrement())
+  mapId                Int?     @map("map_id")
+  orderIndex           Int      @default(0) @map("order_index")
   name                 String
   description          String?
   avatarUrl            String?  @map("avatar_url")
@@ -256,9 +273,29 @@ model BossConfig {
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @updatedAt @map("updated_at")
 
-  sessions BossBattleSession[]
+  map           BossMap?           @relation(fields: [mapId], references: [id])
+  sessions      BossBattleSession[]
+  userProgress  UserBossProgress[]
 
   @@map("boss_configs")
+  @@schema("gamification")
+}
+
+model UserBossProgress {
+  id           Int       @id @default(autoincrement())
+  userId       Int       @map("user_id")
+  bossConfigId Int       @map("boss_config_id")
+  isUnlocked   Boolean   @default(false) @map("is_unlocked")
+  isCompleted  Boolean   @default(false) @map("is_completed")
+  stars        Int       @default(0)
+  bestScore    Int       @default(0) @map("best_score")
+  completedAt  DateTime? @map("completed_at")
+
+  bossConfig BossConfig @relation(fields: [bossConfigId], references: [id])
+
+  @@unique([userId, bossConfigId])
+  @@index([userId])
+  @@map("user_boss_progress")
   @@schema("gamification")
 }
 

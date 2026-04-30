@@ -118,4 +118,100 @@ export class BossBattleRepository {
     });
     return result._max.correctStreak ?? 0;
   }
+
+  // ── Boss Maps ──
+  async findAllMaps(activeOnly = true) {
+    return this.prisma.bossMap.findMany({
+      where: activeOnly ? { isActive: true } : undefined,
+      orderBy: { orderIndex: "asc" },
+      include: {
+        configs: {
+          where: { isActive: true },
+          orderBy: { orderIndex: "asc" },
+        },
+      },
+    });
+  }
+
+  async findMapById(id: number) {
+    return this.prisma.bossMap.findUnique({
+      where: { id },
+      include: {
+        configs: { where: { isActive: true }, orderBy: { orderIndex: "asc" } },
+      },
+    });
+  }
+
+  async createMap(data: {
+    name: string;
+    jlptLevel: string;
+    orderIndex: number;
+    description?: string;
+    emoji?: string;
+  }) {
+    return this.prisma.bossMap.create({ data });
+  }
+
+  // ── User Boss Progress ──
+  async getUserProgress(userId: number) {
+    return this.prisma.userBossProgress.findMany({
+      where: { userId },
+    });
+  }
+
+  async getUserProgressForBoss(userId: number, bossConfigId: number) {
+    return this.prisma.userBossProgress.findUnique({
+      where: { userId_bossConfigId: { userId, bossConfigId } },
+    });
+  }
+
+  async upsertUserProgress(data: {
+    userId: number;
+    bossConfigId: number;
+    isUnlocked?: boolean;
+    isCompleted?: boolean;
+    stars?: number;
+    bestScore?: number;
+    completedAt?: Date;
+  }) {
+    const { userId, bossConfigId, ...rest } = data;
+    return this.prisma.userBossProgress.upsert({
+      where: { userId_bossConfigId: { userId, bossConfigId } },
+      create: { userId, bossConfigId, ...rest },
+      update: rest,
+    });
+  }
+
+  async getNextBossInMap(mapId: number, afterOrderIndex: number) {
+    return this.prisma.bossConfig.findFirst({
+      where: { mapId, orderIndex: { gt: afterOrderIndex }, isActive: true },
+      orderBy: { orderIndex: "asc" },
+    });
+  }
+
+  async getFirstBossOfNextMap(currentMapOrderIndex: number) {
+    const nextMap = await this.prisma.bossMap.findFirst({
+      where: { orderIndex: { gt: currentMapOrderIndex }, isActive: true },
+      orderBy: { orderIndex: "asc" },
+    });
+    if (!nextMap) return null;
+    return this.prisma.bossConfig.findFirst({
+      where: { mapId: nextMap.id, isActive: true },
+      orderBy: { orderIndex: "asc" },
+    });
+  }
+
+  async ensureFirstBossUnlocked(userId: number) {
+    // Unlock the first boss of the first map if no progress exists
+    const firstBoss = await this.prisma.bossConfig.findFirst({
+      where: { isActive: true, map: { isActive: true } },
+      orderBy: [{ map: { orderIndex: "asc" } }, { orderIndex: "asc" }],
+    });
+    if (!firstBoss) return;
+    await this.prisma.userBossProgress.upsert({
+      where: { userId_bossConfigId: { userId, bossConfigId: firstBoss.id } },
+      create: { userId, bossConfigId: firstBoss.id, isUnlocked: true },
+      update: {},
+    });
+  }
 }

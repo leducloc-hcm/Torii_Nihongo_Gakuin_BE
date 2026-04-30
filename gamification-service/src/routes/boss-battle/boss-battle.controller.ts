@@ -30,6 +30,13 @@ import {
 export class BossBattleController {
   constructor(private readonly service: BossBattleService) {}
 
+  // ── Maps with Progress ─────────────────────────
+  @Get("maps")
+  @ApiOperation({ summary: "Get all boss maps with user progress" })
+  getMapsWithProgress(@ActiveUser("userId") userId: number) {
+    return this.service.getMapsWithProgress(userId);
+  }
+
   // ── Configs ──────────────────────────────────
   @Get("configs")
   @ApiOperation({ summary: "List boss configs (activeOnly=true by default)" })
