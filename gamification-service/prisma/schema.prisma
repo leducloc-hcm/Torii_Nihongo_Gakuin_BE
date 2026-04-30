@@ -113,6 +113,9 @@ enum AchievementConditionType {
   QUIZZES_PASSED
   TOTAL_XP
   LOGIN_DAYS
+  BOSS_DEFEATED
+  BOSS_COMBO
+  BOSS_N1_DEFEATED
 
   @@schema("gamification")
 }
@@ -227,5 +230,86 @@ model SeasonalEvent {
 
   @@index([startDate, endDate])
   @@map("seasonal_events")
+  @@schema("gamification")
+}
+
+// ===== Boss Battle =====
+
+model BossConfig {
+  id                   Int      @id @default(autoincrement())
+  name                 String
+  description          String?
+  avatarUrl            String?  @map("avatar_url")
+  jlptLevel            String   @map("jlpt_level")   // "N5" | "N4" | "N3" | "N2" | "N1"
+  hp                   Int
+  timeLimit            Int      @map("time_limit")    // seconds per question
+  questionTypes        String[] @map("question_types") // ["meaning","reading","fill_blank"]
+  kanjiPool            String[] @map("kanji_pool")    // ["N5","N4"] draw pool
+  distractorSimilarity Float    @default(0.3) @map("distractor_similarity")
+  bossSkills           String[] @default([]) @map("boss_skills") // ["blur","time_reduce","lock_answer"]
+  enrageThreshold      Float    @default(0.3) @map("enrage_threshold")
+  baseDamage           Int      @default(20) @map("base_damage")
+  baseXpReward         Int      @map("base_xp_reward")
+  baseCoinReward       Int      @map("base_coin_reward")
+  isActive             Boolean  @default(true) @map("is_active")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  sessions BossBattleSession[]
+
+  @@map("boss_configs")
+  @@schema("gamification")
+}
+
+model BossBattleSession {
+  id                 Int          @id @default(autoincrement())
+  userId             Int          @map("user_id")
+  bossConfigId       Int          @map("boss_config_id")
+  status             BattleStatus @default(IN_PROGRESS)
+  currentHp          Int          @map("current_hp")
+  maxHp              Int          @map("max_hp")
+  correctStreak      Int          @default(0) @map("correct_streak")
+  wrongCount         Int          @default(0) @map("wrong_count")
+  adaptiveDifficulty Float        @default(1.0) @map("adaptive_difficulty")
+  totalDamage        Int          @default(0) @map("total_damage")
+  roundsPlayed       Int          @default(0) @map("rounds_played")
+  startedAt          DateTime     @default(now()) @map("started_at")
+  endedAt            DateTime?    @map("ended_at")
+
+  bossConfig BossConfig    @relation(fields: [bossConfigId], references: [id])
+  rounds     BattleRound[]
+
+  @@index([userId, status])
+  @@index([userId, startedAt(sort: Desc)])
+  @@map("boss_battle_sessions")
+  @@schema("gamification")
+}
+
+model BattleRound {
+  id             Int      @id @default(autoincrement())
+  sessionId      Int      @map("session_id")
+  kanjiCharacter String   @map("kanji_character")
+  questionType   String   @map("question_type") // "meaning" | "reading" | "fill_blank"
+  correctAnswer  String   @map("correct_answer")
+  userAnswer     String?  @map("user_answer")
+  isCorrect      Boolean? @map("is_correct")
+  timeLeft       Float?   @map("time_left")
+  damageDone     Int      @default(0) @map("damage_done")
+  bossSkillUsed  String?  @map("boss_skill_used")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  session BossBattleSession @relation(fields: [sessionId], references: [id])
+
+  @@index([sessionId])
+  @@map("battle_rounds")
+  @@schema("gamification")
+}
+
+enum BattleStatus {
+  IN_PROGRESS
+  WIN
+  LOSE
+  ABANDONED
+
   @@schema("gamification")
 }

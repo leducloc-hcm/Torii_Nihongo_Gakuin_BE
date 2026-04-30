@@ -97,4 +97,18 @@ export class RabbitMQPublisher {
       userId,
     });
   }
+
+  async publishBossDefeated(
+    userId: number,
+    bossName: string,
+    jlptLevel: string,
+    sessionId: number,
+  ): Promise<void> {
+    await this.publishEvent("gamification.boss.defeated", {
+      type: "gamification.boss.defeated",
+      payload: { userId, bossName, jlptLevel, sessionId },
+      timestamp: new Date(),
+      userId,
+    });
+  }
 }

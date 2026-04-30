@@ -4,6 +4,7 @@ import { RedisService } from "src/shared/redis/redis.service";
 import { RabbitMQPublisher } from "src/shared/rabbitmq/rabbitmq.publisher";
 import { CreateAchievementType } from "./achievement.model";
 import { PointsService } from "../points/points.service";
+import { BossBattleService } from "../boss-battle/boss-battle.service";
 
 @Injectable()
 export class AchievementService {
@@ -15,6 +16,8 @@ export class AchievementService {
     private readonly rabbitMQPublisher: RabbitMQPublisher,
     @Inject(forwardRef(() => PointsService))
     private readonly pointsService: PointsService,
+    @Inject(forwardRef(() => BossBattleService))
+    private readonly bossBattleService: BossBattleService,
   ) {}
 
   async getAllAchievements() {
@@ -156,6 +159,18 @@ export class AchievementService {
       case "LOGIN_DAYS": {
         const days = await this.achievementRepo.getUserLoginDays(userId);
         return days >= conditionValue;
+      }
+      case "BOSS_DEFEATED": {
+        const count = await this.bossBattleService.countUserBossDefeats(userId);
+        return count >= conditionValue;
+      }
+      case "BOSS_N1_DEFEATED": {
+        const count = await this.bossBattleService.countUserN1Defeats(userId);
+        return count >= conditionValue;
+      }
+      case "BOSS_COMBO": {
+        const maxCombo = await this.bossBattleService.getMaxCombo(userId);
+        return maxCombo >= conditionValue;
       }
       default:
         return false;
