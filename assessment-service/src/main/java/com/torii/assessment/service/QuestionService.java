@@ -78,6 +78,7 @@ public class QuestionService {
             .mediaUrl(finalMediaUrl)
             .explanation(dto.getExplanation())
             .readingLength(dto.getReadingLength())
+            .createdBy(updatedBy)
             .build();
 
         Question saved = questionRepository.save(question);

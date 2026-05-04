@@ -2,6 +2,8 @@ package com.torii.assessment.controller;
 
 import com.torii.assessment.dto.scoreprofile.*;
 import com.torii.assessment.service.ScoreProfileService;
+import com.torii.assessment.util.RequestAuthUtil;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -18,8 +20,11 @@ public class ScoreProfileController {
     private final ScoreProfileService scoreProfileService;
     
     @PostMapping
-    public ResponseEntity<ScoreProfileResponseDTO> create(@Valid @RequestBody CreateScoreProfileDTO dto) {
-        ScoreProfileResponseDTO response = scoreProfileService.create(dto);
+    public ResponseEntity<ScoreProfileResponseDTO> create(
+            @Valid @RequestBody CreateScoreProfileDTO dto,
+            HttpServletRequest request) {
+        Integer userId = RequestAuthUtil.requireUser(request).userId();
+        ScoreProfileResponseDTO response = scoreProfileService.create(dto, userId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
     
@@ -53,14 +58,17 @@ public class ScoreProfileController {
     @PutMapping("/{id}")
     public ResponseEntity<ScoreProfileResponseDTO> update(
             @PathVariable Long id,
-            @Valid @RequestBody UpdateScoreProfileDTO dto) {
-        ScoreProfileResponseDTO response = scoreProfileService.update(id, dto);
+            @Valid @RequestBody UpdateScoreProfileDTO dto,
+            HttpServletRequest request) {
+        Integer userId = RequestAuthUtil.requireUser(request).userId();
+        ScoreProfileResponseDTO response = scoreProfileService.update(id, dto, userId);
         return ResponseEntity.ok(response);
     }
     
     @DeleteMapping("/{id}")
-    public ResponseEntity<Map<String, String>> delete(@PathVariable Long id) {
-        scoreProfileService.delete(id);
+    public ResponseEntity<Map<String, String>> delete(@PathVariable Long id, HttpServletRequest request) {
+        Integer userId = RequestAuthUtil.requireUser(request).userId();
+        scoreProfileService.delete(id, userId);
         return ResponseEntity.ok(Map.of("message", "Score profile deleted successfully"));
     }
 }

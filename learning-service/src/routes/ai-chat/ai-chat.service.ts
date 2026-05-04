@@ -430,30 +430,28 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
         initialResponse: rejectionMessage,
       });
 
-      // Save user message
-      await this.messageRepo.create({
-        threadId,
-        userId,
-        queryId: queryRecord.id,
-        role: ChatRole.USER,
-        content: query,
-      });
+      // Save user + rejection messages in parallel, then finalize together
+      await Promise.all([
+        this.messageRepo.create({
+          threadId,
+          userId,
+          queryId: queryRecord.id,
+          role: ChatRole.USER,
+          content: query,
+        }),
+        this.messageRepo.create({
+          threadId,
+          userId,
+          queryId: queryRecord.id,
+          role: ChatRole.ASSISTANT,
+          content: rejectionMessage,
+        }),
+      ]);
 
-      // Save rejection message
-      await this.messageRepo.create({
-        threadId,
-        userId,
-        queryId: queryRecord.id,
-        role: ChatRole.ASSISTANT,
-        content: rejectionMessage,
-      });
-
-      await this.queryRepo.update(queryRecord.id, {
-        status: QueryStatus.COMPLETED,
-      });
-
-      // Invalidate cache after new messages
-      await this.invalidateThreadCache(threadId, userId);
+      await Promise.all([
+        this.queryRepo.update(queryRecord.id, { status: QueryStatus.COMPLETED }),
+        this.invalidateThreadCache(threadId, userId),
+      ]);
 
       return {
         queryId: queryRecord.id,
@@ -616,30 +614,28 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
       initialResponse: agentResponse.content || undefined,
     });
 
-    // Save user message
-    await this.messageRepo.create({
-      threadId,
-      userId,
-      queryId: queryRecord.id,
-      role: ChatRole.USER,
-      content: query,
-    });
-
-    // If no tool calls, save assistant response and return
+    // If no tool calls, save user + assistant message + finalize in parallel
     if (!agentResponse.toolCalls || agentResponse.toolCalls.length === 0) {
-      if (agentResponse.content) {
-        await this.messageRepo.create({
+      // Save user message + optional assistant message + status update in parallel
+      await Promise.all([
+        this.messageRepo.create({
           threadId,
           userId,
           queryId: queryRecord.id,
-          role: ChatRole.ASSISTANT,
-          content: agentResponse.content,
-        });
-      }
-
-      await this.queryRepo.update(queryRecord.id, {
-        status: QueryStatus.COMPLETED,
-      });
+          role: ChatRole.USER,
+          content: query,
+        }),
+        agentResponse.content
+          ? this.messageRepo.create({
+              threadId,
+              userId,
+              queryId: queryRecord.id,
+              role: ChatRole.ASSISTANT,
+              content: agentResponse.content,
+            })
+          : Promise.resolve(),
+        this.queryRepo.update(queryRecord.id, { status: QueryStatus.COMPLETED }),
+      ]);
 
       // Ensure thread/messages cache is refreshed for immediate UI reads.
       await this.invalidateThreadCache(threadId, userId);
@@ -658,9 +654,19 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
       `🔧 Auto-executing ${agentResponse.toolCalls.length} tool(s): [${toolNames}]`,
     );
 
-    await this.queryRepo.update(queryRecord.id, {
-      status: QueryStatus.PROCESSING,
-    });
+    // Save user message + mark PROCESSING in parallel before tool execution
+    await Promise.all([
+      this.messageRepo.create({
+        threadId,
+        userId,
+        queryId: queryRecord.id,
+        role: ChatRole.USER,
+        content: query,
+      }),
+      this.queryRepo.update(queryRecord.id, {
+        status: QueryStatus.PROCESSING,
+      }),
+    ]);
 
     this.logger.log("📞 Calling agentService.executeApprovedTools...");
     this.logger.log(`📋 QueryType being passed: ${queryType}`);

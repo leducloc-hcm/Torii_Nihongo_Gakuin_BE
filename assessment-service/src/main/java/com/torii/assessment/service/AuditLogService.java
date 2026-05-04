@@ -32,6 +32,7 @@ public class AuditLogService {
     public static final String ENTITY_QUESTION = "QUESTION";
     public static final String ENTITY_QUESTION_GROUP = "QUESTION_GROUP";
     public static final String ENTITY_OPTION = "OPTION";
+    public static final String ENTITY_SCORE_PROFILE = "SCORE_PROFILE";
     public static final String ENTITY_ITEM_LINK = "ITEM_LINK";
 
     public static final String ACTION_CREATE = "CREATE";

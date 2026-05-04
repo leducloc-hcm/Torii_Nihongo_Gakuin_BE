@@ -53,6 +53,9 @@ public class QuestionGroup {
     @Column(name = "audio_url", length = 500)
     private String audioUrl;
 
+    @Column(name = "created_by")
+    private Integer createdBy;
+
     @Column(name = "created_at")
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();

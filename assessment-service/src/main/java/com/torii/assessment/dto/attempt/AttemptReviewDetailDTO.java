@@ -51,6 +51,7 @@ public class AttemptReviewDetailDTO {
     public static class QuestionResultDTO {
         private Long questionId;
         private String stem;
+        private String explanation;
         private Boolean isCorrect;
         private Long selectedOptionId;
         private Long correctOptionId;

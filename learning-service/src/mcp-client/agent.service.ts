@@ -962,6 +962,22 @@ IMPORTANT: The JSON code block MUST contain the inner data object (with fields: 
       });
     }
 
+    // Fast-path for ENROLLMENT: structured data, no need for Claude to reformat
+    if (type === "ENROLLMENT") {
+      const enrollments = this.extractArrayFromToolResults(results, [
+        "enrollments",
+        "courses",
+        "items",
+        "data",
+      ]);
+
+      if (!enrollments) {
+        return undefined;
+      }
+
+      return this.toJsonCodeBlock({ enrollments, count: enrollments.length });
+    }
+
     return undefined;
   }
 

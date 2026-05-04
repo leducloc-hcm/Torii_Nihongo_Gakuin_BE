@@ -18,7 +18,10 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.stream.Collectors;
+
+import static com.torii.assessment.service.AuditLogService.*;
 
 @Service
 @RequiredArgsConstructor
@@ -27,9 +30,10 @@ public class ScoreProfileService {
     
     private final ScoreProfileRepository scoreProfileRepository;
     private final ScoreProfileSectionRepository scoreProfileSectionRepository;
+    private final AuditLogService auditLogService;
     
     @Transactional
-    public ScoreProfileResponseDTO create(CreateScoreProfileDTO dto) {
+    public ScoreProfileResponseDTO create(CreateScoreProfileDTO dto, Integer userId) {
         // Check if name already exists
         if (scoreProfileRepository.existsByName(dto.getName())) {
             throw new RuntimeException("Score profile with name '" + dto.getName() + "' already exists");
@@ -42,6 +46,7 @@ public class ScoreProfileService {
         profile.setMaxTotal(dto.getMaxTotal());
         profile.setMinTotalPass(dto.getMinTotalPass());
         profile.setNotes(dto.getNotes());
+        profile.setCreatedBy(userId);
         
         ScoreProfile savedProfile = scoreProfileRepository.save(profile);
         
@@ -59,6 +64,10 @@ public class ScoreProfileService {
         }
         
         log.info("Created score profile: {}", savedProfile.getId());
+
+        auditLogService.logAction(null, ENTITY_SCORE_PROFILE, savedProfile.getId(),
+                ACTION_CREATE, null, null, null, userId,
+                "Tạo score profile: " + savedProfile.getName(), Map.of("level", String.valueOf(savedProfile.getLevel())));
         
         // Reload to get sections
         return findById(savedProfile.getId());
@@ -109,7 +118,7 @@ public class ScoreProfileService {
     }
     
     @Transactional
-    public ScoreProfileResponseDTO update(Long id, UpdateScoreProfileDTO dto) {
+    public ScoreProfileResponseDTO update(Long id, UpdateScoreProfileDTO dto, Integer userId) {
         ScoreProfile existing = scoreProfileRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Score profile with ID " + id + " not found"));
         
@@ -157,12 +166,16 @@ public class ScoreProfileService {
         }
         
         log.info("Updated score profile: {}", id);
+
+        auditLogService.logAction(null, ENTITY_SCORE_PROFILE, id,
+                ACTION_UPDATE, null, null, null, userId,
+                "Cập nhật score profile #" + id, null);
         
         return findById(id);
     }
     
     @Transactional
-    public void delete(Long id) {
+    public void delete(Long id, Integer userId) {
         ScoreProfile existing = scoreProfileRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Score profile with ID " + id + " not found"));
         
@@ -174,6 +187,10 @@ public class ScoreProfileService {
         
         scoreProfileRepository.delete(existing);
         log.info("Deleted score profile: {}", id);
+
+        auditLogService.logAction(null, ENTITY_SCORE_PROFILE, id,
+                ACTION_DELETE, null, null, null, userId,
+                "Xóa score profile #" + id, null);
     }
     
     // ===== Helper Methods =====

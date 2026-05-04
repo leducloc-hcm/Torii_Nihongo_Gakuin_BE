@@ -77,8 +77,12 @@ export function routeAgentForQuery(
     candidateRoles.push(AgentRole.SENSEI);
   }
 
+  // Only push ANALYTICS for explicit enrollment/progress queries.
+  // Do NOT push ANALYTICS just because requiresCourse=true — that would
+  // make ANALYTICS the primary (higher ROLE_PRIORITY than SENSEI) for plain
+  // COURSE/LESSON/BLOG/FLASHCARD queries, which gives Claude the wrong
+  // system prompt ("learning analyst" instead of "tutor").
   if (
-    multiTool.requiresCourse ||
     queryType === QueryType.ENROLLMENT ||
     queryType === QueryType.PROGRESS
   ) {
@@ -87,13 +91,17 @@ export function routeAgentForQuery(
 
   const uniqueCandidateRoles = uniqueRoles(candidateRoles);
 
-  // For GRAMMAR/TRANSLATION queries, always keep SENSEI as primary
-  // (pickPrimaryRole would override to ASSESSMENT due to ROLE_PRIORITY)
-  const primaryRole =
-    (queryType === QueryType.GRAMMAR || queryType === QueryType.TRANSLATION) &&
-    baseRole === AgentRole.SENSEI
-      ? AgentRole.SENSEI
-      : pickPrimaryRole(uniqueCandidateRoles);
+  // Keep SENSEI as primary for all SENSEI-native query types.
+  // Without this guard, ROLE_PRIORITY would promote ANALYTICS/ASSESSMENT
+  // even for pure COURSE/BLOG/FLASHCARD/GRAMMAR/TRANSLATION queries.
+  const isSenseiNative =
+    baseRole === AgentRole.SENSEI &&
+    queryType !== QueryType.ENROLLMENT &&
+    queryType !== QueryType.PROGRESS;
+
+  const primaryRole = isSenseiNative
+    ? AgentRole.SENSEI
+    : pickPrimaryRole(uniqueCandidateRoles);
 
   const collaboratorRoles = uniqueCandidateRoles.filter(
     (role) => role !== primaryRole,

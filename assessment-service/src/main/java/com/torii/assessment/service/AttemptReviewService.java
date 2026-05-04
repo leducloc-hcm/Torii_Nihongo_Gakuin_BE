@@ -757,6 +757,7 @@ public class AttemptReviewService {
                 questions.add(AttemptReviewDetailDTO.QuestionResultDTO.builder()
                     .questionId(questionId)
                     .stem(question != null ? question.getStem() : null)
+                    .explanation(question != null ? question.getExplanation() : null)
                     .isCorrect(answer != null ? answer.getIsCorrect() : null)
                     .selectedOptionId(answer != null ? answer.getSelectedOptionId() : null)
                     .correctOptionId(correctOptionId)

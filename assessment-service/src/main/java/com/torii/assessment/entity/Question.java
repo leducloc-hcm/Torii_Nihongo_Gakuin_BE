@@ -58,6 +58,9 @@ public class Question {
     @Column(name = "reading_length")
     private ReadingLength readingLength;
 
+    @Column(name = "created_by")
+    private Integer createdBy;
+
     @Column(name = "created_at")
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();

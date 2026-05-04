@@ -347,6 +347,8 @@ CREATE TABLE IF NOT EXISTS questions (
     audio_url VARCHAR(500),
     reading_length VARCHAR(20),
 
+    created_by INTEGER NOT NULL,
+
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP
 );
@@ -379,6 +381,8 @@ CREATE TABLE IF NOT EXISTS question_groups (
     media_url VARCHAR(500),
     audio_url VARCHAR(500),
 
+    created_by INTEGER NOT NULL,
+
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -401,6 +405,9 @@ CREATE TABLE IF NOT EXISTS score_profiles (
     max_total INTEGER,
     min_total_pass INTEGER,
     notes TEXT,
+
+    created_by INTEGER NOT NULL,
+
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -414,6 +421,8 @@ CREATE TABLE IF NOT EXISTS score_profile_sections (
     weight DECIMAL(5,2),
     min_pass INTEGER
 );
+
+-- QUESTION BANK logs -> reuse assessment_logs table (entity_type: QUESTION | QUESTION_GROUP | SCORE_PROFILE)
 
 ALTER TABLE assessments
     ADD CONSTRAINT fk_assessments_score_profile

@@ -65,6 +65,7 @@ public class QuestionGroupService {
             .explanation(dto.getExplanation())
             .mediaUrl(mediaUrl)
             .audioUrl(audioUrl)
+            .createdBy(updatedBy)
             .build();
 
         QuestionGroup saved = questionGroupRepository.save(group);

@@ -28,7 +28,10 @@ public class ScoreProfile {
     
     @Column(columnDefinition = "TEXT")
     private String notes;
-    
+
+    @Column(name = "created_by")
+    private Integer createdBy;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt = LocalDateTime.now();
     
