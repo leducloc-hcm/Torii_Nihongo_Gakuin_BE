@@ -69,12 +69,10 @@ public class AttemptReviewService {
     public AttemptedAssessmentListResponseDTO getAttemptedAssessments(
         Integer userId,
         Assessment.AssessmentType type,
-        Assessment.JLPTLevel level,
-        int page,
-        int limit
+        Assessment.JLPTLevel level
     ) {
         List<Attempt> submittedAttempts = attemptRepository.findByUserIdAndSubmittedAtIsNotNullOrderBySubmittedAtDesc(userId);
-        return buildAttemptedListResponse(submittedAttempts, type, level, page, limit);
+        return buildAttemptedListResponse(submittedAttempts, type, level);
     }
 
     public AttemptedAssessmentListResponseDTO getAttemptedAssessmentsForStudent(
@@ -85,7 +83,7 @@ public class AttemptReviewService {
         int limit
     ) {
         List<Attempt> submittedAttempts = attemptRepository.findByUserIdAndSubmittedAtIsNotNullOrderBySubmittedAtDesc(studentId);
-        return buildAttemptedListResponse(submittedAttempts, type, level, page, limit);
+        return buildAttemptedListResponsePaged(submittedAttempts, type, level, page, limit);
     }
 
     public AttemptReviewDetailDTO getAttemptDetail(Long attemptId, Integer requesterUserId, String requesterRole) {
@@ -604,6 +602,47 @@ public class AttemptReviewService {
     private AttemptedAssessmentListResponseDTO buildAttemptedListResponse(
         List<Attempt> submittedAttempts,
         Assessment.AssessmentType type,
+        Assessment.JLPTLevel level
+    ) {
+        List<Long> assessmentIds = submittedAttempts.stream()
+            .map(Attempt::getAssessmentId)
+            .distinct()
+            .collect(Collectors.toList());
+
+        Map<Long, Assessment> assessmentMap = assessmentRepository.findAllById(assessmentIds)
+            .stream()
+            .collect(Collectors.toMap(Assessment::getId, a -> a));
+
+        List<Attempt> filteredAttempts = submittedAttempts.stream()
+            .filter(attempt -> {
+                Assessment assessment = assessmentMap.get(attempt.getAssessmentId());
+                if (assessment == null) {
+                    return false;
+                }
+                if (type != null && assessment.getType() != type) {
+                    return false;
+                }
+                if (level != null && assessment.getLevel() != level) {
+                    return false;
+                }
+                return true;
+            })
+            .collect(Collectors.toList());
+
+        List<AttemptedAssessmentListResponseDTO.AttemptedAssessmentDTO> data = filteredAttempts
+            .stream()
+            .map(attempt -> buildAttemptedSummary(attempt, assessmentMap.get(attempt.getAssessmentId())))
+            .collect(Collectors.toList());
+
+        return AttemptedAssessmentListResponseDTO.builder()
+            .data(data)
+            .pagination(null)
+            .build();
+    }
+
+    private AttemptedAssessmentListResponseDTO buildAttemptedListResponsePaged(
+        List<Attempt> submittedAttempts,
+        Assessment.AssessmentType type,
         Assessment.JLPTLevel level,
         int page,
         int limit
@@ -611,17 +650,16 @@ public class AttemptReviewService {
         int safePage = Math.max(page, 1);
         int safeLimit = Math.max(limit, 1);
 
-        Map<Long, Attempt> latestAttemptByAssessment = new LinkedHashMap<>();
-        for (Attempt attempt : submittedAttempts) {
-            latestAttemptByAssessment.putIfAbsent(attempt.getAssessmentId(), attempt);
-        }
+        List<Long> assessmentIds = submittedAttempts.stream()
+            .map(Attempt::getAssessmentId)
+            .distinct()
+            .collect(Collectors.toList());
 
-        List<Long> assessmentIds = new ArrayList<>(latestAttemptByAssessment.keySet());
         Map<Long, Assessment> assessmentMap = assessmentRepository.findAllById(assessmentIds)
             .stream()
             .collect(Collectors.toMap(Assessment::getId, a -> a));
 
-        List<Attempt> filteredAttempts = latestAttemptByAssessment.values().stream()
+        List<Attempt> filteredAttempts = submittedAttempts.stream()
             .filter(attempt -> {
                 Assessment assessment = assessmentMap.get(attempt.getAssessmentId());
                 if (assessment == null) {
@@ -757,7 +795,7 @@ public class AttemptReviewService {
                 questions.add(AttemptReviewDetailDTO.QuestionResultDTO.builder()
                     .questionId(questionId)
                     .stem(question != null ? question.getStem() : null)
-                    .explanation(question != null ? question.getExplanation() : null)
+                    .explanation(resolveExplanation(question, answer))
                     .isCorrect(answer != null ? answer.getIsCorrect() : null)
                     .selectedOptionId(answer != null ? answer.getSelectedOptionId() : null)
                     .correctOptionId(correctOptionId)
@@ -805,6 +843,18 @@ public class AttemptReviewService {
             .correctAnswers(correctAnswers)
             .sectionDetails(sectionDetails)
             .build();
+    }
+
+    private String resolveExplanation(AssessmentQuestion question, AssessmentAnswer answer) {
+        if (question != null && question.getExplanation() != null && !question.getExplanation().isBlank()) {
+            return question.getExplanation();
+        }
+
+        if (answer != null && answer.getExplanation() != null && !answer.getExplanation().isBlank()) {
+            return answer.getExplanation();
+        }
+
+        return null;
     }
 
     private AssessmentStructureSnapshot buildStructureSnapshot(Long assessmentId, boolean includeQuestionData) {

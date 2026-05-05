@@ -93,16 +93,12 @@ public class AttemptController {
     public ResponseEntity<AttemptedAssessmentListResponseDTO> getAttemptedAssessments(
             @RequestParam(required = false) Assessment.AssessmentType type,
             @RequestParam(required = false) Assessment.JLPTLevel level,
-            @RequestParam(required = false, defaultValue = "1") Integer page,
-            @RequestParam(required = false, defaultValue = "10") Integer limit,
             HttpServletRequest request) {
         RequestAuthUtil.AuthUser authUser = RequestAuthUtil.getAuthUser(request);
         return ResponseEntity.ok(attemptReviewService.getAttemptedAssessments(
             authUser.userId(),
             type,
-            level,
-            page,
-            limit
+            level
         ));
     }
 
