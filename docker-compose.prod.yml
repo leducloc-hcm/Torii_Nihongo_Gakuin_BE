@@ -1,0 +1,21 @@
+# Production overlay — used by CI/CD on EC2.
+# Overrides the three app services to use pre-built Docker Hub images
+# instead of the `build:` context defined in docker-compose.yml.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-build
+#
+# Required env var: DOCKER_USERNAME (set in EC2 runner environment or .env)
+
+services:
+  learning-service:
+    build: !reset null
+    image: ${DOCKER_USERNAME}/torii-nihongo-gakuin-learning-service:latest
+
+  assessment-service:
+    build: !reset null
+    image: ${DOCKER_USERNAME}/torii-nihongo-gakuin-assessment-service:latest
+
+  api-gateway:
+    build: !reset null
+    image: ${DOCKER_USERNAME}/torii-nihongo-gakuin-api-gateway:latest

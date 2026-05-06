@@ -1,0 +1,1472 @@
+// JLPT Learning Platform — Prisma Schema
+// Stack: NestJS + Prisma + PostgreSQL
+// Generated: 2025-09-27
+
+// ===== Generator & Datasource =====
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-1.1.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  schemas  = ["learning"]
+}
+
+model User {
+  id         Int          @id @default(autoincrement())
+  email      String       @unique
+  password   String
+  name       String
+  role       Role         @default(CUSTOMER)
+  status     VerifyStatus @default(UNVERIFIED)
+  bio        String?
+  totpSecret String?      @db.VarChar(1000)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  deletedAt  DateTime?
+  lecturerProfile LecturerProfile?
+  staffProfile    StaffProfile?
+  customerProfile CustomerProfile?
+  enrollments     Enrollment[]
+  notes           LessonNote[]
+  lessonProgress  LessonProgress[]
+  devices         Device[]
+  refreshTokens   RefreshToken[]
+  
+  cardProgress    CardProgress[]
+  flashcardDecks  FlashcardDeck[]
+  wrongTerms      WrongTerm[]
+
+  classMembers ClassMember[]
+  liveChats    LiveChatMessage[]
+  liveHands    RaiseHand[]
+  liveNotes    LiveNote[]
+  attendances  Attendance[]
+
+  folders   Folder[]
+  folderPermissions FolderPermission[]
+  resources Resource[] @relation("ResourceAuthor")
+  reactions Reaction[]
+  comments  Comment[]
+
+  cart        Cart?
+  orders      Order[]
+  reviews     Review[]
+
+  blogs Blog[]
+
+  aiThreads  AIThread[]
+  aiMessages AIChatMessage[]
+  aiQueries  AIQuery[]
+
+  Class Class[]
+
+
+  Notification Notification[]
+
+  Websocket Websocket[]
+
+  AdminProfile AdminProfile[]
+  
+  // Coupon system relations
+  createdCoupons     Coupon[] @relation("CouponCreator")
+  approvedCoupons    Coupon[] @relation("CouponApprover")
+  rejectedCoupons    Coupon[] @relation("CouponRejector")
+  purchasedCoupons   Coupon[] @relation("CouponPurchaser")
+  couponRedemptions  CouponRedemption[] @relation("UserCouponRedemptions")
+  couponAuditLogs    CouponAuditLog[] @relation("CouponAuditor")
+  reviewVotes        ReviewVote[]
+  substituteSessions LiveSession[] @relation("SubstituteLecturer")
+  certificates       Certificate[]
+  activityLogs       ActivityLog[]
+  refundRequests     RefundRequest[] @relation("RefundRequester")
+  reviewedRefunds    RefundRequest[] @relation("RefundReviewer")
+  
+  
+  
+@@schema("learning")
+  
+  
+  
+}
+
+model CustomerProfile {
+  id          Int       @id @default(autoincrement())
+  name        String?
+  bio         String?
+  location    String?
+  username    String?   @unique
+  avatar      String?
+  coverPhoto  String?   @map("cover_photo")
+  description String?
+  phoneNumber String?   @map("phone_number")
+  dateOfBirth DateTime? @map("date_of_birth")
+  website     String?
+  userId      Int       @unique @map("user_id")
+  user        User      @relation(fields: [userId], references: [id])
+@@schema("learning")
+}
+
+model Device {
+  id            Int            @id @default(autoincrement())
+  userId        Int
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  userAgent     String
+  ip            String
+  deviceName    String?        @map("device_name")
+  browserName   String?        @map("browser_name")
+  osName        String?        @map("os_name")
+  location      String?
+  lastActive    DateTime       @updatedAt
+  createdAt     DateTime       @default(now())
+  isActive      Boolean        @default(true)
+  refreshTokens RefreshToken[]
+@@schema("learning")
+}
+
+model RefreshToken {
+  token     String   @unique @db.VarChar(1000)
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  deviceId  Int
+  device    Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+@@schema("learning")
+}
+
+model VerificationCode {
+  id    Int                  @id @default(autoincrement())
+  email String               @db.VarChar(500)
+  code  String               @db.VarChar(50)
+  type  VerificationCodeType
+
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@unique([email, type])
+  @@index([expiresAt])
+@@schema("learning")
+}
+
+model LecturerProfile {
+  id          Int       @id @default(autoincrement())
+  userId      Int       @unique
+  name        String?
+  bio         String?
+  location    String?
+  username    String?   @unique
+  avatar      String?
+  coverPhoto  String?   @map("cover_photo")
+  description String?
+  phoneNumber String?   @map("phone_number")
+  dateOfBirth DateTime? @map("date_of_birth")
+  website     String?
+  socialLinks String[]  @map("social_links")
+  user        User      @relation(fields: [userId], references: [id])
+
+  specialties         Specialty[]
+@@schema("learning")
+}
+
+model Specialty {
+  id                  Int                 @id @default(autoincrement())
+  name                String
+  issuingOrganization String?
+  issueDate           DateTime?
+  expirationDate      DateTime?
+  credentialId        String?
+  credentialUrl       String?
+  logoUrl             String?
+  description         String?
+  skills              String[]            @default([])
+
+  lecturerId          Int
+  lecturer            LecturerProfile     @relation(fields: [lecturerId], references: [id], onDelete: Cascade)
+
+  @@index([lecturerId])
+
+  createdAt           DateTime            @default(now()) @map("created_at")
+  updatedAt           DateTime            @updatedAt @map("updated_at")
+@@schema("learning")
+}
+
+
+model Notification {
+  id            Int                  @id @default(autoincrement())
+  type          NotificationType
+  title         String
+  message       String
+  status        NotificationStatus   @default(UNREAD)
+  priority      NotificationPriority @default(NORMAL)
+  data          Json?
+  actionUrl     String?              @map("action_url")
+  userId        Int                  @map("user_id")
+  relatedUserId Int?                 @map("related_user_id")
+  entityId      Int?                 @map("entity_id")
+  entityType    String?              @map("entity_type")
+  createdAt     DateTime             @default(now()) @map("created_at")
+  readAt        DateTime?            @map("read_at")
+  expiresAt     DateTime?            @map("expires_at")
+  user          User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([userId, createdAt])
+  @@index([type])
+  @@map("notifications")
+@@schema("learning")
+}
+
+model Websocket {
+  id        String   @id
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  createdAt DateTime @default(now())
+@@schema("learning")
+}
+
+
+
+model StaffProfile {
+  id          Int       @id @default(autoincrement())
+  userId      Int       @unique
+  name        String?
+  bio         String?
+  location    String?
+  username    String?   @unique
+  avatar      String?
+  coverPhoto  String?   @map("cover_photo")
+  description String?
+  phoneNumber String?   @map("phone_number")
+  dateOfBirth DateTime? @map("date_of_birth")
+  website     String?
+  user        User      @relation(fields: [userId], references: [id])
+@@schema("learning")
+}
+
+model AdminProfile {
+  id          Int       @id @default(autoincrement())
+  userId      Int       @unique
+  name        String?
+  bio         String?
+  location    String?
+  username    String?   @unique
+  avatar      String?
+  coverPhoto  String?   @map("cover_photo")
+  description String?
+  phoneNumber String?   @map("phone_number")
+  dateOfBirth DateTime? @map("date_of_birth")
+  website     String?
+  user        User      @relation(fields: [userId], references: [id])
+@@schema("learning")
+}
+model Course {
+  id           Int          @id @default(autoincrement())
+  slug         String       @unique
+  title        String
+  subtitle     String?
+  description  String?
+  level        JLPTLevel
+  courseType   CourseType   @default(VIDEO_QUIZ)
+  thumbnailUrl String?
+  price        Int          @default(0)
+  status       CourseStatus @default(DRAFT)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  createdBy   Int
+  lecturerIds   Int[]
+  modules     Module[]
+  enrollments Enrollment[]
+  reviews     Review[]
+  orderItems  OrderItem[]
+  cartItems   CartItem[]
+  certificates Certificate[]
+
+  Class Class[]
+  coupons CouponCourse[] @relation("CouponCourses")
+  refundRequests RefundRequest[]
+@@schema("learning")
+}
+
+model Module {
+  id       Int    @id @default(autoincrement())
+  courseId Int
+  title    String
+  order    Int    @default(0)
+
+  course  Course   @relation(fields: [courseId], references: [id])
+  lessons Lesson[]
+@@schema("learning")
+}
+
+model Lesson {
+  id          Int          @id @default(autoincrement())
+  moduleId    Int
+  title       String
+  kind        LessonKind   @default(VIDEO)
+  content     String?
+  durationSec Int?
+  mediaId     Int?
+  order       Int          @default(0)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  status      LessonStatus @default(PRIVATE)
+  module      Module       @relation(fields: [moduleId], references: [id])
+  media   MediaAsset[]
+  liveSession LiveSession?
+  notes       LessonNote[]
+  progress    LessonProgress[]
+@@schema("learning")
+}
+
+model MediaAsset {
+  id        Int       @id @default(autoincrement())
+  lessonId  Int?
+  url       String
+  kind      MediaKind @default(OTHER)
+  status    MediaStatus @default(UPLOADING)
+  mimeType  String?
+  sizeByte  Int?
+  caption   String?
+  meta      Json?
+  createdAt DateTime  @default(now())
+
+  lesson    Lesson?    @relation(fields: [lessonId], references: [id])
+  liveSessions LiveSessionMedia[]
+@@schema("learning")
+}
+
+model Enrollment {
+  id         Int        @id @default(autoincrement())
+  userId     Int
+  courseId   Int
+  courseType CourseType
+  createdAt  DateTime   @default(now())
+  expiresAt  DateTime?
+
+  user   User   @relation(fields: [userId], references: [id])
+  course Course @relation(fields: [courseId], references: [id])
+
+  @@unique([userId, courseId])
+@@schema("learning")
+}
+
+model LessonNote {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  lessonId     Int
+  title        String?
+  body         String
+  timestampSec Int?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id])
+  lesson Lesson @relation(fields: [lessonId], references: [id])
+
+  @@index([lessonId, userId])
+@@schema("learning")
+}
+
+model LessonProgress {
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  lessonId        Int
+  watchedSec      Int      @default(0)
+  lastPositionSec Int      @default(0)
+  completed       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id])
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, lessonId])
+  @@index([lessonId])
+  @@index([userId])
+  @@map("lesson_progress")
+@@schema("learning")
+}
+
+
+model Class {
+  id          Int      @id @default(autoincrement())
+  courseId    Int?
+  title       String
+  description String?
+  lecturerId  Int
+  startDate   DateTime?
+  endDate     DateTime?
+  capacity    Int      @default(20)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  folderId    Int?     @unique
+
+  course     Course?       @relation(fields: [courseId], references: [id])
+  lecturer   User          @relation(fields: [lecturerId], references: [id])
+  sessions   LiveSession[]
+  members    ClassMember[]
+  orderItems OrderItem[]
+  folder     Folder?       @relation("ClassFolder")
+  CartItem   CartItem[]
+  
+@@schema("learning")
+  
+}
+
+model ClassMember {
+  id       Int      @id @default(autoincrement())
+  classId  Int
+  userId   Int
+  role     Role
+  joinedAt DateTime @default(now())
+
+  class Class @relation(fields: [classId], references: [id])
+  user  User  @relation(fields: [userId], references: [id])
+
+  @@unique([classId, userId])
+@@schema("learning")
+}
+
+model  Certificate {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  courseId   Int
+  issuedAt   DateTime @default(now())
+  verifyCode String   @unique
+  pdfUrl     String?
+
+  user   User   @relation(fields: [userId], references: [id])
+  course Course @relation(fields: [courseId], references: [id])
+
+  @@unique([userId, courseId])
+  @@map("certificates")
+@@schema("learning")
+}
+
+model LiveSession {
+  id           Int       @id @default(autoincrement())
+  classId      Int
+  lessonId     Int?      @unique
+  title        String
+  scheduledAt  DateTime
+  endedAt      DateTime?
+  janusRoomId  Int?
+  recordingUrl      String?
+  whiteboardSnapshot Json?
+  substituteLecturerId Int? @map("substitute_lecturer_id")
+
+  class      Class             @relation(fields: [classId], references: [id])
+  lesson     Lesson?           @relation(fields: [lessonId], references: [id])
+  substituteLecturer User?     @relation("SubstituteLecturer", fields: [substituteLecturerId], references: [id])
+  pings      ResourcePing[]
+  chats      LiveChatMessage[]
+  hands      RaiseHand[]
+  attendance Attendance[]
+  notes      LiveNote[]
+
+  mediaAssets LiveSessionMedia[]
+@@schema("learning")
+}
+
+model LiveSessionMedia {
+  liveSessionId Int
+  mediaAssetId  Int
+
+  liveSession LiveSession @relation(fields: [liveSessionId], references: [id], onDelete: Cascade)
+  mediaAsset  MediaAsset  @relation(fields: [mediaAssetId], references: [id], onDelete: Cascade)
+
+  @@id([liveSessionId, mediaAssetId])
+@@schema("learning")
+}
+
+model Attendance {
+  id        Int              @id @default(autoincrement())
+  sessionId Int
+  userId    Int
+  status    AttendanceStatus @default(PRESENT)
+  joinedAt  DateTime         @default(now())
+  leftAt    DateTime?
+
+  session LiveSession @relation(fields: [sessionId], references: [id])
+  user    User        @relation(fields: [userId], references: [id])
+
+  @@unique([sessionId, userId])
+@@schema("learning")
+}
+
+model LiveChatMessage {
+  id        Int      @id @default(autoincrement())
+  sessionId Int
+  userId    Int
+  content   String
+  createdAt DateTime @default(now())
+
+  session LiveSession @relation(fields: [sessionId], references: [id])
+  user    User        @relation(fields: [userId], references: [id])
+@@schema("learning")
+}
+
+model RaiseHand {
+  id        Int      @id @default(autoincrement())
+  sessionId Int
+  userId    Int
+  createdAt DateTime @default(now())
+  resolved  Boolean  @default(false)
+
+  session LiveSession @relation(fields: [sessionId], references: [id])
+  user    User        @relation(fields: [userId], references: [id])
+@@schema("learning")
+}
+
+model ResourcePing {
+  id        Int      @id @default(autoincrement())
+  sessionId Int
+  title     String
+  url       String
+  createdAt DateTime @default(now())
+
+  session LiveSession @relation(fields: [sessionId], references: [id])
+@@schema("learning")
+}
+
+
+model LiveNote {
+  id        Int      @id @default(autoincrement())
+  sessionId Int
+  userId    Int
+  title     String?
+  body      String
+  createdAt DateTime @default(now())
+
+  session LiveSession @relation(fields: [sessionId], references: [id])
+  user    User        @relation(fields: [userId], references: [id])
+@@schema("learning")
+}
+
+// ===== Flashcards & Spaced Repetition =====
+model FlashcardDeck {
+  id         Int        @id @default(autoincrement())
+  ownerId    Int
+  title      String
+  level      JLPTLevel?
+  visibility Visibility @default(PRIVATE)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  owner User        @relation(fields: [ownerId], references: [id])
+  cards Flashcard[]
+@@schema("learning")
+}
+
+model Flashcard {
+  id        Int      @id @default(autoincrement())
+  deckId    Int
+  front     String
+  back      String
+  examples  String?
+  hints     String?
+  tags      String[]
+  aiMeta    Json?
+  createdAt DateTime @default(now())
+
+  deck       FlashcardDeck  @relation(fields: [deckId], references: [id])
+  progresses CardProgress[]
+@@schema("learning")
+}
+
+model CardProgress {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  cardId      Int
+  ef          Float    @default(2.5)
+  interval    Int      @default(0)
+  repetitions Int      @default(0)
+  dueAt       DateTime @default(now())
+  lastGrade   Int?
+
+  user User      @relation(fields: [userId], references: [id])
+  card Flashcard @relation(fields: [cardId], references: [id])
+
+  @@unique([userId, cardId])
+@@schema("learning")
+}
+
+model WrongTerm {
+  id       Int        @id @default(autoincrement())
+  userId   Int
+  term     String
+  level    JLPTLevel?
+  count    Int        @default(1)
+  lastSeen DateTime   @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, term])
+@@schema("learning")
+}
+
+
+
+// ===== Community Library & Folders =====
+model Folder {
+  id           Int      @id @default(autoincrement())
+  ownerId      Int
+  name         String
+  parentId     Int?
+  classId      Int?     @unique
+  totalSizeByte BigInt  @default(0)
+
+  owner        User              @relation(fields: [ownerId], references: [id])
+  parent       Folder?           @relation("FolderToFolder", fields: [parentId], references: [id])
+  children     Folder[]          @relation("FolderToFolder")
+  resources    Resource[]
+  class        Class?            @relation("ClassFolder", fields: [classId], references: [id])
+  permissions  FolderPermission[]
+
+  @@index([classId])
+@@schema("learning")
+}
+
+model Resource {
+  id         Int        @id @default(autoincrement())
+  ownerId    Int
+  folderId   Int?
+  title      String
+  body       String?
+  mediaUrl   String?
+  sizeByte   BigInt?
+  s3Key      String?
+  visibility Visibility @default(PRIVATE)
+  tags       String[]
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  owner     User       @relation("ResourceAuthor", fields: [ownerId], references: [id])
+  folder    Folder?    @relation(fields: [folderId], references: [id])
+  reactions Reaction[]
+  comments  Comment[]
+
+@@schema("learning")
+
+}
+
+model Reaction {
+  id         Int          @id @default(autoincrement())
+  resourceId Int
+  userId     Int
+  kind       ReactionKind
+  createdAt  DateTime     @default(now())
+
+  resource Resource @relation(fields: [resourceId], references: [id])
+  user     User     @relation(fields: [userId], references: [id])
+
+  @@unique([resourceId, userId])
+@@schema("learning")
+}
+
+model Comment {
+  id         Int      @id @default(autoincrement())
+  resourceId Int
+  userId     Int
+  body       String
+  createdAt  DateTime @default(now())
+
+  resource Resource @relation(fields: [resourceId], references: [id])
+  user     User     @relation(fields: [userId], references: [id])
+@@schema("learning")
+}
+
+model FolderPermission {
+  id         Int                @id @default(autoincrement())
+  folderId   Int
+  userId     Int
+  permission FolderPermissionType @default(VIEW_ONLY)
+  grantedAt  DateTime           @default(now())
+  grantedBy  Int?
+
+  folder Folder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([folderId, userId])
+  @@index([userId])
+  @@index([folderId])
+@@schema("learning")
+}
+
+// ===== Commerce, Cart, Orders, Coupons =====
+model Cart {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items CartItem[]
+@@schema("learning")
+}
+
+model CartItem {
+  id       Int @id @default(autoincrement())
+  cartId   Int
+  courseId Int
+  classId   Int?
+
+  cart   Cart   @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [courseId], references: [id])
+  class  Class?  @relation(fields: [classId], references: [id])
+
+  @@unique([cartId, courseId])
+@@schema("learning")
+}
+
+model Order {
+  id            Int           @id @default(autoincrement())
+  userId        Int
+  totalAmount   Int
+  status        OrderStatus   @default(PENDING)
+  providerRef   String?       // Keep for backward compatibility during transition
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt @default(now())
+  
+  // Coupon support
+  couponId Int?
+
+  user       User        @relation(fields: [userId], references: [id])
+  items      OrderItem[]
+  payments   Payment[]
+  coupon     Coupon?     @relation("OrderCoupon", fields: [couponId], references: [id])
+  redemption CouponRedemption? @relation("OrderRedemption")
+  refundRequests RefundRequest[]
+@@schema("learning")
+}
+
+model Payment {
+  id                     Int       @id @default(autoincrement())
+  orderId                Int
+  amount                 Int
+  method                 PaymentMethod @default(SEPAY)
+  status                 PaymentStatus @default(PENDING)
+  providerRef            String?
+  providerTransactionId  String?   @unique
+  providerResponse       Json?
+  failureReason          String?
+  processedAt            DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([status])
+  @@index([providerRef])
+@@schema("learning")
+}
+
+model OrderItem {
+  id        Int           @id @default(autoincrement())
+  orderId   Int
+  type      OrderItemType
+  courseId  Int?
+  classId   Int?
+  unitPrice Int
+  order  Order   @relation(fields: [orderId], references: [id])
+  course Course? @relation(fields: [courseId], references: [id])
+  class  Class?  @relation(fields: [classId], references: [id])
+@@schema("learning")
+}
+
+
+// ===== Enhanced Coupon System =====
+model Coupon {
+  id                 Int           @id @default(autoincrement())
+  code               String        @unique
+  title              String
+  description        String?
+  type               CouponType
+  discountType       DiscountType?
+  discountValue      Int?          // percentage (1-100) or fixed amount in cents
+  
+  // Eligibility & Constraints  
+  minOrderAmount     Int?          // minimum order amount in cents
+  maxDiscountAmount  Int?          // maximum discount cap in cents
+  maxRedemptions     Int?          // global usage limit
+  perUserLimit       Int?          // per-user usage limit
+  newUsersOnly       Boolean       @default(false)
+  requireFullCombo   Boolean       @default(false) // for DISCOUNT_MULTI
+  
+  // Time window
+  startsAt           DateTime?
+  endsAt             DateTime?
+  
+  // Status & Workflow
+  status             CouponStatus  @default(DRAFT)
+  
+  // Audit
+  createdBy          Int
+  approvedBy         Int?
+  rejectedBy         Int?
+  approvalNote       String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  
+  // Gift coupon specific
+  giftMessage        String?
+  extendDays         Int?          @default(30) // days to extend existing video courses
+  
+  // Gift Purchase Support
+  purchasedBy        Int?          // userId who purchased this gift coupon
+  purchaseOrderId    Int?          // order that created this gift coupon
+  recipientEmail     String?       // email of intended recipient
+  recipientName      String?       // name of intended recipient
+  purchasedAt        DateTime?     // when the gift was purchased
+  isGiftPurchase     Boolean       @default(false) // flag to differentiate purchased gifts
+  
+  creator            User          @relation("CouponCreator", fields: [createdBy], references: [id])
+  approver           User?         @relation("CouponApprover", fields: [approvedBy], references: [id])
+  rejector           User?         @relation("CouponRejector", fields: [rejectedBy], references: [id])
+  purchaser          User?         @relation("CouponPurchaser", fields: [purchasedBy], references: [id])
+  
+  courses            CouponCourse[]
+  redemptions        CouponRedemption[]
+  auditLogs          CouponAuditLog[]
+  orders             Order[]       @relation("OrderCoupon")
+
+  @@index([code])
+  @@index([status])
+  @@index([type])
+  @@index([startsAt, endsAt])
+  @@index([purchasedBy])
+  @@index([isGiftPurchase])
+@@schema("learning")
+}
+
+model CouponCourse {
+  id        Int    @id @default(autoincrement())
+  couponId  Int
+  courseId  Int
+  required  Boolean @default(true) // for combo logic
+  
+  coupon    Coupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  course    Course @relation("CouponCourses", fields: [courseId], references: [id])
+  
+  @@unique([couponId, courseId])
+@@schema("learning")
+}
+
+model CouponRedemption {
+  id           Int                @id @default(autoincrement())
+  couponId     Int
+  userId       Int
+  orderId      Int?               @unique // for discount coupons
+  discountApplied Int?            // amount discounted in cents
+  
+  // Gift redemption specific
+  giftedCourses Json?             // array of {courseId, action: 'enrolled'|'extended'}
+  pendingClassSelections Int[]    // courseIds waiting for class selection
+  
+  status       RedemptionStatus   @default(COMPLETED)
+  redeemedAt   DateTime           @default(now())
+  completedAt  DateTime?          // when all actions are done (including class selections)
+  
+  coupon       Coupon             @relation(fields: [couponId], references: [id])
+  user         User               @relation("UserCouponRedemptions", fields: [userId], references: [id])
+  order        Order?             @relation("OrderRedemption", fields: [orderId], references: [id])
+  
+  @@unique([couponId, userId]) // one redemption per user per coupon
+  @@index([userId])
+  @@index([couponId])
+@@schema("learning")
+}
+
+model CouponAuditLog {
+  id        Int                @id @default(autoincrement())
+  couponId  Int
+  userId    Int                // who made the change
+  action    CouponAuditAction
+  oldValues Json?
+  newValues Json?
+  note      String?
+  createdAt DateTime           @default(now())
+  
+  coupon    Coupon             @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  user      User               @relation("CouponAuditor", fields: [userId], references: [id])
+  
+  @@index([couponId])
+  @@index([userId])
+@@schema("learning")
+}
+
+
+// ===== Ratings & Reviews, Blog, Ads =====
+model Review {
+  id              Int          @id @default(autoincrement())
+  courseId        Int
+  userId          Int
+  rating          Int
+  comment         String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  helpfulCount    Int          @default(0)
+  notHelpfulCount Int          @default(0)
+  status          ReviewStatus @default(VISIBLE)
+
+  course Course       @relation(fields: [courseId], references: [id])
+  user   User         @relation(fields: [userId], references: [id])
+  votes  ReviewVote[]
+
+  @@unique([courseId, userId])
+  @@index([courseId, status])
+  @@index([userId])
+@@schema("learning")
+}
+
+model ReviewVote {
+  id        Int      @id @default(autoincrement())
+  reviewId  Int
+  userId    Int
+  isHelpful Boolean
+  createdAt DateTime @default(now())
+
+  review Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([reviewId, userId])
+  @@index([reviewId])
+@@schema("learning")
+}
+
+model Blog {
+  id       Int       @id @default(autoincrement())
+  title    String
+  content  String
+  image    String?
+  slug     String    @unique
+  date     DateTime  @default(now())
+  authorId Int       @map("author_id")
+  author   User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  tags     BlogTag[]
+@@schema("learning")
+}
+
+model Tag {
+  id          Int       @id @default(autoincrement())
+  name        String
+  description String?
+  slug        String    @unique
+  blogs       BlogTag[]
+@@schema("learning")
+}
+
+model BlogTag {
+  blog   Blog @relation(fields: [blogId], references: [id], onDelete: Cascade)
+  blogId Int
+  tag    Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  tagId  Int
+
+  @@id([blogId, tagId])
+@@schema("learning")
+}
+
+model AdSlot {
+  id     Int     @id @default(autoincrement())
+  key    String  @unique
+  active Boolean @default(true)
+
+  creatives AdCreative[]
+@@schema("learning")
+}
+
+model AdCreative {
+  id        Int       @id @default(autoincrement())
+  slotId    Int
+  title     String
+  imageUrl  String?
+  targetUrl String
+  startsAt  DateTime?
+  endsAt    DateTime?
+
+  slot AdSlot @relation(fields: [slotId], references: [id])
+@@schema("learning")
+}
+
+// ===== AI “Sensei” (Chat + Voice) =====
+model AIThread {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  title     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User            @relation(fields: [userId], references: [id])
+  messages AIChatMessage[]
+  queries  AIQuery[]
+
+  @@index([userId, createdAt])
+@@schema("learning")
+}
+
+model AIQuery {
+  id               String      @id @default(cuid())
+  threadId         Int
+  userId           Int
+  query            String      @db.Text
+  queryType        QueryType
+  agentRole        AgentRole   @default(SENSEI)
+  routingReason    String?
+  initialResponse  String?     @db.Text
+  executedTools    Json?
+  status           QueryStatus @default(PENDING)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  thread   AIThread        @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  user     User            @relation(fields: [userId], references: [id])
+  messages AIChatMessage[]
+
+  @@index([threadId, createdAt])
+  @@index([userId, status])
+  @@index([agentRole, createdAt])
+@@schema("learning")
+}
+
+model AIChatMessage {
+  id        Int      @id @default(autoincrement())
+  threadId  Int
+  userId    Int
+  queryId   String?
+  role      ChatRole
+  content   String   @db.Text
+  toolCalls Json?
+  citations Json?
+  createdAt DateTime @default(now())
+
+  thread    AIThread     @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  user      User         @relation(fields: [userId], references: [id])
+  query     AIQuery?     @relation(fields: [queryId], references: [id], onDelete: SetNull)
+
+  @@index([threadId, createdAt])
+  @@index([queryId])
+@@schema("learning")
+}
+
+// ===== Enums =====
+enum Role {
+  @@schema("learning")
+  CUSTOMER
+  STAFF
+  LECTURER
+  ADMIN
+}
+
+enum VerifyStatus {
+  @@schema("learning")
+  UNVERIFIED
+  VERIFIED
+  BANNED
+}
+
+enum CourseStatus {
+  @@schema("learning")
+  DRAFT
+  PENDING_REVIEW
+  PUBLISHED
+  ARCHIVED
+}
+
+enum JLPTLevel {
+  @@schema("learning")
+  N5
+  N4
+  N3
+  N2
+  N1
+}
+
+
+
+
+enum QuestionType {
+  @@schema("learning")
+  VOCAB
+  KANJI
+  GRAMMAR
+  READING
+  LISTENING
+}
+
+enum QuestionGroupType {
+  @@schema("learning")
+  READING_SHORT
+  READING_MEDIUM
+  READING_LONG
+  LISTENING
+}
+
+
+enum Difficulty {
+  @@schema("learning")
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum Visibility {
+  @@schema("learning")
+  PRIVATE
+  UNLISTED
+  PUBLIC
+}
+
+enum CourseType {
+  @@schema("learning")
+  VIDEO_QUIZ
+  VIDEO_QUIZ_LIVE
+  LIVE_ONLY
+}
+
+enum LessonKind {
+  @@schema("learning")
+  VIDEO
+  ARTICLE
+  QUIZ
+  LIVE
+}
+
+enum AttendanceStatus {
+  @@schema("learning")
+  PRESENT
+  LATE
+  ABSENT
+  EXCUSED
+}
+
+enum MediaKind {
+  @@schema("learning")
+  AUDIO
+  VIDEO
+  IMAGE
+  PDF
+  OTHER
+}
+
+enum OrderStatus {
+  @@schema("learning")
+  PENDING
+  PROCESSING
+  COMPLETED
+  CANCELLED
+  PARTIALLY_REFUNDED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  @@schema("learning")
+  PENDING
+  PROCESSING
+  PAID
+  FAILED
+  REFUNDED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  @@schema("learning")
+  SEPAY
+  VNPAY
+  MOMO
+  BANK_TRANSFER
+  CASH
+}
+
+enum OrderItemType {
+  @@schema("learning")
+  COURSE
+  LIVE_SESSION
+  PACKAGE
+}
+
+
+
+
+enum ReactionKind {
+  @@schema("learning")
+  LIKE
+  LOVE
+  HELPFUL
+}
+
+enum ChatRole {
+  @@schema("learning")
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum LessonStatus {
+  @@schema("learning")
+  PRIVATE
+  PUBLISHED
+  GLOBAL_PUBLIC
+}
+
+enum VerificationCodeType {
+  @@schema("learning")
+  REGISTER
+  FORGOT_PASSWORD
+  LOGIN
+  DISABLE_2FA
+}
+
+enum ReadingLength {
+  @@schema("learning")
+  SHORT
+  MEDIUM
+  LONG
+}
+
+enum NotificationType {
+  @@schema("learning")
+  FRIEND_REQUEST
+  FRIEND_REQUEST_ACCEPTED
+  COURSE_ENROLLMENT
+  COURSE_UPDATE
+  COURSE_PENDING_REVIEW
+  COURSE_APPROVED
+  COURSE_REJECTED
+  COUPON_PENDING_APPROVAL
+  COUPON_APPROVED
+  COUPON_REJECTED
+  MESSAGE
+  MENTION
+  LIKE
+  COMMENT
+  RATING
+  SYSTEM
+  REMINDER
+  ACHIEVEMENT
+  REWARD
+  REFUND_REQUEST_CREATED
+  REFUND_APPROVED
+  REFUND_REJECTED
+  REFUND_COMPLETED
+}
+
+enum NotificationStatus {
+  @@schema("learning")
+  UNREAD
+  READ
+  ARCHIVED
+}
+
+enum NotificationPriority {
+  @@schema("learning")
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum MediaStatus {
+  @@schema("learning")
+  UPLOADING
+  TRANSCODING
+  READY
+  FAILED
+}
+
+enum QueryType {
+  @@schema("learning")
+  COURSE
+  BLOG
+  LESSON
+  FLASHCARD
+  ASSESSMENT
+  ASSESSMENT_HISTORY
+  ENROLLMENT
+  PROGRESS
+  GRAMMAR
+  TRANSLATION
+  GENERAL
+}
+
+enum AgentRole {
+  @@schema("learning")
+  SENSEI
+  ASSESSMENT
+  ANALYTICS
+}
+
+enum QueryStatus {
+  @@schema("learning")
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum FolderPermissionType {
+  @@schema("learning")
+  VIEW_ONLY
+  EDIT
+}
+
+// ===== Enhanced Coupon System Enums =====
+enum CouponType {
+  @@schema("learning")
+  DISCOUNT_SINGLE
+  DISCOUNT_MULTI
+  GIFT
+}
+
+enum DiscountType {
+  @@schema("learning")
+  PERCENTAGE
+  FIXED_AMOUNT
+}
+
+enum CouponStatus {
+  @@schema("learning")
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  ACTIVE
+  INACTIVE
+  EXPIRED
+  REJECTED
+}
+
+enum RedemptionStatus {
+  @@schema("learning")
+  PENDING
+  COMPLETED
+  FAILED
+  PARTIALLY_COMPLETED
+}
+
+enum CouponAuditAction {
+  @@schema("learning")
+  CREATED
+  UPDATED
+  SUBMITTED_FOR_APPROVAL
+  APPROVED
+  REJECTED
+  ACTIVATED
+  DEACTIVATED
+  REDEEMED
+}
+
+enum AssignmentStatus {
+  @@schema("learning")
+  PENDING
+  IN_PROGRESS
+  SUBMITTED
+  EXPIRED
+}
+
+enum ReviewStatus {
+  @@schema("learning")
+  VISIBLE
+  HIDDEN
+  FLAGGED
+}
+
+// ===== Activity Log =====
+model ActivityLog {
+  id          Int              @id @default(autoincrement())
+  userId      Int?
+  action      ActivityAction
+  entity      ActivityEntity
+  entityId    Int?
+  description String
+  metadata    Json?
+  ipAddress   String?
+  createdAt   DateTime         @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([action])
+  @@index([entity])
+  @@index([createdAt])
+  @@index([userId])
+  @@schema("learning")
+}
+
+enum ActivityAction {
+  @@schema("learning")
+  PAYMENT_COMPLETED
+  PAYMENT_FAILED
+  COURSE_ENROLLED
+  COUPON_APPLIED
+  COUPON_CREATED
+  COUPON_APPROVED
+  COUPON_REJECTED
+  BLOG_CREATED
+  BLOG_UPDATED
+  BLOG_DELETED
+  COURSE_CREATED
+  COURSE_UPDATED
+  COURSE_PUBLISHED
+  USER_REGISTERED
+  USER_LOGIN
+  CERTIFICATE_ISSUED
+  REFUND_REQUEST_CREATED
+  REFUND_REVIEWED
+}
+
+enum ActivityEntity {
+  @@schema("learning")
+  PAYMENT
+  ENROLLMENT
+  COUPON
+  BLOG
+  COURSE
+  USER
+  CERTIFICATE
+  REFUND
+}
+
+// ===== Refund System =====
+model RefundRequest {
+  id              Int           @id @default(autoincrement())
+  userId          Int
+  orderId         Int
+  courseId        Int
+  fullName        String
+  email           String
+  reason          String        @db.Text
+  bankAccountName String        @map("bank_account_name")
+  bankAccountNumber String      @map("bank_account_number")
+  bankName        String        @map("bank_name")
+  status          RefundStatus  @default(PENDING)
+  rejectionReason String?       @map("rejection_reason") @db.Text
+  rejectionEvidence String?     @map("rejection_evidence") @db.Text
+  approvalEvidence  String?     @map("approval_evidence") @db.Text
+  progressAtRequest Float?      @map("progress_at_request")
+  progressAtReview  Float?      @map("progress_at_review")
+  reviewedBy      Int?          @map("reviewed_by")
+  reviewedAt      DateTime?     @map("reviewed_at")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  user            User          @relation("RefundRequester", fields: [userId], references: [id])
+  reviewer        User?         @relation("RefundReviewer", fields: [reviewedBy], references: [id])
+  order           Order         @relation(fields: [orderId], references: [id])
+  course          Course        @relation(fields: [courseId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@index([orderId])
+  @@map("refund_requests")
+  @@schema("learning")
+}
+
+enum RefundStatus {
+  @@schema("learning")
+  PENDING
+  APPROVED
+  REJECTED
+}

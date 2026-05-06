@@ -1,49 +1,281 @@
-version: '3.8'
-
 services:
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: torii-nihongo-gakuin_container
-    ports:
-      - '4000:4000'
+  redis:
+    image: redis:7-alpine
+    container_name: torii-redis
+    env_file:
+      - .env
     environment:
-      - NODE_ENV=production
-      - DATABASE_URL=postgresql://postgres:nhatngutorii@torii-nihongo-db.ct64ww6csug1.ap-southeast-1.rds.amazonaws.com:5432/postgres?schema=public
-      - ACCESS_TOKEN_SECRET=nhatngutorii
-      - ACCESS_TOKEN_EXPIRES_IN=1h
-      - REFRESH_TOKEN_SECRET=nhatngutorii
-      - REFRESH_TOKEN_EXPIRES_IN=1d
-      - PORT=4000
-      - SECRET_API_KEY=toriinihongogakuin
-      - PAYMENT_API_KEY=
-      - ADMIN_NAME=
-      - ADMIN_PASSWORD=
-      - ADMIN_EMAIL=
-      - ADMIN_PHONE_NUMBER=
-      - OTP_EXPIRES_IN=5m
-      - RESEND_API_KEY=re_XDGkQ5ic_CziF5XzBiXYxAnnoPoJgFDpz
-      - GOOGLE_CLIENT_ID=
-      - GOOGLE_CLIENT_SECRET=
-      - GOOGLE_REDIRECT_URI=
-      - GOOGLE_CLIENT_REDIRECT_URI=
-      - APP_NAME=
-      - S3_REGION=ap-southeast-1
-      - S3_ACCESS_KEY=AKIAVVZPCSCKZAVMUOVN
-      - S3_SECRET_KEY=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
-      - S3_BUCKET_NAME=torii-nihongo-gakuin-s3
-      - REDIS_URL=redis://default:password@localhost:6379
-    restart: unless-stopped
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
     healthcheck:
-      test:
-        [
-          'CMD',
-          'node',
-          '-e',
-          "require('http').get('http://localhost:4000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})",
-        ]
-      interval: 30s
-      timeout: 3s
-      start_period: 40s
-      retries: 3
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: >
+      sh -c "if [ -n \"$$REDIS_PASSWORD\" ]; then
+        redis-server --requirepass $$REDIS_PASSWORD
+      else
+        redis-server
+      fi"
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: torii-rabbitmq
+    env_file:
+      - .env
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-admin}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-admin}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  learning-service:
+    build:
+      context: ./learning-service
+      dockerfile: Dockerfile
+    container_name: torii-learning-service
+    env_file:
+      - .env
+      - ./learning-service/.env
+    ports:
+      - "${LEARNING_SERVICE_PORT:-4001}:${LEARNING_SERVICE_PORT:-4001}"
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: ${LEARNING_SERVICE_PORT:-4001}
+      DATABASE_URL: "postgresql://postgres:nhatngutorii@database-1.cdy0eccyu25d.ap-southeast-1.rds.amazonaws.com:5432/postgres?schema=learning&sslmode=no-verify"
+      REDIS_URL: redis://${REDIS_USERNAME:-}${REDIS_PASSWORD:+:${REDIS_PASSWORD}}@redis:6379
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-admin}:${RABBITMQ_DEFAULT_PASS:-admin}@rabbitmq:5672
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER:-admin}
+      RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS:-admin}
+      JWT_SECRET: ${JWT_SECRET:-your-secret-key}
+      ACCESS_TOKEN_SECRET: ${ACCESS_TOKEN_SECRET:-${JWT_SECRET:-your-access-token-secret}}
+      REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET:-${JWT_SECRET:-your-refresh-token-secret}}
+      ACCESS_TOKEN_EXPIRES_IN: ${ACCESS_TOKEN_EXPIRES_IN:-1d}
+      REFRESH_TOKEN_EXPIRES_IN: ${REFRESH_TOKEN_EXPIRES_IN:-1d}
+      SECRET_API_KEY: ${SECRET_API_KEY:-toriinihongogakuin}
+      PAYMENT_API_KEY: ${PAYMENT_API_KEY:-}
+      ADMIN_NAME: ${ADMIN_NAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@torii-nihongo-gakuin.io.vn}
+      ADMIN_PHONE_NUMBER: ${ADMIN_PHONE_NUMBER:-}
+      OTP_EXPIRES_IN: ${OTP_EXPIRES_IN:-5m}
+      RESEND_API_KEY: ${RESEND_API_KEY:-re_RrB5o6vU_Mvib88FxdRAEXJTMUjNthzwc}
+      RESEND_FROM_ADDRESS: ${RESEND_FROM_ADDRESS:-noreply@torii-nihongo-gakuin.io.vn}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}
+      GOOGLE_CLIENT_REDIRECT_URI: ${GOOGLE_CLIENT_REDIRECT_URI:-}
+      APP_NAME: ${APP_NAME:-Torii Nihongo Gakuin}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-AKIA5W5CC5ODVB7ZBMOS}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-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}
+      AWS_REGION: ${AWS_REGION:-ap-southeast-1}
+      AWS_S3_BUCKET_NAME: ${AWS_S3_BUCKET_NAME:-torii-nihongo-storage-v3}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_USERNAME: ${REDIS_USERNAME:-}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_DB: ${REDIS_DB:-0}
+      REDIS_TLS: ${REDIS_TLS:-false}
+      REDIS_TTL: ${REDIS_TTL:-3600}
+      JANUS_HTTP_URL: ${JANUS_HTTP_URL:-}
+      JANUS_SERVER_URL: ${JANUS_SERVER_URL:-}
+      JANUS_WS_URL: ${JANUS_WS_URL:-}
+      JANUS_ADMIN_SECRET: ${JANUS_ADMIN_SECRET:-}
+      JANUS_API_SECRET: ${JANUS_API_SECRET:-}
+      JANUS_STUN_URL: ${JANUS_STUN_URL:-}
+      JANUS_TURN_URL: ${JANUS_TURN_URL:-}
+      JANUS_TURN_USERNAME: ${JANUS_TURN_USERNAME:-}
+      JANUS_TURN_PASSWORD: ${JANUS_TURN_PASSWORD:-}
+      JANUS_SSH_USER: ${JANUS_SSH_USER:-}
+      JANUS_SSH_KEY: ${JANUS_SSH_KEY:-}
+      SEPAY_ACCOUNT_NUMBER: ${SEPAY_ACCOUNT_NUMBER:-}
+      SEPAY_BANK_CODE: ${SEPAY_BANK_CODE:-}
+      SEPAY_ACCESS_KEY: ${SEPAY_ACCESS_KEY:-}
+      SEPAY_API_URL: ${SEPAY_API_URL:-}
+      SEPAY_WEBHOOK_URL: ${SEPAY_WEBHOOK_URL:-}
+      MCP_ENABLED: ${MCP_ENABLED:-true}
+      MCP_TOOL_APPROVAL_REQUIRED: ${MCP_TOOL_APPROVAL_REQUIRED:-false}
+      MCP_MAX_TOOL_EXECUTIONS: ${MCP_MAX_TOOL_EXECUTIONS:-10}
+      MCP_COURSE_SERVER_URL: https://agent.torii-nihongo-gakuin.io.vn/course/mcp
+      MCP_COURSE_ENABLED: ${MCP_COURSE_ENABLED:-true}
+      MCP_ENROLLMENT_SERVER_URL: https://agent.torii-nihongo-gakuin.io.vn/enrollment/mcp
+      MCP_ENROLLMENT_ENABLED: ${MCP_ENROLLMENT_ENABLED:-true}
+      MCP_FLASHCARD_SERVER_URL: https://agent.torii-nihongo-gakuin.io.vn/flashcard/mcp
+      MCP_FLASHCARD_ENABLED: ${MCP_FLASHCARD_ENABLED:-true}
+      MCP_BLOG_SERVER_URL: https://agent.torii-nihongo-gakuin.io.vn/blog/mcp
+      MCP_BLOG_ENABLED: ${MCP_BLOG_ENABLED:-true}
+      MCP_ASSESSMENT_SERVER_URL: https://agent.torii-nihongo-gakuin.io.vn/assessment/mcp
+      MCP_ASSESSMENT_ENABLED: ${MCP_ASSESSMENT_ENABLED:-true}
+      MCP_ASSESSMENT_HISTORY_SERVER_URL: https://agent.torii-nihongo-gakuin.io.vn/assessment-history/mcp
+      MCP_ASSESSMENT_HISTORY_ENABLED: ${MCP_ASSESSMENT_HISTORY_ENABLED:-true}
+      MCP_ANALYTICS_SERVER_URL: https://agent.torii-nihongo-gakuin.io.vn/analytics/mcp
+      MCP_ANALYTICS_ENABLED: ${MCP_ANALYTICS_ENABLED:-true}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+      FIREBASE_PRIVATE_KEY: ${FIREBASE_PRIVATE_KEY:-}
+      FIREBASE_CLIENT_EMAIL: ${FIREBASE_CLIENT_EMAIL:-}
+    depends_on:
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    # NOTE: No bind-mounts here. The image has all deps baked in.
+    # For local development with hot-reload, use docker-compose.dev.yml instead.
+
+  assessment-service:
+    build:
+      context: ./assessment-service
+      dockerfile: Dockerfile
+    container_name: torii-assessment-service
+    env_file:
+      - .env
+      - ./assessment-service/.env
+    ports:
+      - "${ASSESSMENT_SERVICE_PORT:-4002}:${ASSESSMENT_SERVICE_PORT:-4002}"
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      SERVER_PORT: ${ASSESSMENT_SERVICE_PORT:-4002}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://database-1.cdy0eccyu25d.ap-southeast-1.rds.amazonaws.com:5432/postgres?currentSchema=assessment
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: nhatngutorii
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:-org.postgresql.Driver}
+      SPRING_JPA_HIBERNATE_DDL_AUTO: ${SPRING_JPA_HIBERNATE_DDL_AUTO:-validate}
+      SPRING_JPA_SHOW_SQL: ${SPRING_JPA_SHOW_SQL:-false}
+      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: ${SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT:-org.hibernate.dialect.PostgreSQLDialect}
+      SPRING_JPA_PROPERTIES_HIBERNATE_DEFAULT_SCHEMA: ${SPRING_JPA_PROPERTIES_HIBERNATE_DEFAULT_SCHEMA:-assessment}
+      SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL: ${SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL:-true}
+      SPRING_FLYWAY_ENABLED: ${SPRING_FLYWAY_ENABLED:-true}
+      SPRING_FLYWAY_SCHEMAS: ${SPRING_FLYWAY_SCHEMAS:-assessment}
+      SPRING_FLYWAY_LOCATIONS: ${SPRING_FLYWAY_LOCATIONS:-classpath:db/migration}
+      SPRING_FLYWAY_BASELINE_ON_MIGRATE: ${SPRING_FLYWAY_BASELINE_ON_MIGRATE:-true}
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: ${REDIS_PORT:-6379}
+      SPRING_REDIS_USERNAME: ${REDIS_USERNAME:-}
+      SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      SPRING_REDIS_DB: ${REDIS_DB:-0}
+      SPRING_REDIS_TIMEOUT: ${SPRING_REDIS_TIMEOUT:-2000}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER:-admin}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS:-admin}
+      SPRING_RABBITMQ_VIRTUAL_HOST: ${SPRING_RABBITMQ_VIRTUAL_HOST:-/}
+      SPRING_RABBITMQ_LISTENER_SIMPLE_ACKNOWLEDGE_MODE: ${SPRING_RABBITMQ_LISTENER_SIMPLE_ACKNOWLEDGE_MODE:-auto}
+      SPRING_RABBITMQ_LISTENER_SIMPLE_RETRY_ENABLED: ${SPRING_RABBITMQ_LISTENER_SIMPLE_RETRY_ENABLED:-true}
+      SPRING_RABBITMQ_LISTENER_SIMPLE_RETRY_MAX_ATTEMPTS: ${SPRING_RABBITMQ_LISTENER_SIMPLE_RETRY_MAX_ATTEMPTS:-3}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-AKIA5W5CC5ODVB7ZBMOS}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-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}
+      AWS_REGION: ${AWS_REGION:-ap-southeast-1}
+      AWS_S3_BUCKET_NAME: ${AWS_S3_BUCKET_NAME:-torii-nihongo-storage-v3}
+    depends_on:
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  gamification-service:
+    build:
+      context: ./gamification-service
+      dockerfile: Dockerfile
+    container_name: torii-gamification-service
+    env_file:
+      - .env
+    ports:
+      - "${GAMIFICATION_SERVICE_PORT:-4003}:${GAMIFICATION_SERVICE_PORT:-4003}"
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: ${GAMIFICATION_SERVICE_PORT:-4003}
+      DATABASE_URL: "postgresql://postgres:nhatngutorii@database-1.cdy0eccyu25d.ap-southeast-1.rds.amazonaws.com:5432/postgres?schema=gamification&sslmode=no-verify"
+      REDIS_URL: redis://${REDIS_USERNAME:-}${REDIS_PASSWORD:+:${REDIS_PASSWORD}}@redis:6379
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_USERNAME: ${REDIS_USERNAME:-}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_DB: ${REDIS_DB:-0}
+      REDIS_TLS: ${REDIS_TLS:-false}
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-admin}:${RABBITMQ_DEFAULT_PASS:-admin}@rabbitmq:5672
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER:-admin}
+      RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS:-admin}
+      ACCESS_TOKEN_SECRET: ${ACCESS_TOKEN_SECRET:-${JWT_SECRET:-your-access-token-secret}}
+      SECRET_API_KEY: ${SECRET_API_KEY:-toriinihongogakuin}
+    depends_on:
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  api-docs:
+    image: nginx:1.27-alpine
+    container_name: torii-api-docs
+    volumes:
+      - ./api-docs/index.html:/usr/share/nginx/html/index.html:ro
+      - ./api-docs/combined.html:/usr/share/nginx/html/combined.html:ro
+      - ./api-docs/learning.html:/usr/share/nginx/html/learning.html:ro
+      - ./api-docs/assessment.html:/usr/share/nginx/html/assessment.html:ro
+      - ./api-docs/scalar.json:/usr/share/nginx/html/scalar.json:ro
+      - ./api-docs/default.conf:/etc/nginx/conf.d/default.conf:ro
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    container_name: torii-api-gateway
+    env_file:
+      - .env
+      - ./api-gateway/.env
+    ports:
+      - "${API_GATEWAY_PORT:-8000}:8000"
+      - "${API_GATEWAY_ADMIN_PORT:-8001}:8001"
+      - "${API_GATEWAY_SSL_PORT:-8443}:8443"
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /usr/local/kong/kong.yml
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+      KONG_PROXY_LISTEN: 0.0.0.0:8000
+      KONG_PLUGINS: bundled,jwt-validator
+      JWT_SECRET: ${JWT_SECRET:-your-secret-key}
+      REDIS_HOST: redis
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    depends_on:
+      - learning-service
+      - assessment-service
+      - gamification-service
+      - api-docs
+      - redis
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  redis_data:
+  rabbitmq_data:
+
+networks:
+  default:
+    driver: bridge
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+        - subnet: fd00:dead:beef:1::/64

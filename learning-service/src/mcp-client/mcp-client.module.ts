@@ -1,0 +1,33 @@
+import { Module } from "@nestjs/common";
+import { McpBaseService } from "src/mcp-client/mcp-client.service";
+import { AssessmentMcpClient } from "src/mcp-client/module/assessment/assessment-mcp.service";
+import { AssessmentHistoryMcpClient } from "src/mcp-client/module/assessment_history/history-mcp.service";
+import { AnalyticsMcpClient } from "src/mcp-client/module/analytics/analytics-mcp.service";
+import { CourseMcpClient } from "src/mcp-client/module/course/course-mcp.service";
+import { EnrollmentMcpClient } from "src/mcp-client/module/enrollment/enrollment-mcp.service";
+import { FlashcardMcpClient } from "src/mcp-client/module/flashcard/flashcard-mcp.service";
+import { BlogMcpClient } from "src/mcp-client/module/blog/blog-mcp.service";
+
+@Module({
+  providers: [
+    McpBaseService,
+    AssessmentMcpClient,
+    AssessmentHistoryMcpClient,
+    AnalyticsMcpClient,
+    CourseMcpClient,
+    EnrollmentMcpClient,
+    FlashcardMcpClient,
+    BlogMcpClient,
+  ],
+  exports: [
+    McpBaseService,
+    AssessmentMcpClient,
+    AssessmentHistoryMcpClient,
+    AnalyticsMcpClient,
+    CourseMcpClient,
+    EnrollmentMcpClient,
+    FlashcardMcpClient,
+    BlogMcpClient,
+  ],
+})
+export class McpClientModule {}

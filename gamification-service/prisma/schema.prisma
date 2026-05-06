@@ -1,0 +1,353 @@
+// Gamification Service — Prisma Schema
+// Stack: NestJS + Prisma + PostgreSQL
+// Schema: gamification (separate from learning & assessment)
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-1.1.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  schemas  = ["gamification"]
+}
+
+// ===== Activity Log =====
+model ActivityLog {
+  id        Int          @id @default(autoincrement())
+  userId    Int          @map("user_id")
+  type      ActivityType
+  points    Int
+  meta      Json?
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([userId, createdAt])
+  @@map("activity_logs")
+  @@schema("gamification")
+}
+
+enum ActivityType {
+  ATTENDANCE
+  HOMEWORK
+  MOCK_TEST
+  LESSON_COMPLETED
+  COURSE_ENROLLED
+  FLASHCARD_GENERATED
+  QUIZ_COMPLETED
+  LOGIN
+
+  @@schema("gamification")
+}
+
+// ===== Points Ledger =====
+model PointsLedger {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  delta     Int
+  reason    String
+  meta      Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([userId, createdAt])
+  @@map("points_ledger")
+  @@schema("gamification")
+}
+
+// ===== User Stats (denormalized for fast reads) =====
+model UserStats {
+  id         Int      @id @default(autoincrement())
+  userId     Int      @unique @map("user_id")
+  totalXp    Int      @default(0) @map("total_xp")
+  totalCoins Int      @default(0) @map("total_coins")
+  level      Int      @default(1)
+  name       String?
+  role       String?
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("user_stats")
+  @@schema("gamification")
+}
+
+// ===== Streak =====
+model Streak {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique @map("user_id")
+  startDate DateTime @map("start_date")
+  lastDate  DateTime @map("last_date")
+  longest   Int      @default(0)
+  current   Int      @default(0)
+
+  @@map("streaks")
+  @@schema("gamification")
+}
+
+// ===== Achievement Definition =====
+model Achievement {
+  id             Int               @id @default(autoincrement())
+  name           String
+  description    String
+  icon           String?
+  symbol         String?
+  conditionType  AchievementConditionType @map("condition_type")
+  conditionValue Int               @map("condition_value")
+  rewardCoins    Int               @default(0) @map("reward_coins")
+  rewardXp       Int               @default(0) @map("reward_xp")
+  rarity         AchievementRarity @default(COMMON)
+  category       String?
+  createdAt      DateTime          @default(now()) @map("created_at")
+
+  userAchievements UserAchievement[]
+
+  @@map("achievements")
+  @@schema("gamification")
+}
+
+enum AchievementConditionType {
+  KANJI
+  STREAK
+  LISTENING
+  LESSONS_COMPLETED
+  COURSES_ENROLLED
+  QUIZZES_PASSED
+  TOTAL_XP
+  LOGIN_DAYS
+  BOSS_DEFEATED
+  BOSS_COMBO
+  BOSS_N1_DEFEATED
+
+  @@schema("gamification")
+}
+
+enum AchievementRarity {
+  COMMON
+  UNCOMMON
+  RARE
+  LEGENDARY
+
+  @@schema("gamification")
+}
+
+// ===== User Achievement (unlocked achievements) =====
+model UserAchievement {
+  id            Int         @id @default(autoincrement())
+  userId        Int         @map("user_id")
+  achievementId Int         @map("achievement_id")
+  unlockedAt    DateTime    @default(now()) @map("unlocked_at")
+
+  achievement Achievement @relation(fields: [achievementId], references: [id])
+
+  @@unique([userId, achievementId])
+  @@index([userId])
+  @@map("user_achievements")
+  @@schema("gamification")
+}
+
+// ===== Reward =====
+model Reward {
+  id               Int        @id @default(autoincrement())
+  type             RewardType
+  name             String
+  description      String?
+  cost             Int        @default(0)
+  stock            Int?
+  imageUrl         String?    @map("image_url")
+  isActive         Boolean    @default(true) @map("is_active")
+
+  // Discount-specific fields (only used when type = DISCOUNT)
+  discountType     String?    @map("discount_type")   // "PERCENTAGE" | "FIXED_AMOUNT"
+  discountValue    Int?       @map("discount_value")   // percentage (1-100) or fixed amount
+  maxDiscountAmount Int?      @map("max_discount_amount")
+  applicableCourseIds Int[]   @default([]) @map("applicable_course_ids")
+
+  redemptions RewardRedemption[]
+
+  @@map("rewards")
+  @@schema("gamification")
+}
+
+enum RewardType {
+  BADGE
+  AVATAR_FRAME
+  TITLE
+  DISCOUNT
+
+  @@schema("gamification")
+}
+
+// ===== Reward Redemption =====
+model RewardRedemption {
+  id         Int      @id @default(autoincrement())
+  userId     Int      @map("user_id")
+  rewardId   Int      @map("reward_id")
+  couponCode String?  @map("coupon_code")
+  redeemedAt DateTime @default(now()) @map("redeemed_at")
+
+  reward Reward @relation(fields: [rewardId], references: [id])
+
+  @@index([userId])
+  @@map("reward_redemptions")
+  @@schema("gamification")
+}
+
+// ===== Leaderboard Snapshot (weekly/monthly snapshots) =====
+model LeaderboardEntry {
+  id        Int             @id @default(autoincrement())
+  userId    Int             @map("user_id")
+  period    LeaderboardPeriod
+  periodKey String          @map("period_key") // e.g., "2026-W12", "2026-03"
+  xp        Int             @default(0)
+  rank      Int?
+  createdAt DateTime        @default(now()) @map("created_at")
+  updatedAt DateTime        @updatedAt @map("updated_at")
+
+  @@unique([userId, period, periodKey])
+  @@index([period, periodKey, xp(sort: Desc)])
+  @@map("leaderboard_entries")
+  @@schema("gamification")
+}
+
+enum LeaderboardPeriod {
+  WEEKLY
+  MONTHLY
+
+  @@schema("gamification")
+}
+
+// ===== Seasonal Event =====
+model SeasonalEvent {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  multiplier  Float    @default(1.0)
+  bonusCoins  Int      @default(0) @map("bonus_coins")
+  startDate   DateTime @map("start_date")
+  endDate     DateTime @map("end_date")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([startDate, endDate])
+  @@map("seasonal_events")
+  @@schema("gamification")
+}
+
+// ===== Boss Battle =====
+
+model BossMap {
+  id          Int      @id @default(autoincrement())
+  name        String
+  jlptLevel   String   @map("jlpt_level") // "N5" | "N4" | "N3" | "N2" | "N1"
+  orderIndex  Int      @map("order_index")
+  description String?
+  emoji       String   @default("👹")
+  isActive    Boolean  @default(true) @map("is_active")
+
+  configs BossConfig[]
+
+  @@map("boss_maps")
+  @@schema("gamification")
+}
+
+model BossConfig {
+  id                   Int      @id @default(autoincrement())
+  mapId                Int?     @map("map_id")
+  orderIndex           Int      @default(0) @map("order_index")
+  name                 String
+  description          String?
+  avatarUrl            String?  @map("avatar_url")
+  jlptLevel            String   @map("jlpt_level")   // "N5" | "N4" | "N3" | "N2" | "N1"
+  hp                   Int
+  timeLimit            Int      @map("time_limit")    // seconds per question
+  questionTypes        String[] @map("question_types") // ["meaning","reading","fill_blank"]
+  kanjiPool            String[] @map("kanji_pool")    // ["N5","N4"] draw pool
+  distractorSimilarity Float    @default(0.3) @map("distractor_similarity")
+  bossSkills           String[] @default([]) @map("boss_skills") // ["blur","time_reduce","lock_answer"]
+  enrageThreshold      Float    @default(0.3) @map("enrage_threshold")
+  baseDamage           Int      @default(20) @map("base_damage")
+  baseXpReward         Int      @map("base_xp_reward")
+  baseCoinReward       Int      @map("base_coin_reward")
+  isActive             Boolean  @default(true) @map("is_active")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  map           BossMap?           @relation(fields: [mapId], references: [id])
+  sessions      BossBattleSession[]
+  userProgress  UserBossProgress[]
+
+  @@map("boss_configs")
+  @@schema("gamification")
+}
+
+model UserBossProgress {
+  id           Int       @id @default(autoincrement())
+  userId       Int       @map("user_id")
+  bossConfigId Int       @map("boss_config_id")
+  isUnlocked   Boolean   @default(false) @map("is_unlocked")
+  isCompleted  Boolean   @default(false) @map("is_completed")
+  stars        Int       @default(0)
+  bestScore    Int       @default(0) @map("best_score")
+  completedAt  DateTime? @map("completed_at")
+
+  bossConfig BossConfig @relation(fields: [bossConfigId], references: [id])
+
+  @@unique([userId, bossConfigId])
+  @@index([userId])
+  @@map("user_boss_progress")
+  @@schema("gamification")
+}
+
+model BossBattleSession {
+  id                 Int          @id @default(autoincrement())
+  userId             Int          @map("user_id")
+  bossConfigId       Int          @map("boss_config_id")
+  status             BattleStatus @default(IN_PROGRESS)
+  currentHp          Int          @map("current_hp")
+  maxHp              Int          @map("max_hp")
+  correctStreak      Int          @default(0) @map("correct_streak")
+  wrongCount         Int          @default(0) @map("wrong_count")
+  adaptiveDifficulty Float        @default(1.0) @map("adaptive_difficulty")
+  totalDamage        Int          @default(0) @map("total_damage")
+  roundsPlayed       Int          @default(0) @map("rounds_played")
+  startedAt          DateTime     @default(now()) @map("started_at")
+  endedAt            DateTime?    @map("ended_at")
+
+  bossConfig BossConfig    @relation(fields: [bossConfigId], references: [id])
+  rounds     BattleRound[]
+
+  @@index([userId, status])
+  @@index([userId, startedAt(sort: Desc)])
+  @@map("boss_battle_sessions")
+  @@schema("gamification")
+}
+
+model BattleRound {
+  id             Int      @id @default(autoincrement())
+  sessionId      Int      @map("session_id")
+  kanjiCharacter String   @map("kanji_character")
+  questionType   String   @map("question_type") // "meaning" | "reading" | "fill_blank"
+  correctAnswer  String   @map("correct_answer")
+  userAnswer     String?  @map("user_answer")
+  isCorrect      Boolean? @map("is_correct")
+  timeLeft       Float?   @map("time_left")
+  damageDone     Int      @default(0) @map("damage_done")
+  bossSkillUsed  String?  @map("boss_skill_used")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  session BossBattleSession @relation(fields: [sessionId], references: [id])
+
+  @@index([sessionId])
+  @@map("battle_rounds")
+  @@schema("gamification")
+}
+
+enum BattleStatus {
+  IN_PROGRESS
+  WIN
+  LOSE
+  ABANDONED
+
+  @@schema("gamification")
+}

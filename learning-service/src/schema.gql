@@ -1,0 +1,150 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+type Author {
+  email: String!
+  id: Int!
+  name: String!
+}
+
+type Blog {
+  author: Author!
+  authorId: Int!
+  content: String!
+  date: DateTime!
+  id: Int!
+  image: String
+  slug: String!
+  tags: [BlogTag!]!
+  title: String!
+}
+
+type BlogImageUploadResponse {
+  expiresIn: Int!
+  key: String!
+  publicUrl: String!
+  uploadUrl: String!
+}
+
+type BlogTag {
+  tag: TagInBlog!
+}
+
+input CreateBlogInput {
+  content: String!
+  image: String
+  slug: String!
+  tagIds: [Int!] = []
+  title: String!
+}
+
+input CreateTagGraphQLInput {
+  description: String
+  name: String!
+  slug: String!
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+input GenerateBlogImageUploadInput {
+  contentType: String!
+  filename: String!
+}
+
+type Mutation {
+  createBlog(createBlogInput: CreateBlogInput!): Blog!
+  createTag(createTagInput: CreateTagGraphQLInput!): TagObject!
+  generateBlogImageUploadUrl(input: GenerateBlogImageUploadInput!): BlogImageUploadResponse!
+  removeBlog(id: Int!): Blog!
+  removeTag(id: Int!): TagObject!
+  updateBlog(id: Int!, updateBlogInput: UpdateBlogInput!): Blog!
+  updateTag(id: Int!, updateTagInput: UpdateTagGraphQLInput!): TagObject!
+}
+
+type PaginatedBlogsResponse {
+  data: [Blog!]!
+  meta: PaginationMeta!
+}
+
+type PaginatedTagsResponse {
+  data: [TagObject!]!
+  meta: TagPaginationMeta!
+}
+
+type PaginationMeta {
+  limit: Int!
+  page: Int!
+  total: Int!
+  totalPages: Int!
+}
+
+type Query {
+  blog(id: Int!): Blog!
+  blogBySlug(slug: String!): Blog!
+  blogs(query: QueryBlogsInput): PaginatedBlogsResponse!
+  blogsByAuthor(authorId: Int!, query: QueryBlogsInput): PaginatedBlogsResponse!
+  blogsByTag(query: QueryBlogsInput, tagId: Int!): PaginatedBlogsResponse!
+  tag(id: Int!): TagObject!
+  tagBySlug(slug: String!): TagObject!
+  tags(query: QueryTagsGraphQLInput): PaginatedTagsResponse!
+}
+
+input QueryBlogsInput {
+  authorId: Int
+  limit: Int = 10
+  page: Int = 1
+  search: String
+  sortBy: String = "date"
+  sortOrder: String = "desc"
+  tagId: Int
+}
+
+input QueryTagsGraphQLInput {
+  limit: Int = 10
+  page: Int = 1
+  search: String
+}
+
+type TagBlogCount {
+  blogs: Int!
+}
+
+type TagInBlog {
+  description: String
+  id: Int!
+  name: String!
+  slug: String!
+}
+
+type TagObject {
+  _count: TagBlogCount
+  description: String
+  id: Int!
+  name: String!
+  slug: String!
+}
+
+type TagPaginationMeta {
+  limit: Int!
+  page: Int!
+  total: Int!
+  totalPages: Int!
+}
+
+input UpdateBlogInput {
+  content: String
+  image: String
+  slug: String
+  tagIds: [Int!] = []
+  title: String
+}
+
+input UpdateTagGraphQLInput {
+  description: String
+  name: String
+  slug: String
+}
