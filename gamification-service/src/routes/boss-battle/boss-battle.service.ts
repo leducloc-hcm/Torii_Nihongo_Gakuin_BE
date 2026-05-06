@@ -18,6 +18,11 @@ import {
   SessionState,
   SubmitAnswerResult,
 } from "./boss-battle.model";
+import {
+  CreateBossMapDto,
+  UpdateBossMapDto,
+  AssignBossToMapDto,
+} from "./boss-battle.dto";
 
 @Injectable()
 export class BossBattleService {
@@ -579,5 +584,31 @@ export class BossBattleService {
 
   async getMaxCombo(userId: number) {
     return this.repo.getMaxComboForUser(userId);
+  }
+
+  // ── Admin: Boss Map CRUD ─────────────────────────────────────────────
+
+  async getAllMapsAdmin() {
+    return this.repo.findAllMaps(false);
+  }
+
+  async createMap(dto: CreateBossMapDto) {
+    return this.repo.createMap(dto);
+  }
+
+  async updateMap(id: number, dto: UpdateBossMapDto) {
+    return this.repo.updateMap(id, dto);
+  }
+
+  async deleteMap(id: number) {
+    return this.repo.deleteMap(id);
+  }
+
+  async assignBossToMap(bossConfigId: number, dto: AssignBossToMapDto) {
+    return this.repo.assignBossToMap(bossConfigId, dto.mapId, dto.orderIndex);
+  }
+
+  async unassignBossFromMap(bossConfigId: number) {
+    return this.repo.assignBossToMap(bossConfigId, null, 0);
   }
 }

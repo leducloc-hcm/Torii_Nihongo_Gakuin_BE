@@ -176,3 +176,75 @@ export class UpdateBossConfigDto {
   @IsBoolean()
   isActive?: boolean;
 }
+
+// ── Boss Map DTOs ──────────────────────────────────────────────────────
+export class CreateBossMapDto {
+  @ApiProperty()
+  @IsString()
+  name: string;
+
+  @ApiProperty({ enum: ["N5", "N4", "N3", "N2", "N1"] })
+  @IsString()
+  jlptLevel: string;
+
+  @ApiProperty()
+  @IsInt()
+  orderIndex: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @ApiPropertyOptional({ default: "👹" })
+  @IsOptional()
+  @IsString()
+  emoji?: string;
+
+  @ApiPropertyOptional({ default: true })
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+}
+
+export class UpdateBossMapDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @ApiPropertyOptional({ enum: ["N5", "N4", "N3", "N2", "N1"] })
+  @IsOptional()
+  @IsString()
+  jlptLevel?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  orderIndex?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  emoji?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+}
+
+export class AssignBossToMapDto {
+  @ApiProperty()
+  @IsInt()
+  mapId: number;
+
+  @ApiProperty()
+  @IsInt()
+  orderIndex: number;
+}

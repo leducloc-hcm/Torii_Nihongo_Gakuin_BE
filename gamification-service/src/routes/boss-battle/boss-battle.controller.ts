@@ -22,6 +22,9 @@ import {
   SubmitAnswerDto,
   CreateBossConfigDto,
   UpdateBossConfigDto,
+  CreateBossMapDto,
+  UpdateBossMapDto,
+  AssignBossToMapDto,
 } from "./boss-battle.dto";
 
 @ApiTags("Boss Battle")
@@ -35,6 +38,49 @@ export class BossBattleController {
   @ApiOperation({ summary: "Get all boss maps with user progress" })
   getMapsWithProgress(@ActiveUser("userId") userId: number) {
     return this.service.getMapsWithProgress(userId);
+  }
+
+  // ── Admin: Maps CRUD ───────────────────────────
+  @Get("maps/admin")
+  @ApiOperation({ summary: "[Admin] List all boss maps (including inactive)" })
+  getAllMapsAdmin() {
+    return this.service.getAllMapsAdmin();
+  }
+
+  @Post("maps")
+  @ApiOperation({ summary: "[Admin] Create a boss map" })
+  createMap(@Body() body: CreateBossMapDto) {
+    return this.service.createMap(body);
+  }
+
+  @Patch("maps/:id")
+  @ApiOperation({ summary: "[Admin] Update a boss map" })
+  updateMap(
+    @Param("id", ParseIntPipe) id: number,
+    @Body() body: UpdateBossMapDto,
+  ) {
+    return this.service.updateMap(id, body);
+  }
+
+  @Delete("maps/:id")
+  @ApiOperation({ summary: "[Admin] Delete a boss map" })
+  deleteMap(@Param("id", ParseIntPipe) id: number) {
+    return this.service.deleteMap(id);
+  }
+
+  @Patch("configs/:id/assign-map")
+  @ApiOperation({ summary: "[Admin] Assign a boss config to a map" })
+  assignBossToMap(
+    @Param("id", ParseIntPipe) id: number,
+    @Body() body: AssignBossToMapDto,
+  ) {
+    return this.service.assignBossToMap(id, body);
+  }
+
+  @Patch("configs/:id/unassign-map")
+  @ApiOperation({ summary: "[Admin] Remove a boss config from its map" })
+  unassignBossFromMap(@Param("id", ParseIntPipe) id: number) {
+    return this.service.unassignBossFromMap(id);
   }
 
   // ── Configs ──────────────────────────────────

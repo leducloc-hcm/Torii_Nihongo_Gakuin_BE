@@ -214,4 +214,21 @@ export class BossBattleRepository {
       update: {},
     });
   }
+
+  // ── Admin: Map CRUD ──────────────────────────────────────────────────
+
+  async updateMap(id: number, data: Partial<{ name: string; jlptLevel: string; orderIndex: number; description: string; emoji: string; isActive: boolean }>) {
+    return this.prisma.bossMap.update({ where: { id }, data });
+  }
+
+  async deleteMap(id: number) {
+    return this.prisma.bossMap.delete({ where: { id } });
+  }
+
+  async assignBossToMap(bossConfigId: number, mapId: number | null, orderIndex: number) {
+    return this.prisma.bossConfig.update({
+      where: { id: bossConfigId },
+      data: { mapId, orderIndex },
+    });
+  }
 }
