@@ -7,7 +7,7 @@ dist/
 *.war
 
 # Environment
-# .env
+.env
 # .env.local
 # .env.*.local
 
@@ -38,4 +38,3 @@ Thumbs.db
 
 # Docker
 docker-compose.override.yml
-
