@@ -201,7 +201,7 @@ resource "aws_iam_role_policy" "ecs_execution_secrets" {
 
 # Secrets Manager for application secrets
 resource "aws_secretsmanager_secret" "app_secrets" {
-  name = "${var.project_name}/app/secrets"
+  name = "${var.project_name}/app/secrets/v3"
 }
 
 resource "aws_secretsmanager_secret_version" "app_secrets" {
@@ -469,8 +469,8 @@ resource "aws_ecs_task_definition" "assessment_service" {
     name              = "assessment-service"
     image             = "${aws_ecr_repository.assessment_service.repository_url}:latest"
     essential         = true
-    memory            = 1024
-    memoryReservation = 512
+    memory            = 1536
+    memoryReservation = 768
 
     portMappings = [{
       containerPort = 4002

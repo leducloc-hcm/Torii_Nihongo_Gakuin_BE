@@ -9,7 +9,7 @@ resource "random_password" "rabbitmq_password" {
 
 # Store RabbitMQ password in Secrets Manager
 resource "aws_secretsmanager_secret" "rabbitmq" {
-  name = "${var.project_name}/rabbitmq/password"
+  name = "${var.project_name}/rabbitmq/password/v3"
 }
 
 resource "aws_secretsmanager_secret_version" "rabbitmq" {

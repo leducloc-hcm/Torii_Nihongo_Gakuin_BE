@@ -34,8 +34,9 @@ RUN addgroup -g 1001 -S nestjs && \
 COPY package*.json ./
 COPY prisma ./prisma/
 
-# Install production dependencies only (including @prisma/client)
-RUN npm ci --omit=dev && \
+# Copy node_modules from builder and prune dev dependencies (avoids second npm registry fetch)
+COPY --from=builder /app/node_modules ./node_modules
+RUN npm prune --omit=dev && \
     npm cache clean --force
 
 # Copy built application from builder

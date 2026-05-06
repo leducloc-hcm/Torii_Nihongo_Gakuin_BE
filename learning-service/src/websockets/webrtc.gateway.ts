@@ -124,18 +124,40 @@ export class WebRTCGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   handleConnection(client: Socket) {
     const query = client.handshake.query;
-    const classId = Array.isArray(query.classId)
+    let classId = Array.isArray(query.classId)
       ? query.classId[0]
       : query.classId;
-    const userId = Array.isArray(query.userId) ? query.userId[0] : query.userId;
-    const role = Array.isArray(query.role) ? query.role[0] : query.role;
-    const displayName = Array.isArray(query.displayName)
+    let userId = Array.isArray(query.userId) ? query.userId[0] : query.userId;
+    let role = Array.isArray(query.role) ? query.role[0] : query.role;
+    let displayName = Array.isArray(query.displayName)
       ? query.displayName[0]
       : query.displayName;
     const avatar = Array.isArray(query.avatar) ? query.avatar[0] : query.avatar;
     const source =
       (Array.isArray(query.source) ? query.source[0] : query.source) ||
       "meeting";
+
+    // Proxies (Kong/nginx) can corrupt Unicode characters in URL query params.
+    // Fall back to the join token payload (base64-safe ASCII) if any param is missing.
+    if (!classId || !userId || !role || !displayName) {
+      const rawToken = Array.isArray(query.token)
+        ? query.token[0]
+        : query.token;
+      if (rawToken) {
+        try {
+          const payloadB64 = rawToken.split(".")[1];
+          const payload = JSON.parse(
+            Buffer.from(payloadB64, "base64").toString("utf-8"),
+          );
+          if (!classId) classId = payload.classId;
+          if (!userId) userId = payload.userId;
+          if (!role) role = payload.role;
+          if (!displayName) displayName = payload.displayName;
+        } catch {
+          // ignore decode errors — validation below will catch missing fields
+        }
+      }
+    }
 
     if (!classId || !userId || !role || !displayName) {
       this.logger.warn("Missing connection params", {
