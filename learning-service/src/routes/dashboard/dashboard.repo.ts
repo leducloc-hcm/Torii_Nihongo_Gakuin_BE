@@ -264,18 +264,29 @@ export class DashboardRepository {
         c.slug as course_slug,
         c."thumbnailUrl" as thumbnail_url,
         c.level,
-        COALESCE(SUM(oi."unitPrice"), 0) as total_revenue,
-        COUNT(DISTINCT o.id) as total_enrollments,
+        COALESCE(rev.total_revenue, 0) as total_revenue,
+        COALESCE(enr.total_enrollments, 0) as total_enrollments,
         CASE 
-          WHEN COUNT(DISTINCT o.id) > 0 
-          THEN COALESCE(SUM(oi."unitPrice"), 0) / COUNT(DISTINCT o.id)
+          WHEN COALESCE(rev.order_count, 0) > 0 
+          THEN COALESCE(rev.total_revenue, 0) / rev.order_count
           ELSE 0 
         END as average_price
       FROM learning."Course" c
-      LEFT JOIN learning."OrderItem" oi ON c.id = oi."courseId"
-      LEFT JOIN learning."Order" o ON oi."orderId" = o.id AND o.status = 'COMPLETED'
+      LEFT JOIN (
+        SELECT oi."courseId",
+          SUM(oi."unitPrice") as total_revenue,
+          COUNT(DISTINCT o.id) as order_count
+        FROM learning."OrderItem" oi
+        JOIN learning."Order" o ON oi."orderId" = o.id
+        WHERE o.status = 'COMPLETED'
+        GROUP BY oi."courseId"
+      ) rev ON c.id = rev."courseId"
+      LEFT JOIN (
+        SELECT e."courseId", COUNT(DISTINCT e.id) as total_enrollments
+        FROM learning."Enrollment" e
+        GROUP BY e."courseId"
+      ) enr ON c.id = enr."courseId"
       WHERE c.status = 'PUBLISHED'
-      GROUP BY c.id, c.title, c.slug, c."thumbnailUrl", c.level
       ORDER BY total_revenue DESC
       LIMIT ${limit}
     `;
@@ -310,14 +321,22 @@ export class DashboardRepository {
         c.slug as course_slug,
         c."thumbnailUrl" as thumbnail_url,
         c.level,
-        COALESCE(SUM(oi."unitPrice"), 0) as total_revenue,
-        COUNT(DISTINCT e.id) as total_enrollments
+        COALESCE(rev.total_revenue, 0) as total_revenue,
+        COALESCE(enr.total_enrollments, 0) as total_enrollments
       FROM learning."Course" c
-      LEFT JOIN learning."OrderItem" oi ON c.id = oi."courseId"
-      LEFT JOIN learning."Order" o ON oi."orderId" = o.id AND o.status = 'COMPLETED'
-      LEFT JOIN learning."Enrollment" e ON c.id = e."courseId"
+      LEFT JOIN (
+        SELECT oi."courseId", SUM(oi."unitPrice") as total_revenue
+        FROM learning."OrderItem" oi
+        JOIN learning."Order" o ON oi."orderId" = o.id
+        WHERE o.status = 'COMPLETED'
+        GROUP BY oi."courseId"
+      ) rev ON c.id = rev."courseId"
+      LEFT JOIN (
+        SELECT e."courseId", COUNT(DISTINCT e.id) as total_enrollments
+        FROM learning."Enrollment" e
+        GROUP BY e."courseId"
+      ) enr ON c.id = enr."courseId"
       WHERE c.status = 'PUBLISHED'
-      GROUP BY c.id, c.title, c.slug, c."thumbnailUrl", c.level
       ORDER BY total_revenue DESC
       LIMIT ${limit}
     `;
@@ -351,14 +370,22 @@ export class DashboardRepository {
         c.slug as course_slug,
         c."thumbnailUrl" as thumbnail_url,
         c.level,
-        COALESCE(SUM(oi."unitPrice"), 0) as total_revenue,
-        COUNT(DISTINCT e.id) as total_enrollments
+        COALESCE(rev.total_revenue, 0) as total_revenue,
+        COALESCE(enr.total_enrollments, 0) as total_enrollments
       FROM learning."Course" c
-      LEFT JOIN learning."OrderItem" oi ON c.id = oi."courseId"
-      LEFT JOIN learning."Order" o ON oi."orderId" = o.id AND o.status = 'COMPLETED'
-      LEFT JOIN learning."Enrollment" e ON c.id = e."courseId"
+      LEFT JOIN (
+        SELECT oi."courseId", SUM(oi."unitPrice") as total_revenue
+        FROM learning."OrderItem" oi
+        JOIN learning."Order" o ON oi."orderId" = o.id
+        WHERE o.status = 'COMPLETED'
+        GROUP BY oi."courseId"
+      ) rev ON c.id = rev."courseId"
+      LEFT JOIN (
+        SELECT e."courseId", COUNT(DISTINCT e.id) as total_enrollments
+        FROM learning."Enrollment" e
+        GROUP BY e."courseId"
+      ) enr ON c.id = enr."courseId"
       WHERE c.status = 'PUBLISHED'
-      GROUP BY c.id, c.title, c.slug, c."thumbnailUrl", c.level
       ORDER BY total_enrollments DESC
       LIMIT ${limit}
     `;
