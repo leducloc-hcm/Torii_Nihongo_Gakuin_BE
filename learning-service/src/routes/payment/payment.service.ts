@@ -164,10 +164,36 @@ export class PaymentService {
           },
           coupon: {
             select: {
+              id: true,
               code: true,
               title: true,
               type: true,
+              discountType: true,
+              discountValue: true,
+              maxDiscountAmount: true,
             },
+          },
+          redemption: {
+            select: {
+              id: true,
+              discountApplied: true,
+              status: true,
+              redeemedAt: true,
+              completedAt: true,
+            },
+          },
+          payments: {
+            select: {
+              id: true,
+              amount: true,
+              method: true,
+              status: true,
+              providerTransactionId: true,
+              failureReason: true,
+              processedAt: true,
+              createdAt: true,
+            },
+            orderBy: { createdAt: "desc" },
           },
         },
         orderBy: { createdAt: "desc" },
@@ -183,6 +209,44 @@ export class PaymentService {
       page,
       limit,
       totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async getOrdersSummary() {
+    const [
+      totalOrders,
+      pendingOrders,
+      processingOrders,
+      completedOrders,
+      cancelledOrders,
+      refundedOrders,
+      failedPayments,
+      totalRevenueResult,
+    ] = await Promise.all([
+      this.prisma.order.count(),
+      this.prisma.order.count({ where: { status: "PENDING" } }),
+      this.prisma.order.count({ where: { status: "PROCESSING" } }),
+      this.prisma.order.count({ where: { status: "COMPLETED" } }),
+      this.prisma.order.count({ where: { status: "CANCELLED" } }),
+      this.prisma.order.count({
+        where: { status: { in: ["REFUNDED", "PARTIALLY_REFUNDED"] } },
+      }),
+      this.prisma.payment.count({ where: { status: "FAILED" } }),
+      this.prisma.payment.aggregate({
+        where: { status: "PAID" },
+        _sum: { amount: true },
+      }),
+    ]);
+
+    return {
+      totalOrders,
+      pendingOrders,
+      processingOrders,
+      completedOrders,
+      cancelledOrders,
+      refundedOrders,
+      failedPayments,
+      totalRevenue: totalRevenueResult._sum.amount ?? 0,
     };
   }
 

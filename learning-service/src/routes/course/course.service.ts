@@ -384,13 +384,29 @@ export class CourseService {
       await this.lecturerRepository.findLectureProfileByUserIds(
         courses.map((course) => course.lecturerIds).flat(),
       );
+
+    const data = await Promise.all(
+      courses.map(async (course) => {
+        const responseCourse: any = {
+          ...course,
+          lecturers: this.attachLecturerPublicProfilePaths(
+            lecturerArray.filter((lecturer) =>
+              course.lecturerIds.includes(lecturer.userId),
+            ),
+          ),
+        };
+
+        if (course.courseType === "LIVE_ONLY") {
+          responseCourse.classes =
+            await this.onlineClassRepository.findByCourseId(course.id);
+        }
+
+        return responseCourse;
+      }),
+    );
+
     return {
-      data: courses.map((course) => ({
-        ...course,
-        lecturers: lecturerArray.filter((lecturer) =>
-          course.lecturerIds.includes(lecturer.userId),
-        ),
-      })),
+      data,
       meta: {
         page,
         limit: Number(limit),
@@ -1013,7 +1029,7 @@ export class CourseService {
       lecturers: lecturerArray,
     };
   }
-  async publish(id: number): Promise<CourseWithRelations> {
+  async publish(id: number, userId: number): Promise<CourseWithRelations> {
     // Check if course exists
     const existingCourse = await this.findOne(id);
 
@@ -1056,6 +1072,7 @@ export class CourseService {
     }
 
     this.activityLogService.log({
+      userId: userId,
       action: "COURSE_PUBLISHED",
       entity: "COURSE",
       entityId: id,

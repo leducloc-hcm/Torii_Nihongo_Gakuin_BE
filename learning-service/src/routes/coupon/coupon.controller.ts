@@ -1,5 +1,3 @@
-// Coupon Controller
-
 import {
   Controller,
   Get,

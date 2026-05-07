@@ -31,11 +31,28 @@ import {
 import { CLAUDE_CONFIG } from "src/shared/config/claude.config";
 import { AgentRole } from "src/mcp-client/shared/agent-routing.utils";
 import { getAgentRolePrompt } from "src/mcp-client/prompts/agent-role.prompt";
+import { buildFormatInstruction } from "src/mcp-client/agent/agent-response-formatter.util";
+import { tryBuildFastStructuredResponse } from "src/mcp-client/agent/fast-structured-response.util";
+import {
+  selectToolsForRoles,
+  ToolRegistryItem,
+} from "src/mcp-client/agent/role-tools-policy.util";
+import {
+  resolveServerUrlForTool,
+  shouldInjectUserId,
+} from "src/mcp-client/agent/tool-resolution.util";
 
-interface ToolRegistryItem {
-  serverKey: string;
-  serverUrl: string;
-  tool: ClaudeTool;
+/**
+ * Strip leftover XML-style function_call blocks that older Anthropic models
+ * sometimes emit inside text content, e.g.:
+ *   <function_calls><invoke name="...">...</invoke></function_calls>
+ * These must never reach the frontend — they break the UI renderer.
+ */
+function stripFunctionCallXml(text: string): string {
+  return text
+    .replace(/<function_calls>[\s\S]*?<\/function_calls>/g, "")
+    .replace(/<invoke\b[\s\S]*?<\/invoke>/g, "")
+    .trim();
 }
 
 @Injectable()
@@ -355,12 +372,6 @@ export class AgentService {
   ): Promise<ExecuteToolsResponse> {
     const results: MCPToolResult[] = [];
 
-    if (request.toolCalls.length > 1) {
-      //this.logger.log(
-      //  `Executing ${request.toolCalls.length} tools in parallel: ${request.toolCalls.map((tc) => tc.name).join(', ')}`,
-      //)
-    }
-
     const toolCallsStartTime = Date.now();
     const toolPromises = request.toolCalls.map(async (toolCall) => {
       try {
@@ -369,11 +380,6 @@ export class AgentService {
           toolCall.arguments,
           request.userId,
         );
-        if (result.result) {
-          //this.logger.log(`  Result preview: ${JSON.stringify(result.result).substring(0, 200)}...`)
-        }
-        //this.logger.log(`=== Tool ${toolCall.name} completed ===\n`)
-
         return {
           toolCallId: toolCall.id,
           toolName: toolCall.name,
@@ -397,7 +403,28 @@ export class AgentService {
     const toolCallsTime = Date.now() - toolCallsStartTime;
     //this.logger.log(`⏱️  Tool calls completed in ${toolCallsTime}ms`)
 
-    const fastResponse = this.tryBuildFastStructuredResponse(
+    // ── Guard: all tool calls failed → return graceful message immediately
+    // Do NOT pass error results to Claude — it will hallucinate platform data.
+    const allToolsFailed =
+      results.length > 0 && results.every((r) => !!r.error);
+    if (allToolsFailed) {
+      this.logger.warn(
+        `⚠️ All ${results.length} tool call(s) failed. Returning no-data message to prevent hallucination.`,
+      );
+      const failedToolName = results[0]?.toolName ?? "unknown";
+      const lang = request.userId ? "vi" : "vi";
+      const noDataMsg =
+        lang === "vi"
+          ? `Xin lỗi, hệ thống hiện không thể lấy dữ liệu từ tool "${failedToolName}". Vui lòng thử lại sau hoặc liên hệ hỗ trợ nếu sự cố tiếp tục.`
+          : `Sorry, the system could not fetch data from the "${failedToolName}" tool right now. Please try again later.`;
+      return {
+        results,
+        finalResponse: noDataMsg,
+        hasMoreTools: false,
+      };
+    }
+
+    const fastResponse = tryBuildFastStructuredResponse(
       request.queryType,
       results,
     );
@@ -413,16 +440,32 @@ export class AgentService {
       };
     }
 
-    // Build tool_result messages for Claude
-    // Anthropic format: user message with tool_result content blocks
     const toolResultContents: Anthropic.Messages.ToolResultBlockParam[] =
-      results.map((result) => ({
-        type: "tool_result" as const,
-        tool_use_id: result.toolCallId,
-        content: result.error || JSON.stringify(result.result),
-      }));
+      results.map((result) => {
+        let content: string;
+        if (result.error) {
+          // Explicitly label errors so Claude knows it MUST NOT fabricate data
+          content = `TOOL_ERROR: ${result.error}. The tool failed to return data. DO NOT invent or fabricate any platform-specific data (courses, prices, assessments, etc.). Tell the user the data is temporarily unavailable.`;
+        } else if (
+          result.result === null ||
+          result.result === undefined ||
+          (typeof result.result === "object" &&
+            !Array.isArray(result.result) &&
+            Object.keys(result.result as object).length === 0) ||
+          (Array.isArray(result.result) && result.result.length === 0)
+        ) {
+          // Empty/null results — also guard against hallucination
+          content = `TOOL_EMPTY: The tool returned no data (null or empty). DO NOT invent or fabricate any platform-specific data. Tell the user no data was found.`;
+        } else {
+          content = JSON.stringify(result.result);
+        }
+        return {
+          type: "tool_result" as const,
+          tool_use_id: result.toolCallId,
+          content,
+        };
+      });
 
-    // Build the assistant message that contains the tool_use blocks
     const assistantToolUseContent: Anthropic.Messages.ContentBlockParam[] =
       request.toolCalls.map((tc) => ({
         type: "tool_use" as const,
@@ -431,10 +474,22 @@ export class AgentService {
         input: tc.arguments,
       }));
 
-    // Build message chain: existing messages + assistant(tool_use) + user(tool_result)
     const existingMessages = (request.messages || []).filter(
       (m) => (m as any).role !== "system",
     );
+
+    // The last entry pushed by ai-chat.service.ts is an assistant message containing
+    // pre-tool "thinking" text (e.g. "I'll search for...") with OpenAI-style tool_calls.
+    // We drop it here because we're about to add the proper Anthropic-format tool_use
+    // assistant message below. Keeping both creates two consecutive assistant turns,
+    // which causes Claude to re-echo the preamble inside its final response.
+    if (
+      existingMessages.length > 0 &&
+      (existingMessages[existingMessages.length - 1] as any).role ===
+        "assistant"
+    ) {
+      existingMessages.pop();
+    }
 
     const messages: ClaudeMessageParam[] = [
       ...existingMessages,
@@ -451,10 +506,6 @@ export class AgentService {
     // Build system prompt parts
     const systemParts: string[] = [];
 
-    // Add format instructions based on query type before final response
-    //this.logger.log(`🔍 QueryType for final response: "${request.queryType}" (type: ${typeof request.queryType})`)
-
-    // Inject module-specific system prompt for ASSESSMENT or ASSESSMENT_HISTORY
     if (
       request.queryType === "ASSESSMENT" ||
       request.queryType === QueryType.ASSESSMENT
@@ -492,198 +543,10 @@ export class AgentService {
       this.extractSystemAndMessages(messages, systemParts);
 
     // Add user instructions for specific query types
-    let formatInstruction: string | undefined;
-
-    if (
-      request.queryType === "COURSE" ||
-      request.queryType === QueryType.COURSE
-    ) {
-      //this.logger.log('📋 Adding COURSE format instructions to messages')
-      formatInstruction = `CRITICAL INSTRUCTION - READ CAREFULLY:
-
-You MUST respond with ONLY the JSON code block below. NOTHING ELSE.
-
-DO NOT write:
-- "Đây là các khóa học..." ❌
-- "Website có..." ❌
-- "Bạn muốn..." ❌
-- Any greeting, intro, or follow-up text ❌
-
-Your ENTIRE response must be EXACTLY this format:
-
-\`\`\`json
-{
-  "courses": [complete array of all course objects from tool result],
-  "count": total number
-}
-\`\`\`
-
-That's it. Nothing before the \`\`\`json. Nothing after the closing \`\`\`.
-
-Include in each course: id, title, slug, level, thumbnailUrl, courseType, price, moduleCount, lessonCount
-Use EXACT data from tool result - do not modify.`;
-    } else if (
-      request.queryType === "BLOG" ||
-      request.queryType === QueryType.BLOG
-    ) {
-      //this.logger.log('📋 Adding BLOG format instructions to messages')
-      formatInstruction = `CRITICAL INSTRUCTION - READ CAREFULLY:
-
-You MUST respond with ONLY the JSON code block below. NOTHING ELSE.
-
-DO NOT write:
-- "Tôi tìm thấy..." ❌
-- "Dưới đây là..." ❌
-- "Bạn muốn..." ❌
-- Any greeting, intro, or follow-up text ❌
-
-Your ENTIRE response must be EXACTLY this format:
-
-\`\`\`json
-{
-  "blogs": [complete array of all blog objects from tool result],
-  "count": total number
-}
-\`\`\`
-
-That's it. Nothing before the \`\`\`json. Nothing after the closing \`\`\`.
-
-Include in each blog: id, title, slug, date, image, excerpt, tags
-Use EXACT data from tool result - do not modify.`;
-    } else if (
-      request.queryType === "FLASHCARD" ||
-      request.queryType === QueryType.FLASHCARD
-    ) {
-      //this.logger.log('📋 Adding FLASHCARD format instructions to messages')
-
-      // Check if this is a generation request
-      const isFlashcardGeneration = results.some(
-        (r) => r.toolName === "generate_flashcard_suggestions",
-      );
-
-      if (isFlashcardGeneration) {
-        //this.logger.log('🎴 Flashcard GENERATION detected - using formatted text response')
-        formatInstruction = `CRITICAL INSTRUCTION - FLASHCARD GENERATION FORMAT:
-
-The tool generate_flashcard_suggestions has returned flashcard data.
-
-You MUST format the response using this EXACT pattern:
-
-📚 Đã tạo [COUNT] flashcards về [TOPIC] (cấp độ [LEVEL])!
-
-**Thẻ 1:**
-🔹 Mặt trước: [front]
-🔸 Mặt sau: [back]
-🔊 Phát âm: [pronunciation]
-📝 Ví dụ: [example]
-💡 Gợi ý nhớ: [hint]
-
-**Thẻ 2:**
-🔹 Mặt trước: [front]
-🔸 Mặt sau: [back]
-🔊 Phát âm: [pronunciation]
-📝 Ví dụ: [example]
-💡 Gợi ý nhớ: [hint]
-
-(repeat for ALL cards - show EVERY card, no truncation!)
-
----
-
-⚠️ **LƯU Ý QUAN TRỌNG:** Các flashcard này CHƯA được lưu vào hệ thống!
-Bạn cần xác nhận để lưu vào tài khoản của mình.
-
-[Tạo tất cả] [Chỉnh sửa] [Hủy]
-
-MANDATORY RULES:
-- ✅ MUST start each card with "**Thẻ [number]:**"
-- ✅ MUST use emojis: 🔹 🔸 🔊 📝 💡
-- ✅ MUST show ALL cards (no "...see more" or truncation)
-- ✅ MUST include action buttons at the end
-- ✅ MUST include "CHƯA được lưu" warning
-- ❌ DO NOT use JSON format for generation!
-- ❌ DO NOT say "decks": [] or "count": 0`;
-      } else {
-        //this.logger.log('🔍 Flashcard SEARCH detected - using JSON format')
-        formatInstruction = `CRITICAL INSTRUCTION - READ CAREFULLY:
-
-You MUST respond with ONLY the JSON code block below. NOTHING ELSE.
-
-DO NOT write:
-- "Đây là bộ flashcard..." ❌
-- "Website có..." ❌
-- "Bạn muốn xem..." ❌
-- Any greeting, intro, or follow-up text ❌
-
-Your ENTIRE response must be EXACTLY this format:
-
-\`\`\`json
-{
-  "decks": [complete array of all flashcard deck objects from tool result],
-  "count": total number
-}
-\`\`\`
-
-That's it. Nothing before the \`\`\`json. Nothing after the closing \`\`\`.
-
-Include in each deck: id, title, level, card_count, owner_name, createdAt, updatedAt
-Use EXACT data from tool result - do not modify.`;
-      }
-    } else if (
-      request.queryType === "GRAMMAR" ||
-      request.queryType === QueryType.GRAMMAR
-    ) {
-      formatInstruction = `The tool explain_grammar_personalized has returned a result.
-
-MANDATORY — Do BOTH parts in order:
-
-PART 1 — Write a SHORT, structured explanation (under 250 words) in the SAME language the user wrote in:
-- Grammar point + level
-- Meaning / usage
-- Structure / conjugation pattern
-- 2–3 example sentences (Japanese / romaji / translation)
-- 1–2 common pitfalls (notes)
-
-PART 2 — You MUST append this JSON block EXACTLY at the very end of your response (no text after it):
-
-\`\`\`json
-{"type":"grammar_explanation","grammar_point":"FILL","level":"FILL","meaning":"FILL","structure":"FILL","notes":"FILL","examples":[{"jp":"FILL","romaji":"FILL","translation":"FILL"},{"jp":"FILL","romaji":"FILL","translation":"FILL"},{"jp":"FILL","romaji":"FILL","translation":"FILL"}]}
-\`\`\`
-
-Replace every "FILL" with the actual value from the tool result. Use the inner explanation object fields.
-
-RULES:
-- ✅ The \`\`\`json block is REQUIRED — never omit it
-- ✅ All examples must have jp, romaji, translation
-- ✅ notes must be a string (join array items with " • " if array)
-- ❌ Do NOT add any text after the closing \`\`\` fence`;
-    } else if (
-      request.queryType === "TRANSLATION" ||
-      request.queryType === QueryType.TRANSLATION
-    ) {
-      formatInstruction = `The tool translate_with_level_context has returned a result.
-
-Do two things:
-1. Write a short formatted response (clean translation → vocabulary table with ⚠️ for above-level words → grammar patterns → learning tip), responding in the same language the user wrote in.
-2. After the explanation, output the raw tool result data inside a JSON code block like this:
-\`\`\`json
-{...the data object from the tool result...}
-\`\`\`
-
-IMPORTANT: The JSON code block MUST contain the inner data object (with fields: type, original_text, translation, vocabulary, grammar_patterns, learning_tip). Do not omit or modify any fields.`;
-    } else if (
-      request.queryType !== "ASSESSMENT" &&
-      request.queryType !== QueryType.ASSESSMENT &&
-      request.queryType !== "ASSESSMENT_HISTORY" &&
-      request.queryType !== QueryType.ASSESSMENT_HISTORY &&
-      request.queryType !== "COURSE" &&
-      request.queryType !== QueryType.COURSE &&
-      request.queryType !== "BLOG" &&
-      request.queryType !== QueryType.BLOG &&
-      request.queryType !== "FLASHCARD" &&
-      request.queryType !== QueryType.FLASHCARD
-    ) {
-      //this.logger.warn(`⚠️ No format instructions added - queryType was: "${request.queryType}"`)
-    }
+    const formatInstruction = buildFormatInstruction(
+      request.queryType,
+      results,
+    );
 
     // If we have format instructions, append to last user message
     if (formatInstruction) {
@@ -702,54 +565,170 @@ IMPORTANT: The JSON code block MUST contain the inner data object (with fields: 
       };
     }
 
-    const finalCompletionOptions: Anthropic.Messages.MessageCreateParamsNonStreaming =
-      {
+    // ── ReAct Loop ──────────────────────────────────────────────────────────
+    // [FIX] Trước đây: Claude được gọi đúng 1 lần, KHÔNG có tools → chỉ
+    // format lại dữ liệu tool vừa trả về, không thể reason thêm.
+    //
+    // Bây giờ: mỗi vòng lặp đưa kết quả tools trở lại Claude KÈM theo
+    // danh sách tools → Claude tự quyết định:
+    //   • stop_reason = "end_turn"  → đã đủ thông tin, trả lời ngay
+    //   • stop_reason = "tool_use"  → cần thêm dữ liệu, gọi tool tiếp, lặp lại
+    //
+    // Đây là vòng lặp Reason → Act → Observe → Reason lại của ReAct pattern.
+    // MAX_REACT_ITERATIONS giới hạn số vòng để tránh infinite loop.
+    const MAX_REACT_ITERATIONS = 4;
+
+    // [FIX] Tool set được pass vào Claude trong mỗi vòng lặp.
+    // Cũ: finalCompletionOptions không có trường `tools` → Claude bị "mù",
+    // không thể chủ động gọi thêm tool dù kết quả đầu trả về không đủ.
+    const routedToolsForLoop = this.getToolsForRole(
+      request.agentRole as AgentRole | undefined,
+    );
+
+    let reactIteration = 0;
+
+    while (reactIteration <= MAX_REACT_ITERATIONS) {
+      try {
+        // [FIX] Truyền tools vào đây — đây là điểm mấu chốt.
+        // Anthropic API: khi tools có mặt, model được phép phát ra
+        // tool_use blocks thay vì chỉ text. Nếu không có tools,
+        // Claude KHÔNG THỂ gọi tool dù muốn.
+        const loopResponse = await this.anthropic.messages.create({
+          model: runtimeModel,
+          system: existingSystem,
+          messages: cleanMessages,
+          tools: routedToolsForLoop.length > 0 ? routedToolsForLoop : undefined,
+          tool_choice:
+            routedToolsForLoop.length > 0 ? { type: "auto" } : undefined,
+          temperature: CLAUDE_CONFIG.temperature,
+          max_tokens: CLAUDE_CONFIG.maxTokens,
+        });
+
+        const textBlocks = loopResponse.content.filter(
+          (b): b is Anthropic.Messages.TextBlock => b.type === "text",
+        );
+        const toolUseBlocks = loopResponse.content.filter(
+          (b): b is Anthropic.Messages.ToolUseBlock => b.type === "tool_use",
+        );
+
+        // ── OBSERVE: Claude tự quyết định đã đủ thông tin → trả lời ──────
+        // [FIX] Cũ: luôn return sau 1 Claude call dù stop_reason là gì.
+        // Mới: chỉ return khi Claude thực sự kết thúc (end_turn).
+        if (
+          loopResponse.stop_reason === "end_turn" ||
+          toolUseBlocks.length === 0
+        ) {
+          const finalText = stripFunctionCallXml(
+            textBlocks.map((b) => b.text).join(""),
+          );
+          return {
+            results,
+            finalResponse: finalText || undefined,
+            hasMoreTools: false,
+          };
+        }
+
+        // ── ACT: Claude cần thêm dữ liệu → thực thi tool mới ───────────
+        // [FIX] Đây là bước hoàn toàn mới — trước đây không tồn tại.
+        // Claude có thể gọi tool khác sau khi thấy kết quả tool đầu tiên,
+        // ví dụ: thấy user chưa enroll course nào → tự gọi thêm search_courses
+        // để gợi ý khóa học phù hợp, không cần user hỏi lại.
+        this.logger.log(
+          `🔄 [ReAct iteration ${reactIteration + 1}/${MAX_REACT_ITERATIONS}] Claude called ${toolUseBlocks.length} additional tool(s): ${toolUseBlocks.map((b) => b.name).join(", ")}`,
+        );
+
+        const additionalToolResults = await Promise.all(
+          toolUseBlocks.map(async (toolUse) => {
+            const res = await this.executeToolCall(
+              toolUse.name,
+              toolUse.input as Record<string, any>,
+              request.userId,
+            );
+            return { ...res, toolCallId: toolUse.id };
+          }),
+        );
+
+        results.push(...additionalToolResults);
+
+        // ── Cập nhật message chain để Claude có context đầy đủ ──────────
+        // [FIX] Thêm cặp assistant(tool_use) + user(tool_result) vào
+        // cleanMessages. Đây là giao thức bắt buộc của Anthropic API:
+        // model output phải được echo lại trước khi thêm tool_result.
+        // Nếu thiếu bước này, API sẽ báo lỗi invalid message sequence.
+        cleanMessages.push({
+          role: "assistant",
+          content: loopResponse.content,
+        } as ClaudeMessageParam);
+
+        cleanMessages.push({
+          role: "user",
+          content: additionalToolResults.map((r) => {
+            let content: string;
+            if (r.error) {
+              content = `TOOL_ERROR: ${r.error}. The tool failed to return data. DO NOT invent or fabricate any platform-specific data. Tell the user the data is temporarily unavailable.`;
+            } else if (
+              r.result === null ||
+              r.result === undefined ||
+              (typeof r.result === "object" &&
+                !Array.isArray(r.result) &&
+                Object.keys(r.result as object).length === 0) ||
+              (Array.isArray(r.result) && r.result.length === 0)
+            ) {
+              content = `TOOL_EMPTY: The tool returned no data (null or empty). DO NOT invent or fabricate any platform-specific data. Tell the user no data was found.`;
+            } else {
+              content = JSON.stringify(r.result);
+            }
+            return {
+              type: "tool_result" as const,
+              tool_use_id: r.toolCallId,
+              content,
+            };
+          }),
+        } as ClaudeMessageParam);
+
+        reactIteration++;
+      } catch (error) {
+        this.logger.error(
+          `❌ ReAct loop error at iteration ${reactIteration}:`,
+          error instanceof Error ? error.message : String(error),
+        );
+        return {
+          results,
+          finalResponse: undefined,
+          hasMoreTools: false,
+        };
+      }
+    }
+
+    // ── Max iterations reached ───────────────────────────────────────────
+    // [FIX] Safety net: nếu Claude liên tục gọi tool sau 4 vòng (hiếm gặp),
+    // buộc kết thúc bằng 1 lần gọi không có tools để user không bị treo.
+    this.logger.warn(
+      `⚠️ ReAct loop reached MAX_REACT_ITERATIONS (${MAX_REACT_ITERATIONS}). Forcing final answer without tools.`,
+    );
+
+    try {
+      const forcedResponse = await this.anthropic.messages.create({
         model: runtimeModel,
         system: existingSystem,
         messages: cleanMessages,
         temperature: CLAUDE_CONFIG.temperature,
         max_tokens: CLAUDE_CONFIG.maxTokens,
-      };
+      });
 
-    try {
-      //this.logger.log('🔄 Calling Claude with tool results...')
-      const claudeStartTime = Date.now();
-
-      const finalResponse = await this.anthropic.messages.create(
-        finalCompletionOptions,
+      const finalText = stripFunctionCallXml(
+        forcedResponse.content
+          .filter((b): b is Anthropic.Messages.TextBlock => b.type === "text")
+          .map((b) => b.text)
+          .join(""),
       );
-
-      const claudeTime = Date.now() - claudeStartTime;
-      //this.logger.log(`✅ Claude response received in ${claudeTime}ms`)
-
-      // Extract text from content blocks
-      const responseText = finalResponse.content
-        .filter(
-          (block): block is Anthropic.Messages.TextBlock =>
-            block.type === "text",
-        )
-        .map((block) => block.text)
-        .join("");
-
-      const hasMoreToolUse = finalResponse.content.some(
-        (block) => block.type === "tool_use",
-      );
-
-      if (!responseText) {
-        //this.logger.warn('⚠️ Claude returned empty content in final response')
-      } else {
-        //this.logger.log(`✅ Final response: ${responseText.substring(0, 200)}...`)
-      }
 
       return {
         results,
-        finalResponse: responseText || undefined,
-        hasMoreTools: hasMoreToolUse,
+        finalResponse: finalText || undefined,
+        hasMoreTools: false,
       };
     } catch (error) {
-      //this.logger.error('❌ Failed to get final response from Claude:', error.message)
-
-      // Return results but with no final response
       return {
         results,
         finalResponse: undefined,
@@ -771,14 +750,7 @@ IMPORTANT: The JSON code block MUST contain the inner data object (with fields: 
     }
 
     // Auto-inject user_id for tools that require authenticated user context
-    const lowerToolName = toolName.toLowerCase();
-    const requiresUserId =
-      lowerToolName.includes("my_assessment") ||
-      lowerToolName.includes("progress_summary") ||
-      lowerToolName.includes("history") ||
-      lowerToolName.includes("enrollment") ||
-      lowerToolName.includes("my_") || // Any "my_*" tool requires user_id
-      lowerToolName.includes("user_");
+    const requiresUserId = shouldInjectUserId(toolName);
 
     if (requiresUserId && userId) {
       // ALWAYS override user_id with authenticated userId to prevent security issues
@@ -816,276 +788,90 @@ IMPORTANT: The JSON code block MUST contain the inner data object (with fields: 
   }
 
   private getServerUrlForTool(toolName: string): string | null {
-    const registryMatch = this.toolRegistry.find((item) => {
-      return item.tool.name === toolName;
-    });
-
-    if (registryMatch) {
-      return registryMatch.serverUrl;
-    }
-
-    const lowerToolName = toolName.toLowerCase();
-
-    if (lowerToolName.includes("course")) {
-      return MCP_SERVERS.course.url;
-    }
-
-    if (
-      lowerToolName.includes("enrollment") ||
-      lowerToolName.includes("progress") ||
-      lowerToolName.includes("learning")
-    ) {
-      return MCP_SERVERS.enrollment.url;
-    }
-
-    if (
-      lowerToolName.includes("flashcard") ||
-      lowerToolName.includes("deck") ||
-      lowerToolName.includes("generate_flashcard")
-    ) {
-      return MCP_SERVERS.flashcard.url;
-    }
-
-    if (
-      lowerToolName.includes("blog") ||
-      lowerToolName.includes("post") ||
-      lowerToolName.includes("article")
-    ) {
-      return MCP_SERVERS.blog.url;
-    }
-
-    // Assessment History tools (user's past attempts, progress, results)
-    if (
-      lowerToolName.includes("my_assessment") ||
-      lowerToolName.includes("attempt_result") ||
-      lowerToolName.includes("progress_summary") ||
-      lowerToolName.includes("history")
-    ) {
-      return MCP_SERVERS.assessmentHistory.url;
-    }
-
-    // Assessment Search tools (find available tests/exams)
-    if (
-      lowerToolName.includes("assessment") ||
-      lowerToolName.includes("test") ||
-      lowerToolName.includes("quiz") ||
-      lowerToolName.includes("exam")
-    ) {
-      return MCP_SERVERS.assessment.url;
-    }
-
-    // Default to first enabled server
     const enabledServers = getEnabledMCPServers();
-    return enabledServers.length > 0 ? enabledServers[0].url : null;
+    const enabledUrls = enabledServers.map((s) => s.url);
+    return resolveServerUrlForTool(toolName, this.toolRegistry, enabledUrls);
   }
 
   getAvailableTools(): ClaudeTool[] {
     return this.allTools;
   }
 
-  private tryBuildFastStructuredResponse(
-    queryType: string | undefined,
-    results: MCPToolResult[],
-  ): string | undefined {
-    if (!queryType || results.length === 0) {
-      return undefined;
-    }
+  /**
+   * Multi-agent: Chạy một Claude call ngắn với perspective của collaborator role.
+   *
+   * Pattern:
+   *   Primary agent (SENSEI) → gọi tools → lấy kết quả
+   *   Collaborator (ASSESSMENT) → nhận kết quả tool → phân tích từ góc độ riêng
+   *   Collaborator (ANALYTICS)  → nhận kết quả tool → phân tích từ góc độ riêng
+   *   → Merge tất cả insight vào response cuối
+   *
+   * Quy tắc: Chỉ comment dựa trên dữ liệu tool đã có.
+   * KHÔNG bịa thêm tên course/test/blog cụ thể.
+   */
+  async getCollaboratorInsight(
+    query: string,
+    primaryResponse: string,
+    toolResults: MCPToolResult[],
+    collaboratorRole: AgentRole,
+  ): Promise<string | undefined> {
+    if (!primaryResponse || toolResults.length === 0) return undefined;
 
-    const hasFlashcardGeneration = results.some(
-      (r) => r.toolName === "generate_flashcard_suggestions",
-    );
+    const runtimeModel = this.getRuntimeModel();
+    const rolePrompt = getAgentRolePrompt(collaboratorRole);
 
-    const type = queryType.toUpperCase();
-    if (type === "FLASHCARD" && hasFlashcardGeneration) {
-      return undefined;
-    }
+    // Tóm tắt ngắn gọn kết quả tool (tránh context quá dài)
+    const toolSummary = toolResults
+      .slice(0, 3)
+      .map((r) =>
+        r.error
+          ? `[${r.toolName}]: Error - ${r.error}`
+          : `[${r.toolName}]: ${JSON.stringify(r.result).substring(0, 250)}`,
+      )
+      .join("\n");
 
-    if (type === "COURSE") {
-      const courses = this.extractArrayFromToolResults(results, [
-        "courses",
-        "course_list",
-        "items",
-        "data",
-      ]);
-      if (!courses) {
-        return undefined;
-      }
-
-      return this.toJsonCodeBlock({ courses, count: courses.length });
-    }
-
-    if (type === "BLOG") {
-      const blogs = this.extractArrayFromToolResults(results, [
-        "blogs",
-        "posts",
-        "articles",
-        "items",
-        "data",
-      ]);
-      if (!blogs) {
-        return undefined;
-      }
-
-      return this.toJsonCodeBlock({ blogs, count: blogs.length });
-    }
-
-    if (type === "FLASHCARD") {
-      const decks = this.extractArrayFromToolResults(results, [
-        "decks",
-        "flashcards",
-        "items",
-        "data",
-      ]);
-      if (!decks) {
-        return undefined;
-      }
-
-      return this.toJsonCodeBlock({ decks, count: decks.length });
-    }
-
-    if (type === "ASSESSMENT") {
-      const assessments = this.extractArrayFromToolResults(results, [
-        "results",
-        "assessments",
-        "items",
-        "data",
-      ]);
-
-      if (!assessments) {
-        return undefined;
-      }
-
-      return this.toJsonCodeBlock({
-        type: "assessment_search",
-        results: assessments,
-        count: assessments.length,
+    try {
+      const response = await this.anthropic.messages.create({
+        model: runtimeModel,
+        system: `${rolePrompt}\n\nYou are the ${collaboratorRole} specialist agent providing a brief supplementary analysis. Respond in 1-2 concise sentences. Base your response SOLELY on the tool data provided. Do NOT fabricate specific course names, test scores, flashcard content, or any resource that wasn't in the tool data.`,
+        messages: [
+          {
+            role: "user",
+            content: `User query: "${query}"\n\nTool data retrieved:\n${toolSummary}\n\nAs the ${collaboratorRole} agent, add a brief insight from your specialist perspective.`,
+          },
+        ],
+        max_tokens: 180,
+        temperature: 0.2,
       });
+
+      const insight = response.content
+        .filter((b): b is Anthropic.Messages.TextBlock => b.type === "text")
+        .map((b) => b.text)
+        .join("")
+        .trim();
+
+      if (insight) {
+        this.logger.log(
+          `🤝 [Multi-Agent] ${collaboratorRole}: ${insight.substring(0, 100)}...`,
+        );
+      }
+      return insight || undefined;
+    } catch {
+      return undefined;
     }
-
-    // Fast-path for ENROLLMENT: structured data, no need for Claude to reformat
-    if (type === "ENROLLMENT") {
-      const enrollments = this.extractArrayFromToolResults(results, [
-        "enrollments",
-        "courses",
-        "items",
-        "data",
-      ]);
-
-      if (!enrollments) {
-        return undefined;
-      }
-
-      return this.toJsonCodeBlock({ enrollments, count: enrollments.length });
-    }
-
-    return undefined;
-  }
-
-  private extractArrayFromToolResults(
-    results: MCPToolResult[],
-    candidateKeys: string[],
-  ): any[] | undefined {
-    for (const result of results) {
-      const payload = result.result;
-      if (!payload || typeof payload !== "object") {
-        continue;
-      }
-
-      if (Array.isArray(payload)) {
-        return payload;
-      }
-
-      for (const key of candidateKeys) {
-        const value = (payload as Record<string, any>)[key];
-        if (Array.isArray(value)) {
-          return value;
-        }
-      }
-
-      const nestedData = (payload as Record<string, any>).data;
-      if (nestedData && typeof nestedData === "object") {
-        if (Array.isArray(nestedData)) {
-          return nestedData;
-        }
-
-        for (const key of candidateKeys) {
-          const value = (nestedData as Record<string, any>)[key];
-          if (Array.isArray(value)) {
-            return value;
-          }
-        }
-      }
-    }
-
-    return undefined;
-  }
-
-  private toJsonCodeBlock(payload: Record<string, any>): string {
-    return `\`\`\`json\n${JSON.stringify(payload, null, 2)}\n\`\`\``;
   }
 
   private getToolsForRole(
     primaryRole?: AgentRole,
     collaboratorRoles: AgentRole[] = [],
   ): ClaudeTool[] {
-    if (!primaryRole && collaboratorRoles.length === 0) {
-      return this.allTools;
-    }
-
-    const targetRoles = [primaryRole, ...collaboratorRoles].filter(
-      (role): role is AgentRole => !!role,
+    return selectToolsForRoles(
+      this.allTools,
+      this.toolRegistry,
+      this.roleServerPolicies,
+      primaryRole,
+      collaboratorRoles,
+      this.logger,
     );
-
-    const allowedServers = new Set<string>();
-    const fallbackServers = new Set<string>();
-
-    for (const role of targetRoles) {
-      const policy = this.roleServerPolicies[role];
-      if (!policy) {
-        continue;
-      }
-
-      for (const server of policy.allowedServers) {
-        allowedServers.add(server);
-      }
-
-      for (const server of policy.fallbackServers) {
-        fallbackServers.add(server);
-      }
-    }
-
-    if (allowedServers.size === 0 && fallbackServers.size === 0) {
-      return this.allTools;
-    }
-
-    const allowedTools = this.toolRegistry
-      .filter((item) => allowedServers.has(item.serverKey))
-      .map((item) => item.tool);
-
-    const fallbackTools = this.toolRegistry
-      .filter((item) => fallbackServers.has(item.serverKey))
-      .map((item) => item.tool);
-
-    const seenToolNames = new Set<string>();
-    const filteredTools = [...allowedTools, ...fallbackTools].filter((tool) => {
-      if (seenToolNames.has(tool.name)) {
-        return false;
-      }
-
-      seenToolNames.add(tool.name);
-      return true;
-    });
-
-    if (filteredTools.length === 0) {
-      this.logger.warn(
-        `No server-policy tools matched for roles [${targetRoles.join(", ")}]. Falling back to full toolset (${this.allTools.length} tools).`,
-      );
-      return this.allTools;
-    }
-
-    this.logger.log(
-      `Primary role ${primaryRole || "N/A"} with collaborators [${collaboratorRoles.join(", ") || "none"}] using ${filteredTools.length}/${this.allTools.length} tools.`,
-    );
-    return filteredTools;
   }
 }

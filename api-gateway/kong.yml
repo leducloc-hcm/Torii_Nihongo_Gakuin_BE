@@ -226,6 +226,26 @@ services:
           - name: jwt-validator
             config:
               secret: nhatngutorii
+      - name: courses-mcp-route
+        paths:
+          - /courses/mcp
+        strip_path: false
+        methods:
+          - GET
+          - OPTIONS
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 120
+              hour: 1200
+              policy: redis
+              redis:
+                host: redis
+                port: 6379
+                password: ""
+                database: 0
+          # No jwt-validator here — authentication is handled by x-internal-api-key
+          # header checked inside the learning-service CourseController.verifyMcpApiKey()
       - name: courses-route
         paths:
           - /courses

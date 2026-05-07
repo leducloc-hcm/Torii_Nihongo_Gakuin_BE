@@ -82,10 +82,7 @@ export function routeAgentForQuery(
   // make ANALYTICS the primary (higher ROLE_PRIORITY than SENSEI) for plain
   // COURSE/LESSON/BLOG/FLASHCARD queries, which gives Claude the wrong
   // system prompt ("learning analyst" instead of "tutor").
-  if (
-    queryType === QueryType.ENROLLMENT ||
-    queryType === QueryType.PROGRESS
-  ) {
+  if (queryType === QueryType.ENROLLMENT || queryType === QueryType.PROGRESS) {
     candidateRoles.push(AgentRole.ANALYTICS);
   }
 
@@ -113,6 +110,9 @@ export function routeAgentForQuery(
     queryType === QueryType.PROGRESS ||
     queryType === QueryType.GRAMMAR ||
     queryType === QueryType.TRANSLATION ||
+    queryType === QueryType.COURSE ||
+    queryType === QueryType.BLOG ||
+    queryType === QueryType.ASSESSMENT ||
     (queryType === QueryType.FLASHCARD &&
       /tạo|create|generate|make|作成|生成/i.test(query));
 

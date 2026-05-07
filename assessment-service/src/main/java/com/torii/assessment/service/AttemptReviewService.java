@@ -159,10 +159,39 @@ public class AttemptReviewService {
             })
             .collect(Collectors.toList());
 
+        // Batch-load user info for ALL students so keyword can match name/email
+        Set<Integer> allStudentIds = attemptsByStudent.keySet();
+        Map<Integer, AssessmentDTO.CreatorInfoDTO> allUserMap =
+            learningUserLookupService.getCreatorsByIds(allStudentIds);
+
+        // Enrich every row with user fields before filtering/sorting
+        studentRows = studentRows.stream().map(row -> {
+            Map<String, Object> enriched = new LinkedHashMap<>(row);
+            Integer sid = (Integer) enriched.get("studentId");
+            AssessmentDTO.CreatorInfoDTO userInfo = allUserMap.get(sid);
+            if (userInfo != null) {
+                enriched.put("fullName", userInfo.getName());
+                enriched.put("email", userInfo.getEmail());
+                enriched.put("username", userInfo.getUsername());
+            } else {
+                enriched.put("fullName", null);
+                enriched.put("email", null);
+                enriched.put("username", null);
+            }
+            return enriched;
+        }).collect(Collectors.toList());
+
         if (keyword != null && !keyword.isBlank()) {
             String kw = keyword.trim().toLowerCase();
             studentRows = studentRows.stream()
-                .filter(row -> String.valueOf(row.get("studentId")).toLowerCase().contains(kw))
+                .filter(row -> {
+                    if (String.valueOf(row.get("studentId")).toLowerCase().contains(kw)) return true;
+                    String fullName = (String) row.get("fullName");
+                    if (fullName != null && fullName.toLowerCase().contains(kw)) return true;
+                    String email = (String) row.get("email");
+                    if (email != null && email.toLowerCase().contains(kw)) return true;
+                    return false;
+                })
                 .collect(Collectors.toList());
         }
 
@@ -190,7 +219,7 @@ public class AttemptReviewService {
         int total = studentRows.size();
         int from = Math.min((safePage - 1) * safeLimit, total);
         int to = Math.min(from + safeLimit, total);
-        List<Map<String, Object>> pagedRows = studentRows.subList(from, to);
+        List<Map<String, Object>> pagedRows = new ArrayList<>(studentRows.subList(from, to));
 
         Map<String, Object> assessmentInfo = new LinkedHashMap<>();
         AssessmentDTO.CreatorInfoDTO creator = learningUserLookupService.getCreatorById(assessment.getCreatedBy());

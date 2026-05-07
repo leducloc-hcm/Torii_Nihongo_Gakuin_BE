@@ -24,6 +24,7 @@ import { PaymentModule } from "./routes/payment/payment.module";
 import { AIChatModule } from "./routes/ai-chat/ai-chat.module";
 import { CouponModule } from "./routes/coupon/coupon.module";
 import { DashboardModule } from "./routes/dashboard/dashboard.module";
+import { LecturerDashboardModule } from "./routes/dashboard/lecturer-dashboard/lecturer-dashboard.module";
 import { RedisModule } from "./shared/redis/redis.module";
 import { RabbitMQModule } from "./shared/rabbitmq/rabbitmq.module";
 import { ReviewModule } from "./routes/review/review.module";
@@ -33,6 +34,7 @@ import { MultiAgentModule } from "./routes/multi-agent/multi-agent.module";
 import { CertificateModule } from "./routes/certificate/certificate.module";
 import { ActivityLogModule } from "./routes/activity-log/activity-log.module";
 import { RefundModule } from "./routes/refund/refund.module";
+import { WorkersModule } from "./shared/workers/workers.module";
 
 @Module({
   imports: [
@@ -75,6 +77,7 @@ import { RefundModule } from "./routes/refund/refund.module";
     AIChatModule,
     CouponModule,
     DashboardModule,
+    LecturerDashboardModule,
     ReviewModule,
     AssessmentAIModule,
     BlogAIModule,
@@ -82,6 +85,7 @@ import { RefundModule } from "./routes/refund/refund.module";
     CertificateModule,
     ActivityLogModule,
     RefundModule,
+    WorkersModule,
   ],
   controllers: [AppController],
   providers: [AppService],

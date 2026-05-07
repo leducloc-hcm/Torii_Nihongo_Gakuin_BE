@@ -18,12 +18,14 @@ import {
   QueryType,
 } from "src/mcp-client/shared/query-detection.utils";
 import { routeAgentForQuery } from "src/mcp-client/shared/agent-routing.utils";
+import { ToolPlannerService } from "src/mcp-client/agent/tool-planner.service";
+import { AgentMemoryService } from "src/mcp-client/agent/agent-memory.service";
 
 @Injectable()
 export class AIChatService {
   private readonly logger = new Logger(AIChatService.name);
-  private readonly THREAD_CACHE_TTL = 120; // 10 minutes in seconds
-  private readonly MESSAGES_CACHE_TTL = 600; // 10 minutes in seconds
+  private readonly THREAD_CACHE_TTL = 3600; // 1 hour in seconds
+  private readonly MESSAGES_CACHE_TTL = 3600; // 1 hour in seconds
 
   constructor(
     private readonly agentService: AgentService,
@@ -32,6 +34,8 @@ export class AIChatService {
     private readonly queryRepo: AIQueryRepository,
     private readonly messageRepo: AIMessageRepository,
     private readonly redis: RedisContextService,
+    private readonly toolPlanner: ToolPlannerService,
+    private readonly agentMemory: AgentMemoryService,
   ) {
     this.agentService.loadTools().catch((err) => {
       this.logger.error("Failed to load MCP tools on startup:", err);
@@ -146,11 +150,81 @@ Do you have any questions about learning Japanese or our courses? 😊`;
 Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của chúng tôi không? 😊`;
   }
 
-  private isOffTopicQuery(query: string): boolean {
+  private getLanguageResponseInstruction(language: "vi" | "en" | "ja"): string {
+    if (language === "ja") {
+      return "CRITICAL LANGUAGE RULE: Respond ONLY in Japanese. Do not switch to English or Vietnamese unless the user explicitly asks.";
+    }
+    if (language === "en") {
+      return "CRITICAL LANGUAGE RULE: Respond ONLY in English. Do not switch to Vietnamese or Japanese unless the user explicitly asks.";
+    }
+    return "CRITICAL LANGUAGE RULE: Respond ONLY in Vietnamese. Do not switch to English or Japanese unless the user explicitly asks.";
+  }
+
+  private getFormattingErrorMessage(language: "vi" | "en" | "ja"): string {
+    if (language === "ja") {
+      return "申し訳ありません。情報は見つかりましたが、回答の整形中に問題が発生しました。もう一度同じ質問をしていただけますか？";
+    }
+    if (language === "en") {
+      return "Sorry, I found the information but had an issue formatting the response. Could you please ask the same question again?";
+    }
+    return "Xin lỗi, tôi đã tìm thấy thông tin nhưng gặp lỗi khi định dạng câu trả lời. Bạn có thể hỏi lại câu hỏi này không?";
+  }
+
+  private getNoDataFallbackByTool(
+    language: "vi" | "en" | "ja",
+    toolName: string,
+  ): string {
+    if (toolName.includes("enrollment") || toolName.includes("progress")) {
+      if (language === "ja") {
+        return "現在、あなたの受講登録または学習進捗の情報が見つかりません。まだコースに登録していないか、学習履歴がない可能性があります。";
+      }
+      if (language === "en") {
+        return "I couldn't find your enrollment or learning progress yet. You may not have enrolled in a course or have no progress data so far.";
+      }
+      return "Hiện tại tôi chưa tìm thấy thông tin enrollment hoặc progress của bạn. Có thể bạn chưa đăng ký khóa học nào hoặc chưa có tiến độ học tập.";
+    }
+
+    if (toolName.includes("course")) {
+      if (language === "ja") {
+        return "申し訳ありません。リクエストに合うコースが見つかりませんでした。別のキーワードで検索してみてください。";
+      }
+      if (language === "en") {
+        return "Sorry, I couldn't find a course matching your request. Could you try different keywords?";
+      }
+      return "Xin lỗi, tôi không tìm thấy khóa học phù hợp với yêu cầu của bạn. Bạn có thể thử tìm kiếm với từ khóa khác không?";
+    }
+
+    if (language === "ja") {
+      return "申し訳ありません。ご希望の情報が見つかりませんでした。別の言い方で質問してみてください。";
+    }
+    if (language === "en") {
+      return "Sorry, I couldn't find the information you requested. Could you try asking in a different way?";
+    }
+    return "Xin lỗi, tôi không tìm thấy thông tin bạn yêu cầu. Bạn có thể thử hỏi lại với cách khác không?";
+  }
+
+  private getCollaboratorInsightsTitle(language: "vi" | "en" | "ja"): string {
+    if (language === "ja") return "専門家による補足分析:";
+    if (language === "en") return "Additional Expert Insights:";
+    return "Phân tích bổ sung từ chuyên gia:";
+  }
+
+  private isOffTopicQuery(query: string, hasActiveGoal = false): boolean {
     const lower = query.toLowerCase().trim();
 
+    // If user has an active learning goal, allow short follow-up planning queries.
+    // Example: "Hôm nay tôi nên học gì tiếp theo?"
+    if (
+      hasActiveGoal &&
+      /(hôm nay|today|tiếp theo|next|what should i|nên làm gì|làm gì tiếp|kế hoạch|lộ trình|roadmap|study plan|ôn gì|học gì)/i.test(
+        lower,
+      )
+    ) {
+      return false;
+    }
+
     const japaneseContext =
-      /jlpt|n[1-5]|tiếng nhật|japanese|日本語|nihongo|kanji|漢字|hiragana|ひらがな|katakana|カタカナ|ngữ pháp|grammar|từ vựng|vocabulary|học|learn|勉強|khóa học|course|bài học|lesson|luyện thi|practice|flashcard/i;
+      /jlpt|n[1-5]|tiếng nhật|japanese|日本語|nihongo|kanji|漢字|hiragana|ひらがな|katakana|カタカナ|ngữ pháp|grammar|từ vựng|vocabulary|học|learn|勉強|khóa học|course|bài học|lesson|luyện thi|practice|flashcard|lộ trình|roadmap|study plan|kế hoạch học|mục tiêu|goal|ôn thi|ôn tập/i;
     if (japaneseContext.test(lower)) return false;
 
     if (
@@ -384,6 +458,7 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
   async handleQuery(userId: number, dto: SendQueryDto) {
     const queryStartTime = Date.now();
     const { threadId, query } = dto;
+    const responseLanguage = this.detectLanguage(query);
 
     this.logger.log(
       `[handleQuery] User ID: ${userId} | Thread ID: ${threadId}`,
@@ -410,14 +485,21 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
       }
     }
 
+    // ── Load persistent memory early ──────────────────────────────────────
+    // We load this before off-topic check so follow-up goal queries
+    // (e.g. "hôm nay nên học gì tiếp theo") are not rejected.
+    const [userContext, currentGoal] = await Promise.all([
+      this.agentMemory.getUserContext(userId).catch(() => null),
+      this.agentMemory.getGoal(userId).catch(() => null),
+    ]);
+
     // Check if query is off-topic (not related to Japanese learning)
-    const isOffTopic = this.isOffTopicQuery(query);
+    const isOffTopic = this.isOffTopicQuery(query, !!currentGoal);
     if (isOffTopic) {
       this.logger.warn(`🚫 Off-topic query detected: "${query}"`);
 
-      const detectedLanguage = this.detectLanguage(query);
-      const rejectionMessage = this.getRejectionMessage(detectedLanguage);
-      this.logger.log(`📢 Language detected: ${detectedLanguage}`);
+      const rejectionMessage = this.getRejectionMessage(responseLanguage);
+      this.logger.log(`📢 Language detected: ${responseLanguage}`);
 
       const queryRecord = await this.queryRepo.create({
         threadId,
@@ -449,7 +531,9 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
       ]);
 
       await Promise.all([
-        this.queryRepo.update(queryRecord.id, { status: QueryStatus.COMPLETED }),
+        this.queryRepo.update(queryRecord.id, {
+          status: QueryStatus.COMPLETED,
+        }),
         this.invalidateThreadCache(threadId, userId),
       ]);
 
@@ -461,14 +545,22 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
       };
     }
 
-    const queryType = detectQueryType(query);
-    const needsMultipleTools = requiresMultipleTools(query);
-    const suggestedTools = needsMultipleTools
-      ? suggestToolCombination(query)
-      : [];
-    const routingDecision = routeAgentForQuery(queryType, query);
-    const agentRole = routingDecision.primaryRole;
-    const routingReason = routingDecision.reason;
+    // ── AI-Powered Planning ───────────────────────────────────────────────
+    // 🧠 Thay vì dùng keyword matching để detect query type & agent role,
+    // ta dùng Claude để reasoning về intent của user và chọn tool phù hợp.
+    // Nếu Claude call thất bại → tự động fallback về keyword routing.
+    const availableTools = this.agentService.getAvailableTools();
+    const plan = await this.toolPlanner.plan(query, availableTools, {
+      userContext,
+      currentGoal,
+    });
+
+    const queryType = plan.queryType;
+    const agentRole = plan.primaryRole;
+    const routingReason = plan.reasoning;
+    const suggestedTools = plan.suggestedTools;
+    const needsMultipleTools =
+      plan.suggestedTools.length > 1 || requiresMultipleTools(query);
 
     // Detect flashcard generation request
     const isFlashcardGeneration =
@@ -477,23 +569,50 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
         query.toLowerCase().includes("create") ||
         query.toLowerCase().includes("generate"));
 
-    this.logger.log(`Query type detected: ${queryType}`);
-    this.logger.log(`Agent role routed: ${agentRole}`);
-    if (routingDecision.collaboratorRoles.length > 0) {
+    this.logger.log(
+      `🧠 [${plan.isAIPlanned ? "AI Plan" : "Keyword Fallback"}] type=${queryType}, role=${agentRole}`,
+    );
+    if (plan.collaboratorRoles.length > 0) {
       this.logger.log(
-        `Collaborator roles: ${routingDecision.collaboratorRoles.join(", ")}`,
+        `Collaborator roles: ${plan.collaboratorRoles.join(", ")}`,
       );
     }
     this.logger.debug(`Routing reason: ${routingReason}`);
     this.logger.log(`Is flashcard generation: ${isFlashcardGeneration}`);
-    if (needsMultipleTools) {
-      this.logger.log(
-        `Multi-tool query detected. Suggested tools: [${suggestedTools.join(", ")}]`,
-      );
+    if (suggestedTools.length > 0) {
+      this.logger.log(`Suggested tools: [${suggestedTools.join(", ")}]`);
+    }
+
+    // ── Handle goal-setting intent ─────────────────────────────────────────
+    // If user is setting a learning goal → save to Redis immediately (fire-and-forget)
+    if (plan.isGoalSetting) {
+      const goalIntent = this.agentMemory.detectGoalIntent(query);
+      const roadmapGen: Promise<any[]> = goalIntent.targetLevel
+        ? this.toolPlanner
+            .generateRoadmap(
+              goalIntent.targetLevel,
+              userContext?.jlptLevel ?? undefined,
+            )
+            .catch(() => [])
+        : Promise.resolve([]);
+      roadmapGen
+        .then((roadmapSteps) => {
+          this.agentMemory
+            .saveGoal(userId, {
+              title: goalIntent.targetLevel
+                ? `Mục tiêu đạt ${goalIntent.targetLevel}`
+                : "Lộ trình học tiếng Nhật",
+              targetLevel: goalIntent.targetLevel,
+              rawStatement: query,
+              roadmapSteps,
+            })
+            .catch(() => {});
+        })
+        .catch(() => {});
     }
 
     const detectionTime = Date.now() - queryStartTime;
-    this.logger.log(`⏱️  [+${detectionTime}ms] Query type detected`);
+    this.logger.log(`⏱️  [+${detectionTime}ms] Planning completed`);
 
     // Build chat messages with language detection and multi-tool hint
     let systemPrompt = this.promptService.getSystemPrompt(
@@ -506,10 +625,24 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
       `[System Prompt] Generated for userId: ${userId}, queryType: ${queryType}`,
     );
 
-    // Add multi-tool hint if needed
-    if (needsMultipleTools) {
+    // Force response language to follow the user's query language (vi/en/ja).
+    systemPrompt = `${systemPrompt}\n\n${this.getLanguageResponseInstruction(responseLanguage)}`;
+
+    // Inject suggested tools hint if planner identified specific tools
+    if (suggestedTools.length > 0) {
+      systemPrompt = `${systemPrompt}\n\nSuggested tools to use for this query: ${suggestedTools.join(", ")}`;
+    } else if (needsMultipleTools) {
       const multiToolHint = generateMultiToolHint(query);
       systemPrompt = `${systemPrompt}\n\n${multiToolHint}`;
+    }
+
+    // ── Inject persistent memory context ─────────────────────────────────
+    const contextBlock = this.agentMemory.buildContextSystemBlock(
+      userContext,
+      currentGoal,
+    );
+    if (contextBlock) {
+      systemPrompt = `${systemPrompt}\n${contextBlock}`;
     }
 
     const messages: ClaudeMessageParam[] = [
@@ -517,8 +650,8 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
       { role: "system", content: systemPrompt } as any,
     ];
 
-    // Add recent thread messages for context (last 10)
-    const recentMessages = thread.messages.slice(-10);
+    // Add recent thread messages for context (last 30 — extended for better continuity)
+    const recentMessages = thread.messages.slice(-30);
     for (const msg of recentMessages) {
       if (msg.role === ChatRole.USER || msg.role === ChatRole.ASSISTANT) {
         // Strip embedded JSON code blocks from assistant messages so the AI
@@ -544,7 +677,7 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
 
     // Determine if we should FORCE tool calling
     // Force tools for queries that MUST fetch data (user-specific data)
-    const shouldForceTools = routingDecision.forceTools;
+    const shouldForceTools = plan.forceTools;
 
     if (shouldForceTools) {
       this.logger.log(`🎯 FORCING tool calls for queryType: ${queryType}`);
@@ -558,7 +691,7 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
       shouldForceTools,
       query,
       agentRole,
-      routingDecision.collaboratorRoles,
+      plan.collaboratorRoles,
       queryType,
     );
     const aiCallTime = Date.now() - aiCallStartTime;
@@ -634,7 +767,9 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
               content: agentResponse.content,
             })
           : Promise.resolve(),
-        this.queryRepo.update(queryRecord.id, { status: QueryStatus.COMPLETED }),
+        this.queryRepo.update(queryRecord.id, {
+          status: QueryStatus.COMPLETED,
+        }),
       ]);
 
       // Ensure thread/messages cache is refreshed for immediate UI reads.
@@ -762,24 +897,113 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
       );
 
       if (hasData) {
-        finalResponse =
-          "Xin lỗi, tôi đã tìm thấy thông tin nhưng gặp lỗi khi định dạng câu trả lời. Bạn có thể hỏi lại câu hỏi này không?";
+        finalResponse = this.getFormattingErrorMessage(responseLanguage);
       } else {
         const toolName = executeResult.results[0]?.toolName || "tool";
-        if (toolName.includes("enrollment") || toolName.includes("progress")) {
-          finalResponse =
-            "Hiện tại tôi chưa tìm thấy thông tin enrollment hoặc progress của bạn. Có thể bạn chưa đăng ký khóa học nào hoặc chưa có tiến độ học tập.";
-        } else if (toolName.includes("course")) {
-          finalResponse =
-            "Xin lỗi, tôi không tìm thấy khóa học phù hợp với yêu cầu của bạn. Bạn có thể thử tìm kiếm với từ khóa khác không?";
-        } else {
-          finalResponse =
-            "Xin lỗi, tôi không tìm thấy thông tin bạn yêu cầu. Bạn có thể thử hỏi lại với cách khác không?";
-        }
+        finalResponse = this.getNoDataFallbackByTool(
+          responseLanguage,
+          toolName,
+        );
       }
     }
 
     this.logger.debug(`Saving assistant message to database...`);
+
+    // ── Multi-agent collaborator insights ──────────────────────────────────
+    // After the primary agent finishes, each collaborator role adds a brief
+    // specialist perspective (max 2 sentences) based ONLY on the already-fetched
+    // tool results — no extra DB/MCP calls, no fabricated data.
+    if (
+      plan.collaboratorRoles.length > 0 &&
+      finalResponse &&
+      executeResult.results.length > 0
+    ) {
+      const insights = await Promise.all(
+        plan.collaboratorRoles.map((role) =>
+          this.agentService
+            .getCollaboratorInsight(
+              query,
+              finalResponse!,
+              executeResult.results.map((r) => ({
+                toolCallId: r.toolCallId,
+                toolName: r.toolName,
+                result: r.result,
+                error: r.error,
+                executedAt: new Date(),
+              })),
+              role,
+            )
+            .catch(() => undefined),
+        ),
+      );
+      const validLines = plan.collaboratorRoles
+        .map((role, i) => (insights[i] ? `• [${role}] ${insights[i]}` : null))
+        .filter(Boolean);
+      if (validLines.length > 0) {
+        finalResponse = `${finalResponse}\n\n---\n**${this.getCollaboratorInsightsTitle(responseLanguage)}**\n${validLines.join("\n")}`;
+        this.logger.log(
+          `🤝 [Multi-Agent] Appended ${validLines.length} collaborator insight(s)`,
+        );
+      }
+    }
+
+    // ── Update persistent user context (fire-and-forget) ──────────────────
+    // Detect JLPT level from query/response to gradually build user profile.
+    const detectedLevel =
+      this.agentMemory.extractLevelFromText(query) ??
+      this.agentMemory.extractLevelFromText(finalResponse ?? "");
+    this.agentMemory
+      .upsertUserContext(userId, {
+        totalSessions: 1,
+        ...(detectedLevel ? { jlptLevel: detectedLevel } : {}),
+      })
+      .catch(() => {});
+
+    // ── Auto-advance roadmap step (fire-and-forget) ────────────────────────
+    // Khi agent thực sự dùng tool thành công → tự động mark bước roadmap
+    // phù hợp sang DONE để goal tracker phản ánh hoạt động học thật của user.
+    if (currentGoal?.roadmapSteps?.length && executeResult.results.length > 0) {
+      const usedStepTypes = new Set<string>();
+      for (const r of executeResult.results) {
+        if (r.error) continue;
+        const n = r.toolName.toLowerCase();
+        if (n.includes("grammar") || n.includes("explain"))
+          usedStepTypes.add("GRAMMAR");
+        if (n.includes("vocab") || n.includes("kanji"))
+          usedStepTypes.add("VOCABULARY");
+        if (n.includes("flashcard") || n.includes("deck"))
+          usedStepTypes.add("FLASHCARD");
+        if (
+          n.includes("assessment") ||
+          n.includes("quiz") ||
+          n.includes("test")
+        )
+          usedStepTypes.add("ASSESSMENT");
+        if (n.includes("course") || n.includes("lesson"))
+          usedStepTypes.add("COURSE");
+        if (
+          n.includes("blog") ||
+          n.includes("reading") ||
+          n.includes("article")
+        )
+          usedStepTypes.add("READING");
+        if (n.includes("listen")) usedStepTypes.add("LISTENING");
+        if (n.includes("enrollment") || n.includes("progress"))
+          usedStepTypes.add("COURSE");
+      }
+      const matchingStep = currentGoal.roadmapSteps.find(
+        (s) => s.status === "PENDING" && usedStepTypes.has(s.stepType),
+      );
+      if (matchingStep) {
+        this.agentMemory
+          .markRoadmapStepDone(userId, matchingStep.order)
+          .catch(() => {});
+        this.logger.log(
+          `📈 [Goal] Advanced step ${matchingStep.order} [${matchingStep.stepType}]: "${matchingStep.description}"`,
+        );
+      }
+    }
+
     await this.messageRepo.create({
       threadId,
       userId,
