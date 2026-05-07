@@ -1013,7 +1013,7 @@ export class CourseService {
       lecturers: lecturerArray,
     };
   }
-  async publish(id: number): Promise<CourseWithRelations> {
+  async publish(id: number, userId: number): Promise<CourseWithRelations> {
     // Check if course exists
     const existingCourse = await this.findOne(id);
 
@@ -1056,6 +1056,7 @@ export class CourseService {
     }
 
     this.activityLogService.log({
+      userId: userId,
       action: "COURSE_PUBLISHED",
       entity: "COURSE",
       entityId: id,

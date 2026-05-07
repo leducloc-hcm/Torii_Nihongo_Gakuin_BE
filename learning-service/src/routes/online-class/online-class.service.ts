@@ -1289,6 +1289,8 @@ export class OnlineClassService {
           sessions: {
             orderBy: { scheduledAt: "asc" },
           },
+          startDate: true,
+          endDate: true,
           _count: {
             select: {
               sessions: true,

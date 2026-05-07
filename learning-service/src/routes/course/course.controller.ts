@@ -244,8 +244,8 @@ export class CourseController {
   @Auth([AuthType.Bearer])
   @Roles(RoleName.Admin)
   @HttpCode(HttpStatus.OK)
-  async publish(@Param("id", ParseIntPipe) id: number) {
-    return this.courseService.publish(id);
+  async publish(@Param("id", ParseIntPipe) id: number, @ActiveUser("userId") userId: number) {
+    return this.courseService.publish(id, userId);
   }
   @Put("admin/status/:id")
   @Auth([AuthType.Bearer])
