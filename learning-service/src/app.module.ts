@@ -24,6 +24,7 @@ import { PaymentModule } from "./routes/payment/payment.module";
 import { AIChatModule } from "./routes/ai-chat/ai-chat.module";
 import { CouponModule } from "./routes/coupon/coupon.module";
 import { DashboardModule } from "./routes/dashboard/dashboard.module";
+import { LecturerDashboardModule } from "./routes/dashboard/lecturer-dashboard/lecturer-dashboard.module";
 import { RedisModule } from "./shared/redis/redis.module";
 import { RabbitMQModule } from "./shared/rabbitmq/rabbitmq.module";
 import { ReviewModule } from "./routes/review/review.module";
@@ -76,6 +77,7 @@ import { WorkersModule } from "./shared/workers/workers.module";
     AIChatModule,
     CouponModule,
     DashboardModule,
+    LecturerDashboardModule,
     ReviewModule,
     AssessmentAIModule,
     BlogAIModule,
