@@ -384,13 +384,29 @@ export class CourseService {
       await this.lecturerRepository.findLectureProfileByUserIds(
         courses.map((course) => course.lecturerIds).flat(),
       );
+
+    const data = await Promise.all(
+      courses.map(async (course) => {
+        const responseCourse: any = {
+          ...course,
+          lecturers: this.attachLecturerPublicProfilePaths(
+            lecturerArray.filter((lecturer) =>
+              course.lecturerIds.includes(lecturer.userId),
+            ),
+          ),
+        };
+
+        if (course.courseType === "LIVE_ONLY") {
+          responseCourse.classes =
+            await this.onlineClassRepository.findByCourseId(course.id);
+        }
+
+        return responseCourse;
+      }),
+    );
+
     return {
-      data: courses.map((course) => ({
-        ...course,
-        lecturers: lecturerArray.filter((lecturer) =>
-          course.lecturerIds.includes(lecturer.userId),
-        ),
-      })),
+      data,
       meta: {
         page,
         limit: Number(limit),
