@@ -403,6 +403,27 @@ export class AgentService {
     const toolCallsTime = Date.now() - toolCallsStartTime;
     //this.logger.log(`⏱️  Tool calls completed in ${toolCallsTime}ms`)
 
+    // ── Guard: all tool calls failed → return graceful message immediately
+    // Do NOT pass error results to Claude — it will hallucinate platform data.
+    const allToolsFailed =
+      results.length > 0 && results.every((r) => !!r.error);
+    if (allToolsFailed) {
+      this.logger.warn(
+        `⚠️ All ${results.length} tool call(s) failed. Returning no-data message to prevent hallucination.`,
+      );
+      const failedToolName = results[0]?.toolName ?? "unknown";
+      const lang = request.userId ? "vi" : "vi";
+      const noDataMsg =
+        lang === "vi"
+          ? `Xin lỗi, hệ thống hiện không thể lấy dữ liệu từ tool "${failedToolName}". Vui lòng thử lại sau hoặc liên hệ hỗ trợ nếu sự cố tiếp tục.`
+          : `Sorry, the system could not fetch data from the "${failedToolName}" tool right now. Please try again later.`;
+      return {
+        results,
+        finalResponse: noDataMsg,
+        hasMoreTools: false,
+      };
+    }
+
     const fastResponse = tryBuildFastStructuredResponse(
       request.queryType,
       results,
@@ -420,11 +441,30 @@ export class AgentService {
     }
 
     const toolResultContents: Anthropic.Messages.ToolResultBlockParam[] =
-      results.map((result) => ({
-        type: "tool_result" as const,
-        tool_use_id: result.toolCallId,
-        content: result.error || JSON.stringify(result.result),
-      }));
+      results.map((result) => {
+        let content: string;
+        if (result.error) {
+          // Explicitly label errors so Claude knows it MUST NOT fabricate data
+          content = `TOOL_ERROR: ${result.error}. The tool failed to return data. DO NOT invent or fabricate any platform-specific data (courses, prices, assessments, etc.). Tell the user the data is temporarily unavailable.`;
+        } else if (
+          result.result === null ||
+          result.result === undefined ||
+          (typeof result.result === "object" &&
+            !Array.isArray(result.result) &&
+            Object.keys(result.result as object).length === 0) ||
+          (Array.isArray(result.result) && result.result.length === 0)
+        ) {
+          // Empty/null results — also guard against hallucination
+          content = `TOOL_EMPTY: The tool returned no data (null or empty). DO NOT invent or fabricate any platform-specific data. Tell the user no data was found.`;
+        } else {
+          content = JSON.stringify(result.result);
+        }
+        return {
+          type: "tool_result" as const,
+          tool_use_id: result.toolCallId,
+          content,
+        };
+      });
 
     const assistantToolUseContent: Anthropic.Messages.ContentBlockParam[] =
       request.toolCalls.map((tc) => ({
@@ -622,11 +662,28 @@ export class AgentService {
 
         cleanMessages.push({
           role: "user",
-          content: additionalToolResults.map((r) => ({
-            type: "tool_result" as const,
-            tool_use_id: r.toolCallId,
-            content: r.error || JSON.stringify(r.result),
-          })),
+          content: additionalToolResults.map((r) => {
+            let content: string;
+            if (r.error) {
+              content = `TOOL_ERROR: ${r.error}. The tool failed to return data. DO NOT invent or fabricate any platform-specific data. Tell the user the data is temporarily unavailable.`;
+            } else if (
+              r.result === null ||
+              r.result === undefined ||
+              (typeof r.result === "object" &&
+                !Array.isArray(r.result) &&
+                Object.keys(r.result as object).length === 0) ||
+              (Array.isArray(r.result) && r.result.length === 0)
+            ) {
+              content = `TOOL_EMPTY: The tool returned no data (null or empty). DO NOT invent or fabricate any platform-specific data. Tell the user no data was found.`;
+            } else {
+              content = JSON.stringify(r.result);
+            }
+            return {
+              type: "tool_result" as const,
+              tool_use_id: r.toolCallId,
+              content,
+            };
+          }),
         } as ClaudeMessageParam);
 
         reactIteration++;
