@@ -8,6 +8,7 @@ import CalendarInviteEmail from "emails/calendarInvite";
 import CourseCertificateEmail from "emails/courseCertificate";
 import RefundRejectedEmail from "emails/refundRejected";
 import RefundApprovedEmail from "emails/refundApproved";
+import GiftCouponEmail from "emails/giftCoupon";
 
 @Injectable()
 export class EmailService {
@@ -206,6 +207,31 @@ export class EmailService {
           rejectionEvidence={payload.rejectionEvidence}
           progressPercent={payload.progressPercent}
           refundId={payload.refundId}
+        />
+      ),
+    });
+  }
+
+  async sendGiftCoupon(payload: {
+    recipientEmail: string;
+    recipientName: string;
+    senderName: string;
+    giftCode: string;
+    courses: string[];
+    giftMessage?: string;
+  }) {
+    const subject = `🎁 You have received a gift course!`;
+    return await this.resend.emails.send({
+      from: process.env.RESEND_FROM_ADDRESS!,
+      to: [payload.recipientEmail],
+      subject,
+      react: (
+        <GiftCouponEmail
+          recipientName={payload.recipientName}
+          senderName={payload.senderName}
+          giftCode={payload.giftCode}
+          courses={payload.courses}
+          giftMessage={payload.giftMessage}
         />
       ),
     });
