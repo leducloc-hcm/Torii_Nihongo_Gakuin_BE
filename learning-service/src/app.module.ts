@@ -33,6 +33,7 @@ import { MultiAgentModule } from "./routes/multi-agent/multi-agent.module";
 import { CertificateModule } from "./routes/certificate/certificate.module";
 import { ActivityLogModule } from "./routes/activity-log/activity-log.module";
 import { RefundModule } from "./routes/refund/refund.module";
+import { WorkersModule } from "./shared/workers/workers.module";
 
 @Module({
   imports: [
@@ -82,6 +83,7 @@ import { RefundModule } from "./routes/refund/refund.module";
     CertificateModule,
     ActivityLogModule,
     RefundModule,
+    WorkersModule,
   ],
   controllers: [AppController],
   providers: [AppService],
