@@ -1364,4 +1364,114 @@ export class OnlineClassService {
       );
     }
   }
+
+  async getMembersAttendance(classId: number, requestingUserId: number) {
+    try {
+      // Verify the requesting user is the class lecturer or a substitute
+      const onlineClass = await this.prisma.class.findUnique({
+        where: { id: classId },
+        select: { lecturerId: true },
+      });
+
+      if (!onlineClass) {
+        throw new NotFoundException("Class not found");
+      }
+
+      const isLecturer = onlineClass.lecturerId === requestingUserId;
+      if (!isLecturer) {
+        // Allow substitute lecturers
+        const isSubstitute = await this.prisma.liveSession.findFirst({
+          where: { classId, substituteLecturerId: requestingUserId },
+        });
+        if (!isSubstitute) {
+          throw new ForbiddenException(
+            "Only the class lecturer or substitute can view attendance",
+          );
+        }
+      }
+
+      // Get all sessions for this class (ordered by scheduled time)
+      const sessions = await this.prisma.liveSession.findMany({
+        where: { classId },
+        select: {
+          id: true,
+          title: true,
+          scheduledAt: true,
+          endedAt: true,
+        },
+        orderBy: { scheduledAt: "asc" },
+      });
+
+      const totalSessions = sessions.length;
+
+      // Get all members with their attendance records
+      const members = await this.prisma.classMember.findMany({
+        where: { classId },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              customerProfile: {
+                select: { avatar: true },
+              },
+            },
+          },
+        },
+      });
+
+      // For each member, get their attendance per session
+      const result = await Promise.all(
+        members.map(async (member) => {
+          const attendanceRecords = await this.prisma.attendance.findMany({
+            where: {
+              userId: member.userId,
+              session: { classId },
+            },
+            select: {
+              sessionId: true,
+              joinedAt: true,
+              leftAt: true,
+            },
+          });
+
+          const attendanceMap = new Map(
+            attendanceRecords.map((a) => [a.sessionId, a]),
+          );
+
+          const sessionDetails = sessions.map((s) => {
+            const record = attendanceMap.get(s.id);
+            return {
+              sessionId: s.id,
+              title: s.title,
+              scheduledAt: s.scheduledAt,
+              endedAt: s.endedAt,
+              attended: !!record,
+              joinedAt: record?.joinedAt ?? null,
+              leftAt: record?.leftAt ?? null,
+            };
+          });
+
+          return {
+            userId: member.userId,
+            name: member.user.name,
+            email: member.user.email,
+            avatar: member.user.customerProfile?.avatar ?? null,
+            attendedCount: attendanceRecords.length,
+            totalSessions,
+            sessions: sessionDetails,
+          };
+        }),
+      );
+
+      return result;
+    } catch (error) {
+      this.logger.error("Failed to get members attendance:", error);
+      throw error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+        ? error
+        : new BadRequestException("Failed to retrieve members attendance");
+    }
+  }
 }

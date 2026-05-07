@@ -253,4 +253,40 @@ export class OnlineClassController {
       );
     }
   }
+
+  @Get(":classId/members/attendance")
+  @Auth([AuthType.Bearer])
+  @Roles(RoleName.Lecturer, RoleName.Staff)
+  @ApiOperation({ summary: "Get attendance summary for all members of a class" })
+  @ApiResponse({
+    status: 200,
+    description: "Members attendance retrieved successfully",
+  })
+  async getMembersAttendance(
+    @Param("classId") classId: string,
+    @ActiveUser("userId") userId: number,
+  ) {
+    try {
+      const data = await this.onlineClassService.getMembersAttendance(
+        parseInt(classId),
+        userId,
+      );
+      return {
+        success: true,
+        message: "Members attendance retrieved successfully",
+        data,
+      };
+    } catch (error) {
+      throw new HttpException(
+        {
+          success: false,
+          message:
+            error instanceof Error
+              ? error.message
+              : "Failed to retrieve members attendance",
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
 }
