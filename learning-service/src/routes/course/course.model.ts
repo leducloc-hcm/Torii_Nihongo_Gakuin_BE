@@ -28,7 +28,7 @@ export const CourseSchema = z.object({
   thumbnailUrl: z.string().url("Invalid thumbnail URL").nullable().optional(),
   price: z.number().int().min(0, "Price must be non-negative").default(0),
   status: z
-    .enum(["DRAFT", "PENDING_REVIEW", "PUBLISHED", "ARCHIVED"])
+    .enum(["DRAFT", "PENDING_REVIEW", "PUBLISHED", "ARCHIVED", "REJECTED"])
     .default("DRAFT"),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
@@ -70,7 +70,7 @@ export const UpdateCourseStatusSchemaForAdmin = CourseSchema.omit({
 })
   .partial()
   .extend({
-    status: z.enum(["DRAFT", "PENDING_REVIEW", "PUBLISHED", "ARCHIVED"]),
+    status: z.enum(["DRAFT", "PENDING_REVIEW", "PUBLISHED", "ARCHIVED","REJECTED"]),
   });
 
 // Query Course Schema
@@ -200,7 +200,7 @@ export type CourseUpdateInput = {
   courseType?: "VIDEO_QUIZ" | "VIDEO_QUIZ_LIVE" | "LIVE_ONLY";
   thumbnailUrl?: string | null;
   price?: number;
-  status?: "DRAFT" | "PENDING_REVIEW" | "PUBLISHED" | "ARCHIVED";
+  status?: "DRAFT" | "PENDING_REVIEW" | "PUBLISHED" | "ARCHIVED" | "REJECTED";
   lecturer?:
     | {
         connect: {
