@@ -42,6 +42,19 @@ import {
   shouldInjectUserId,
 } from "src/mcp-client/agent/tool-resolution.util";
 
+/**
+ * Strip leftover XML-style function_call blocks that older Anthropic models
+ * sometimes emit inside text content, e.g.:
+ *   <function_calls><invoke name="...">...</invoke></function_calls>
+ * These must never reach the frontend — they break the UI renderer.
+ */
+function stripFunctionCallXml(text: string): string {
+  return text
+    .replace(/<function_calls>[\s\S]*?<\/function_calls>/g, "")
+    .replace(/<invoke\b[\s\S]*?<\/invoke>/g, "")
+    .trim();
+}
+
 @Injectable()
 export class AgentService {
   private readonly logger = new Logger(AgentService.name);
@@ -425,6 +438,19 @@ export class AgentService {
       (m) => (m as any).role !== "system",
     );
 
+    // The last entry pushed by ai-chat.service.ts is an assistant message containing
+    // pre-tool "thinking" text (e.g. "I'll search for...") with OpenAI-style tool_calls.
+    // We drop it here because we're about to add the proper Anthropic-format tool_use
+    // assistant message below. Keeping both creates two consecutive assistant turns,
+    // which causes Claude to re-echo the preamble inside its final response.
+    if (
+      existingMessages.length > 0 &&
+      (existingMessages[existingMessages.length - 1] as any).role ===
+        "assistant"
+    ) {
+      existingMessages.pop();
+    }
+
     const messages: ClaudeMessageParam[] = [
       ...existingMessages,
       {
@@ -552,7 +578,9 @@ export class AgentService {
           loopResponse.stop_reason === "end_turn" ||
           toolUseBlocks.length === 0
         ) {
-          const finalText = textBlocks.map((b) => b.text).join("");
+          const finalText = stripFunctionCallXml(
+            textBlocks.map((b) => b.text).join(""),
+          );
           return {
             results,
             finalResponse: finalText || undefined,
@@ -631,10 +659,12 @@ export class AgentService {
         max_tokens: CLAUDE_CONFIG.maxTokens,
       });
 
-      const finalText = forcedResponse.content
-        .filter((b): b is Anthropic.Messages.TextBlock => b.type === "text")
-        .map((b) => b.text)
-        .join("");
+      const finalText = stripFunctionCallXml(
+        forcedResponse.content
+          .filter((b): b is Anthropic.Messages.TextBlock => b.type === "text")
+          .map((b) => b.text)
+          .join(""),
+      );
 
       return {
         results,

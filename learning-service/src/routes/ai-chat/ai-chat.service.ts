@@ -150,11 +150,81 @@ Do you have any questions about learning Japanese or our courses? 😊`;
 Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của chúng tôi không? 😊`;
   }
 
-  private isOffTopicQuery(query: string): boolean {
+  private getLanguageResponseInstruction(language: "vi" | "en" | "ja"): string {
+    if (language === "ja") {
+      return "CRITICAL LANGUAGE RULE: Respond ONLY in Japanese. Do not switch to English or Vietnamese unless the user explicitly asks.";
+    }
+    if (language === "en") {
+      return "CRITICAL LANGUAGE RULE: Respond ONLY in English. Do not switch to Vietnamese or Japanese unless the user explicitly asks.";
+    }
+    return "CRITICAL LANGUAGE RULE: Respond ONLY in Vietnamese. Do not switch to English or Japanese unless the user explicitly asks.";
+  }
+
+  private getFormattingErrorMessage(language: "vi" | "en" | "ja"): string {
+    if (language === "ja") {
+      return "申し訳ありません。情報は見つかりましたが、回答の整形中に問題が発生しました。もう一度同じ質問をしていただけますか？";
+    }
+    if (language === "en") {
+      return "Sorry, I found the information but had an issue formatting the response. Could you please ask the same question again?";
+    }
+    return "Xin lỗi, tôi đã tìm thấy thông tin nhưng gặp lỗi khi định dạng câu trả lời. Bạn có thể hỏi lại câu hỏi này không?";
+  }
+
+  private getNoDataFallbackByTool(
+    language: "vi" | "en" | "ja",
+    toolName: string,
+  ): string {
+    if (toolName.includes("enrollment") || toolName.includes("progress")) {
+      if (language === "ja") {
+        return "現在、あなたの受講登録または学習進捗の情報が見つかりません。まだコースに登録していないか、学習履歴がない可能性があります。";
+      }
+      if (language === "en") {
+        return "I couldn't find your enrollment or learning progress yet. You may not have enrolled in a course or have no progress data so far.";
+      }
+      return "Hiện tại tôi chưa tìm thấy thông tin enrollment hoặc progress của bạn. Có thể bạn chưa đăng ký khóa học nào hoặc chưa có tiến độ học tập.";
+    }
+
+    if (toolName.includes("course")) {
+      if (language === "ja") {
+        return "申し訳ありません。リクエストに合うコースが見つかりませんでした。別のキーワードで検索してみてください。";
+      }
+      if (language === "en") {
+        return "Sorry, I couldn't find a course matching your request. Could you try different keywords?";
+      }
+      return "Xin lỗi, tôi không tìm thấy khóa học phù hợp với yêu cầu của bạn. Bạn có thể thử tìm kiếm với từ khóa khác không?";
+    }
+
+    if (language === "ja") {
+      return "申し訳ありません。ご希望の情報が見つかりませんでした。別の言い方で質問してみてください。";
+    }
+    if (language === "en") {
+      return "Sorry, I couldn't find the information you requested. Could you try asking in a different way?";
+    }
+    return "Xin lỗi, tôi không tìm thấy thông tin bạn yêu cầu. Bạn có thể thử hỏi lại với cách khác không?";
+  }
+
+  private getCollaboratorInsightsTitle(language: "vi" | "en" | "ja"): string {
+    if (language === "ja") return "専門家による補足分析:";
+    if (language === "en") return "Additional Expert Insights:";
+    return "Phân tích bổ sung từ chuyên gia:";
+  }
+
+  private isOffTopicQuery(query: string, hasActiveGoal = false): boolean {
     const lower = query.toLowerCase().trim();
 
+    // If user has an active learning goal, allow short follow-up planning queries.
+    // Example: "Hôm nay tôi nên học gì tiếp theo?"
+    if (
+      hasActiveGoal &&
+      /(hôm nay|today|tiếp theo|next|what should i|nên làm gì|làm gì tiếp|kế hoạch|lộ trình|roadmap|study plan|ôn gì|học gì)/i.test(
+        lower,
+      )
+    ) {
+      return false;
+    }
+
     const japaneseContext =
-      /jlpt|n[1-5]|tiếng nhật|japanese|日本語|nihongo|kanji|漢字|hiragana|ひらがな|katakana|カタカナ|ngữ pháp|grammar|từ vựng|vocabulary|học|learn|勉強|khóa học|course|bài học|lesson|luyện thi|practice|flashcard/i;
+      /jlpt|n[1-5]|tiếng nhật|japanese|日本語|nihongo|kanji|漢字|hiragana|ひらがな|katakana|カタカナ|ngữ pháp|grammar|từ vựng|vocabulary|học|learn|勉強|khóa học|course|bài học|lesson|luyện thi|practice|flashcard|lộ trình|roadmap|study plan|kế hoạch học|mục tiêu|goal|ôn thi|ôn tập/i;
     if (japaneseContext.test(lower)) return false;
 
     if (
@@ -388,6 +458,7 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
   async handleQuery(userId: number, dto: SendQueryDto) {
     const queryStartTime = Date.now();
     const { threadId, query } = dto;
+    const responseLanguage = this.detectLanguage(query);
 
     this.logger.log(
       `[handleQuery] User ID: ${userId} | Thread ID: ${threadId}`,
@@ -414,14 +485,21 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
       }
     }
 
+    // ── Load persistent memory early ──────────────────────────────────────
+    // We load this before off-topic check so follow-up goal queries
+    // (e.g. "hôm nay nên học gì tiếp theo") are not rejected.
+    const [userContext, currentGoal] = await Promise.all([
+      this.agentMemory.getUserContext(userId).catch(() => null),
+      this.agentMemory.getGoal(userId).catch(() => null),
+    ]);
+
     // Check if query is off-topic (not related to Japanese learning)
-    const isOffTopic = this.isOffTopicQuery(query);
+    const isOffTopic = this.isOffTopicQuery(query, !!currentGoal);
     if (isOffTopic) {
       this.logger.warn(`🚫 Off-topic query detected: "${query}"`);
 
-      const detectedLanguage = this.detectLanguage(query);
-      const rejectionMessage = this.getRejectionMessage(detectedLanguage);
-      this.logger.log(`📢 Language detected: ${detectedLanguage}`);
+      const rejectionMessage = this.getRejectionMessage(responseLanguage);
+      this.logger.log(`📢 Language detected: ${responseLanguage}`);
 
       const queryRecord = await this.queryRepo.create({
         threadId,
@@ -466,13 +544,6 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
         toolCalls: [],
       };
     }
-
-    // ── Load persistent memory ────────────────────────────────────────────
-    // Retrieve user context + active goal from Redis (fire in parallel)
-    const [userContext, currentGoal] = await Promise.all([
-      this.agentMemory.getUserContext(userId).catch(() => null),
-      this.agentMemory.getGoal(userId).catch(() => null),
-    ]);
 
     // ── AI-Powered Planning ───────────────────────────────────────────────
     // 🧠 Thay vì dùng keyword matching để detect query type & agent role,
@@ -553,6 +624,9 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
     this.logger.debug(
       `[System Prompt] Generated for userId: ${userId}, queryType: ${queryType}`,
     );
+
+    // Force response language to follow the user's query language (vi/en/ja).
+    systemPrompt = `${systemPrompt}\n\n${this.getLanguageResponseInstruction(responseLanguage)}`;
 
     // Inject suggested tools hint if planner identified specific tools
     if (suggestedTools.length > 0) {
@@ -823,20 +897,13 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
       );
 
       if (hasData) {
-        finalResponse =
-          "Xin lỗi, tôi đã tìm thấy thông tin nhưng gặp lỗi khi định dạng câu trả lời. Bạn có thể hỏi lại câu hỏi này không?";
+        finalResponse = this.getFormattingErrorMessage(responseLanguage);
       } else {
         const toolName = executeResult.results[0]?.toolName || "tool";
-        if (toolName.includes("enrollment") || toolName.includes("progress")) {
-          finalResponse =
-            "Hiện tại tôi chưa tìm thấy thông tin enrollment hoặc progress của bạn. Có thể bạn chưa đăng ký khóa học nào hoặc chưa có tiến độ học tập.";
-        } else if (toolName.includes("course")) {
-          finalResponse =
-            "Xin lỗi, tôi không tìm thấy khóa học phù hợp với yêu cầu của bạn. Bạn có thể thử tìm kiếm với từ khóa khác không?";
-        } else {
-          finalResponse =
-            "Xin lỗi, tôi không tìm thấy thông tin bạn yêu cầu. Bạn có thể thử hỏi lại với cách khác không?";
-        }
+        finalResponse = this.getNoDataFallbackByTool(
+          responseLanguage,
+          toolName,
+        );
       }
     }
 
@@ -873,7 +940,7 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
         .map((role, i) => (insights[i] ? `• [${role}] ${insights[i]}` : null))
         .filter(Boolean);
       if (validLines.length > 0) {
-        finalResponse = `${finalResponse}\n\n---\n**Phân tích bổ sung từ chuyên gia:**\n${validLines.join("\n")}`;
+        finalResponse = `${finalResponse}\n\n---\n**${this.getCollaboratorInsightsTitle(responseLanguage)}**\n${validLines.join("\n")}`;
         this.logger.log(
           `🤝 [Multi-Agent] Appended ${validLines.length} collaborator insight(s)`,
         );
