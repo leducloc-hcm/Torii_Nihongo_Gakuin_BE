@@ -11,6 +11,10 @@ export class BlogAIService {
       topic: dto.topic,
       language: dto.language || "vi",
       style: dto.style || "educational",
+      targetAudience: dto.targetAudience,
+      jlptLevel: dto.jlptLevel,
+      context: dto.context,
+      keywords: dto.keywords,
     });
 
     if (!result.success) {

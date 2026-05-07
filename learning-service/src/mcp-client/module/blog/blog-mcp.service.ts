@@ -7,6 +7,10 @@ export interface GenerateBlogPayload {
   topic: string;
   language?: "vi" | "en" | "ja";
   style?: "educational" | "news" | "story" | "tips";
+  targetAudience?: "beginner" | "intermediate" | "advanced" | "general";
+  jlptLevel?: "N5" | "N4" | "N3" | "N2" | "N1";
+  context?: string;
+  keywords?: string[];
 }
 
 @Injectable()
@@ -33,6 +37,10 @@ export class BlogMcpClient {
       topic: payload.topic,
       language: payload.language || "vi",
       style: payload.style || "educational",
+      target_audience: payload.targetAudience,
+      jlpt_level: payload.jlptLevel,
+      context: payload.context,
+      keywords: payload.keywords,
     });
   }
 }
