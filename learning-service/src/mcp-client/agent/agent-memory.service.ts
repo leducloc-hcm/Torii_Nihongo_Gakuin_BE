@@ -96,8 +96,6 @@ export class AgentMemoryService {
   ): Promise<void> {
     const existing = await this.getUserContext(userId);
     const merged: UserLearningContext = {
-      totalSessions: 0,
-      lastActiveAt: new Date().toISOString(),
       ...existing,
       ...updates,
       totalSessions:

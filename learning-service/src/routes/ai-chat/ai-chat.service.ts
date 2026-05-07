@@ -857,7 +857,13 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
             .getCollaboratorInsight(
               query,
               finalResponse!,
-              executeResult.results,
+              executeResult.results.map((r) => ({
+                toolCallId: r.toolCallId,
+                toolName: r.toolName,
+                result: r.result,
+                error: r.error,
+                executedAt: new Date(),
+              })),
               role,
             )
             .catch(() => undefined),
@@ -894,20 +900,37 @@ Bạn có câu hỏi nào về học tiếng Nhật hoặc khóa học của ch�
       for (const r of executeResult.results) {
         if (r.error) continue;
         const n = r.toolName.toLowerCase();
-        if (n.includes("grammar") || n.includes("explain")) usedStepTypes.add("GRAMMAR");
-        if (n.includes("vocab") || n.includes("kanji"))     usedStepTypes.add("VOCABULARY");
-        if (n.includes("flashcard") || n.includes("deck"))  usedStepTypes.add("FLASHCARD");
-        if (n.includes("assessment") || n.includes("quiz") || n.includes("test")) usedStepTypes.add("ASSESSMENT");
-        if (n.includes("course") || n.includes("lesson"))   usedStepTypes.add("COURSE");
-        if (n.includes("blog") || n.includes("reading") || n.includes("article")) usedStepTypes.add("READING");
-        if (n.includes("listen"))                            usedStepTypes.add("LISTENING");
-        if (n.includes("enrollment") || n.includes("progress")) usedStepTypes.add("COURSE");
+        if (n.includes("grammar") || n.includes("explain"))
+          usedStepTypes.add("GRAMMAR");
+        if (n.includes("vocab") || n.includes("kanji"))
+          usedStepTypes.add("VOCABULARY");
+        if (n.includes("flashcard") || n.includes("deck"))
+          usedStepTypes.add("FLASHCARD");
+        if (
+          n.includes("assessment") ||
+          n.includes("quiz") ||
+          n.includes("test")
+        )
+          usedStepTypes.add("ASSESSMENT");
+        if (n.includes("course") || n.includes("lesson"))
+          usedStepTypes.add("COURSE");
+        if (
+          n.includes("blog") ||
+          n.includes("reading") ||
+          n.includes("article")
+        )
+          usedStepTypes.add("READING");
+        if (n.includes("listen")) usedStepTypes.add("LISTENING");
+        if (n.includes("enrollment") || n.includes("progress"))
+          usedStepTypes.add("COURSE");
       }
       const matchingStep = currentGoal.roadmapSteps.find(
         (s) => s.status === "PENDING" && usedStepTypes.has(s.stepType),
       );
       if (matchingStep) {
-        this.agentMemory.markRoadmapStepDone(userId, matchingStep.order).catch(() => {});
+        this.agentMemory
+          .markRoadmapStepDone(userId, matchingStep.order)
+          .catch(() => {});
         this.logger.log(
           `📈 [Goal] Advanced step ${matchingStep.order} [${matchingStep.stepType}]: "${matchingStep.description}"`,
         );
