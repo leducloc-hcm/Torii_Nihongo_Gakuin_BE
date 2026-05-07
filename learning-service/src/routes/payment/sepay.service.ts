@@ -232,6 +232,11 @@ export class SepayService {
         );
       }
 
+      // Determine if this is a gift coupon purchase (User A buying for User B).
+      // In that case we must NOT enroll the purchaser — the gift code is sent to the recipient instead.
+      const isGiftPurchase =
+        order.coupon?.type === "GIFT" && order.coupon?.status === "DRAFT";
+
       // Process payment in transaction with increased timeout
       const result = await this.prisma.$transaction(
         async (tx) => {
@@ -270,6 +275,9 @@ export class SepayService {
           const expiresAt = new Date();
           expiresAt.setFullYear(expiresAt.getFullYear() + 1);
 
+          // Only enroll the purchaser if this is NOT a gift purchase.
+          // For gift purchases the courses belong to the recipient (User B), not the buyer.
+          if (!isGiftPurchase) {
           for (const item of order.items) {
             if (item.courseId) {
               const existingEnrollment = await tx.enrollment.findUnique({
@@ -328,6 +336,7 @@ export class SepayService {
               }
             }
           }
+          } // end if (!isGiftPurchase)
 
           // Update coupon redemption status to COMPLETED
           if (order.couponId) {
@@ -392,6 +401,61 @@ export class SepayService {
 
       // Clear cart after successful transaction
       await this.cartService.clearCart(order.userId);
+
+      // ── Gift purchase: notify the recipient (User B) with the gift code ──
+      if (isGiftPurchase && order.coupon) {
+        const giftCoupon = order.coupon as typeof order.coupon & {
+          recipientEmail: string;
+          recipientName: string;
+          description?: string | null;
+        };
+        const courseNames = order.items
+          .filter((i) => i.course?.title)
+          .map((i) => i.course!.title);
+
+        try {
+          await this.emailService.sendGiftCoupon({
+            recipientEmail: giftCoupon.recipientEmail,
+            recipientName: giftCoupon.recipientName,
+            senderName: order.user.name,
+            giftCode: giftCoupon.code,
+            courses: courseNames,
+            giftMessage: giftCoupon.description ?? undefined,
+          });
+          this.logger.log(
+            `Gift coupon email sent to ${giftCoupon.recipientEmail} for coupon ${giftCoupon.code}`,
+          );
+        } catch (emailError) {
+          this.logger.error(
+            `Failed to send gift coupon email to ${giftCoupon.recipientEmail}:`,
+            emailError,
+          );
+        }
+
+        // Notify the purchaser (User A) that the gift was sent successfully
+        this.notificationGateway.notifyPaymentSuccess(order.userId, {
+          orderId: order.id,
+          transactionId: String(webhookData.id),
+          amount: receivedAmount,
+          courseIds: order.items
+            .map((i) => i.courseId)
+            .filter((id): id is number => id !== null),
+          message: `Your gift purchase was successful! The gift code has been sent to ${giftCoupon.recipientEmail}.`,
+        });
+
+        await this.notifyStaffAndAdminAboutPayment(
+          "SUCCESS",
+          order,
+          String(webhookData.id),
+        );
+
+        return {
+          success: true,
+          message: "Gift coupon payment processed successfully",
+          orderId: order.id,
+          transactionId: String(webhookData.id),
+        };
+      }
 
       // Process external operations after transaction (these can fail without affecting payment)
       for (const enrollment of result) {
